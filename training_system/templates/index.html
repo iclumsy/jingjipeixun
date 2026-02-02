@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>阳泉精技培训 - 学员信息采集</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>学员信息采集系统</h1>
+            <p>阳泉精技培训有限公司</p>
+        </header>
+
+        <form id="collectionForm">
+            <div id="students-container">
+                <!-- Student Entry Template will be injected here -->
+            </div>
+
+            <div class="actions">
+                <button type="button" id="addStudentBtn" class="btn secondary">+ 添加学员</button>
+                <button type="submit" id="submitBtn" class="btn primary">提交所有信息</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Template for a student entry -->
+    <template id="student-template">
+        <div class="student-entry">
+            <div class="entry-header">
+                <h3>学员信息</h3>
+                <button type="button" class="btn-delete" onclick="removeStudent(this)">×</button>
+            </div>
+            <div class="form-grid">
+                <div class="form-group w-xs">
+                    <label>姓名</label>
+                    <span class="hint-slot"></span>
+                    <input type="text" name="name" required>
+                </div>
+                <div class="form-group w-xs">
+                    <label>性别</label>
+                    <span class="hint-slot"></span>
+                    <select name="gender" required>
+                        <option value="男">男</option>
+                        <option value="女">女</option>
+                    </select>
+                </div>
+                <div class="form-group w-sm">
+                    <label>文化程度</label>
+                    <span class="hint-slot"></span>
+                    <select name="education" required>
+                        <option value="初中">初中</option>
+                        <option value="高中">高中</option>
+                        <option value="中专">中专</option>
+                        <option value="大专">大专</option>
+                        <option value="本科">本科</option>
+                        <option value="研究生">研究生</option>
+                    </select>
+                </div>
+                <div class="form-group w-lg">
+                    <label>身份证号</label>
+                    <span class="hint-slot"></span>
+                    <input type="text" name="id_card" required pattern="\d{17}[\dXx]" title="请输入正确的18位身份证号">
+                </div>
+                <div class="form-group w-md">
+                    <label>手机号</label>
+                    <span class="hint-slot"></span>
+                    <input type="tel" name="phone" required pattern="\d{11}" title="请输入11位手机号">
+                </div>
+                <div class="form-group w-md">
+                    <label>毕业院校</label>
+                    <span class="hint-slot"></span>
+                    <input type="text" name="school">
+                </div>
+                <div class="form-group w-md">
+                    <label>所学专业</label>
+                    <span class="hint-slot"></span>
+                    <input type="text" name="major">
+                </div>
+                <div class="form-group w-lg">
+                    <label>单位名称</label>
+                    <span class="hint-slot"></span>
+                    <input type="text" name="company">
+                </div>
+                <div class="form-group w-md">
+                    <label>申请作业类别</label>
+                    <span class="hint-slot"></span>
+                    <select name="job_category" required>
+                        <option value="">请选择</option>
+                        <option value="电工作业">电工作业</option>
+                        <option value="熔化焊接与热切割作业">熔化焊接与热切割作业</option>
+                        <option value="高处作业">高处作业</option>
+                        <option value="制冷与空调作业">制冷与空调作业</option>
+                        <option value="冶金（有色）生产安全作业">冶金（有色）生产安全作业</option>
+                        <option value="煤矿安全作业">煤矿安全作业</option>
+                        <option value="金属非金属矿山安全作业">金属非金属矿山安全作业</option>
+                        <option value="危险化学品安全作业">危险化学品安全作业</option>
+                    </select>
+                </div>
+                <div class="form-group w-md">
+                    <label>报考准操项目</label>
+                    <span class="hint-slot"></span>
+                    <input type="text" name="exam_project">
+                </div>
+                <div class="form-group w-sm">
+                    <label>项目代码</label>
+                    <span class="hint-slot"></span>
+                    <input type="text" name="exam_code">
+                </div>
+                <div class="form-group w-sm">
+                    <label>考试类别</label>
+                    <span class="hint-slot"></span>
+                    <select name="exam_category" required>
+                        <option value="初次领证">初次领证</option>
+                        <option value="复审">复审</option>
+                        <option value="延期换证">延期换证</option>
+                    </select>
+                </div>
+                <div class="form-group w-full">
+                    <label>单位地址</label>
+                    <span class="hint-slot"></span>
+                    <input type="text" name="company_address">
+                </div>
+                
+                <!-- File Uploads Integrated -->
+                <div class="form-group w-upload">
+                    <div class="upload-box" onclick="this.querySelector('input').click()">
+                        <div class="upload-placeholder">
+                            <span class="icon">+</span>
+                            <span class="text">个人照片</span>
+                        </div>
+                        <img class="preview-img" style="display: none;">
+                        <input type="file" name="photo" accept="image/*" required onchange="previewFile(this)">
+                    </div>
+                </div>
+                <div class="form-group w-upload">
+                    <div class="upload-box" onclick="this.querySelector('input').click()">
+                        <div class="upload-placeholder">
+                            <span class="icon">+</span>
+                            <span class="text">学历证书</span>
+                        </div>
+                        <img class="preview-img" style="display: none;">
+                        <input type="file" name="diploma" accept="image/*" onchange="previewFile(this)">
+                    </div>
+                </div>
+                <div class="form-group w-upload">
+                    <div class="upload-box" onclick="this.querySelector('input').click()">
+                        <div class="upload-placeholder">
+                            <span class="icon">+</span>
+                            <span class="text">所持证件</span>
+                        </div>
+                        <img class="preview-img" style="display: none;">
+                        <input type="file" name="cert" accept="image/*" onchange="previewFile(this)">
+                    </div>
+                </div>
+                <div class="form-group w-upload">
+                    <div class="upload-box" onclick="this.querySelector('input').click()">
+                        <div class="upload-placeholder">
+                            <span class="icon">+</span>
+                            <span class="text">身份证正面</span>
+                        </div>
+                        <img class="preview-img" style="display: none;">
+                        <input type="file" name="id_card_front" accept="image/*" required onchange="previewFile(this)">
+                    </div>
+                </div>
+                <div class="form-group w-upload">
+                    <div class="upload-box" onclick="this.querySelector('input').click()">
+                        <div class="upload-placeholder">
+                            <span class="icon">+</span>
+                            <span class="text">身份证反面</span>
+                        </div>
+                        <img class="preview-img" style="display: none;">
+                        <input type="file" name="id_card_back" accept="image/*" required onchange="previewFile(this)">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </template>
+
+    <script src="/static/js/script.js"></script>
+</body>
+</html>
