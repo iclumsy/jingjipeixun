@@ -50,7 +50,12 @@ def init_db():
             cert_path TEXT,
             id_card_front_path TEXT,
             id_card_back_path TEXT,
-            training_form_path TEXT
+            training_form_path TEXT,
+            theory_exam_time TEXT,
+            practical_exam_time TEXT,
+            passed TEXT,
+            theory_makeup_time TEXT,
+            makeup_exam TEXT
         )
     ''')
     conn.commit()
@@ -119,14 +124,17 @@ def create_student():
             INSERT INTO students (
                 name, gender, education, school, major, id_card, phone,
                 company, company_address, job_category, exam_project, exam_code,
-                exam_category, photo_path, diploma_path, cert_path, id_card_front_path, id_card_back_path, training_form_path
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                exam_category, photo_path, diploma_path, cert_path, id_card_front_path, id_card_back_path, training_form_path,
+                theory_exam_time, practical_exam_time, passed, theory_makeup_time, makeup_exam
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data['name'], data['gender'], data['education'], data['school'], data['major'],
             data['id_card'], data['phone'], data['company'], data['company_address'],
             data['job_category'], data['exam_project'], data['exam_code'], data['exam_category'],
             file_paths['photo_path'], file_paths['diploma_path'], file_paths['cert_path'],
-            file_paths['id_card_front_path'], file_paths['id_card_back_path'], file_paths['training_form_path']
+            file_paths['id_card_front_path'], file_paths['id_card_back_path'], file_paths['training_form_path'],
+            data.get('theory_exam_time', ''), data.get('practical_exam_time', ''), data.get('passed', ''),
+            data.get('theory_makeup_time', ''), data.get('makeup_exam', '')
         ))
         conn.commit()
         conn.close()
@@ -138,14 +146,35 @@ def create_student():
 def get_students():
     status = request.args.get('status', 'unreviewed')
     search = request.args.get('search', '')
+    company = request.args.get('company', '')
+    passed = request.args.get('passed', '')
+    examined = request.args.get('examined', '')
     
     conn = get_db_connection()
-    query = "SELECT * FROM students WHERE status = ?"
-    params = [status]
+    
+    # Base query
+    if status == 'examined':
+        # Special case for examined status
+        query = "SELECT * FROM students WHERE (theory_exam_time IS NOT NULL AND theory_exam_time != '') OR (practical_exam_time IS NOT NULL AND practical_exam_time != '')"
+        params = []
+    else:
+        query = "SELECT * FROM students WHERE status = ?"
+        params = [status]
     
     if search:
         query += " AND (name LIKE ? OR id_card LIKE ? OR phone LIKE ?)"
         params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
+    
+    if company:
+        query += " AND company LIKE ?"
+        params.append(f"%{company}%")
+    
+    if passed:
+        query += " AND passed = ?"
+        params.append(passed)
+    
+    if examined and status != 'examined':
+        query += " AND ((theory_exam_time IS NOT NULL AND theory_exam_time != '') OR (practical_exam_time IS NOT NULL AND practical_exam_time != ''))"
         
     students = conn.execute(query, params).fetchall()
     conn.close()
@@ -157,7 +186,8 @@ def update_student(id):
     allowed_text = [
         'name', 'gender', 'education', 'school', 'major', 'id_card', 'phone',
         'company', 'company_address', 'job_category', 'exam_project', 'exam_code',
-        'exam_category'
+        'exam_category', 'theory_exam_time', 'practical_exam_time', 'passed',
+        'theory_makeup_time', 'makeup_exam'
     ]
     file_map = {
         'photo': 'photo_path',
@@ -397,6 +427,107 @@ def serve_uploads(filename):
 @app.route('/reviewed_students/<path:filename>')
 def serve_reviewed(filename):
     return send_from_directory(app.config['REVIEWED_FOLDER'], filename)
+
+@app.route('/api/companies', methods=['GET'])
+def get_companies():
+    conn = get_db_connection()
+    companies = conn.execute('SELECT DISTINCT company FROM students WHERE company IS NOT NULL AND company != "" ORDER BY company').fetchall()
+    conn.close()
+    return jsonify([dict(c)['company'] for c in companies])
+
+@app.route('/api/students/batch/approve', methods=['POST'])
+def batch_approve_students():
+    try:
+        data = request.get_json()
+        if not data or 'ids' not in data:
+            return jsonify({'error': 'Missing student IDs'}), 400
+        
+        ids = data['ids']
+        if not isinstance(ids, list):
+            return jsonify({'error': 'IDs must be a list'}), 400
+        
+        conn = get_db_connection()
+        
+        # Update status for all selected students
+        placeholders = ','.join(['?'] * len(ids))
+        query = f"UPDATE students SET status = 'reviewed' WHERE id IN ({placeholders})"
+        conn.execute(query, ids)
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'message': f'Successfully approved {len(ids)} students'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/students/batch/reject', methods=['POST'])
+def batch_reject_students():
+    try:
+        data = request.get_json()
+        if not data or 'ids' not in data:
+            return jsonify({'error': 'Missing student IDs'}), 400
+        
+        ids = data['ids']
+        if not isinstance(ids, list):
+            return jsonify({'error': 'IDs must be a list'}), 400
+        
+        conn = get_db_connection()
+        
+        # Get all students to delete
+        placeholders = ','.join(['?'] * len(ids))
+        students = conn.execute(f"SELECT * FROM students WHERE id IN ({placeholders})", ids).fetchall()
+        
+        # Delete files for each student
+        for student in students:
+            for key in ['photo_path', 'diploma_path', 'cert_path', 'id_card_front_path', 'id_card_back_path', 'training_form_path']:
+                if student[key]:
+                    filename = os.path.basename(student[key])
+                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+        
+        # Delete students from database
+        conn.execute(f"DELETE FROM students WHERE id IN ({placeholders})", ids)
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'message': f'Successfully rejected and deleted {len(ids)} students'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/students/batch/delete', methods=['POST'])
+def batch_delete_students():
+    try:
+        data = request.get_json()
+        if not data or 'ids' not in data:
+            return jsonify({'error': 'Missing student IDs'}), 400
+        
+        ids = data['ids']
+        if not isinstance(ids, list):
+            return jsonify({'error': 'IDs must be a list'}), 400
+        
+        conn = get_db_connection()
+        
+        # Get all students to delete
+        placeholders = ','.join(['?'] * len(ids))
+        students = conn.execute(f"SELECT * FROM students WHERE id IN ({placeholders})", ids).fetchall()
+        
+        # Delete files for each student
+        for student in students:
+            for key in ['photo_path', 'diploma_path', 'cert_path', 'id_card_front_path', 'id_card_back_path', 'training_form_path']:
+                if student[key]:
+                    filename = os.path.basename(student[key])
+                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+        
+        # Delete students from database
+        conn.execute(f"DELETE FROM students WHERE id IN ({placeholders})", ids)
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'message': f'Successfully deleted {len(ids)} students'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
