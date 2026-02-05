@@ -62,6 +62,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Mobile menu toggle
+    const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+    const sidebar = document.getElementById('sidebar');
+    
+    if (mobileMenuToggle && sidebar) {
+        mobileMenuToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('mobile-open');
+        });
+        
+        // Close sidebar when clicking on a student
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768 && 
+                !sidebar.contains(e.target) && 
+                !mobileMenuToggle.contains(e.target) && 
+                sidebar.classList.contains('mobile-open')) {
+                sidebar.classList.remove('mobile-open');
+            }
+        });
+    }
+    
     // Event Listeners
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -77,6 +97,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             mainContent.innerHTML = '<div class="empty-state">请选择左侧学员查看详情</div>';
             currentStudentId = null;
+            
+            // Don't close sidebar on mobile after selecting a tab
+            // Let user select a student first
         });
     });
 
@@ -175,6 +198,11 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             el.onclick = () => {
                 showDetail(student);
+                
+                // Close sidebar on mobile after selecting a student
+                if (window.innerWidth <= 768 && sidebar) {
+                    sidebar.classList.remove('mobile-open');
+                }
             };
             listContainer.appendChild(el);
         });
