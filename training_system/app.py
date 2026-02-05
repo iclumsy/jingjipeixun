@@ -128,9 +128,9 @@ def create_student():
                 theory_exam_time, practical_exam_time, passed, theory_makeup_time, makeup_exam
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            data['name'], data['gender'], data['education'], data['school'], data['major'],
-            data['id_card'], data['phone'], data['company'], data['company_address'],
-            data['job_category'], data['exam_project'], data['exam_code'], data['exam_category'],
+            data['name'], data['gender'], data['education'], data.get('school', ''), data.get('major', ''),
+            data['id_card'], data['phone'], data.get('company', ''), data.get('company_address', ''),
+            data['job_category'], data.get('exam_project', ''), data.get('exam_code', ''), data['exam_category'],
             file_paths['photo_path'], file_paths['diploma_path'], file_paths['cert_path'],
             file_paths['id_card_front_path'], file_paths['id_card_back_path'], file_paths['training_form_path'],
             data.get('theory_exam_time', ''), data.get('practical_exam_time', ''), data.get('passed', ''),

@@ -3,6 +3,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const template = document.getElementById('student-template');
     const addBtn = document.getElementById('addStudentBtn');
     const submitBtn = document.getElementById('submitBtn');
+    const form = document.getElementById('collectionForm');
+    const actions = document.querySelector('.actions');
 
     // Add initial student
     addStudent();
@@ -14,16 +16,23 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const entries = document.querySelectorAll('.student-entry');
         let allValid = true;
+        let oldStatus = document.getElementById('submit-status');
+        if (oldStatus) oldStatus.remove();
         
         // Validate all first
         entries.forEach(entry => {
-            if (!validateEntry(entry)) {
+            const res = validateEntry(entry);
+            if (!res.valid) {
                 allValid = false;
             }
         });
 
         if (!allValid) {
-            // alert('请检查红色框标记的字段，填写正确后再提交。');
+            const firstError = document.querySelector('.student-entry .error');
+            if (firstError) {
+                firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstError.focus();
+            }
             return;
         }
 
@@ -80,6 +89,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        submitBtn.click();
+    });
+
     function addStudent() {
         const clone = template.content.cloneNode(true);
         container.appendChild(clone);
@@ -119,31 +133,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function validateEntry(entry) {
         let isValid = true;
+        const errors = [];
         const inputs = entry.querySelectorAll('input, select');
-        
         inputs.forEach(input => {
-            // Reset
             input.classList.remove('error');
-            const parent = input.parentElement;
+            const parent = input.closest('.form-group') || input.parentElement;
             let pop = parent.querySelector('.error-pop');
             if (pop) pop.remove();
-            
-            // Check validity
             if (!input.checkValidity()) {
                 input.classList.add('error');
                 isValid = false;
-
-                // Floating error tooltip
-                const msgText = input.validity.patternMismatch && input.title
-                    ? input.title
-                    : (input.validationMessage || input.title || '请填写此字段');
+                const msgText = input.title || input.validationMessage || '请填写此字段';
                 pop = document.createElement('span');
                 pop.className = 'error-pop';
                 pop.textContent = msgText;
                 parent.appendChild(pop);
-                
-                // Add listener to remove error on input
+                const labelEl = parent.querySelector('label');
+                const nameMap = {
+                    'photo': '个人照片',
+                    'diploma': '学历证书',
+                    'cert': '所持证件',
+                    'id_card_front': '身份证正面',
+                    'id_card_back': '身份证反面'
+                };
+                const labelText = labelEl ? labelEl.textContent.trim() : (nameMap[input.name] || input.name);
+                errors.push({ input, label: labelText, message: msgText });
                 input.addEventListener('input', () => {
+                    if (input.checkValidity()) {
+                        input.classList.remove('error');
+                        const p = parent.querySelector('.error-pop');
+                        if (p) p.remove();
+                    }
+                });
+                input.addEventListener('change', () => {
                     if (input.checkValidity()) {
                         input.classList.remove('error');
                         const p = parent.querySelector('.error-pop');
@@ -152,23 +174,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
         });
-        
-        return isValid;
+        return { valid: isValid, errors };
     }
 
     function attachEntryValidation(entry) {
         const inputs = entry.querySelectorAll('input, select');
         inputs.forEach(input => {
-            const parent = input.parentElement;
+            const parent = input.closest('.form-group') || input.parentElement;
             const showError = () => {
                 input.classList.remove('error');
                 const exist = parent.querySelector('.error-pop');
                 if (exist) exist.remove();
                 if (!input.checkValidity()) {
                     input.classList.add('error');
-                    const msgText = input.validity.patternMismatch && input.title
-                        ? input.title
-                        : (input.validationMessage || input.title || '请填写此字段');
+                    const msgText = input.title || input.validationMessage || '请填写此字段';
                     const pop = document.createElement('span');
                     pop.className = 'error-pop';
                     pop.textContent = msgText;
@@ -177,9 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             input.addEventListener('input', showError);
             input.addEventListener('blur', showError);
-            if (input.type === 'file') {
-                input.addEventListener('change', showError);
-            }
+            input.addEventListener('change', showError);
         });
     }
 });
