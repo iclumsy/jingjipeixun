@@ -95,6 +95,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 companyFilter.value = '';
                 currentFilters.company = '';
             }
+            // Toggle passed filter visibility based on status
+            togglePassedFilterVisibility(currentStatus);
             mainContent.innerHTML = '<div class="empty-state">请选择左侧学员查看详情</div>';
             currentStudentId = null;
             
@@ -116,7 +118,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // Filter event listeners
     const companyFilter = document.getElementById('companyFilter');
     const passedFilter = document.getElementById('passedFilter');
+    const passedFilterContainer = document.getElementById('passedFilterContainer');
     const resetFilters = document.getElementById('resetFilters');
+    
+    // Function to toggle passed filter visibility based on status
+    function togglePassedFilterVisibility(status) {
+        if (passedFilterContainer) {
+            if (status === 'examined') {
+                passedFilterContainer.style.display = 'block';
+            } else {
+                passedFilterContainer.style.display = 'none';
+                // Reset passed filter when hiding
+                if (passedFilter) {
+                    passedFilter.value = '';
+                    currentFilters.passed = '';
+                }
+            }
+        }
+    }
+    
+    // Initial toggle based on current status
+    togglePassedFilterVisibility(currentStatus);
     
     if (companyFilter) {
         companyFilter.addEventListener('change', (e) => {

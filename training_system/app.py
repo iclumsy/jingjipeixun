@@ -155,7 +155,7 @@ def get_students():
     # Base query
     if status == 'examined':
         # Special case for examined status
-        query = "SELECT * FROM students WHERE (theory_exam_time IS NOT NULL AND theory_exam_time != '') OR (practical_exam_time IS NOT NULL AND practical_exam_time != '')"
+        query = "SELECT * FROM students WHERE ((theory_exam_time IS NOT NULL AND theory_exam_time != '') OR (practical_exam_time IS NOT NULL AND practical_exam_time != ''))"
         params = []
     else:
         query = "SELECT * FROM students WHERE status = ?"
