@@ -630,13 +630,92 @@ document.addEventListener('DOMContentLoaded', () => {
             
             input.addEventListener('change', () => {
                 if (input.files && input.files[0]) {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        img.src = e.target.result;
-                        img.style.display = 'block';
-                        placeholder.style.display = 'none';
-                    };
-                    reader.readAsDataURL(input.files[0]);
+                    const file = input.files[0];
+                    // If this is the personal photo field, crop to one-inch ratio client-side
+                    if (input.name === 'photo') {
+                        const imgEl = new Image();
+                        const reader = new FileReader();
+                        reader.onload = function(ev) {
+                            imgEl.onload = function() {
+                                try {
+                                    // Target physical size: 2.5cm x 3.5cm -> in inches
+                                    const tgtWIn = 2.5 / 2.54;
+                                    const tgtHIn = 3.5 / 2.54;
+                                    const dpi = 300;
+                                    const pxW = Math.max(120, Math.round(tgtWIn * dpi));
+                                    const pxH = Math.max(160, Math.round(tgtHIn * dpi));
+
+                                    // Scale to fit target box (contain) and center, padding with white
+                                    const srcW = imgEl.naturalWidth;
+                                    const srcH = imgEl.naturalHeight;
+                                    const canvas = document.createElement('canvas');
+                                    canvas.width = pxW;
+                                    canvas.height = pxH;
+                                    const ctx = canvas.getContext('2d');
+                                    // Fill white background
+                                    ctx.fillStyle = '#FFFFFF';
+                                    ctx.fillRect(0, 0, pxW, pxH);
+                                    // Compute scale to fit entire source image into target (no cropping)
+                                    const scale = Math.min(pxW / srcW, pxH / srcH);
+                                    const newW = Math.max(1, Math.round(srcW * scale));
+                                    const newH = Math.max(1, Math.round(srcH * scale));
+                                    const dx = Math.round((pxW - newW) / 2);
+                                    const dy = Math.round((pxH - newH) / 2);
+                                    ctx.drawImage(imgEl, 0, 0, srcW, srcH, dx, dy, newW, newH);
+
+                                    // Convert to blob and replace input.files with the cropped file
+                                    canvas.toBlob(function(blob) {
+                                        if (!blob) {
+                                            // fallback to original preview
+                                            img.src = ev.target.result;
+                                            img.style.display = 'block';
+                                            placeholder.style.display = 'none';
+                                            return;
+                                        }
+                                        const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, '') + '_1inch.jpg', { type: 'image/jpeg' });
+                                        // Update the input's FileList
+                                        try {
+                                            const dt = new DataTransfer();
+                                            dt.items.add(newFile);
+                                            input.files = dt.files;
+                                        } catch (e) {
+                                            // Some browsers may not support DataTransfer constructor
+                                            console.warn('Could not replace FileList programmatically:', e);
+                                        }
+                                        // Update preview
+                                        try {
+                                            const objUrl = URL.createObjectURL(newFile);
+                                            img.src = objUrl;
+                                        } catch (e) {
+                                            // fallback to dataURL
+                                            const reader2 = new FileReader();
+                                            reader2.onload = function(ev2) { img.src = ev2.target.result; };
+                                            reader2.readAsDataURL(newFile);
+                                        }
+                                        img.style.display = 'block';
+                                        placeholder.style.display = 'none';
+                                    }, 'image/jpeg', 0.95);
+                                } catch (err) {
+                                    console.error('Photo processing failed:', err);
+                                    // fallback to original preview
+                                    img.src = ev.target.result;
+                                    img.style.display = 'block';
+                                    placeholder.style.display = 'none';
+                                }
+                            };
+                            imgEl.src = ev.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    } else {
+                        // Non-photo files: simple preview
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            img.src = e.target.result;
+                            img.style.display = 'block';
+                            placeholder.style.display = 'none';
+                        };
+                        reader.readAsDataURL(file);
+                    }
                 } else {
                     img.style.display = 'none';
                     img.src = '';
@@ -697,8 +776,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (currentStatus === 'reviewed') {
             const genBtn = document.createElement('button');
             genBtn.className = 'btn primary';
-            genBtn.textContent = '生成材料';
-            genBtn.onclick = () => handleGenerate(student.id);
+            genBtn.textContent = '生成体检表';
+            genBtn.onclick = () => handleGenerate(student.id, genBtn);
             actionBar.appendChild(genBtn);
         }
 
@@ -838,17 +917,64 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function handleGenerate(id) {
-        if (!confirm('确认生成材料？')) return;
+    async function handleGenerate(id, btn) {
+        // direct generate without confirmation; show inline status above button
+        const actionBar = btn ? btn.parentElement : null;
+        let statusEl = mainContent.querySelector('.generate-result');
+        if (!statusEl && actionBar) {
+            statusEl = document.createElement('div');
+            statusEl.className = 'generate-result';
+            statusEl.style.marginBottom = '8px';
+            statusEl.style.fontSize = '0.95rem';
+            statusEl.style.color = '#0f172a';
+            statusEl.style.padding = '6px 10px';
+            statusEl.style.borderRadius = '6px';
+            statusEl.style.background = 'rgba(241,245,249,0.8)';
+            actionBar.insertAdjacentElement('beforebegin', statusEl);
+        }
+        if (statusEl) {
+            statusEl.textContent = '正在生成体检表...';
+            statusEl.style.background = 'rgba(219,234,254,0.9)';
+        }
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = '生成中...';
+        }
         try {
             const res = await fetch(`/api/students/${id}/generate`, { method: 'POST' });
             if (res.ok) {
-                alert('已生成材料');
+                const data = await res.json().catch(() => ({}));
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '下载体检表';
+                    btn.onclick = () => {
+                        if (data.download_url) {
+                            window.location.href = data.download_url;
+                        } else {
+                            // fallback: refresh to show link in UI
+                            window.location.reload();
+                        }
+                    };
+                }
+                if (statusEl) {
+                    statusEl.textContent = '生成成功：体检表已生成，点击“下载体检表”下载';
+                    statusEl.style.background = 'rgba(220,253,233,0.9)';
+                }
             } else {
-                alert('操作失败');
+                const err = await res.json().catch(() => ({}));
+                console.error('生成失败', err);
+                if (btn) { btn.disabled = false; btn.textContent = '生成体检表'; }
+                if (statusEl) {
+                    statusEl.textContent = '生成失败，请重试';
+                    statusEl.style.background = 'rgba(254,226,226,0.9)';
+                }
             }
         } catch (e) {
-            alert('网络错误');
+            if (btn) { btn.disabled = false; btn.textContent = '生成体检表'; }
+            if (statusEl) {
+                statusEl.textContent = '网络错误，生成失败';
+                statusEl.style.background = 'rgba(254,226,226,0.9)';
+            }
         }
     }
 
