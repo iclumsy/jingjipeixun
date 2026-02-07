@@ -12,6 +12,11 @@ try:
     import cv2
 except Exception:
     cv2 = None
+try:
+    from rembg import remove, new_session
+except Exception:
+    remove = None
+    new_session = None
 from lxml import etree
 import io
 from werkzeug.utils import secure_filename
@@ -88,8 +93,52 @@ def _ensure_ext(fname, default_ext='.jpg'):
     return ext.lower() if ext else default_ext
 
 
-def process_and_save_file(file_storage, id_card, label_key):
-    """Save uploaded file using pattern '<id_card>-<label>.<ext>'.
+def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
+    """将证件照背景替换为指定颜色（默认白色），优化衣服边缘识别问题"""
+    if remove is None or new_session is None:
+        # rembg 不可用，直接返回原路径
+        return input_path
+    
+    try:
+        # 配置rembg会话，启用alpha抠图优化边缘
+        session = new_session(
+            model_name="u2net_human_seg",
+            alpha_matting=True,
+            alpha_matting_foreground_threshold=240,
+            alpha_matting_background_threshold=10,
+            alpha_matting_erode_size=10
+        )
+
+        # 读取图片并精准抠图
+        with open(input_path, "rb") as f:
+            input_img = f.read()
+        output_img = remove(input_img, session=session)
+        img_no_bg = Image.open(io.BytesIO(output_img)).convert("RGBA")
+
+        # 修复抠图蒙版，避免衣服区域缺失
+        img_np = np.array(img_no_bg)
+        alpha_channel = img_np[:, :, 3]
+        kernel = np.ones((3, 3), np.uint8)
+        alpha_channel = cv2.dilate(alpha_channel, kernel, iterations=1)
+        img_np[:, :, 3] = alpha_channel
+        img_no_bg_fixed = Image.fromarray(img_np, mode="RGBA")
+
+        # 创建纯白色背景并合成
+        bg_img = Image.new("RGBA", img_no_bg_fixed.size, bg_color + (255,))
+        result = Image.alpha_composite(bg_img, img_no_bg_fixed)
+        result = result.convert("RGB")
+
+        # 保存处理后的图片
+        result.save(output_path, quality=95)
+        return output_path
+    except Exception as e:
+        # 如果处理失败，返回原图路径
+        print(f"背景替换失败: {e}")
+        return input_path
+
+
+def process_and_save_file(file_storage, id_card, name, label_key):
+    """Save uploaded file using pattern '<id_card><name>-<label>.<ext>'.
     If label_key is 'photo', run face-detection centering and produce a one-inch image.
     Returns relative path like 'uploads/....'
     """
@@ -98,8 +147,8 @@ def process_and_save_file(file_storage, id_card, label_key):
 
     label_name = LABEL_NAME_MAP.get(label_key, label_key)
     orig_ext = _ensure_ext(file_storage.filename, '.jpg')
-    # Do NOT use secure_filename on entire name as it strips Chinese characters
-    safe_name = f"{id_card}-{label_name}{orig_ext}"
+    # Include student name in filename; avoid secure_filename stripping Chinese text
+    safe_name = f"{id_card}{name}-{label_name}{orig_ext}"
     abs_path = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
 
     # Save initial upload (overwrite if exists)
@@ -240,7 +289,7 @@ def create_student():
             file = files.get(input_name)
             if file and file.filename and id_card_val:
                 try:
-                    rel = process_and_save_file(file, id_card_val, input_name)
+                    rel = process_and_save_file(file, id_card_val, data.get('name', ''), input_name)
                     file_paths[db_key] = rel
                 except Exception:
                     file_paths[db_key] = ""
@@ -354,23 +403,24 @@ def update_student(id):
         for input_name, db_key in file_map.items():
             f = request.files.get(input_name)
             if f and f.filename:
-                    # Determine id_card to use for naming (prefer updated one if provided)
-                    id_card_for_name = data.get('id_card', current['id_card'])
-                    # delete old file if exists
-                    old_rel = current[db_key]
-                    if old_rel:
-                        old_fn = os.path.basename(old_rel)
-                        old_abs = os.path.join(app.config['UPLOAD_FOLDER'], old_fn)
-                        if os.path.exists(old_abs):
-                            try:
-                                os.remove(old_abs)
-                            except Exception:
-                                pass
-                    try:
-                        rel = process_and_save_file(f, id_card_for_name, input_name)
-                        updates[db_key] = rel
-                    except Exception:
-                        updates[db_key] = ''
+                # Determine id_card and name to use for naming (prefer updated ones if provided)
+                id_card_for_name = data.get('id_card', current['id_card'])
+                name_for_save = data.get('name', current['name'])
+                # delete old file if exists
+                old_rel = current[db_key]
+                if old_rel:
+                    old_fn = os.path.basename(old_rel)
+                    old_abs = os.path.join(app.config['UPLOAD_FOLDER'], old_fn)
+                    if os.path.exists(old_abs):
+                        try:
+                            os.remove(old_abs)
+                        except Exception:
+                            pass
+                try:
+                    rel = process_and_save_file(f, id_card_for_name, name_for_save, input_name)
+                    updates[db_key] = rel
+                except Exception:
+                    updates[db_key] = ''
     else:
         payload = request.get_json(silent=True) or {}
         for k in allowed_text:
@@ -444,17 +494,17 @@ def generate_materials(id):
     if not student:
         conn.close()
         return jsonify({'error': 'Student not found'}), 404
-    # Use only ID card number for reviewed folder name
-    folder_name = f"{student['id_card']}"
+    # Use ID card + name for reviewed folder name
+    folder_name = f"{student['id_card']}{student['name']}"
     student_dir = os.path.join(app.config['REVIEWED_FOLDER'], folder_name)
     os.makedirs(student_dir, exist_ok=True)
     file_mapping = {
-        'training_form_path': f"{student['id_card']}-培训信息登记表.jpg",
-        'diploma_path': f"{student['id_card']}-学历证书复印件.jpg",
-        'cert_path': f"{student['id_card']}-所持证件复印件.jpg",
-        'id_card_front_path': f"{student['id_card']}-身份证正面.jpg",
-        'id_card_back_path': f"{student['id_card']}-身份证反面.jpg",
-        'photo_path': f"{student['id_card']}-个人照片.jpg"
+        'training_form_path': f"{student['id_card']}{student['name']}-培训信息登记表.jpg",
+        'diploma_path': f"{student['id_card']}{student['name']}-学历证书复印件.jpg",
+        'cert_path': f"{student['id_card']}{student['name']}-所持证件复印件.jpg",
+        'id_card_front_path': f"{student['id_card']}{student['name']}-身份证正面.jpg",
+        'id_card_back_path': f"{student['id_card']}{student['name']}-身份证反面.jpg",
+        'photo_path': f"{student['id_card']}{student['name']}-个人照片.jpg"
     }
     for db_field, target_name in file_mapping.items():
         db_path = student[db_field]
@@ -466,7 +516,7 @@ def generate_materials(id):
                 base_target_name = os.path.splitext(target_name)[0]
                 final_target_name = base_target_name + ext
                 shutil.copy2(src_path, os.path.join(student_dir, final_target_name))
-    doc_path = os.path.join(student_dir, f"{student['id_card']}-体检表.docx")
+    doc_path = os.path.join(student_dir, f"{student['id_card']}{student['name']}-体检表.docx")
     photo_abs_path = None
     if student['photo_path']:
         filename = os.path.basename(student['photo_path'])
@@ -531,101 +581,33 @@ def generate_word_doc(template_path, output_path, data, photo_path=None):
                         else:
                             target_cell.text = new_val
     
-    # 2. Image Replacement: find image relationship in document and replace blob with processed photo
+    # 2. Image Replacement: directly use the already-processed uploaded photo
     if photo_path and os.path.exists(photo_path):
         try:
-            # Prepare processed photo: convert to white background, crop center to square and resize to 1 inch (~300px)
+            # 处理照片背景：使用rembg将背景替换为白色
+            temp_photo_path = None
             try:
-                im = Image.open(photo_path)
-            except Exception:
-                im = Image.open(photo_path)
+                import tempfile
+                temp_fd, temp_photo_path = tempfile.mkstemp(suffix='.jpg')
+                os.close(temp_fd)
+                # 调用背景替换函数
+                processed_photo_path = change_id_photo_bg(photo_path, temp_photo_path)
+                if processed_photo_path == temp_photo_path:
+                    photo_to_use = processed_photo_path
+                else:
+                    photo_to_use = photo_path
+            except Exception as e:
+                print(f"背景处理失败，使用原照片: {e}")
+                photo_to_use = photo_path
+                temp_photo_path = None
 
-            # Ensure RGBA for alpha handling, then flatten over white
-            if im.mode != 'RGBA':
-                im_rgba = im.convert('RGBA')
-            else:
-                im_rgba = im
-            white_bg = Image.new('RGBA', im_rgba.size, (255, 255, 255, 255))
-            composed = Image.alpha_composite(white_bg, im_rgba)
-            composed = composed.convert('RGB')
+            # Load photo (already processed during upload with face detection and one-inch sizing)
+            with open(photo_to_use, 'rb') as f:
+                img_bytes = f.read()
 
-            # Try GrabCut foreground extraction (preferred). Fall back to pixel-threshold replace.
-            def grabcut_white_background(pil_img):
-                if cv2 is None:
-                    return None
-                try:
-                    img_cv = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
-                    h, w = img_cv.shape[:2]
-                    mask = np.zeros((h, w), np.uint8)
-                    rect = (int(w*0.05), int(h*0.05), int(w*0.9), int(h*0.9))
-                    bgdModel = np.zeros((1,65), np.float64)
-                    fgdModel = np.zeros((1,65), np.float64)
-                    cv2.grabCut(img_cv, mask, rect, bgdModel, fgdModel, 5, cv2.GC_INIT_WITH_RECT)
-                    # Create mask where sure or likely foreground are 1
-                    mask2 = np.where((mask==cv2.GC_FGD) | (mask==cv2.GC_PR_FGD), 255, 0).astype('uint8')
-                    # Smooth mask and apply alpha
-                    mask_blur = cv2.GaussianBlur(mask2, (5,5), 0)
-                    alpha = (mask_blur/255.0).astype('float32')
-                    b,g,r = cv2.split(img_cv)
-                    img_rgb = cv2.merge([r,g,b]).astype('float32')
-                    white = np.ones_like(img_rgb) * 255.0
-                    out = img_rgb * alpha[:,:,None] + white * (1 - alpha[:,:,None])
-                    out = np.clip(out, 0, 255).astype('uint8')
-                    return Image.fromarray(out)
-                except Exception:
-                    return None
-
-            replaced_img = None
-            try:
-                replaced_img = grabcut_white_background(composed)
-            except Exception:
-                replaced_img = None
-
-            if replaced_img is None:
-                # Fallback to pixel-threshold replacement
-                def replace_bg_with_white(img_obj, bg_color, thr=40):
-                    img2 = img_obj.convert('RGBA')
-                    px2 = img2.load()
-                    ww, hh = img2.size
-                    for yy in range(hh):
-                        for xx in range(ww):
-                            r, g, b, a = px2[xx, yy]
-                            if a == 0:
-                                px2[xx, yy] = (255, 255, 255, 255)
-                                continue
-                            if (abs(r - bg_color[0]) + abs(g - bg_color[1]) + abs(b - bg_color[2])) <= thr:
-                                px2[xx, yy] = (255, 255, 255, 255)
-                    return img2.convert('RGB')
-
-                # estimate background color from corners
-                w, h = composed.size
-                cs_w = max(1, w // 20)
-                cs_h = max(1, h // 20)
-                corner_regions = []
-                for sx, sy in [(0, 0), (w - cs_w, 0), (0, h - cs_h), (w - cs_w, h - cs_h)]:
-                    try:
-                        region = composed.crop((sx, sy, sx + cs_w, sy + cs_h))
-                        stat = ImageStat.Stat(region)
-                        corner_regions.append(tuple(int(c) for c in stat.mean))
-                    except Exception:
-                        corner_regions.append((255, 255, 255))
-
-                try:
-                    bg_color = max(set(corner_regions), key=corner_regions.count)
-                except Exception:
-                    bg_color = corner_regions[0]
-
-                composed = replace_bg_with_white(composed, bg_color, thr=50)
-            else:
-                composed = replaced_img
-
-            # Do not perform additional cropping here — uploaded photo is already
-            # prepared (face-centered one-inch) on save. Use the composed image as-is.
+            # Default target (one-inch portrait 2.5x3.5cm) in inches
             default_w_in = 2.5 / 2.54  # ~0.984in
             default_h_in = 3.5 / 2.54  # ~1.378in
-            bio_tmp = io.BytesIO()
-            composed.save(bio_tmp, format='JPEG', quality=95)
-            src_bytes = bio_tmp.getvalue()
 
             # First: try inserting into a table cell (preferred)
             replaced = False
@@ -716,8 +698,8 @@ def generate_word_doc(template_path, output_path, data, photo_path=None):
 
                 # Crop source image to target aspect ratio (cover)
                 try:
-                    # Load source image (already background-processed in src_bytes)
-                    src_img = Image.open(io.BytesIO(src_bytes)).convert('RGB')
+                    # Load source image (already processed during upload)
+                    src_img = Image.open(io.BytesIO(img_bytes)).convert('RGB')
                     src_w, src_h = src_img.size
 
                     # resize to fit target box while preserving original aspect ratio
@@ -800,6 +782,13 @@ def generate_word_doc(template_path, output_path, data, photo_path=None):
                             replaced = False
         except Exception as e:
             print(f"Error processing or replacing image: {e}")
+        finally:
+            # 清理临时文件
+            if 'temp_photo_path' in locals() and temp_photo_path and os.path.exists(temp_photo_path):
+                try:
+                    os.remove(temp_photo_path)
+                except Exception:
+                    pass
 
     doc.save(output_path)
 
