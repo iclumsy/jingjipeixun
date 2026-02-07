@@ -23,6 +23,8 @@ from werkzeug.utils import secure_filename
 import re
 
 app = Flask(__name__)
+# app.config['LOGGING_LEVEL'] = logging.DEBUG
+# logging.basicConfig(level=app.config['LOGGING_LEVEL'])
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
 app.config['STUDENTS_FOLDER'] = os.path.join(BASE_DIR, 'students')
@@ -314,19 +316,24 @@ def get_students():
     else:
         query = "SELECT * FROM students WHERE status = ?"
         params = [status]
-    
+        
+        # For 'reviewed' status, exclude students who have already taken exams
+        if status == 'reviewed':
+            query += " AND ((theory_exam_time IS NULL OR theory_exam_time = '') AND (practical_exam_time IS NULL OR practical_exam_time = ''))"
+        
+
     if search:
         query += " AND (name LIKE ? OR id_card LIKE ? OR phone LIKE ?)"
         params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
-    
+
     if company:
         query += " AND company LIKE ?"
         params.append(f"%{company}%")
-    
+
     if passed:
         query += " AND passed = ?"
         params.append(passed)
-    
+
     if examined and status != 'examined':
         query += " AND ((theory_exam_time IS NOT NULL AND theory_exam_time != '') OR (practical_exam_time IS NOT NULL AND practical_exam_time != ''))"
         
@@ -495,37 +502,6 @@ def generate_materials(id):
     student_folder_name = f"{student['id_card']}{student['name']}"
     student_folder_path = os.path.join(app.config['STUDENTS_FOLDER'], student_folder_name)
     os.makedirs(student_folder_path, exist_ok=True)
-
-    # Copy other files to the student's folder (for admin review)
-    file_mapping = {
-        'training_form_path': f"{student['id_card']}{student['name']}-培训信息登记表.jpg",
-        'diploma_path': f"{student['id_card']}{student['name']}-学历证书复印件.jpg",
-        'cert_path': f"{student['id_card']}{student['name']}-所持证件复印件.jpg",
-        'id_card_front_path': f"{student['id_card']}{student['name']}-身份证正面.jpg",
-        'id_card_back_path': f"{student['id_card']}{student['name']}-身份证反面.jpg",
-        'photo_path': f"{student['id_card']}{student['name']}-个人照片.jpg"
-    }
-    for db_field, target_name in file_mapping.items():
-        db_path = student[db_field]
-        if db_path:
-            # Handle both old and new path formats
-            if db_path.startswith('students/'):
-                # New format: students/<id_card><name>/filename
-                src_path = os.path.join(BASE_DIR, db_path)
-            else:
-                # Old format: uploads/filename
-                filename = os.path.basename(db_path)
-                src_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-
-            if os.path.exists(src_path):
-                _, ext = os.path.splitext(src_path)
-                base_target_name = os.path.splitext(target_name)[0]
-                final_target_name = base_target_name + ext
-                dest_path = os.path.join(student_folder_path, final_target_name)
-                
-                # Only copy if source and destination are different files
-                if src_path != dest_path:
-                    shutil.copy2(src_path, dest_path)
 
     # Generate the physical examination form in the student's folder
     doc_path = os.path.join(student_folder_path, f"{student['id_card']}{student['name']}-体检表.docx")
