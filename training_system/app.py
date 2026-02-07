@@ -25,14 +25,14 @@ import re
 app = Flask(__name__)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
-app.config['REVIEWED_FOLDER'] = os.path.join(BASE_DIR, 'reviewed_students')
+app.config['STUDENTS_FOLDER'] = os.path.join(BASE_DIR, 'students')
 app.config['DATABASE'] = os.path.join(BASE_DIR, 'database/students.db')
 app.config['TEMPLATE_PATH'] = os.path.join(BASE_DIR, '特种设备作业人员考试体检表（锅炉水处理、客运索道司机）-杜臻.docx')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
 
 # Ensure directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs(app.config['REVIEWED_FOLDER'], exist_ok=True)
+os.makedirs(app.config['STUDENTS_FOLDER'], exist_ok=True)
 os.makedirs(os.path.join(BASE_DIR, 'database'), exist_ok=True)
 
 def get_db_connection():
@@ -77,6 +77,60 @@ def init_db():
     conn.close()
 
 init_db()
+
+
+def migrate_existing_files():
+    """
+    Migrate existing file paths in the database to the new structure.
+    Move files from uploads/ to students/<id_card><name>/ and update database records.
+    """
+    conn = get_db_connection()
+    students = conn.execute("SELECT * FROM students").fetchall()
+    
+    for student in students:
+        id_card = student['id_card']
+        name = student['name']
+        student_folder_name = f"{id_card}{name}"
+        student_folder_path = os.path.join(app.config['STUDENTS_FOLDER'], student_folder_name)
+        os.makedirs(student_folder_path, exist_ok=True)
+        
+        # Define the file fields to migrate
+        file_fields = ['photo_path', 'diploma_path', 'cert_path', 'id_card_front_path', 'id_card_back_path', 'training_form_path']
+        
+        updates = {}
+        for field in file_fields:
+            old_path = student[field]
+            if old_path and old_path.startswith('uploads/') and not old_path.startswith('students/'):
+                # This is an old-style path, needs migration
+                filename = os.path.basename(old_path)
+                old_abs_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                
+                if os.path.exists(old_abs_path):
+                    # Move file to new location
+                    new_file_path = os.path.join(student_folder_path, filename)
+                    shutil.move(old_abs_path, new_file_path)
+                    
+                    # Update database record
+                    new_rel_path = f"students/{student_folder_name}/{filename}"
+                    updates[field] = new_rel_path
+        
+        # Apply updates to database if any
+        if updates:
+            set_clause = ", ".join([f"{key} = ?" for key in updates.keys()])
+            values = list(updates.values()) + [student['id']]
+            conn.execute(f"UPDATE students SET {set_clause} WHERE id = ?", values)
+    
+    conn.commit()
+    conn.close()
+    print("Migration completed!")
+
+
+# Run migration when the app starts (only once)
+if not os.path.exists(os.path.join(BASE_DIR, '.migration_complete')):
+    migrate_existing_files()
+    # Create a marker file to indicate migration is done
+    with open(os.path.join(BASE_DIR, '.migration_complete'), 'w') as f:
+        f.write('Migration completed on startup')
 
 # Mapping for human-readable suffixes used when saving files
 LABEL_NAME_MAP = {
@@ -138,111 +192,30 @@ def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
 
 
 def process_and_save_file(file_storage, id_card, name, label_key):
-    """Save uploaded file using pattern '<id_card><name>-<label>.<ext>'.
+    """Save uploaded file using pattern '<id_card><name>/<id_card><name>-<label>.<ext>'.
     If label_key is 'photo', run face-detection centering and produce a one-inch image.
-    Returns relative path like 'uploads/....'
+    Returns relative path like 'students/<id_card><name>/...'
     """
     if not file_storage or not file_storage.filename:
         return ''
 
     label_name = LABEL_NAME_MAP.get(label_key, label_key)
     orig_ext = _ensure_ext(file_storage.filename, '.jpg')
+    # Create student folder name using ID card and name
+    student_folder_name = f"{id_card}{name}"
+    student_folder_path = os.path.join(app.config['STUDENTS_FOLDER'], student_folder_name)
+    os.makedirs(student_folder_path, exist_ok=True)
+    
     # Include student name in filename; avoid secure_filename stripping Chinese text
     safe_name = f"{id_card}{name}-{label_name}{orig_ext}"
-    abs_path = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+    abs_path = os.path.join(student_folder_path, safe_name)
 
     # Save initial upload (overwrite if exists)
     file_storage.save(abs_path)
 
-    # If this is the personal photo, perform face-detection centering and one-inch generation
-    if label_key == 'photo':
-        try:
-            _process_photo_center_face(abs_path)
-        except Exception:
-            # If processing fails, leave the original upload
-            pass
-
-    return f"uploads/{safe_name}"
+    return f"students/{student_folder_name}/{safe_name}"
 
 
-def _process_photo_center_face(abs_path):
-    """Load image at abs_path, detect face with OpenCV (if available),
-    generate a one-inch (portrait 2.5x3.5cm) image where the face is centered.
-    Overwrites file at abs_path with a JPEG.
-    """
-    # Target physical size: 2.5cm x 3.5cm -> inches
-    tgt_w_in = 2.5 / 2.54
-    tgt_h_in = 3.5 / 2.54
-    dpi = 300
-    px_w = max(120, int(tgt_w_in * dpi))
-    px_h = max(160, int(tgt_h_in * dpi))
-
-    im = Image.open(abs_path).convert('RGBA')
-    # flatten alpha onto white
-    white_bg = Image.new('RGBA', im.size, (255, 255, 255, 255))
-    composed = Image.alpha_composite(white_bg, im).convert('RGB')
-    img_w, img_h = composed.size
-
-    # Try face detection with OpenCV
-    face_center = None
-    face_box = None
-    if cv2 is not None:
-        try:
-            gray = cv2.cvtColor(np.array(composed), cv2.COLOR_RGB2GRAY)
-            cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-            face_cascade = cv2.CascadeClassifier(cascade_path)
-            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-            if len(faces) > 0:
-                # choose largest face
-                faces = sorted(faces, key=lambda r: r[2] * r[3], reverse=True)
-                x, y, w, h = faces[0]
-                face_center = (x + w / 2.0, y + h / 2.0)
-                face_box = (x, y, w, h)
-        except Exception:
-            face_center = None
-
-    # If we detected a face, perform cover-scaling and center the face
-    if face_center is not None:
-        try:
-            # cover scale so that final crop will be filled (may crop edges)
-            scale = max(px_w / img_w, px_h / img_h)
-            resized_w = max(1, int(img_w * scale))
-            resized_h = max(1, int(img_h * scale))
-            resized = composed.resize((resized_w, resized_h), Image.LANCZOS)
-
-            # scaled face center
-            fc_x = int(round(face_center[0] * scale))
-            fc_y = int(round(face_center[1] * scale))
-
-            # compute top-left corner on resized image so face_center maps to canvas center
-            src_left = int(fc_x - px_w // 2)
-            src_top = int(fc_y - px_h // 2)
-            # clamp
-            src_left = max(0, min(resized_w - px_w, src_left))
-            src_top = max(0, min(resized_h - px_h, src_top))
-
-            cropped = resized.crop((src_left, src_top, src_left + px_w, src_top + px_h))
-            out = Image.new('RGB', (px_w, px_h), (255, 255, 255))
-            out.paste(cropped, (0, 0))
-            out.save(abs_path, format='JPEG', quality=95)
-            return
-        except Exception:
-            pass
-
-    # Fallback: contain-scale and center (no face centering)
-    try:
-        scale = min(px_w / img_w, px_h / img_h)
-        new_w = max(1, int(img_w * scale))
-        new_h = max(1, int(img_h * scale))
-        resized = composed.resize((new_w, new_h), Image.LANCZOS)
-        canvas = Image.new('RGB', (px_w, px_h), (255, 255, 255))
-        paste_left = (px_w - new_w) // 2
-        paste_top = (px_h - new_h) // 2
-        canvas.paste(resized, (paste_left, paste_top))
-        canvas.save(abs_path, format='JPEG', quality=95)
-    except Exception:
-        # last resort: save original flattened as JPEG
-        composed.convert('RGB').save(abs_path, format='JPEG', quality=90)
 
 @app.route('/')
 def index():
@@ -409,11 +382,24 @@ def update_student(id):
                 # delete old file if exists
                 old_rel = current[db_key]
                 if old_rel:
-                    old_fn = os.path.basename(old_rel)
-                    old_abs = os.path.join(app.config['UPLOAD_FOLDER'], old_fn)
+                    # Handle both old and new path formats
+                    if old_rel.startswith('students/'):
+                        # New format: students/<id_card><name>/filename
+                        old_abs = os.path.join(BASE_DIR, old_rel)
+                    else:
+                        # Old format: uploads/filename
+                        old_fn = os.path.basename(old_rel)
+                        old_abs = os.path.join(app.config['UPLOAD_FOLDER'], old_fn)
+                    
                     if os.path.exists(old_abs):
                         try:
                             os.remove(old_abs)
+                            
+                            # If it was in a student folder, try to remove empty folder
+                            if old_rel.startswith('students/'):
+                                folder_path = os.path.dirname(old_abs)
+                                if os.path.isdir(folder_path) and not os.listdir(folder_path):
+                                    os.rmdir(folder_path)  # Remove empty student folder
                         except Exception:
                             pass
                 try:
@@ -460,14 +446,23 @@ def reject_student(id):
     # Delete files
     for key in ['photo_path', 'diploma_path', 'cert_path', 'id_card_front_path', 'id_card_back_path', 'training_form_path']:
         if student[key]:
-            # Construct absolute path from relative DB path
-            # DB stores "uploads/filename", we need "/abs/path/to/uploads/filename"
-            # But UPLOAD_FOLDER is "/abs/path/to/uploads"
-            # So we strip "uploads/" from student[key] or use basename
-            filename = os.path.basename(student[key])
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            # Handle both old and new path formats
+            if student[key].startswith('students/'):
+                # New format: students/<id_card><name>/filename
+                file_path = os.path.join(BASE_DIR, student[key])
+            else:
+                # Old format: uploads/filename
+                filename = os.path.basename(student[key])
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            
             if os.path.exists(file_path):
                 os.remove(file_path)
+                
+                # If it was in a student folder, try to remove empty folder
+                if student[key].startswith('students/'):
+                    folder_path = os.path.dirname(file_path)
+                    if os.path.isdir(folder_path) and not os.listdir(folder_path):
+                        os.rmdir(folder_path)  # Remove empty student folder
             
     conn.execute('DELETE FROM students WHERE id = ?', (id,))
     conn.commit()
@@ -487,6 +482,7 @@ def approve_student(id):
     conn.close()
     return jsonify(dict(student))
 
+
 @app.route('/api/students/<int:id>/generate', methods=['POST'])
 def generate_materials(id):
     conn = get_db_connection()
@@ -494,10 +490,13 @@ def generate_materials(id):
     if not student:
         conn.close()
         return jsonify({'error': 'Student not found'}), 404
-    # Use ID card + name for reviewed folder name
-    folder_name = f"{student['id_card']}{student['name']}"
-    student_dir = os.path.join(app.config['REVIEWED_FOLDER'], folder_name)
-    os.makedirs(student_dir, exist_ok=True)
+
+    # Use ID card + name for student folder name
+    student_folder_name = f"{student['id_card']}{student['name']}"
+    student_folder_path = os.path.join(app.config['STUDENTS_FOLDER'], student_folder_name)
+    os.makedirs(student_folder_path, exist_ok=True)
+
+    # Copy other files to the student's folder (for admin review)
     file_mapping = {
         'training_form_path': f"{student['id_card']}{student['name']}-培训信息登记表.jpg",
         'diploma_path': f"{student['id_card']}{student['name']}-学历证书复印件.jpg",
@@ -509,44 +508,60 @@ def generate_materials(id):
     for db_field, target_name in file_mapping.items():
         db_path = student[db_field]
         if db_path:
-            filename = os.path.basename(db_path)
-            src_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            # Handle both old and new path formats
+            if db_path.startswith('students/'):
+                # New format: students/<id_card><name>/filename
+                src_path = os.path.join(BASE_DIR, db_path)
+            else:
+                # Old format: uploads/filename
+                filename = os.path.basename(db_path)
+                src_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
             if os.path.exists(src_path):
                 _, ext = os.path.splitext(src_path)
                 base_target_name = os.path.splitext(target_name)[0]
                 final_target_name = base_target_name + ext
-                shutil.copy2(src_path, os.path.join(student_dir, final_target_name))
-    doc_path = os.path.join(student_dir, f"{student['id_card']}{student['name']}-体检表.docx")
+                dest_path = os.path.join(student_folder_path, final_target_name)
+                
+                # Only copy if source and destination are different files
+                if src_path != dest_path:
+                    shutil.copy2(src_path, dest_path)
+
+    # Generate the physical examination form in the student's folder
+    doc_path = os.path.join(student_folder_path, f"{student['id_card']}{student['name']}-体检表.docx")
     photo_abs_path = None
     if student['photo_path']:
-        filename = os.path.basename(student['photo_path'])
-        photo_abs_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        # Handle both old and new path formats for photo
+        if student['photo_path'].startswith('students/'):
+            # New format: students/<id_card><name>/filename
+            photo_abs_path = os.path.join(BASE_DIR, student['photo_path'])
+        else:
+            # Old format: uploads/filename
+            filename = os.path.basename(student['photo_path'])
+            photo_abs_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     generate_word_doc(app.config['TEMPLATE_PATH'], doc_path, student, photo_abs_path)
-    # store generated docx relative path in DB and return download url
-    rel_path = f"reviewed_students/{folder_name}/{os.path.basename(doc_path)}"
+
+    # store generated docx relative path in DB and return download url (pointing to student folder)
+    rel_path = f"students/{student_folder_name}/{os.path.basename(doc_path)}"
     conn.execute('UPDATE students SET training_form_path = ? WHERE id = ?', (rel_path, id))
     conn.commit()
     conn.close()
-    download_url = f"/reviewed_students/{folder_name}/{os.path.basename(doc_path)}"
+    download_url = f"/students/{student_folder_name}/{os.path.basename(doc_path)}"
     return jsonify({'message': 'materials generated', 'download_url': download_url, 'path': rel_path})
+
 
 def generate_word_doc(template_path, output_path, data, photo_path=None):
     doc = Document(template_path)
-    
+
     # 1. Text Replacement (Preserving Style)
     replacements = {
-        '姓　名': data['name'],
         '姓名': data['name'],
         '性别': data['gender'],
-        '文化程度': data['education'],
         '身份证号': data['id_card'],
-        '移动电话': data['phone'],
-        '手机号': data['phone'],
-        '工作单位': data['company'],
-        '作业类别': data['job_category'],
-        '操作项目': data['exam_project']
+        '申请作业种类': data['job_category'],  
+        '申请作业项目（代号）': data['exam_code'],
     }
-    
+
     for table in doc.tables:
         for row in table.rows:
             for i, cell in enumerate(row.cells):
@@ -555,14 +570,14 @@ def generate_word_doc(template_path, output_path, data, photo_path=None):
                     # Look for the next cell
                     if i + 1 < len(row.cells):
                         target_cell = row.cells[i+1]
-                        
+
                         # Safety check: Don't overwrite if the target cell is also a known label
                         # This prevents issues with merged cells or repeated labels like "移动电话 | 移动电话"
                         if target_cell.text.strip() in replacements:
                             continue
-                            
+
                         new_val = replacements[text]
-                        
+
                         # Replace text in the first run of the first paragraph to preserve formatting
                         if target_cell.paragraphs:
                             p = target_cell.paragraphs[0]
@@ -574,13 +589,13 @@ def generate_word_doc(template_path, output_path, data, photo_path=None):
                             else:
                                 # No runs, add one (formatting might be default, but better than nothing)
                                 p.add_run(new_val)
-                                
+
                             # Clear other paragraphs in the cell
                             for p in target_cell.paragraphs[1:]:
                                 p.clear()
                         else:
                             target_cell.text = new_val
-    
+
     # 2. Image Replacement: directly use the already-processed uploaded photo
     if photo_path and os.path.exists(photo_path):
         try:
@@ -792,13 +807,34 @@ def generate_word_doc(template_path, output_path, data, photo_path=None):
 
     doc.save(output_path)
 
+
 @app.route('/uploads/<path:filename>')
 def serve_uploads(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    # Check if file exists in the old uploads folder
+    if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], filename)):
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    # If not found in uploads, try to serve from students folder structure
+    # Format: <id_card><name>/<actual_filename>
+    parts = filename.split('/', 1)
+    if len(parts) == 2:
+        student_folder, actual_filename = parts
+        student_path = os.path.join(app.config['STUDENTS_FOLDER'], student_folder, actual_filename)
+        if os.path.exists(student_path):
+            return send_from_directory(os.path.join(app.config['STUDENTS_FOLDER'], student_folder), actual_filename)
+    # If file doesn't exist in either location, return 404
+    return "File not found", 404
 
-@app.route('/reviewed_students/<path:filename>')
-def serve_reviewed(filename):
-    return send_from_directory(app.config['REVIEWED_FOLDER'], filename)
+@app.route('/students/<path:filename>')
+def serve_students(filename):
+    # Serve files from the students folder structure
+    # Format: <id_card><name>/<actual_filename>
+    parts = filename.split('/', 1)
+    if len(parts) == 2:
+        student_folder, actual_filename = parts
+        return send_from_directory(os.path.join(app.config['STUDENTS_FOLDER'], student_folder), actual_filename)
+    else:
+        # If no subfolder is specified, try to serve directly from students folder
+        return send_from_directory(app.config['STUDENTS_FOLDER'], filename)
 
 @app.route('/api/companies', methods=['GET'])
 def get_companies():
@@ -852,10 +888,23 @@ def batch_reject_students():
         for student in students:
             for key in ['photo_path', 'diploma_path', 'cert_path', 'id_card_front_path', 'id_card_back_path', 'training_form_path']:
                 if student[key]:
-                    filename = os.path.basename(student[key])
-                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    # Handle both old and new path formats
+                    if student[key].startswith('students/'):
+                        # New format: students/<id_card><name>/filename
+                        file_path = os.path.join(BASE_DIR, student[key])
+                    else:
+                        # Old format: uploads/filename
+                        filename = os.path.basename(student[key])
+                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    
                     if os.path.exists(file_path):
                         os.remove(file_path)
+                        
+                        # If it was in a student folder, try to remove empty folder
+                        if student[key].startswith('students/'):
+                            folder_path = os.path.dirname(file_path)
+                            if os.path.isdir(folder_path) and not os.listdir(folder_path):
+                                os.rmdir(folder_path)  # Remove empty student folder
         
         # Delete students from database
         conn.execute(f"DELETE FROM students WHERE id IN ({placeholders})", ids)
@@ -887,10 +936,23 @@ def batch_delete_students():
         for student in students:
             for key in ['photo_path', 'diploma_path', 'cert_path', 'id_card_front_path', 'id_card_back_path', 'training_form_path']:
                 if student[key]:
-                    filename = os.path.basename(student[key])
-                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    # Handle both old and new path formats
+                    if student[key].startswith('students/'):
+                        # New format: students/<id_card><name>/filename
+                        file_path = os.path.join(BASE_DIR, student[key])
+                    else:
+                        # Old format: uploads/filename
+                        filename = os.path.basename(student[key])
+                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    
                     if os.path.exists(file_path):
                         os.remove(file_path)
+                        
+                        # If it was in a student folder, try to remove empty folder
+                        if student[key].startswith('students/'):
+                            folder_path = os.path.dirname(file_path)
+                            if os.path.isdir(folder_path) and not os.listdir(folder_path):
+                                os.rmdir(folder_path)  # Remove empty student folder
         
         # Delete students from database
         conn.execute(f"DELETE FROM students WHERE id IN ({placeholders})", ids)
