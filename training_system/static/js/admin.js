@@ -209,8 +209,9 @@ document.addEventListener('DOMContentLoaded', () => {
             el.className = `list-item ${currentStudentId === student.id ? 'active' : ''}`;
             el.innerHTML = `
                 <div style="flex: 1;">
-                    <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 6px;">
-                        ${student.name}
+                    <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: baseline;">
+                        <span>${student.name}</span>
+                        <span style="font-size: 0.8rem; color: #666; margin-left: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${student.company || ''}</span>
                     </h4>
                     <div style="font-size: 0.75rem; color: #666; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
                         <span style="flex: 1; min-width: 100px;">${student.job_category}</span>
@@ -220,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             el.onclick = () => {
                 showDetail(student);
-                
+
                 // Close sidebar on mobile after selecting a student
                 if (window.innerWidth <= 768 && sidebar) {
                     sidebar.classList.remove('mobile-open');
