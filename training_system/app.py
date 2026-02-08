@@ -616,6 +616,61 @@ def generate_materials(id):
     return jsonify({'message': 'materials generated', 'download_url': download_url, 'path': rel_path})
 
 
+@app.route('/api/students/<int:id>/attachments.zip', methods=['GET'])
+def download_attachments_zip(id):
+    try:
+        import io, zipfile
+        conn = get_db_connection()
+        student_row = conn.execute('SELECT * FROM students WHERE id = ?', (id,)).fetchone()
+        conn.close()
+        if not student_row:
+            return jsonify({'error': 'Student not found'}), 404
+        student = dict(student_row)
+        if student.get('status') != 'reviewed':
+            return jsonify({'error': '仅支持已审核学员打包下载'}), 400
+
+        attachment_keys = [
+            'photo_path',
+            'diploma_path',
+            'cert_front_path',
+            'cert_back_path',
+            'id_card_front_path',
+            'id_card_back_path',
+            'training_form_path'
+        ]
+        files_to_zip = []
+        for key in attachment_keys:
+            rel = student.get(key, '')
+            if not rel:
+                continue
+            abs_path = os.path.join(BASE_DIR, rel)
+            if os.path.exists(abs_path) and os.path.isfile(abs_path):
+                arcname = f"{os.path.basename(abs_path)}"
+                files_to_zip.append((abs_path, arcname))
+
+        if not files_to_zip:
+            return jsonify({'error': '该学员暂无可打包的附件'}), 400
+
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
+            for abs_path, arcname in files_to_zip:
+                try:
+                    zf.write(abs_path, arcname)
+                except Exception:
+                    pass
+        buffer.seek(0)
+
+        from flask import send_file
+        safe_name = f"{student.get('id_card','')}-{student.get('name','')}".replace('/', '-').replace('\\', '-')
+        return send_file(
+            buffer,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f"{safe_name}.zip"
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 def generate_word_doc(template_path, output_path, data, photo_path=None):
     doc = Document(template_path)
 
@@ -1205,4 +1260,4 @@ if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == 'migrate':
         run_migration()
     else:
-        app.run(debug=True, port=5000)
+        app.run(debug=True, host='0.0.0.0',port=5001)

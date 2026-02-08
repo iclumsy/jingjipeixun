@@ -932,6 +932,14 @@ document.addEventListener('DOMContentLoaded', () => {
             genBtn.textContent = '生成体检表';
             genBtn.onclick = () => handleGenerate(student.id, genBtn);
             actionBar.appendChild(genBtn);
+            
+            const zipBtn = document.createElement('button');
+            zipBtn.className = 'btn';
+            zipBtn.textContent = '附件打包下载';
+            zipBtn.onclick = () => {
+                window.location.href = `/api/students/${student.id}/attachments.zip`;
+            };
+            actionBar.appendChild(zipBtn);
         }
 
         mainContent.innerHTML = '';
@@ -1267,5 +1275,4 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 });
-
 
