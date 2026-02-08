@@ -1269,3 +1269,38 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+// Global functions for export functionality
+window.handleExportButtonClick = function() {
+    // Call the functionality that should happen when export button is clicked
+    // Get the elements that were defined in the DOMContentLoaded event
+    const showExportModal = document.getElementById('showExportModal');
+    const exportModal = document.getElementById('exportModal');
+    const exportCompany = document.getElementById('exportCompany');
+    
+    if (showExportModal && exportCompany) {
+        // Load company list and show modal
+        loadExportCompanies();
+        if (exportModal) {
+            exportModal.style.display = 'flex';
+        }
+    } else {
+        // Fallback: dispatch click event if elements are not accessible
+        if (showExportModal) {
+            showExportModal.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        }
+    }
+};
+
+window.startExportGlobal = function() {
+    const btn = document.getElementById('startExport');
+    if (btn) {
+        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    }
+};
+
+window.closeExportModalGlobal = function() {
+    const btn = document.getElementById('closeExportModal');
+    if (btn) {
+        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    }
+};

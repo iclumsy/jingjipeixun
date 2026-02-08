@@ -681,13 +681,21 @@
     <div class="admin-layout">
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h3>学员管理</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <h3>学员管理</h3>
+                </div>
                 <input type="text" id="searchInput" class="search-box" placeholder="搜索姓名、身份证...">
             </div>
             <div class="tabs">
                 <div class="tab active" data-status="unreviewed">未审核</div>
                 <div class="tab" data-status="reviewed">已审核</div>
                 <div class="tab" data-status="examined">已考试</div>
+            </div>
+            
+            <div style="padding: 15px; border-top: 1px solid #eee; background: #f9fafb;">
+                <button id="exportExcelBtn" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background: #f0f9ff; color: #0369a1; font-size: 0.9rem; cursor: pointer; transition: all 0.3s ease; font-weight: 500;">
+                    导出Excel
+                </button>
             </div>
             <div class="filter-controls" style="padding: 15px; border-bottom: 1px solid #eee;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -723,6 +731,7 @@
         </div>
     </div>
 
+
     <!-- Template for Details -->
     <template id="detail-template">
         <div class="detail-card">
@@ -750,6 +759,331 @@
         </div>
     </template>
 
+    <!-- 导出Excel弹窗 -->
+    <div id="exportModal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center;">
+        <div class="modal-content" style="background: white; border-radius: 16px; box-shadow: 0 25px 50px -5px rgba(0, 0, 0, 0.25); max-width: 500px; width: 90%; position: relative; overflow: hidden;">
+            <div style="background: linear-gradient(135deg, #4f46e5, #7c3aed); padding: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; color: white; font-size: 1.5rem; font-weight: 600;">导出学员信息</h3>
+                <button id="closeExportModal" style="background: rgba(255,255,255,0.2); border: none; width: 36px; height: 36px; border-radius: 50%; color: white; font-size: 1.2rem; cursor: pointer; transition: background 0.3s ease;">×</button>
+            </div>
+
+            <div style="padding: 25px;">
+                <div class="export-options" style="margin-bottom: 25px;">
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; font-size: 0.95rem; color: #4b5563; margin-bottom: 8px; font-weight: 500;">导出状态</label>
+                        <select id="exportStatus" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 0.95rem; background-color: #fff; transition: all 0.2s ease; outline: none; height: 44px; line-height: normal; box-sizing: border-box;">
+                            <option value="">全部状态</option>
+                            <option value="unreviewed">未审核</option>
+                            <option value="reviewed">已审核</option>
+                            <option value="examined">已考试</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; font-size: 0.95rem; color: #4b5563; margin-bottom: 8px; font-weight: 500;">公司名称</label>
+                        <select id="exportCompany" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 0.95rem; background-color: #fff; transition: all 0.2s ease; outline: none; height: 44px; line-height: normal; box-sizing: border-box;">
+                            <option value="">全部公司</option>
+                            <!-- Options will be populated by JavaScript -->
+                        </select>
+                    </div>
+
+                    <div id="exportPassedContainer" style="margin-bottom: 20px;">
+                        <label style="display: block; font-size: 0.95rem; color: #4b5563; margin-bottom: 8px; font-weight: 500;">考试是否通过</label>
+                        <select id="exportPassed" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 0.95rem; background-color: #fff; transition: all 0.2s ease; outline: none; height: 44px; line-height: normal; box-sizing: border-box;">
+                            <option value="">全部</option>
+                            <option value="是">是</option>
+                            <option value="否">否</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="export-actions" style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+                    <button id="cancelExport" style="padding: 12px 20px; border: 1px solid #d1d5db; border-radius: 8px; background: white; color: #4b5563; font-size: 0.95rem; cursor: pointer; transition: all 0.2s ease; font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">取消</button>
+                    <button id="startExport" style="padding: 12px 20px; border: none; border-radius: 8px; background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; font-size: 0.95rem; cursor: pointer; transition: all 0.3s ease; font-weight: 500; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.3); position: relative; overflow: hidden;">
+                        <span id="exportBtnText">开始导出</span>
+                        <span id="exportSpinner" style="display: none; margin-left: 8px;">⏳</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/admin.js"></script>
+    <script>
+        // 导出功能
+        document.addEventListener('DOMContentLoaded', function() {
+            const exportBtn = document.getElementById('exportExcelBtn');
+            const exportModal = document.getElementById('exportModal');
+            const closeExportModal = document.getElementById('closeExportModal');
+            const cancelExport = document.getElementById('cancelExport');
+            const startExport = document.getElementById('startExport');
+            const exportStatus = document.getElementById('exportStatus');
+            const exportCompany = document.getElementById('exportCompany');
+            const exportPassed = document.getElementById('exportPassed');
+            const exportBtnText = document.getElementById('exportBtnText');
+            const exportSpinner = document.getElementById('exportSpinner');
+            
+            // 显示导出模态框
+            exportBtn.addEventListener('click', async function() {
+                // 加载公司列表
+                await loadExportCompanies();
+                exportModal.style.display = 'flex';
+            });
+            
+            // 关闭导出模态框
+            function closeModal() {
+                exportModal.style.display = 'none';
+            }
+            
+            closeExportModal.addEventListener('click', closeModal);
+            cancelExport.addEventListener('click', closeModal);
+            
+            // 点击模态框外部关闭
+            exportModal.addEventListener('click', function(e) {
+                if (e.target === exportModal) {
+                    closeModal();
+                }
+            });
+            
+            // 开始导出
+            startExport.addEventListener('click', async function() {
+                try {
+                    // 显示导出状态
+                    startExport.disabled = true;
+                    exportBtnText.textContent = '正在导出...';
+                    exportSpinner.style.display = 'inline';
+                    
+                    // 构建查询参数
+                    const params = new URLSearchParams();
+                    if (exportStatus.value) {
+                        params.append('status', exportStatus.value);
+                    }
+                    if (exportCompany.value) {
+                        params.append('company', exportCompany.value);
+                    }
+                    if (exportPassed.value) {
+                        params.append('passed', exportPassed.value);
+                    }
+                    
+                    // 发送导出请求
+                    const response = await fetch(`/api/export/excel?${params.toString()}`, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`导出失败: ${response.status} ${response.statusText}`);
+                    }
+                    
+                    // 获取文件并下载
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.style.display = 'none';
+                    link.href = url;
+                    
+                    // 生成文件名
+                    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                    let fileName = `学员信息-${timestamp}.xlsx`;
+                    
+                    if (exportStatus.value) {
+                        const statusLabels = {
+                            'unreviewed': '未审核',
+                            'reviewed': '已审核',
+                            'examined': '已考试'
+                        };
+                        fileName = fileName.replace('学员信息', `学员信息-${statusLabels[exportStatus.value] || exportStatus.value}`);
+                    }
+                    if (exportCompany.value) {
+                        fileName = fileName.replace('学员信息', `学员信息-${exportCompany.value}`);
+                    }
+                    if (exportPassed.value) {
+                        fileName = fileName.replace('学员信息', `学员信息-${exportPassed.value}`);
+                    }
+                    
+                    link.download = fileName;
+                    document.body.appendChild(link);
+                    link.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(link);
+                    
+                    // 显示成功消息（不使用系统弹框）
+                    showMessage('导出成功！', 'success');
+                    closeModal();
+                } catch (error) {
+                    console.error('导出失败:', error);
+                    // 显示错误消息（不使用系统弹框）
+                    showMessage(`导出失败: ${error.message}`, 'error');
+                } finally {
+                    // 恢复按钮状态
+                    startExport.disabled = false;
+                    exportBtnText.textContent = '开始导出';
+                    exportSpinner.style.display = 'none';
+                }
+            });
+            
+            // 计算导出弹窗当前筛选参数（仅使用弹窗内的选择）
+            function getExportFilterParams() {
+                const params = new URLSearchParams();
+                
+                // 仅获取弹窗内的筛选值，完全忽略左侧栏
+                const modalStatus = document.getElementById('exportStatus')?.value || '';
+                const modalPassed = document.getElementById('exportPassed')?.value || '';
+                
+                if (modalStatus) params.append('status', modalStatus);
+                if (modalPassed) params.append('passed', modalPassed);
+                
+                return params;
+            }
+            
+            // 加载公司列表（根据当前筛选条件，实时）
+            async function loadExportCompanies() {
+                try {
+                    const params = getExportFilterParams();
+                    const response = await fetch(`/api/companies?${params.toString()}`);
+                    if (!response.ok) {
+                        throw new Error(`网络错误: ${response.status}`);
+                    }
+                    const companies = await response.json();
+
+                    // 清空现有选项（保留第一个）
+                    while (exportCompany.options.length > 1) {
+                        exportCompany.remove(1);
+                    }
+
+                    // 添加公司到下拉菜单
+                    companies.forEach(company => {
+                        const option = document.createElement('option');
+                        option.value = company;
+                        option.textContent = company;
+                        exportCompany.appendChild(option);
+                    });
+                } catch (err) {
+                    console.error('加载公司列表失败:', err);
+                }
+            }
+            
+            // 实时更新公司列表（基于当前筛选条件）
+            async function updateExportCompanies() {
+                try {
+                    const params = getExportFilterParams();
+                    const response = await fetch(`/api/companies?${params.toString()}`);
+                    if (!response.ok) {
+                        throw new Error(`网络错误: ${response.status}`);
+                    }
+                    const companies = await response.json();
+                    
+                    // 保存当前选中的值
+                    const currentSelection = exportCompany.value;
+                    
+                    // 清空现有选项（保留第一个）
+                    while (exportCompany.options.length > 1) {
+                        exportCompany.remove(1);
+                    }
+                    
+                    // 添加公司到下拉菜单
+                    companies.forEach(company => {
+                        const option = document.createElement('option');
+                        option.value = company;
+                        option.textContent = company;
+                        exportCompany.appendChild(option);
+                    });
+                    
+                    // 恢复之前的选中状态（如果仍然存在）
+                    if (currentSelection) {
+                        const optionExists = Array.from(exportCompany.options).some(opt => opt.value === currentSelection);
+                        if (optionExists) {
+                            exportCompany.value = currentSelection;
+                        }
+                    }
+                } catch (err) {
+                    console.error('更新公司列表失败:', err);
+                }
+            }
+            
+            // 监听弹窗内筛选变更，实时刷新公司列表
+            function toggleExportPassedVisibility() {
+                const container = document.getElementById('exportPassedContainer');
+                if (!container) return;
+                if (exportStatus.value === 'examined') {
+                    container.style.display = 'block';
+                } else {
+                    container.style.display = 'none';
+                    // Reset passed filter when hiding to avoid stale filtering
+                    exportPassed.value = '';
+                }
+            }
+            exportStatus.addEventListener('change', () => {
+                toggleExportPassedVisibility();
+                updateExportCompanies();
+            });
+            exportPassed.addEventListener('change', updateExportCompanies);
+            
+            // Update company list when the export modal is opened
+            document.getElementById('exportExcelBtn').addEventListener('click', async function() {
+                // Wait for modal to be displayed, then update company list
+                // 打开时重置或更新公司列表，不受左侧影响
+                setTimeout(() => {
+                    toggleExportPassedVisibility();
+                    updateExportCompanies();
+                }, 100);
+            });
+        });
+        
+        // 显示消息函数
+        function showMessage(message, type = 'info') {
+            // Remove existing message if any
+            const existingMessage = document.querySelector('.custom-message');
+            if (existingMessage) {
+                existingMessage.remove();
+            }
+
+            // Create message element
+            const messageElement = document.createElement('div');
+            messageElement.className = `custom-message ${type}`;
+            messageElement.style.position = 'fixed';
+            messageElement.style.top = '20px';
+            messageElement.style.right = '20px';
+            messageElement.style.padding = '15px 20px';
+            messageElement.style.borderRadius = '8px';
+            messageElement.style.zIndex = '10000';
+            messageElement.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+            messageElement.style.transition = 'all 0.3s ease';
+            messageElement.style.maxWidth = '400px';
+            messageElement.style.wordWrap = 'break-word';
+            messageElement.style.fontSize = '0.95rem';
+
+            // Set styles based on type
+            if (type === 'success') {
+                messageElement.style.backgroundColor = '#dcfce7';
+                messageElement.style.color = '#166534';
+                messageElement.style.border = '1px solid #bbf7d0';
+            } else if (type === 'error') {
+                messageElement.style.backgroundColor = '#fee2e2';
+                messageElement.style.color = '#991b1b';
+                messageElement.style.border = '1px solid #fecaca';
+            } else {
+                messageElement.style.backgroundColor = '#dbeafe';
+                messageElement.style.color = '#1e40af';
+                messageElement.style.border = '1px solid #bfdbfe';
+            }
+
+            messageElement.textContent = message;
+            document.body.appendChild(messageElement);
+
+            // Remove after 4 seconds
+            setTimeout(() => {
+                if (messageElement.parentNode) {
+                    messageElement.style.opacity = '0';
+                    messageElement.style.transform = 'translateY(-20px)';
+                    setTimeout(() => {
+                        messageElement.remove();
+                    }, 300);
+                }
+            }, 4000);
+        }
+    </script>
 </body>
 </html>

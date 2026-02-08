@@ -6,3 +6,4 @@ opencv-python==4.8.0.76
 numpy==1.26.4
 rembg==2.0.56
 lxml==4.9.3
+openpyxl==3.1.2

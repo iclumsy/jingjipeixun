@@ -3,14 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>阳泉精技培训 - 学员信息采集</title>
+    <title>特种作业人员学员信息采集系统</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>学员信息采集系统</h1>
-            <p>阳泉精技培训有限公司</p>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <img src="/static/images/logo.jpg" alt="Logo" style="height: 60px; width: auto;">
+                <div>
+                    <h1>特种作业人员学员信息采集系统</h1>
+                    <p>阳泉精技特种作业人员培训有限公司</p>
+                </div>
+            </div>
         </header>
 
         <form id="collectionForm">
@@ -50,12 +55,13 @@
                     <label>文化程度</label>
                     <span class="hint-slot"></span>
                     <select name="education" required>
+                        <option value="">请选择</option>
+                        <option value="研究生及以上">研究生及以上</option>
+                        <option value="本科或同等学历">本科或同等学历</option>
+                        <option value="专科或同等学历">专科或同等学历</option>
+                        <option value="中专或同等学历">中专或同等学历</option>
+                        <option value="高中或同等学历">高中或同等学历</option>
                         <option value="初中">初中</option>
-                        <option value="高中">高中</option>
-                        <option value="中专">中专</option>
-                        <option value="大专">大专</option>
-                        <option value="本科">本科</option>
-                        <option value="研究生">研究生</option>
                     </select>
                 </div>
                 <div class="form-group w-lg">
@@ -84,24 +90,21 @@
                     <input type="text" name="company">
                 </div>
                 <div class="form-group w-md">
-                    <label>申请作业类别</label>
+                    <label>作业类别</label>
                     <span class="hint-slot"></span>
-                    <select name="job_category" required>
+                    <select name="job_category" id="job_category" required onchange="updateExamProjectOptions(this)">
                         <option value="">请选择</option>
                         <option value="电工作业">电工作业</option>
-                        <option value="熔化焊接与热切割作业">熔化焊接与热切割作业</option>
+                        <option value="焊接与热切割作业">焊接与热切割作业</option>
                         <option value="高处作业">高处作业</option>
-                        <option value="制冷与空调作业">制冷与空调作业</option>
-                        <option value="冶金（有色）生产安全作业">冶金（有色）生产安全作业</option>
-                        <option value="煤矿安全作业">煤矿安全作业</option>
-                        <option value="金属非金属矿山安全作业">金属非金属矿山安全作业</option>
-                        <option value="危险化学品安全作业">危险化学品安全作业</option>
                     </select>
                 </div>
                 <div class="form-group w-md">
-                    <label>报考准操项目</label>
+                    <label>操作项目</label>
                     <span class="hint-slot"></span>
-                    <input type="text" name="exam_project">
+                    <select name="exam_project" id="exam_project" required>
+                        <option value="">请先选择作业类别</option>
+                    </select>
                 </div>
                 <div class="form-group w-sm">
                     <label>项目代码</label>
@@ -148,10 +151,20 @@
                     <div class="upload-box" onclick="this.querySelector('input').click()">
                         <div class="upload-placeholder">
                             <span class="icon">+</span>
-                            <span class="text">所持证件</span>
+                            <span class="text">所持证件正面</span>
                         </div>
                         <img class="preview-img" style="display: none;">
-                        <input type="file" name="cert" accept="image/*" onchange="previewFile(this)">
+                        <input type="file" name="cert_front" accept="image/*" onchange="previewFile(this)">
+                    </div>
+                </div>
+                <div class="form-group w-upload">
+                    <div class="upload-box" onclick="this.querySelector('input').click()">
+                        <div class="upload-placeholder">
+                            <span class="icon">+</span>
+                            <span class="text">所持证件反面</span>
+                        </div>
+                        <img class="preview-img" style="display: none;">
+                        <input type="file" name="cert_back" accept="image/*" onchange="previewFile(this)">
                     </div>
                 </div>
                 <div class="form-group w-upload">
@@ -180,5 +193,43 @@
     </template>
 
     <script src="/static/js/script.js"></script>
+    <script>
+        // 二级联动下拉选项数据
+        const examProjectOptions = {
+            '电工作业': [
+                { value: '低压电工作业', text: '低压电工作业' },
+                { value: '高压电工作业', text: '高压电工作业' },
+                { value: '电力电缆作业', text: '电力电缆作业' },
+                { value: '电气试验作业', text: '电气试验作业' },
+                { value: '继电保护作业', text: '继电保护作业' },
+                { value: '防爆电气作业', text: '防爆电气作业' }
+            ],
+            '焊接与热切割作业': [
+                { value: '熔化焊接与热切割作业', text: '熔化焊接与热切割作业' }
+            ],
+            '高处作业': [
+                { value: '高处安装、维护、拆除作业', text: '高处安装、维护、拆除作业' },
+                { value: '登高架设作业', text: '登高架设作业' }
+            ]
+        };
+
+        function updateExamProjectOptions(categorySelect) {
+            const projectSelect = document.getElementById('exam_project');
+            const selectedCategory = categorySelect.value;
+            
+            // 清空操作项目下拉选项
+            projectSelect.innerHTML = '<option value="">请选择操作项目</option>';
+            
+            if (selectedCategory && examProjectOptions[selectedCategory]) {
+                // 添加对应的操作项目选项
+                examProjectOptions[selectedCategory].forEach(option => {
+                    const optionElement = document.createElement('option');
+                    optionElement.value = option.value;
+                    optionElement.textContent = option.text;
+                    projectSelect.appendChild(optionElement);
+                });
+            }
+        }
+    </script>
 </body>
 </html>

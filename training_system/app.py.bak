@@ -529,6 +529,142 @@ def update_student(id):
     conn.close()
     return jsonify(dict(student))
 
+@app.route('/api/export/excel', methods=['GET'])
+def export_excel():
+    try:
+        import io
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+        
+        # Get query parameters
+        scope = request.args.get('scope', 'current')  # 'current' for current filter, 'all' for all students
+        status = request.args.get('status', '')
+        company = request.args.get('company', '')
+        
+        # Build query based on scope
+        if scope == 'all':
+            # Export all students regardless of current filter
+            query = "SELECT * FROM students WHERE 1=1"
+            params = []
+        else:
+            # Export based on current status (similar to what's displayed)
+            query = "SELECT * FROM students WHERE status = ?"
+            params = [current_status]  # This would need to be passed differently
+            
+            # For now, let's just use the status parameter if provided
+            if status:
+                query = "SELECT * FROM students WHERE status = ?"
+                params = [status]
+            else:
+                query = "SELECT * FROM students WHERE 1=1"
+                params = []
+        
+        # Add additional filters if provided
+        if status and status != '':
+            query += " AND status = ?"
+            params.append(status)
+        if company and company != '':
+            query += " AND company LIKE ?"
+            params.append(f"%{company}%")
+        
+        # Execute query
+        conn = get_db_connection()
+        students = conn.execute(query, params).fetchall()
+        conn.close()
+        
+        # Create workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "学员信息"
+        
+        # Define headers
+        headers = [
+            'ID', '姓名', '性别', '文化程度', '毕业院校', '所学专业', 
+            '身份证号', '手机号', '单位名称', '单位地址', 
+            '作业类别', '操作项目', '项目代码', '考试类别',
+            '审核状态', '创建时间', '理论考试时间', '实操考试时间', 
+            '是否通过', '理论补考时间', '是否补考'
+        ]
+        
+        # Add headers to worksheet
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num, value=header)
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+        
+        # Add data rows
+        for row_num, student in enumerate(students, 2):
+            data = [
+                student['id'],
+                student['name'],
+                student['gender'],
+                student['education'],
+                student['school'],
+                student['major'],
+                student['id_card'],
+                student['phone'],
+                student['company'],
+                student['company_address'],
+                student['job_category'],
+                student['exam_project'],
+                student['exam_code'],
+                student['exam_category'],
+                '已审核' if student['status'] == 'reviewed' else ('已考试' if student['status'] == 'examined' else '未审核'),
+                student['created_at'],
+                student['theory_exam_time'],
+                student['practical_exam_time'],
+                student['passed'],
+                student['theory_makeup_time'],
+                student['makeup_exam']
+            ]
+            
+            for col_num, value in enumerate(data, 1):
+                cell = ws.cell(row=row_num, column=col_num, value=str(value) if value is not None else '')
+                cell.alignment = Alignment(horizontal='left', vertical='center')
+                cell.border = Border(
+                    left=Side(style='thin'),
+                    right=Side(style='thin'),
+                    top=Side(style='thin'),
+                    bottom=Side(style='thin')
+                )
+        
+        # Auto-adjust column widths
+        for column in ws.columns:
+            max_length = 0
+            column_letter = get_column_letter(column[0].column)
+            
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            
+            adjusted_width = min(max_length + 2, 50)  # Limit max width
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # Save to BytesIO
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        # Return Excel file
+        from flask import send_file
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'学员信息_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/students/<int:id>/reject', methods=['POST'])
@@ -905,37 +1041,7 @@ def serve_students(filename):
 @app.route('/api/companies', methods=['GET'])
 def get_companies():
     conn = get_db_connection()
-    
-    # Get query parameters for filtering
-    status = request.args.get('status', '')
-    company_filter = request.args.get('company', '')
-    passed = request.args.get('passed', '')
-    
-    # Build query with optional filters
-    query = "SELECT DISTINCT company FROM students WHERE company IS NOT NULL AND company != ''"
-    params = []
-    
-    # Handle status filter with special logic for 'examined'
-    if status == 'examined':
-        query += " AND ((theory_exam_time IS NOT NULL AND theory_exam_time != '') OR (practical_exam_time IS NOT NULL AND practical_exam_time != ''))"
-    elif status:
-        query += " AND status = ?"
-        params.append(status)
-        # For 'reviewed', ensure not yet taken exams
-        if status == 'reviewed':
-            query += " AND ((theory_exam_time IS NULL OR theory_exam_time = '') AND (practical_exam_time IS NULL OR practical_exam_time = ''))"
-    
-    if company_filter:
-        query += " AND company LIKE ?"
-        params.append(f"%{company_filter}%")
-    
-    if passed:
-        query += " AND passed = ?"
-        params.append(passed)
-    
-    query += " ORDER BY company"
-    
-    companies = conn.execute(query, params).fetchall()
+    companies = conn.execute('SELECT DISTINCT company FROM students WHERE company IS NOT NULL AND company != "" ORDER BY company').fetchall()
     conn.close()
     return jsonify([dict(c)['company'] for c in companies])
 
@@ -1077,15 +1183,9 @@ def export_excel():
         query = "SELECT * FROM students WHERE 1=1"
         params = []
         
-        # Handle status filter with special logic for 'examined'
-        if status == 'examined':
-            query += " AND ((theory_exam_time IS NOT NULL AND theory_exam_time != '') OR (practical_exam_time IS NOT NULL AND practical_exam_time != ''))"
-        elif status:
+        if status:
             query += " AND status = ?"
             params.append(status)
-            # For 'reviewed', ensure not yet taken exams
-            if status == 'reviewed':
-                query += " AND ((theory_exam_time IS NULL OR theory_exam_time = '') AND (practical_exam_time IS NULL OR practical_exam_time = ''))"
         
         if company:
             query += " AND company LIKE ?"
