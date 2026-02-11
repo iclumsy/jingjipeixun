@@ -681,10 +681,10 @@
     <div class="admin-layout">
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                    <h3>学员管理</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 10px;">
+                    <h3 style="margin: 0;">学员管理</h3>
+                    <input type="text" id="searchInput" class="search-box" placeholder="搜索姓名、身份证..." style="width: 150px;">
                 </div>
-                <input type="text" id="searchInput" class="search-box" placeholder="搜索姓名、身份证...">
             </div>
             <div class="tabs">
                 <div class="tab active" data-status="unreviewed">未审核</div>
@@ -692,15 +692,11 @@
                 <div class="tab" data-status="examined">已考试</div>
             </div>
             
-            <div style="padding: 15px; border-top: 1px solid #eee; background: #f9fafb;">
-                <button id="exportExcelBtn" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background: #f0f9ff; color: #0369a1; font-size: 0.9rem; cursor: pointer; transition: all 0.3s ease; font-weight: 500;">
-                    导出Excel
-                </button>
-            </div>
             <div class="filter-controls" style="padding: 15px; border-bottom: 1px solid #eee;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h4 style="margin: 0; font-size: 0.9rem; color: #666;">筛选条件</h4>
-                    <button id="resetFilters" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; background: #f9fafb; font-size: 0.8rem; cursor: pointer;">重置筛选</button>
+                <div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-bottom: 10px;">
+                    <h4 style="margin: 0; font-size: 0.9rem; color: #666; justify-self: start;">筛选条件</h4>
+                    <button id="resetFilters" style="padding: 8px 16px; border: 1px solid #ddd; border-radius: 8px; background: #f9fafb; font-size: 0.85rem; cursor: pointer; transition: all 0.3s ease; font-weight: 500; white-space: nowrap;">重置筛选</button>
+                    <button id="exportExcelBtn" style="padding: 8px 16px; border: 1px solid #ddd; border-radius: 8px; background: #f0f9ff; color: #0369a1; font-size: 0.85rem; cursor: pointer; transition: all 0.3s ease; font-weight: 500; white-space: nowrap; justify-self: end;">导出Excel</button>
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 10px;">
                     <div>
