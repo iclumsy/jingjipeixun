@@ -1,1 +1,14 @@
 jj/
+*.pyc
+__pycache__/
+.DS_Store
+*.db
+.venv/
+venv/
+uploads/
+students/
+*.log
+logs/
+*.bak
+*.old
+.migration_complete

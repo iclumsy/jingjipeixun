@@ -1,1263 +1,176 @@
+"""Main application entry point."""
 import os
-import sqlite3
 import shutil
-from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_from_directory
-from docx import Document
-from docx.shared import Inches
-from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
-from PIL import Image, ImageOps, ImageStat
-import numpy as np
-try:
-    import cv2
-except Exception:
-    cv2 = None
-try:
-    from rembg import remove, new_session
-except Exception:
-    remove = None
-    new_session = None
-from lxml import etree
-import io
-from werkzeug.utils import secure_filename
-import re
-
-app = Flask(__name__)
-# app.config['LOGGING_LEVEL'] = logging.DEBUG
-# logging.basicConfig(level=app.config['LOGGING_LEVEL'])
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
-app.config['STUDENTS_FOLDER'] = os.path.join(BASE_DIR, 'students')
-app.config['DATABASE'] = os.path.join(BASE_DIR, 'database/students.db')
-app.config['TEMPLATE_PATH'] = os.path.join(BASE_DIR, '特种设备作业人员考试体检表（锅炉水处理、客运索道司机）-杜臻.docx')
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
-
-# Ensure directories exist
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs(app.config['STUDENTS_FOLDER'], exist_ok=True)
-os.makedirs(os.path.join(BASE_DIR, 'database'), exist_ok=True)
-
-def get_db_connection():
-    conn = sqlite3.connect(app.config['DATABASE'])
-    conn.row_factory = sqlite3.Row
-    return conn
-
-def init_db():
-    conn = get_db_connection()
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS students (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            gender TEXT NOT NULL,
-            education TEXT NOT NULL,
-            school TEXT,
-            major TEXT,
-            id_card TEXT NOT NULL,
-            phone TEXT NOT NULL,
-            company TEXT,
-            company_address TEXT,
-            job_category TEXT NOT NULL,
-            exam_project TEXT,
-            exam_code TEXT,
-            exam_category TEXT NOT NULL,
-            status TEXT DEFAULT 'unreviewed',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            photo_path TEXT,
-            diploma_path TEXT,
-            cert_front_path TEXT,
-            cert_back_path TEXT,
-            id_card_front_path TEXT,
-            id_card_back_path TEXT,
-            training_form_path TEXT,
-            theory_exam_time TEXT,
-            practical_exam_time TEXT,
-            passed TEXT,
-            theory_makeup_time TEXT,
-            makeup_exam TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-init_db()
+from flask import Flask, render_template
+from models.student import init_db
+from routes.student_routes import student_bp
+from routes.file_routes import file_bp
+from routes.export_routes import export_bp
+from utils.logger import setup_logger
+from utils.error_handlers import register_error_handlers
 
 
-def migrate_existing_files():
+def create_app():
+    """Create and configure the Flask application."""
+    app = Flask(__name__)
+
+    # Configuration
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    app.config['BASE_DIR'] = BASE_DIR
+    app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
+    app.config['STUDENTS_FOLDER'] = os.path.join(BASE_DIR, 'students')
+    app.config['DATABASE'] = os.path.join(BASE_DIR, 'database/students.db')
+    app.config['TEMPLATE_PATH'] = os.path.join(
+        BASE_DIR,
+        '特种设备作业人员考试体检表（锅炉水处理、客运索道司机）-杜臻.docx'
+    )
+    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
+
+    # Ensure directories exist
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    os.makedirs(app.config['STUDENTS_FOLDER'], exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, 'database'), exist_ok=True)
+
+    # Initialize database
+    init_db(app.config['DATABASE'])
+
+    # Setup logging
+    setup_logger(app)
+
+    # Register error handlers
+    register_error_handlers(app)
+
+    # Register blueprints
+    app.register_blueprint(student_bp)
+    app.register_blueprint(file_bp)
+    app.register_blueprint(export_bp)
+
+    # Main routes
+    @app.route('/')
+    def index():
+        return render_template('index.html')
+
+    @app.route('/admin')
+    def admin():
+        return render_template('admin.html')
+
+    # Run migration if needed
+    _run_migration_if_needed(app)
+
+    app.logger.info('Application initialized successfully')
+
+    return app
+
+
+def _run_migration_if_needed(app):
+    """Run data migration if not already completed."""
+    migration_marker = os.path.join(app.config['BASE_DIR'], '.migration_complete')
+
+    if not os.path.exists(migration_marker):
+        app.logger.info('Running data migration...')
+        try:
+            _migrate_existing_files(app)
+            with open(migration_marker, 'w') as f:
+                f.write('Migration completed on startup')
+            app.logger.info('Migration completed successfully')
+        except Exception as e:
+            app.logger.error(f'Migration failed: {str(e)}')
+
+
+def _migrate_existing_files(app):
     """
     Migrate existing file paths in the database to the new structure.
-    Move files from uploads/ and old students/<id_card><name>/ to students/<company>-<name>/ and update database records.
+    Move files from uploads/ and old students/<id_card><name>/ to students/<company>-<name>/.
     """
-    conn = get_db_connection()
+    import sqlite3
+
+    conn = sqlite3.connect(app.config['DATABASE'])
+    conn.row_factory = sqlite3.Row
     students = conn.execute("SELECT * FROM students").fetchall()
-    
+
     for student in students:
         id_card = student['id_card']
         name = student['name']
-        company = student['company'] or '未知公司'  # Use '未知公司' if company is empty
+        company = student['company'] or '未知公司'
         student_folder_name = f"{company}-{name}"
         student_folder_path = os.path.join(app.config['STUDENTS_FOLDER'], student_folder_name)
         os.makedirs(student_folder_path, exist_ok=True)
-        
-        # Define the file fields to migrate
-        file_fields = ['photo_path', 'diploma_path', 'cert_front_path', 'cert_back_path', 'id_card_front_path', 'id_card_back_path', 'training_form_path']
-        
+
+        file_fields = [
+            'photo_path', 'diploma_path', 'cert_front_path', 'cert_back_path',
+            'id_card_front_path', 'id_card_back_path', 'training_form_path'
+        ]
+
         updates = {}
         for field in file_fields:
             old_path = student[field]
             if old_path and old_path.startswith('uploads/') and not old_path.startswith('students/'):
-                # This is an old-style path from uploads/, needs migration
                 filename = os.path.basename(old_path)
                 old_abs_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                
+
                 if os.path.exists(old_abs_path):
-                    # Move file to new location
                     new_file_path = os.path.join(student_folder_path, filename)
                     shutil.move(old_abs_path, new_file_path)
-                    
-                    # Update database record
                     new_rel_path = f"students/{student_folder_name}/{filename}"
                     updates[field] = new_rel_path
+
             elif old_path and old_path.startswith('students/'):
-                # This is already in students folder, check if it's using old naming convention
-                parts = old_path.split('/', 2)  # Split into at most 3 parts: ['students', 'folder_name', 'filename']
+                parts = old_path.split('/', 2)
                 if len(parts) >= 2:
                     old_folder_name = parts[1]
-                    
-                    # Check if old folder name starts with the student's ID card (indicating old format)
+
                     if old_folder_name.startswith(id_card):
-                        # This is using the old id_card+name format, need to move to company-name format
-                        old_file_path = os.path.join(BASE_DIR, old_path)
-                        
+                        old_file_path = os.path.join(app.config['BASE_DIR'], old_path)
+
                         if os.path.exists(old_file_path):
-                            # Move file to new location with company-name folder (with - separator)
                             new_file_path = os.path.join(student_folder_path, os.path.basename(old_file_path))
-                            
-                            # Ensure destination directory exists
                             os.makedirs(student_folder_path, exist_ok=True)
-                            
-                            # Move the file
                             shutil.move(old_file_path, new_file_path)
-                            
-                            # Update database record
                             new_rel_path = f"students/{student_folder_name}/{os.path.basename(old_file_path)}"
                             updates[field] = new_rel_path
-        
-        # Additionally, migrate old cert_path to cert_front_path if cert_front_path is empty
-        if not student['cert_front_path'] and student['cert_path']:
-            old_cert_path = student['cert_path']
-            if old_cert_path and old_cert_path.startswith('uploads/'):
-                # Move from uploads to new structure
-                filename = os.path.basename(old_cert_path)
-                old_abs_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                
-                if os.path.exists(old_abs_path):
-                    new_file_path = os.path.join(student_folder_path, filename)
-                    shutil.move(old_abs_path, new_file_path)
-                    
-                    # Update database record
-                    new_rel_path = f"students/{student_folder_name}/{filename}"
-                    updates['cert_front_path'] = new_rel_path
-            elif old_cert_path and old_cert_path.startswith('students/'):
-                # Already in students folder, just update the field
-                updates['cert_front_path'] = old_cert_path
-        
-        # Apply updates to database if any
+
+        # Apply updates
         if updates:
             set_clause = ", ".join([f"{key} = ?" for key in updates.keys()])
             values = list(updates.values()) + [student['id']]
             conn.execute(f"UPDATE students SET {set_clause} WHERE id = ?", values)
-    
-    # Additional step: Process any remaining old folders that weren't caught by the above logic
+
+    # Clean up old folders
     for student in students:
         id_card = student['id_card']
         name = student['name']
-        company = student['company'] or '未知公司'  # Use '未知公司' if company is empty
+        company = student['company'] or '未知公司'
         new_folder_name = f"{company}-{name}"
-        new_folder_path = os.path.join(app.config['STUDENTS_FOLDER'], new_folder_name)
-        
-        # Check for old folder name format (id_card + name)
         old_folder_name = f"{id_card}{name}"
         old_folder_path = os.path.join(app.config['STUDENTS_FOLDER'], old_folder_name)
-        
+
         if os.path.exists(old_folder_path) and os.path.isdir(old_folder_path):
-            # If there are files in the old folder that weren't processed above, move them to new folder
+            new_folder_path = os.path.join(app.config['STUDENTS_FOLDER'], new_folder_name)
             for item in os.listdir(old_folder_path):
                 src_path = os.path.join(old_folder_path, item)
                 dst_path = os.path.join(new_folder_path, item)
-                
-                if os.path.isfile(src_path):
-                    # If destination file doesn't exist, move it
-                    if not os.path.exists(dst_path):
-                        shutil.move(src_path, dst_path)
-                    else:
-                        # If destination file exists, check if they are different and handle accordingly
-                        import filecmp
-                        if not filecmp.cmp(src_path, dst_path, shallow=False):
-                            # Files are different, we could rename the source or skip
-                            # For now, we'll skip to avoid overwriting
-                            print(f"File {item} already exists in destination, skipping...")
-                elif os.path.isdir(src_path):
-                    # If it's a subdirectory, move it too
-                    if not os.path.exists(dst_path):
-                        shutil.move(src_path, dst_path)
-            
-            # After moving all contents, remove old empty folder if it's empty
+
+                if os.path.isfile(src_path) and not os.path.exists(dst_path):
+                    shutil.move(src_path, dst_path)
+
             if os.path.isdir(old_folder_path) and not os.listdir(old_folder_path):
                 os.rmdir(old_folder_path)
-    
+
     conn.commit()
     conn.close()
-    print("Migration completed!")
 
 
-# Run migration when the app starts (only once)
-if not os.path.exists(os.path.join(BASE_DIR, '.migration_complete')):
-    migrate_existing_files()
-    # Create a marker file to indicate migration is done
-    with open(os.path.join(BASE_DIR, '.migration_complete'), 'w') as f:
-        f.write('Migration completed on startup')
-
-# Mapping for human-readable suffixes used when saving files
-LABEL_NAME_MAP = {
-    'photo': '个人照片',
-    'diploma': '学历证书',
-    'cert_front': '所持证件正面',
-    'cert_back': '所持证件反面',
-    'id_card_front': '身份证正面',
-    'id_card_back': '身份证反面'
-}
-
-
-def _ensure_ext(fname, default_ext='.jpg'):
-    _, ext = os.path.splitext(fname)
-    return ext.lower() if ext else default_ext
-
-
-def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
-    """将证件照背景替换为指定颜色（默认白色），优化衣服边缘识别问题"""
-    if remove is None or new_session is None:
-        # rembg 不可用，直接返回原路径
-        return input_path
-    
-    try:
-        # 配置rembg会话，启用alpha抠图优化边缘
-        session = new_session(
-            model_name="u2net_human_seg",
-            alpha_matting=True,
-            alpha_matting_foreground_threshold=240,
-            alpha_matting_background_threshold=10,
-            alpha_matting_erode_size=10
-        )
-
-        # 读取图片并精准抠图
-        with open(input_path, "rb") as f:
-            input_img = f.read()
-        output_img = remove(input_img, session=session)
-        img_no_bg = Image.open(io.BytesIO(output_img)).convert("RGBA")
-
-        # 修复抠图蒙版，避免衣服区域缺失
-        img_np = np.array(img_no_bg)
-        alpha_channel = img_np[:, :, 3]
-        kernel = np.ones((3, 3), np.uint8)
-        alpha_channel = cv2.dilate(alpha_channel, kernel, iterations=1)
-        img_np[:, :, 3] = alpha_channel
-        img_no_bg_fixed = Image.fromarray(img_np, mode="RGBA")
-
-        # 创建纯白色背景并合成
-        bg_img = Image.new("RGBA", img_no_bg_fixed.size, bg_color + (255,))
-        result = Image.alpha_composite(bg_img, img_no_bg_fixed)
-        result = result.convert("RGB")
-
-        # 保存处理后的图片
-        result.save(output_path, quality=95)
-        return output_path
-    except Exception as e:
-        # 如果处理失败，返回原图路径
-        print(f"背景替换失败: {e}")
-        return input_path
-
-
-def process_and_save_file(file_storage, id_card, name, label_key, company=''):
-    """Save uploaded file using pattern '<company>-<name>/<id_card><name>-<label>.<ext>'.
-    If label_key is 'photo', run face-detection centering and produce a one-inch image.
-    Returns relative path like 'students/<company>-<name>/...'
-    """
-    if not file_storage or not file_storage.filename:
-        return ''
-
-    label_name = LABEL_NAME_MAP.get(label_key, label_key)
-    orig_ext = _ensure_ext(file_storage.filename, '.jpg')
-    # Create student folder name using company and name with '-' separator
-    student_folder_name = f"{company}-{name}"
-    student_folder_path = os.path.join(app.config['STUDENTS_FOLDER'], student_folder_name)
-    os.makedirs(student_folder_path, exist_ok=True)
-    
-    # Include student name in filename; avoid secure_filename stripping Chinese text
-    safe_name = f"{id_card}{name}-{label_name}{orig_ext}"
-    abs_path = os.path.join(student_folder_path, safe_name)
-
-    # Save initial upload (overwrite if exists)
-    file_storage.save(abs_path)
-
-    return f"students/{student_folder_name}/{safe_name}"
-
-
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/admin')
-def admin():
-    return render_template('admin.html')
-
-@app.route('/api/students', methods=['POST'])
-def create_student():
-    try:
-        data = request.form
-        files = request.files
-        
-        # Server-side validation (required fields and patterns)
-        required_fields = ['name', 'gender', 'education', 'id_card', 'phone', 'job_category', 'exam_category']
-        errors = {}
-        for f in required_fields:
-            if not data.get(f):
-                errors[f] = '必填项'
-        if 'gender' in data and data.get('gender') not in ['男', '女']:
-            errors['gender'] = '性别须为“男”或“女”'
-        if 'id_card' in data and not re.fullmatch(r'\d{17}[\dXx]', data.get('id_card', '')):
-            errors['id_card'] = '身份证号格式不正确'
-        if 'phone' in data and not re.fullmatch(r'\d{11}', data.get('phone', '')):
-            errors['phone'] = '手机号格式不正确'
-        if errors:
-            return jsonify({'error': 'validation_failed', 'fields': errors}), 400
-        
-        # Save files using ID card + descriptive name convention
-        file_paths = {}
-        # Map input names to DB column keys
-        file_map = {
-            'photo': 'photo_path',
-            'diploma': 'diploma_path',
-            'cert_front': 'cert_front_path',
-            'cert_back': 'cert_back_path',
-            'id_card_front': 'id_card_front_path',
-            'id_card_back': 'id_card_back_path'
-        }
-
-        id_card_val = data.get('id_card', '').strip()
-        company_val = data.get('company', '').strip()
-        for input_name, db_key in file_map.items():
-            file = files.get(input_name)
-            if file and file.filename and id_card_val:
-                try:
-                    rel = process_and_save_file(file, id_card_val, data.get('name', ''), input_name, company_val)
-                    file_paths[db_key] = rel
-                except Exception:
-                    file_paths[db_key] = ""
-            else:
-                file_paths[db_key] = ""
-        
-        # training_form is generated, not collected
-        file_paths['training_form_path'] = ""
-
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO students (
-                name, gender, education, school, major, id_card, phone,
-                company, company_address, job_category, exam_project, exam_code,
-                exam_category, photo_path, diploma_path, cert_front_path, cert_back_path, id_card_front_path, id_card_back_path, training_form_path,
-                theory_exam_time, practical_exam_time, passed, theory_makeup_time, makeup_exam
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            data['name'], data['gender'], data['education'], data.get('school', ''), data.get('major', ''),
-            data['id_card'], data['phone'], data.get('company', ''), data.get('company_address', ''),
-            data['job_category'], data.get('exam_project', ''), data.get('exam_code', ''), data['exam_category'],
-            file_paths['photo_path'], file_paths['diploma_path'], file_paths['cert_front_path'], file_paths['cert_back_path'],
-            file_paths['id_card_front_path'], file_paths['id_card_back_path'], file_paths['training_form_path'],
-            data.get('theory_exam_time', ''), data.get('practical_exam_time', ''), data.get('passed', ''),
-            data.get('theory_makeup_time', ''), data.get('makeup_exam', '')
-        ))
-        conn.commit()
-        conn.close()
-        return jsonify({'message': 'Student added successfully'}), 201
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/students', methods=['GET'])
-def get_students():
-    status = request.args.get('status', 'unreviewed')
-    search = request.args.get('search', '')
-    company = request.args.get('company', '')
-    passed = request.args.get('passed', '')
-    examined = request.args.get('examined', '')
-    
-    conn = get_db_connection()
-    
-    # Base query
-    if status == 'examined':
-        # Special case for examined status
-        query = "SELECT * FROM students WHERE ((theory_exam_time IS NOT NULL AND theory_exam_time != '') OR (practical_exam_time IS NOT NULL AND practical_exam_time != ''))"
-        params = []
-    else:
-        query = "SELECT * FROM students WHERE status = ?"
-        params = [status]
-        
-        # For 'reviewed' status, exclude students who have already taken exams
-        if status == 'reviewed':
-            query += " AND ((theory_exam_time IS NULL OR theory_exam_time = '') AND (practical_exam_time IS NULL OR practical_exam_time = ''))"
-        
-
-    if search:
-        query += " AND (name LIKE ? OR id_card LIKE ? OR phone LIKE ?)"
-        params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
-
-    if company:
-        query += " AND company LIKE ?"
-        params.append(f"%{company}%")
-
-    if passed:
-        query += " AND passed = ?"
-        params.append(passed)
-
-    if examined and status != 'examined':
-        query += " AND ((theory_exam_time IS NOT NULL AND theory_exam_time != '') OR (practical_exam_time IS NOT NULL AND practical_exam_time != ''))"
-        
-    students = conn.execute(query, params).fetchall()
-    conn.close()
-    
-    return jsonify([dict(s) for s in students])
-
-@app.route('/api/students/<int:id>', methods=['PUT', 'PATCH'])
-def update_student(id):
-    allowed_text = [
-        'name', 'gender', 'education', 'school', 'major', 'id_card', 'phone',
-        'company', 'company_address', 'job_category', 'exam_project', 'exam_code',
-        'exam_category', 'theory_exam_time', 'practical_exam_time', 'passed',
-        'theory_makeup_time', 'makeup_exam'
-    ]
-    file_map = {
-        'photo': 'photo_path',
-        'diploma': 'diploma_path',
-        'cert_front': 'cert_front_path',
-        'cert_back': 'cert_back_path',
-        'id_card_front': 'id_card_front_path',
-        'id_card_back': 'id_card_back_path'
-    }
-    conn = get_db_connection()
-    current = conn.execute('SELECT * FROM students WHERE id = ?', (id,)).fetchone()
-    if not current:
-        conn.close()
-        return jsonify({'error': 'Student not found'}), 404
-    updates = {}
-    # Prefer form data when present (multipart), else JSON
-    if request.form:
-        data = request.form
-        for k in allowed_text:
-            if k in data:
-                updates[k] = data[k]
-        # Validate present text fields (partial update)
-        errors = {}
-        if 'gender' in data and data.get('gender') not in ['男', '女']:
-            errors['gender'] = '性别须为“男”或“女”'
-        if 'id_card' in data and not re.fullmatch(r'\d{17}[\dXx]', data.get('id_card', '')):
-            errors['id_card'] = '身份证号格式不正确'
-        if 'phone' in data and not re.fullmatch(r'\d{11}', data.get('phone', '')):
-            errors['phone'] = '手机号格式不正确'
-        if errors:
-            conn.close()
-            return jsonify({'error': 'validation_failed', 'fields': errors}), 400
-        for input_name, db_key in file_map.items():
-            f = request.files.get(input_name)
-            if f and f.filename:
-                # Determine id_card and name to use for naming (prefer updated ones if provided)
-                id_card_for_name = data.get('id_card', current['id_card'])
-                name_for_save = data.get('name', current['name'])
-                company_for_name = data.get('company', current['company']) or current['company'] or ''
-                # delete old file if exists
-                old_rel = current[db_key]
-                if old_rel:
-                    # Handle both old and new path formats
-                    if old_rel.startswith('students/'):
-                        # New format: students/<id_card><name>/filename
-                        old_abs = os.path.join(BASE_DIR, old_rel)
-                    else:
-                        # Old format: uploads/filename
-                        old_fn = os.path.basename(old_rel)
-                        old_abs = os.path.join(app.config['UPLOAD_FOLDER'], old_fn)
-                    
-                    if os.path.exists(old_abs):
-                        try:
-                            os.remove(old_abs)
-                            
-                            # If it was in a student folder, try to remove empty folder
-                            if old_rel.startswith('students/'):
-                                folder_path = os.path.dirname(old_abs)
-                                if os.path.isdir(folder_path) and not os.listdir(folder_path):
-                                    os.rmdir(folder_path)  # Remove empty student folder
-                        except Exception:
-                            pass
-                try:
-                    rel = process_and_save_file(f, id_card_for_name, name_for_save, input_name, company_for_name)
-                    updates[db_key] = rel
-                except Exception:
-                    updates[db_key] = ''
-    else:
-        payload = request.get_json(silent=True) or {}
-        for k in allowed_text:
-            if k in payload:
-                updates[k] = payload[k]
-        # Validate present text fields (partial update)
-        errors = {}
-        if 'gender' in payload and payload.get('gender') not in ['男', '女']:
-            errors['gender'] = '性别须为“男”或“女”'
-        if 'id_card' in payload and not re.fullmatch(r'\d{17}[\dXx]', payload.get('id_card', '')):
-            errors['id_card'] = '身份证号格式不正确'
-        if 'phone' in payload and not re.fullmatch(r'\d{11}', payload.get('phone', '')):
-            errors['phone'] = '手机号格式不正确'
-        if errors:
-            conn.close()
-            return jsonify({'error': 'validation_failed', 'fields': errors}), 400
-    if not updates:
-        conn.close()
-        return jsonify({'error': 'no fields to update'}), 400
-    sets = ', '.join([f"{k} = ?" for k in updates.keys()])
-    values = list(updates.values()) + [id]
-    conn.execute(f"UPDATE students SET {sets} WHERE id = ?", values)
-    conn.commit()
-    student = conn.execute('SELECT * FROM students WHERE id = ?', (id,)).fetchone()
-    conn.close()
-    return jsonify(dict(student))
-
-
-
-@app.route('/api/students/<int:id>/reject', methods=['POST'])
-def reject_student(id):
-    conn = get_db_connection()
-    student = conn.execute('SELECT * FROM students WHERE id = ?', (id,)).fetchone()
-    
-    if not student:
-        conn.close()
-        return jsonify({'error': 'Student not found'}), 404
-        
-    # Delete files
-    for key in ['photo_path', 'diploma_path', 'cert_front_path', 'cert_back_path', 'id_card_front_path', 'id_card_back_path', 'training_form_path']:
-        if student[key]:
-            # Handle both old and new path formats
-            if student[key].startswith('students/'):
-                # New format: students/<company>-<name>/filename
-                file_path = os.path.join(BASE_DIR, student[key])
-            else:
-                # Old format: uploads/filename
-                filename = os.path.basename(student[key])
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                
-                # If it was in a student folder, try to remove empty folder
-                if student[key].startswith('students/'):
-                    folder_path = os.path.dirname(file_path)
-                    if os.path.isdir(folder_path) and not os.listdir(folder_path):
-                        os.rmdir(folder_path)  # Remove empty student folder
-            
-    conn.execute('DELETE FROM students WHERE id = ?', (id,))
-    conn.commit()
-    conn.close()
-    return jsonify({'message': 'Student rejected and deleted'})
-
-@app.route('/api/students/<int:id>/approve', methods=['POST'])
-def approve_student(id):
-    conn = get_db_connection()
-    exists = conn.execute('SELECT id FROM students WHERE id = ?', (id,)).fetchone()
-    if not exists:
-        conn.close()
-        return jsonify({'error': 'Student not found'}), 404
-    conn.execute("UPDATE students SET status = 'reviewed' WHERE id = ?", (id,))
-    conn.commit()
-    student = conn.execute('SELECT * FROM students WHERE id = ?', (id,)).fetchone()
-    conn.close()
-    return jsonify(dict(student))
-
-
-@app.route('/api/students/<int:id>/generate', methods=['POST'])
-def generate_materials(id):
-    conn = get_db_connection()
-    student = conn.execute('SELECT * FROM students WHERE id = ?', (id,)).fetchone()
-    if not student:
-        conn.close()
-        return jsonify({'error': 'Student not found'}), 404
-
-    # Use company - name for student folder name with '-' separator
-    student_folder_name = f"{student['company']}-{student['name']}"
-    student_folder_path = os.path.join(app.config['STUDENTS_FOLDER'], student_folder_name)
-    os.makedirs(student_folder_path, exist_ok=True)
-
-    # Generate the physical examination form in the student's folder
-    doc_path = os.path.join(student_folder_path, f"{student['id_card']}{student['name']}-体检表.docx")
-    photo_abs_path = None
-    if student['photo_path']:
-        # Handle both old and new path formats for photo
-        if student['photo_path'].startswith('students/'):
-            # New format: students/<company>-<name>/filename
-            photo_abs_path = os.path.join(BASE_DIR, student['photo_path'])
-        else:
-            # Old format: uploads/filename
-            filename = os.path.basename(student['photo_path'])
-            photo_abs_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    generate_word_doc(app.config['TEMPLATE_PATH'], doc_path, student, photo_abs_path)
-
-    # store generated docx relative path in DB and return download url (pointing to student folder)
-    rel_path = f"students/{student_folder_name}/{os.path.basename(doc_path)}"
-    conn.execute('UPDATE students SET training_form_path = ? WHERE id = ?', (rel_path, id))
-    conn.commit()
-    conn.close()
-    download_url = f"/students/{student_folder_name}/{os.path.basename(doc_path)}"
-    return jsonify({'message': 'materials generated', 'download_url': download_url, 'path': rel_path})
-
-
-@app.route('/api/students/<int:id>/attachments.zip', methods=['GET'])
-def download_attachments_zip(id):
-    try:
-        import io, zipfile
-        conn = get_db_connection()
-        student_row = conn.execute('SELECT * FROM students WHERE id = ?', (id,)).fetchone()
-        conn.close()
-        if not student_row:
-            return jsonify({'error': 'Student not found'}), 404
-        student = dict(student_row)
-        if student.get('status') != 'reviewed':
-            return jsonify({'error': '仅支持已审核学员打包下载'}), 400
-
-        attachment_keys = [
-            'photo_path',
-            'diploma_path',
-            'cert_front_path',
-            'cert_back_path',
-            'id_card_front_path',
-            'id_card_back_path',
-            'training_form_path'
-        ]
-        files_to_zip = []
-        for key in attachment_keys:
-            rel = student.get(key, '')
-            if not rel:
-                continue
-            abs_path = os.path.join(BASE_DIR, rel)
-            if os.path.exists(abs_path) and os.path.isfile(abs_path):
-                arcname = f"{os.path.basename(abs_path)}"
-                files_to_zip.append((abs_path, arcname))
-
-        if not files_to_zip:
-            return jsonify({'error': '该学员暂无可打包的附件'}), 400
-
-        buffer = io.BytesIO()
-        with zipfile.ZipFile(buffer, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
-            for abs_path, arcname in files_to_zip:
-                try:
-                    zf.write(abs_path, arcname)
-                except Exception:
-                    pass
-        buffer.seek(0)
-
-        from flask import send_file
-        safe_name = f"{student.get('id_card','')}-{student.get('name','')}".replace('/', '-').replace('\\', '-')
-        return send_file(
-            buffer,
-            mimetype='application/zip',
-            as_attachment=True,
-            download_name=f"{safe_name}.zip"
-        )
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-def generate_word_doc(template_path, output_path, data, photo_path=None):
-    doc = Document(template_path)
-
-    # 1. Text Replacement (Preserving Style)
-    replacements = {
-        '姓名': data['name'],
-        '性别': data['gender'],
-        '身份证号': data['id_card'],
-        '申请作业种类': data['job_category'],  
-        '申请作业项目（代号）': data['exam_code'],
-    }
-
-    for table in doc.tables:
-        for row in table.rows:
-            for i, cell in enumerate(row.cells):
-                text = cell.text.strip()
-                if text in replacements:
-                    # Look for the next cell
-                    if i + 1 < len(row.cells):
-                        target_cell = row.cells[i+1]
-
-                        # Safety check: Don't overwrite if the target cell is also a known label
-                        # This prevents issues with merged cells or repeated labels like "移动电话 | 移动电话"
-                        if target_cell.text.strip() in replacements:
-                            continue
-
-                        new_val = replacements[text]
-
-                        # Replace text in the first run of the first paragraph to preserve formatting
-                        if target_cell.paragraphs:
-                            p = target_cell.paragraphs[0]
-                            if p.runs:
-                                p.runs[0].text = new_val
-                                # Clear other runs in this paragraph
-                                for r in p.runs[1:]:
-                                    r.text = ''
-                            else:
-                                # No runs, add one (formatting might be default, but better than nothing)
-                                p.add_run(new_val)
-
-                            # Clear other paragraphs in the cell
-                            for p in target_cell.paragraphs[1:]:
-                                p.clear()
-                        else:
-                            target_cell.text = new_val
-
-    # 2. Image Replacement: directly use the already-processed uploaded photo
-    if photo_path and os.path.exists(photo_path):
-        try:
-            # 处理照片背景：使用rembg将背景替换为白色
-            temp_photo_path = None
-            try:
-                import tempfile
-                temp_fd, temp_photo_path = tempfile.mkstemp(suffix='.jpg')
-                os.close(temp_fd)
-                # 调用背景替换函数
-                processed_photo_path = change_id_photo_bg(photo_path, temp_photo_path)
-                if processed_photo_path == temp_photo_path:
-                    photo_to_use = processed_photo_path
-                else:
-                    photo_to_use = photo_path
-            except Exception as e:
-                print(f"背景处理失败，使用原照片: {e}")
-                photo_to_use = photo_path
-                temp_photo_path = None
-
-            # Load photo (already processed during upload with face detection and one-inch sizing)
-            with open(photo_to_use, 'rb') as f:
-                img_bytes = f.read()
-
-            # Default target (one-inch portrait 2.5x3.5cm) in inches
-            default_w_in = 2.5 / 2.54  # ~0.984in
-            default_h_in = 3.5 / 2.54  # ~1.378in
-
-            # First: try inserting into a table cell (preferred)
-            replaced = False
-            target_cell = None
-            found_table = None
-            found_row_idx = None
-            found_col_idx = None
-            # First look for a cell that contains the word '照' or '照片' (common markers)
-            for ti, table in enumerate(doc.tables):
-                for ri, row in enumerate(table.rows):
-                    for ci, cell in enumerate(row.cells):
-                        txt = cell.text.strip()
-                        if '照片' in txt or '照' in txt:
-                            target_cell = cell
-                            found_table = table
-                            found_row_idx = ri
-                            found_col_idx = ci
-                            break
-                    if target_cell:
-                        break
-                if target_cell:
-                    break
-
-            # Fallback: choose top-right cell of the first table
-            if not target_cell and len(doc.tables) > 0:
-                tbl = doc.tables[0]
-                target_cell = tbl.cell(0, len(tbl.rows[0].cells)-1)
-                found_table = tbl
-                found_row_idx = 0
-                found_col_idx = len(tbl.rows[0].cells)-1
-
-            if target_cell:
-                # Determine target cell size in inches
-                ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
-                try:
-                    cell_root = etree.fromstring(target_cell._tc.xml.encode('utf-8'))
-                except Exception:
-                    cell_root = None
-                tcW = None
-                if cell_root is not None:
-                    tcW = cell_root.xpath('.//w:tcPr/w:tcW', namespaces=ns)
-                if tcW:
-                    try:
-                        w_val = int(tcW[0].get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w'))
-                        w_type = tcW[0].get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}type')
-                        if w_type == 'dxa':
-                            target_w_in = w_val / 1440.0
-                        else:
-                            target_w_in = default_w_in
-                    except Exception:
-                        target_w_in = default_w_in
-                else:
-                    # fallback to table gridCol width
-                    try:
-                        tbl_root = etree.fromstring(found_table._tbl.xml.encode('utf-8'))
-                        gridCols = tbl_root.xpath('.//w:tblGrid/w:gridCol', namespaces=ns)
-                        if gridCols and found_col_idx is not None and found_col_idx < len(gridCols):
-                            gv = int(gridCols[found_col_idx].get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w'))
-                            target_w_in = gv / 1440.0
-                        else:
-                            target_w_in = default_w_in
-                    except Exception:
-                        target_w_in = default_w_in
-
-                # We'll derive target height from target width to avoid tiny template row-height values
-                try:
-                    if 'target_w_in' in locals():
-                        if not target_w_in or target_w_in <= 0 or target_w_in > 20:
-                            target_w_in = None
-                except Exception:
-                    target_w_in = None
-
-                if 'target_w_in' in locals() and target_w_in:
-                    tgt_w = target_w_in
-                    # assume portrait 2.5x3.5cm aspect ratio (one-inch portrait)
-                    tgt_h = tgt_w * (3.5 / 2.5)
-                else:
-                    tgt_w = default_w_in
-                    tgt_h = default_h_in
-
-                # Ensure minimum sensible physical size to avoid extremely thin image
-                min_w_in = 0.6
-                min_h_in = 0.8
-                if tgt_w < min_w_in:
-                    tgt_w = min_w_in
-                if tgt_h < min_h_in:
-                    tgt_h = min_h_in
-
-                # Crop source image to target aspect ratio (cover)
-                try:
-                    # Load source image (already processed during upload)
-                    src_img = Image.open(io.BytesIO(img_bytes)).convert('RGB')
-                    src_w, src_h = src_img.size
-
-                    # resize to fit target box while preserving original aspect ratio
-                    dpi = 300
-                    px_w = max(120, int(tgt_w * dpi))
-                    px_h = max(160, int(tgt_h * dpi))
-                    scale = min(px_w / src_w, px_h / src_h)
-                    new_w = max(1, int(src_w * scale))
-                    new_h = max(1, int(src_h * scale))
-                    resized_img = src_img.resize((new_w, new_h), Image.LANCZOS)
-
-                    # Paste onto white canvas of exact target pixels so we don't over-crop
-                    canvas = Image.new('RGB', (px_w, px_h), (255, 255, 255))
-                    paste_left = (px_w - new_w) // 2
-                    paste_top = (px_h - new_h) // 2
-                    canvas.paste(resized_img, (paste_left, paste_top))
-
-                    out_bio = io.BytesIO()
-                    canvas.save(out_bio, format='JPEG', quality=95)
-                    img_bytes_final = out_bio.getvalue()
-
-                    # clear existing paragraphs
-                    for p in list(target_cell.paragraphs):
-                        p.clear()
-                    p = target_cell.paragraphs[0]
-                    try:
-                        p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-                    except Exception:
-                        pass
-                    run = p.add_run()
-                    bio2 = io.BytesIO(img_bytes_final)
-                    # insert with target sizes
-                    try:
-                        run.add_picture(bio2, width=Inches(tgt_w), height=Inches(tgt_h))
-                    except TypeError:
-                        bio2.seek(0)
-                        run.add_picture(bio2, width=Inches(tgt_w))
-                    # make sure fallback replacement uses this final bytes
-                    img_bytes = img_bytes_final
-                    replaced = True
-                except Exception as e:
-                    print(f"Error preparing/resizing picture for cell: {e}")
-
-            # If insertion didn't happen, fall back to replacing existing image rels
-            if not replaced:
-                # Find first image relationship (blip) in document part relationships
-                blip_rid = None
-                for rel in doc.part.rels:
-                    # relationship objects have reltype; image reltypes contain 'image'
-                    try:
-                        rel_obj = doc.part.rels[rel]
-                        if getattr(rel_obj, 'reltype', '').endswith('/image') or 'image' in getattr(rel_obj.target_part, '__class__', '').lower():
-                            blip_rid = rel
-                            break
-                    except Exception:
-                        continue
-
-                # fallback: search paragraphs xml for r:embed
-                if not blip_rid:
-                    import re
-                    for p in doc.paragraphs:
-                        xml = p._element.xml
-                        if 'r:embed="' in xml:
-                            match = re.search(r'r:embed="([^\"]+)"', xml)
-                            if match:
-                                blip_rid = match.group(1)
-                                break
-
-                if blip_rid and blip_rid in doc.part.rels:
-                    try:
-                        doc.part.rels[blip_rid].target_part._blob = img_bytes
-                        replaced = True
-                    except Exception:
-                        try:
-                            with open(output_path + '.tmp.jpg', 'wb') as f:
-                                f.write(img_bytes)
-                            doc.part.rels[blip_rid].target_part._blob = img_bytes
-                            replaced = True
-                        except Exception:
-                            replaced = False
-        except Exception as e:
-            print(f"Error processing or replacing image: {e}")
-        finally:
-            # 清理临时文件
-            if 'temp_photo_path' in locals() and temp_photo_path and os.path.exists(temp_photo_path):
-                try:
-                    os.remove(temp_photo_path)
-                except Exception:
-                    pass
-
-    doc.save(output_path)
-
-
-@app.route('/uploads/<path:filename>')
-def serve_uploads(filename):
-    # Check if file exists in the old uploads folder
-    if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], filename)):
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-    # If not found in uploads, try to serve from students folder structure
-    # Format: <company>-<name>/<actual_filename>
-    parts = filename.split('/', 1)
-    if len(parts) == 2:
-        student_folder, actual_filename = parts
-        student_path = os.path.join(app.config['STUDENTS_FOLDER'], student_folder, actual_filename)
-        if os.path.exists(student_path):
-            return send_from_directory(os.path.join(app.config['STUDENTS_FOLDER'], student_folder), actual_filename)
-    # If file doesn't exist in either location, return 404
-    return "File not found", 404
-
-@app.route('/students/<path:filename>')
-def serve_students(filename):
-    # Serve files from the students folder structure
-    # Format: <company>-<name>/<actual_filename>
-    parts = filename.split('/', 1)
-    if len(parts) == 2:
-        student_folder, actual_filename = parts
-        return send_from_directory(os.path.join(app.config['STUDENTS_FOLDER'], student_folder), actual_filename)
-    else:
-        # If no subfolder is specified, try to serve directly from students folder
-        return send_from_directory(app.config['STUDENTS_FOLDER'], filename)
-
-@app.route('/api/companies', methods=['GET'])
-def get_companies():
-    conn = get_db_connection()
-    
-    # Get query parameters for filtering
-    status = request.args.get('status', '')
-    company_filter = request.args.get('company', '')
-    passed = request.args.get('passed', '')
-    
-    # Build query with optional filters
-    query = "SELECT DISTINCT company FROM students WHERE company IS NOT NULL AND company != ''"
-    params = []
-    
-    # Handle status filter with special logic for 'examined'
-    if status == 'examined':
-        query += " AND ((theory_exam_time IS NOT NULL AND theory_exam_time != '') OR (practical_exam_time IS NOT NULL AND practical_exam_time != ''))"
-    elif status:
-        query += " AND status = ?"
-        params.append(status)
-        # For 'reviewed', ensure not yet taken exams
-        if status == 'reviewed':
-            query += " AND ((theory_exam_time IS NULL OR theory_exam_time = '') AND (practical_exam_time IS NULL OR practical_exam_time = ''))"
-    
-    if company_filter:
-        query += " AND company LIKE ?"
-        params.append(f"%{company_filter}%")
-    
-    if passed:
-        query += " AND passed = ?"
-        params.append(passed)
-    
-    query += " ORDER BY company"
-    
-    companies = conn.execute(query, params).fetchall()
-    conn.close()
-    return jsonify([dict(c)['company'] for c in companies])
-
-@app.route('/api/students/batch/approve', methods=['POST'])
-def batch_approve_students():
-    try:
-        data = request.get_json()
-        if not data or 'ids' not in data:
-            return jsonify({'error': 'Missing student IDs'}), 400
-        
-        ids = data['ids']
-        if not isinstance(ids, list):
-            return jsonify({'error': 'IDs must be a list'}), 400
-        
-        conn = get_db_connection()
-        
-        # Update status for all selected students
-        placeholders = ','.join(['?'] * len(ids))
-        query = f"UPDATE students SET status = 'reviewed' WHERE id IN ({placeholders})"
-        conn.execute(query, ids)
-        conn.commit()
-        conn.close()
-        
-        return jsonify({'message': f'Successfully approved {len(ids)} students'}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/students/batch/reject', methods=['POST'])
-def batch_reject_students():
-    try:
-        data = request.get_json()
-        if not data or 'ids' not in data:
-            return jsonify({'error': 'Missing student IDs'}), 400
-        
-        ids = data['ids']
-        if not isinstance(ids, list):
-            return jsonify({'error': 'IDs must be a list'}), 400
-        
-        conn = get_db_connection()
-        
-        # Get all students to delete
-        placeholders = ','.join(['?'] * len(ids))
-        students = conn.execute(f"SELECT * FROM students WHERE id IN ({placeholders})", ids).fetchall()
-        
-        # Delete files for each student
-        for student in students:
-            for key in ['photo_path', 'diploma_path', 'cert_front_path', 'cert_back_path', 'id_card_front_path', 'id_card_back_path', 'training_form_path']:
-                if student[key]:
-                    # Handle both old and new path formats
-                    if student[key].startswith('students/'):
-                        # New format: students/<company>-<name>/filename
-                        file_path = os.path.join(BASE_DIR, student[key])
-                    else:
-                        # Old format: uploads/filename
-                        filename = os.path.basename(student[key])
-                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                    
-                    if os.path.exists(file_path):
-                        os.remove(file_path)
-                        
-                        # If it was in a student folder, try to remove empty folder
-                        if student[key].startswith('students/'):
-                            folder_path = os.path.dirname(file_path)
-                            if os.path.isdir(folder_path) and not os.listdir(folder_path):
-                                os.rmdir(folder_path)  # Remove empty student folder
-        
-        # Delete students from database
-        conn.execute(f"DELETE FROM students WHERE id IN ({placeholders})", ids)
-        conn.commit()
-        conn.close()
-        
-        return jsonify({'message': f'Successfully rejected and deleted {len(ids)} students'}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/students/batch/delete', methods=['POST'])
-def batch_delete_students():
-    try:
-        data = request.get_json()
-        if not data or 'ids' not in data:
-            return jsonify({'error': 'Missing student IDs'}), 400
-
-        ids = data['ids']
-        if not isinstance(ids, list):
-            return jsonify({'error': 'IDs must be a list'}), 400
-
-        conn = get_db_connection()
-
-        # Get all students to delete
-        placeholders = ','.join(['?'] * len(ids))
-        students = conn.execute(f"SELECT * FROM students WHERE id IN ({placeholders})", ids).fetchall()
-
-        # Delete files for each student
-        for student in students:
-            for key in ['photo_path', 'diploma_path', 'cert_front_path', 'cert_back_path', 'id_card_front_path', 'id_card_back_path', 'training_form_path']:
-                if student[key]:
-                    # Handle both old and new path formats
-                    if student[key].startswith('students/'):
-                        # New format: students/<company>-<name>/filename
-                        file_path = os.path.join(BASE_DIR, student[key])
-                    else:
-                        # Old format: uploads/filename
-                        filename = os.path.basename(student[key])
-                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-
-                    if os.path.exists(file_path):
-                        os.remove(file_path)
-
-                        # If it was in a student folder, try to remove empty folder
-                        if student[key].startswith('students/'):
-                            folder_path = os.path.dirname(file_path)
-                            if os.path.isdir(folder_path) and not os.listdir(folder_path):
-                                os.rmdir(folder_path)  # Remove empty student folder
-
-        # Delete students from database
-        conn.execute(f"DELETE FROM students WHERE id IN ({placeholders})", ids)
-        conn.commit()
-        conn.close()
-
-        return jsonify({'message': f'Successfully deleted {len(ids)} students'}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/export/excel', methods=['GET'])
-def export_excel():
-    try:
-        import io
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, Alignment, Border, Side
-        from openpyxl.utils import get_column_letter
-        
-        # Get query parameters
-        status = request.args.get('status', '')
-        company = request.args.get('company', '')
-        passed = request.args.get('passed', '')
-        
-        # Build query
-        query = "SELECT * FROM students WHERE 1=1"
-        params = []
-        
-        # Handle status filter with special logic for 'examined'
-        if status == 'examined':
-            query += " AND ((theory_exam_time IS NOT NULL AND theory_exam_time != '') OR (practical_exam_time IS NOT NULL AND practical_exam_time != ''))"
-        elif status:
-            query += " AND status = ?"
-            params.append(status)
-            # For 'reviewed', ensure not yet taken exams
-            if status == 'reviewed':
-                query += " AND ((theory_exam_time IS NULL OR theory_exam_time = '') AND (practical_exam_time IS NULL OR practical_exam_time = ''))"
-        
-        if company:
-            query += " AND company LIKE ?"
-            params.append(f"%{company}%")
-        
-        if passed:
-            query += " AND passed = ?"
-            params.append(passed)
-        
-        # Execute query
-        conn = get_db_connection()
-        students = conn.execute(query, params).fetchall()
-        conn.close()
-        
-        # Create workbook
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "学员信息"
-        
-        # Define headers
-        headers = [
-            'ID', '姓名', '性别', '文化程度', '毕业院校', '所学专业', 
-            '身份证号', '手机号', '单位名称', '单位地址', 
-            '作业类别', '操作项目', '项目代码', '考试类别',
-            '状态', '创建时间', '理论考试时间', '实操考试时间', 
-            '是否通过', '理论补考时间', '是否补考'
-        ]
-        
-        # Add headers to worksheet
-        for col_num, header in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col_num, value=header)
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal='center', vertical='center')
-            cell.border = Border(
-                left=Side(style='thin'),
-                right=Side(style='thin'),
-                top=Side(style='thin'),
-                bottom=Side(style='thin')
-            )
-        
-        # Add data rows
-        for row_num, student in enumerate(students, 2):
-            data = [
-                student['id'],
-                student['name'],
-                student['gender'],
-                student['education'],
-                student['school'],
-                student['major'],
-                student['id_card'],
-                student['phone'],
-                student['company'],
-                student['company_address'],
-                student['job_category'],
-                student['exam_project'],
-                student['exam_code'],
-                student['exam_category'],
-                '已审核' if student['status'] == 'reviewed' else ('已考试' if student['status'] == 'examined' else '未审核'),
-                student['created_at'],
-                student['theory_exam_time'],
-                student['practical_exam_time'],
-                student['passed'],
-                student['theory_makeup_time'],
-                student['makeup_exam']
-            ]
-            
-            for col_num, value in enumerate(data, 1):
-                cell = ws.cell(row=row_num, column=col_num, value=str(value) if value is not None else '')
-                cell.alignment = Alignment(horizontal='left', vertical='center')
-                cell.border = Border(
-                    left=Side(style='thin'),
-                    right=Side(style='thin'),
-                    top=Side(style='thin'),
-                    bottom=Side(style='thin')
-                )
-        
-        # Auto-adjust column widths
-        for column in ws.columns:
-            max_length = 0
-            column_letter = get_column_letter(column[0].column)
-            
-            for cell in column:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            
-            adjusted_width = min(max_length + 2, 50)  # Limit max width
-            ws.column_dimensions[column_letter].width = adjusted_width
-        
-        # Save to BytesIO
-        output = io.BytesIO()
-        wb.save(output)
-        output.seek(0)
-        
-        # Return Excel file
-        from flask import send_file
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=f'学员信息_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-        )
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-def run_migration():
-    """Run the migration function directly from command line"""
-    print("开始运行迁移函数...")
-    migrate_existing_files()
-    print("迁移完成！")
+# Create application instance
+app = create_app()
 
 
 if __name__ == '__main__':
     import sys
     if len(sys.argv) > 1 and sys.argv[1] == 'migrate':
-        run_migration()
+        print("开始运行迁移函数...")
+        _migrate_existing_files(app)
+        print("迁移完成！")
     else:
-        app.run(debug=True, host='0.0.0.0',port=5001)
+        # Use environment variable for debug mode
+        debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+        app.run(debug=debug_mode, host='0.0.0.0', port=5001)
