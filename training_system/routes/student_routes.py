@@ -9,6 +9,7 @@ from services.image_service import process_and_save_file, delete_student_files
 from services.document_service import generate_word_doc
 from utils.validators import validate_student_data
 from utils.error_handlers import ValidationError, NotFoundError
+from utils.constants import FILE_MAP, ALLOWED_TEXT_FIELDS, ATTACHMENT_KEYS
 import os
 import io
 import zipfile
@@ -24,24 +25,13 @@ def create_student_route():
         data = request.form
         files = request.files
 
-        # Validate data
         validate_student_data(data)
 
-        # Save files
         file_paths = {}
-        file_map = {
-            'photo': 'photo_path',
-            'diploma': 'diploma_path',
-            'cert_front': 'cert_front_path',
-            'cert_back': 'cert_back_path',
-            'id_card_front': 'id_card_front_path',
-            'id_card_back': 'id_card_back_path'
-        }
-
         id_card_val = data.get('id_card', '').strip()
         company_val = data.get('company', '').strip()
 
-        for input_name, db_key in file_map.items():
+        for input_name, db_key in FILE_MAP.items():
             file = files.get(input_name)
             if file and file.filename and id_card_val:
                 try:
@@ -93,44 +83,25 @@ def get_students_route():
 def update_student_route(id):
     """Update a student."""
     try:
-        allowed_text = [
-            'name', 'gender', 'education', 'school', 'major', 'id_card', 'phone',
-            'company', 'company_address', 'job_category', 'exam_project', 'exam_code',
-            'exam_category', 'theory_exam_time', 'practical_exam_time', 'passed',
-            'theory_makeup_time', 'makeup_exam'
-        ]
-        file_map = {
-            'photo': 'photo_path',
-            'diploma': 'diploma_path',
-            'cert_front': 'cert_front_path',
-            'cert_back': 'cert_back_path',
-            'id_card_front': 'id_card_front_path',
-            'id_card_back': 'id_card_back_path'
-        }
-
         current_student = get_student_by_id(id)
         updates = {}
 
-        # Handle form data (multipart) or JSON
         if request.form:
             data = request.form
-            for k in allowed_text:
+            for k in ALLOWED_TEXT_FIELDS:
                 if k in data:
                     updates[k] = data[k]
 
-            # Validate partial update
             if updates:
                 validate_student_data(updates, required_fields=[])
 
-            # Handle file uploads
-            for input_name, db_key in file_map.items():
+            for input_name, db_key in FILE_MAP.items():
                 f = request.files.get(input_name)
                 if f and f.filename:
                     id_card_for_name = data.get('id_card', current_student['id_card'])
                     name_for_save = data.get('name', current_student['name'])
                     company_for_name = data.get('company', current_student.get('company', ''))
 
-                    # Delete old file
                     old_rel = current_student.get(db_key)
                     if old_rel:
                         delete_student_files({db_key: old_rel}, current_app.config['BASE_DIR'])
@@ -145,7 +116,7 @@ def update_student_route(id):
                         updates[db_key] = ''
         else:
             payload = request.get_json(silent=True) or {}
-            for k in allowed_text:
+            for k in ALLOWED_TEXT_FIELDS:
                 if k in payload:
                     updates[k] = payload[k]
 
@@ -264,13 +235,8 @@ def download_attachments_zip_route(id):
         if student.get('status') != 'reviewed':
             return jsonify({'error': '仅支持已审核学员打包下载'}), 400
 
-        attachment_keys = [
-            'photo_path', 'diploma_path', 'cert_front_path', 'cert_back_path',
-            'id_card_front_path', 'id_card_back_path', 'training_form_path'
-        ]
-
         files_to_zip = []
-        for key in attachment_keys:
+        for key in ATTACHMENT_KEYS:
             rel = student.get(key, '')
             if not rel:
                 continue

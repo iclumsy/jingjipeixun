@@ -231,30 +231,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Debounce function for auto-save
-    function debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    }
+    // Debounce function for auto-save (using utils.js)
     
     // Auto-save function with status feedback
     const autoSave = debounce(async (studentId) => {
         if (!studentId) return;
         
-        // Show saving status
-        showSaveStatus('保存中...', 'info');
+        showSaveStatus(mainContent, '保存中...', 'info');
         
         try {
             const formData = new FormData();
             
-            // Get all input elements including those in exam fields
             const allInputs = mainContent.querySelectorAll('input[data-key], select[data-key]');
             allInputs.forEach(input => {
                 const key = input.getAttribute('data-key');
@@ -271,122 +258,16 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const updated = await res.json();
             
-            // Show success status
-            showSaveStatus('保存成功', 'success');
+            showSaveStatus(mainContent, '保存成功', 'success');
             
-            // Update local student data
             const idx = students.findIndex(s => s.id === studentId);
             if (idx >= 0) students[idx] = updated;
             
         } catch (e) {
             console.error('Auto-save error:', e);
-            showSaveStatus('保存失败', 'error');
+            showSaveStatus(mainContent, '保存失败', 'error');
         }
-    }, 1000); // 1 second debounce
-    
-    // Show save status feedback
-    function showSaveStatus(message, type = 'info') {
-        // Remove existing status if any
-        const existingStatus = mainContent.querySelector('.save-status');
-        if (existingStatus) {
-            existingStatus.remove();
-        }
-
-        // Create status element
-        const statusElement = document.createElement('div');
-        statusElement.className = `save-status ${type}`;
-        statusElement.style.position = 'fixed';
-        statusElement.style.top = '20px';
-        statusElement.style.right = '20px';
-        statusElement.style.padding = '10px 15px';
-        statusElement.style.borderRadius = '4px';
-        statusElement.style.fontSize = '0.9rem';
-        statusElement.style.zIndex = '1000';
-        statusElement.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-        statusElement.style.transition = 'all 0.3s ease';
-
-        // Set styles based on type
-        if (type === 'success') {
-            statusElement.style.backgroundColor = '#dcfce7';
-            statusElement.style.color = '#166534';
-            statusElement.style.border = '1px solid #bbf7d0';
-        } else if (type === 'error') {
-            statusElement.style.backgroundColor = '#fee2e2';
-            statusElement.style.color = '#991b1b';
-            statusElement.style.border = '1px solid #fecaca';
-        } else {
-            statusElement.style.backgroundColor = '#dbeafe';
-            statusElement.style.color = '#1e40af';
-            statusElement.style.border = '1px solid #bfdbfe';
-        }
-
-        statusElement.textContent = message;
-        mainContent.appendChild(statusElement);
-
-        // Remove after 3 seconds
-        setTimeout(() => {
-            if (statusElement.parentNode) {
-                statusElement.style.opacity = '0';
-                statusElement.style.transform = 'translateX(100%)';
-                setTimeout(() => {
-                    statusElement.remove();
-                }, 300);
-            }
-        }, 3000);
-    }
-
-    // Show message function
-    function showMessage(message, type = 'info') {
-        // Remove existing message if any
-        const existingMessage = document.querySelector('.custom-message');
-        if (existingMessage) {
-            existingMessage.remove();
-        }
-
-        // Create message element
-        const messageElement = document.createElement('div');
-        messageElement.className = `custom-message ${type}`;
-        messageElement.style.position = 'fixed';
-        messageElement.style.top = '20px';
-        messageElement.style.right = '20px';
-        messageElement.style.padding = '15px 20px';
-        messageElement.style.borderRadius = '8px';
-        messageElement.style.fontSize = '0.95rem';
-        messageElement.style.zIndex = '10000';
-        messageElement.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-        messageElement.style.transition = 'all 0.3s ease';
-        messageElement.style.maxWidth = '400px';
-        messageElement.style.wordWrap = 'break-word';
-
-        // Set styles based on type
-        if (type === 'success') {
-            messageElement.style.backgroundColor = '#dcfce7';
-            messageElement.style.color = '#166534';
-            messageElement.style.border = '1px solid #bbf7d0';
-        } else if (type === 'error') {
-            messageElement.style.backgroundColor = '#fee2e2';
-            messageElement.style.color = '#991b1b';
-            messageElement.style.border = '1px solid #fecaca';
-        } else {
-            messageElement.style.backgroundColor = '#dbeafe';
-            messageElement.style.color = '#1e40af';
-            messageElement.style.border = '1px solid #bfdbfe';
-        }
-
-        messageElement.textContent = message;
-        document.body.appendChild(messageElement);
-
-        // Remove after 4 seconds
-        setTimeout(() => {
-            if (messageElement.parentNode) {
-                messageElement.style.opacity = '0';
-                messageElement.style.transform = 'translateY(-20px)';
-                setTimeout(() => {
-                    messageElement.remove();
-                }, 300);
-            }
-        }, 4000);
-    }
+    }, 1000);
 
     function showDetail(student) {
         currentStudentId = student.id;
@@ -408,56 +289,20 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const grid = clone.querySelector('.detail-grid');
         
-        // 二级联动下拉选项数据
-        const examProjectOptions = {
-            '电工作业': [
-                { value: '低压电工作业', text: '低压电工作业' },
-                { value: '高压电工作业', text: '高压电工作业' },
-                { value: '电力电缆作业', text: '电力电缆作业' },
-                { value: '电气试验作业', text: '电气试验作业' },
-                { value: '继电保护作业', text: '继电保护作业' },
-                { value: '防爆电气作业', text: '防爆电气作业' }
-            ],
-            '焊接与热切割作业': [
-                { value: '熔化焊接与热切割作业', text: '熔化焊接与热切割作业' }
-            ],
-            '高处作业': [
-                { value: '高处安装、维护、拆除作业', text: '高处安装、维护、拆除作业' },
-                { value: '登高架设作业', text: '登高架设作业' }
-            ]
-        };
-
         const editable = [
             { key: 'name', label: '姓名', required: true },
             { key: 'gender', label: '性别', required: true, pattern: '男|女', title: '请输入"男"或"女"' },
-            { key: 'education', label: '文化程度', required: true, type: 'select', options: [
-                { value: '', text: '请选择' },
-                { value: '研究生及以上', text: '研究生及以上' },
-                { value: '本科或同等学历', text: '本科或同等学历' },
-                { value: '专科或同等学历', text: '专科或同等学历' },
-                { value: '中专或同等学历', text: '中专或同等学历' },
-                { value: '高中或同等学历', text: '高中或同等学历' },
-                { value: '初中', text: '初中' }
-            ]},
+            { key: 'education', label: '文化程度', required: true, type: 'select', options: EducationOptions },
             { key: 'id_card', label: '身份证号', required: true, pattern: '\\d{17}[\\dXx]', title: '请输入正确的18位身份证号' },
             { key: 'phone', label: '手机号', required: true, pattern: '\\d{11}', title: '请输入11位手机号' },
             { key: 'school', label: '毕业院校' },
             { key: 'major', label: '所学专业' },
             { key: 'company', label: '单位名称' },
             { key: 'company_address', label: '单位地址' },
-            { key: 'job_category', label: '作业类别', required: true, type: 'select', options: [
-                { value: '', text: '请选择' },
-                { value: '电工作业', text: '电工作业' },
-                { value: '焊接与热切割作业', text: '焊接与热切割作业' },
-                { value: '高处作业', text: '高处作业' }
-            ]},
+            { key: 'job_category', label: '作业类别', required: true, type: 'select', options: JobCategoryOptions },
             { key: 'exam_project', label: '操作项目', required: true, type: 'select', options: [] },
             { key: 'exam_code', label: '项目代码' },
-            { key: 'exam_category', label: '考试类别', required: true, type: 'select', options: [
-                { value: '初次领证', text: '初次领证' },
-                { value: '复审', text: '复审' },
-                { value: '延期换证', text: '延期换证' }
-            ]}
+            { key: 'exam_category', label: '考试类别', required: true, type: 'select', options: ExamCategoryOptions }
         ];
         
         // Store the original student data for comparison
@@ -544,9 +389,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Clear exam project options
             projectSelect.innerHTML = '<option value="">请选择操作项目</option>';
             
-            if (selectedCategory && examProjectOptions[selectedCategory]) {
-                // Add corresponding exam project options
-                examProjectOptions[selectedCategory].forEach(option => {
+            if (selectedCategory && ExamProjectOptions[selectedCategory]) {
+                ExamProjectOptions[selectedCategory].forEach(option => {
                     const optionElement = document.createElement('option');
                     optionElement.value = option.value;
                     optionElement.textContent = option.text;
@@ -681,12 +525,12 @@ document.addEventListener('DOMContentLoaded', () => {
         filesContainer.style.padding = '10px 0';
         
         const fileMap = {
-            'photo_path': '个人照片',
-            'diploma_path': '学历证书',
-            'cert_front_path': '所持证件正面',
-            'cert_back_path': '所持证件反面',
-            'id_card_front_path': '身份证正面',
-            'id_card_back_path': '身份证反面'
+            'photo_path': FileLabelNameMap['photo'],
+            'diploma_path': FileLabelNameMap['diploma'],
+            'cert_front_path': FileLabelNameMap['cert_front'],
+            'cert_back_path': FileLabelNameMap['cert_back'],
+            'id_card_front_path': FileLabelNameMap['id_card_front'],
+            'id_card_back_path': FileLabelNameMap['id_card_back']
         };
         
         for (const [key, label] of Object.entries(fileMap)) {

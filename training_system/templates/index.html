@@ -92,7 +92,7 @@
                 <div class="form-group w-md">
                     <label>作业类别</label>
                     <span class="hint-slot"></span>
-                    <select name="job_category" id="job_category" required onchange="updateExamProjectOptions(this)">
+                    <select name="job_category" id="job_category" required onchange="updateExamProjectOptions(this, 'exam_project')">
                         <option value="">请选择</option>
                         <option value="电工作业">电工作业</option>
                         <option value="焊接与热切割作业">焊接与热切割作业</option>
@@ -192,44 +192,7 @@
         </div>
     </template>
 
+    <script src="/static/js/constants.js"></script>
     <script src="/static/js/script.js"></script>
-    <script>
-        // 二级联动下拉选项数据
-        const examProjectOptions = {
-            '电工作业': [
-                { value: '低压电工作业', text: '低压电工作业' },
-                { value: '高压电工作业', text: '高压电工作业' },
-                { value: '电力电缆作业', text: '电力电缆作业' },
-                { value: '电气试验作业', text: '电气试验作业' },
-                { value: '继电保护作业', text: '继电保护作业' },
-                { value: '防爆电气作业', text: '防爆电气作业' }
-            ],
-            '焊接与热切割作业': [
-                { value: '熔化焊接与热切割作业', text: '熔化焊接与热切割作业' }
-            ],
-            '高处作业': [
-                { value: '高处安装、维护、拆除作业', text: '高处安装、维护、拆除作业' },
-                { value: '登高架设作业', text: '登高架设作业' }
-            ]
-        };
-
-        function updateExamProjectOptions(categorySelect) {
-            const projectSelect = document.getElementById('exam_project');
-            const selectedCategory = categorySelect.value;
-            
-            // 清空操作项目下拉选项
-            projectSelect.innerHTML = '<option value="">请选择操作项目</option>';
-            
-            if (selectedCategory && examProjectOptions[selectedCategory]) {
-                // 添加对应的操作项目选项
-                examProjectOptions[selectedCategory].forEach(option => {
-                    const optionElement = document.createElement('option');
-                    optionElement.value = option.value;
-                    optionElement.textContent = option.text;
-                    projectSelect.appendChild(optionElement);
-                });
-            }
-        }
-    </script>
 </body>
 </html>

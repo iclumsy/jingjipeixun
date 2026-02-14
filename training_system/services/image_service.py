@@ -4,6 +4,7 @@ import io
 from PIL import Image, ImageOps
 import numpy as np
 from flask import current_app
+from utils.constants import ATTACHMENT_KEYS
 
 try:
     import cv2
@@ -174,11 +175,6 @@ def delete_student_files(student_record, base_dir):
         student_record: Student record dictionary
         base_dir: Base directory
     """
-    file_keys = [
-        'photo_path', 'diploma_path', 'cert_front_path', 'cert_back_path',
-        'id_card_front_path', 'id_card_back_path', 'training_form_path'
-    ]
-
-    for key in file_keys:
+    for key in ATTACHMENT_KEYS:
         if student_record.get(key):
             delete_file_if_exists(student_record[key], base_dir)

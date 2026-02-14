@@ -1,6 +1,7 @@
 """Data validation utilities."""
 import re
 from utils.error_handlers import ValidationError
+from utils.constants import REQUIRED_FIELDS, ALLOWED_EXTENSIONS
 
 
 def validate_student_data(data, required_fields=None):
@@ -18,27 +19,22 @@ def validate_student_data(data, required_fields=None):
         ValidationError: If validation fails
     """
     if required_fields is None:
-        required_fields = ['name', 'gender', 'education', 'id_card', 'phone',
-                          'job_category', 'exam_category']
+        required_fields = REQUIRED_FIELDS
 
     errors = {}
 
-    # Check required fields
     for field in required_fields:
         if not data.get(field):
             errors[field] = '必填项'
 
-    # Validate gender
     if 'gender' in data and data.get('gender') not in ['男', '女']:
         errors['gender'] = '性别须为"男"或"女"'
 
-    # Validate ID card
     if 'id_card' in data:
         id_card = data.get('id_card', '')
         if id_card and not re.fullmatch(r'\d{17}[\dXx]', id_card):
             errors['id_card'] = '身份证号格式不正确'
 
-    # Validate phone
     if 'phone' in data:
         phone = data.get('phone', '')
         if phone and not re.fullmatch(r'\d{11}', phone):
@@ -65,12 +61,11 @@ def validate_file_upload(file, allowed_extensions=None):
         ValidationError: If validation fails
     """
     if allowed_extensions is None:
-        allowed_extensions = {'jpg', 'jpeg', 'png', 'pdf', 'docx'}
+        allowed_extensions = ALLOWED_EXTENSIONS
 
     if not file or not file.filename:
         raise ValidationError('未选择文件')
 
-    # Check file extension
     if '.' not in file.filename:
         raise ValidationError('文件名无效')
 
