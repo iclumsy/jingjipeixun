@@ -1,18 +1,54 @@
 document.addEventListener('DOMContentLoaded', () => {
     let currentStatus = 'unreviewed';
     let currentStudentId = null;
+    let currentTrainingType = 'special_equipment';
     let students = [];
 
     const listContainer = document.getElementById('studentList');
     const mainContent = document.getElementById('mainContent');
     const searchInput = document.getElementById('searchInput');
-    const tabs = document.querySelectorAll('.tab');
     const detailTemplate = document.getElementById('detail-template');
     
     // Filter controls
     let currentFilters = {
         company: ''
     };
+    
+    // Get training type from global variable if present
+    if (window.trainingType) {
+        currentTrainingType = window.trainingType;
+    } else {
+        // Get training type from URL if present
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlTrainingType = urlParams.get('training_type');
+        if (urlTrainingType) {
+            currentTrainingType = urlTrainingType;
+        }
+    }
+    
+    // Update training type button active state
+    function updateTrainingTypeButtons() {
+        const btnSpecialOperation = document.getElementById('btnSpecialOperation');
+        const btnSpecialEquipment = document.getElementById('btnSpecialEquipment');
+        if (btnSpecialOperation && btnSpecialEquipment) {
+            if (currentTrainingType === 'special_operation') {
+                btnSpecialOperation.style.background = '#4f46e5';
+                btnSpecialOperation.style.color = '#fff';
+                btnSpecialOperation.style.borderColor = '#4f46e5';
+                btnSpecialEquipment.style.background = '#fff';
+                btnSpecialEquipment.style.color = '#333';
+                btnSpecialEquipment.style.borderColor = '#ddd';
+            } else {
+                btnSpecialEquipment.style.background = '#4f46e5';
+                btnSpecialEquipment.style.color = '#fff';
+                btnSpecialEquipment.style.borderColor = '#4f46e5';
+                btnSpecialOperation.style.background = '#fff';
+                btnSpecialOperation.style.color = '#333';
+                btnSpecialOperation.style.borderColor = '#ddd';
+            }
+        }
+    }
+    updateTrainingTypeButtons();
 
     // Init
     loadStudents();
@@ -26,7 +62,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             // Build query string with current filters and status
             const queryParams = new URLSearchParams({
-                status: status
+                status: status,
+                training_type: currentTrainingType
             });
             
             // Load students with current filters to get companies with data
@@ -76,36 +113,109 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Event Listeners
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            currentStatus = tab.dataset.status;
+    // Training type button click events
+    const btnSpecialOperation = document.getElementById('btnSpecialOperation');
+    const btnSpecialEquipment = document.getElementById('btnSpecialEquipment');
+    
+    if (btnSpecialOperation) {
+        btnSpecialOperation.addEventListener('click', () => {
+            currentTrainingType = 'special_operation';
+            updateTrainingTypeButtons();
             loadStudents();
             loadCompanies(currentStatus);
-            // Reset company filter when changing tab
             if (companyFilter) {
                 companyFilter.value = '';
                 currentFilters.company = '';
             }
             mainContent.innerHTML = '<div class="empty-state">请选择左侧学员查看详情</div>';
             currentStudentId = null;
-            
-            // Don't close sidebar on mobile after selecting a tab
-            // Let user select a student first
         });
-    });
+    }
+    
+    if (btnSpecialEquipment) {
+        btnSpecialEquipment.addEventListener('click', () => {
+            currentTrainingType = 'special_equipment';
+            updateTrainingTypeButtons();
+            loadStudents();
+            loadCompanies(currentStatus);
+            if (companyFilter) {
+                companyFilter.value = '';
+                currentFilters.company = '';
+            }
+            mainContent.innerHTML = '<div class="empty-state">请选择左侧学员查看详情</div>';
+            currentStudentId = null;
+        });
+    }
+    
+    // Update status button active state
+    function updateStatusButtons() {
+        const btnUnreviewed = document.getElementById('btnUnreviewed');
+        const btnReviewed = document.getElementById('btnReviewed');
+        if (btnUnreviewed && btnReviewed) {
+            if (currentStatus === 'unreviewed') {
+                btnUnreviewed.style.background = '#4f46e5';
+                btnUnreviewed.style.color = '#fff';
+                btnUnreviewed.style.borderColor = '#4f46e5';
+                btnReviewed.style.background = '#fff';
+                btnReviewed.style.color = '#333';
+                btnReviewed.style.borderColor = '#ddd';
+            } else {
+                btnReviewed.style.background = '#4f46e5';
+                btnReviewed.style.color = '#fff';
+                btnReviewed.style.borderColor = '#4f46e5';
+                btnUnreviewed.style.background = '#fff';
+                btnUnreviewed.style.color = '#333';
+                btnUnreviewed.style.borderColor = '#ddd';
+            }
+        }
+    }
+    updateStatusButtons();
+    
+    // Status button click events
+    const btnUnreviewed = document.getElementById('btnUnreviewed');
+    const btnReviewed = document.getElementById('btnReviewed');
+    
+    if (btnUnreviewed) {
+        btnUnreviewed.addEventListener('click', () => {
+            currentStatus = 'unreviewed';
+            updateStatusButtons();
+            loadStudents();
+            loadCompanies(currentStatus);
+            if (companyFilter) {
+                companyFilter.value = '';
+                currentFilters.company = '';
+            }
+            mainContent.innerHTML = '<div class="empty-state">请选择左侧学员查看详情</div>';
+            currentStudentId = null;
+        });
+    }
+    
+    if (btnReviewed) {
+        btnReviewed.addEventListener('click', () => {
+            currentStatus = 'reviewed';
+            updateStatusButtons();
+            loadStudents();
+            loadCompanies(currentStatus);
+            if (companyFilter) {
+                companyFilter.value = '';
+                currentFilters.company = '';
+            }
+            mainContent.innerHTML = '<div class="empty-state">请选择左侧学员查看详情</div>';
+            currentStudentId = null;
+        });
+    }
 
-    searchInput.addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        const filtered = students.filter(s => 
-            s.name.toLowerCase().includes(term) || 
-            s.id_card.includes(term) || 
-            s.phone.includes(term)
-        );
-        renderList(filtered);
-    });
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            const filtered = students.filter(s => 
+                s.name.toLowerCase().includes(term) || 
+                s.id_card.includes(term) || 
+                s.phone.includes(term)
+            );
+            renderList(filtered);
+        });
+    }
     
     // Filter event listeners
     const companyFilter = document.getElementById('companyFilter');
@@ -139,7 +249,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Build query string with filters
             const queryParams = new URLSearchParams({
                 status: currentStatus,
-                company: currentFilters.company
+                company: currentFilters.company,
+                training_type: currentTrainingType
             });
             
             const res = await fetch(`/api/students?${queryParams.toString()}`);
@@ -410,6 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ]},
             { key: 'exam_project', label: '操作项目', required: true, type: 'select', options: [] },
             { key: 'exam_code', label: '项目代码' }
+            { key: 'exam_code', label: '项目代码' }
         ];
         
         // Store the original student data for comparison
@@ -509,6 +621,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
         }
+
+
 
         // Files
         const filesContainer = clone.querySelector('.file-thumbs');

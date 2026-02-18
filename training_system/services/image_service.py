@@ -71,7 +71,7 @@ def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
         return input_path
 
 
-def process_and_save_file(file_storage, id_card, name, label_key, company=''):
+def process_and_save_file(file_storage, id_card, name, label_key, company='', training_type='special_operation'):
     """
     Save uploaded file with naming pattern '<company>-<name>/<id_card><name>-<label>.<ext>'.
 
@@ -81,9 +81,10 @@ def process_and_save_file(file_storage, id_card, name, label_key, company=''):
         name: Student name
         label_key: File label key (e.g., 'photo', 'diploma')
         company: Company name
+        training_type: Training type (special_operation or special_equipment)
 
     Returns:
-        str: Relative path like 'students/<company>-<name>/...'
+        str: Relative path like 'students/<training_type>-<company>-<name>/...'
     """
     if not file_storage or not file_storage.filename:
         return ''
@@ -102,8 +103,15 @@ def process_and_save_file(file_storage, id_card, name, label_key, company=''):
     _, ext = os.path.splitext(file_storage.filename)
     orig_ext = ext.lower() if ext else '.jpg'
 
+    # Map training type to Chinese name
+    training_type_map = {
+        'special_operation': '特种作业',
+        'special_equipment': '特种设备'
+    }
+    training_type_name = training_type_map.get(training_type, '特种作业')
+
     # Create student folder
-    student_folder_name = f"{company}-{name}"
+    student_folder_name = f"{training_type_name}-{company}-{name}"
     student_folder_path = os.path.join(
         current_app.config['STUDENTS_FOLDER'],
         student_folder_name
@@ -111,7 +119,7 @@ def process_and_save_file(file_storage, id_card, name, label_key, company=''):
     os.makedirs(student_folder_path, exist_ok=True)
 
     # Generate filename
-    safe_name = f"{id_card}{name}-{label_name}{orig_ext}"
+    safe_name = f"{id_card}-{name}-{label_name}{orig_ext}"
     abs_path = os.path.join(student_folder_path, safe_name)
 
     # Save file

@@ -1,0 +1,55 @@
+{
+    "job_categories": [
+        {
+            "name": "电工作业",
+            "training_type": "special_operation",
+            "exam_projects": [
+                "低压电工作业",
+                "高压电工作业",
+                "电力电缆作业",
+                "电气试验作业",
+                "继电保护作业",
+                "防爆电气作业"
+            ]
+        },
+        {
+            "name": "焊接与热切割作业",
+            "training_type": "special_operation",
+            "exam_projects": [
+                "熔化焊接与热切割作业"
+            ]
+        },
+        {
+            "name": "高处作业",
+            "training_type": "special_operation",
+            "exam_projects": [
+                "登高架设作业",
+                "高处安装、维护、拆除作业"
+            ]
+        },
+        {
+            "name": "制冷与空调作业",
+            "training_type": "special_equipment",
+            "exam_projects": [
+                "制冷与空调设备运行操作作业",
+                "制冷与空调设备安装修理作业"
+            ]
+        },
+        {
+            "name": "金属非金属矿山安全作业",
+            "training_type": "special_equipment",
+            "exam_projects": [
+                "金属非金属矿井通风作业",
+                "金属非金属矿山安全检查作业"
+            ]
+        },
+        {
+            "name": "危险化学品安全作业",
+            "training_type": "special_equipment",
+            "exam_projects": [
+                "光气及光气化工艺作业",
+                "氯碱电解工艺作业"
+            ]
+        }
+    ]
+}

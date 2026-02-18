@@ -2,10 +2,11 @@
 import os
 import shutil
 from flask import Flask, render_template
-from models.student import init_db
+from models.student import init_db, migrate_db
 from routes.student_routes import student_bp
 from routes.file_routes import file_bp
 from routes.export_routes import export_bp
+from routes.config_routes import config_bp
 from utils.logger import setup_logger
 from utils.error_handlers import register_error_handlers
 
@@ -44,6 +45,7 @@ def create_app():
     app.register_blueprint(student_bp)
     app.register_blueprint(file_bp)
     app.register_blueprint(export_bp)
+    app.register_blueprint(config_bp)
 
     # Main routes
     @app.route('/')
@@ -52,10 +54,14 @@ def create_app():
 
     @app.route('/admin')
     def admin():
-        return render_template('admin.html')
+        return render_template('admin.html', training_type='special_equipment')
+
+    # @app.route('/admin/special_equipment')
+    # def admin_special_equipment():
+    #     return render_template('admin.html', training_type='special_equipment')
 
     # Run migration if needed
-    # _run_migration_if_needed(app)
+    migrate_db(app.config['DATABASE'])
 
     app.logger.info('Application initialized successfully')
 

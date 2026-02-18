@@ -52,6 +52,7 @@ def init_db(database_path):
                 job_category TEXT NOT NULL,
                 exam_project TEXT,
                 exam_code TEXT,
+                training_type TEXT DEFAULT 'special_operation',
                 status TEXT DEFAULT 'unreviewed',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 photo_path TEXT,
@@ -61,11 +62,100 @@ def init_db(database_path):
                 id_card_front_path TEXT,
                 id_card_back_path TEXT,
                 training_form_path TEXT
+                training_form_path TEXT
             )
         ''')
         conn.commit()
     except sqlite3.Error as e:
         raise DatabaseError(f'Failed to initialize database: {str(e)}')
+    finally:
+        conn.close()
+
+
+def migrate_db(database_path):
+    """
+    Migrate the database to add missing fields.
+
+    Args:
+        database_path: Path to the database file
+    """
+    conn = sqlite3.connect(database_path)
+    try:
+        # Check if training_type column exists
+        cursor = conn.execute("PRAGMA table_info(students)")
+        columns = [row[1] for row in cursor.fetchall()]
+        
+        if 'training_type' not in columns:
+            # Add training_type column with default value
+            conn.execute("ALTER TABLE students ADD COLUMN training_type TEXT DEFAULT 'special_operation'")
+            conn.commit()
+        
+        # Modify exam_category column to allow NULL values
+        # First, check if exam_category column exists and is NOT NULL
+        cursor = conn.execute("PRAGMA table_info(students)")
+        for row in cursor.fetchall():
+            if row[1] == 'exam_category' and row[3] == 1:  # 1 means NOT NULL
+                # Create a new table without NOT NULL constraint
+                conn.execute('''
+                    CREATE TABLE IF NOT EXISTS students_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        gender TEXT NOT NULL,
+                        education TEXT NOT NULL,
+                        school TEXT,
+                        major TEXT,
+                        id_card TEXT NOT NULL,
+                        phone TEXT NOT NULL,
+                        company TEXT,
+                        company_address TEXT,
+                        job_category TEXT NOT NULL,
+                        exam_project TEXT,
+                        exam_code TEXT,
+                        exam_category TEXT,
+                        status TEXT DEFAULT 'unreviewed',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        photo_path TEXT,
+                        diploma_path TEXT,
+                        cert_path TEXT,
+                        id_card_front_path TEXT,
+                        id_card_back_path TEXT,
+                        training_form_path TEXT,
+                        theory_exam_time TEXT,
+                        practical_exam_time TEXT,
+                        passed TEXT,
+                        theory_makeup_time TEXT,
+                        makeup_exam TEXT,
+                        cert_front_path TEXT,
+                        cert_back_path TEXT,
+                        training_type TEXT DEFAULT 'special_operation'
+                    )
+                ''')
+                # Copy data from old table to new table
+                conn.execute('''
+                    INSERT INTO students_new (
+                        id, name, gender, education, school, major, id_card, phone,
+                        company, company_address, job_category, exam_project, exam_code, exam_category,
+                        status, created_at, photo_path, diploma_path, cert_path,
+                        id_card_front_path, id_card_back_path, training_form_path, theory_exam_time,
+                        practical_exam_time, passed, theory_makeup_time, makeup_exam,
+                        cert_front_path, cert_back_path, training_type
+                    ) SELECT 
+                        id, name, gender, education, school, major, id_card, phone,
+                        company, company_address, job_category, exam_project, exam_code, exam_category,
+                        status, created_at, photo_path, diploma_path, cert_path,
+                        id_card_front_path, id_card_back_path, training_form_path, theory_exam_time,
+                        practical_exam_time, passed, theory_makeup_time, makeup_exam,
+                        cert_front_path, cert_back_path, training_type
+                    FROM students
+                ''')
+                # Drop old table
+                conn.execute("DROP TABLE students")
+                # Rename new table to old table
+                conn.execute("ALTER TABLE students_new RENAME TO students")
+                conn.commit()
+                break
+    except sqlite3.Error as e:
+        raise DatabaseError(f'Failed to migrate database: {str(e)}')
     finally:
         conn.close()
 
@@ -86,24 +176,26 @@ def create_student(data, file_paths):
         cursor.execute('''
             INSERT INTO students (
                 name, gender, education, school, major, id_card, phone,
-                company, company_address, job_category, exam_project, exam_code,
-                photo_path, diploma_path, cert_front_path, cert_back_path,
+                company, company_address, job_category, exam_project, exam_code, exam_category,
+                training_type, photo_path, diploma_path, cert_front_path, cert_back_path,
                 id_card_front_path, id_card_back_path, training_form_path
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data['name'], data['gender'], data['education'], data.get('school', ''),
             data.get('major', ''), data['id_card'], data['phone'], data.get('company', ''),
             data.get('company_address', ''), data['job_category'], data.get('exam_project', ''),
-            data.get('exam_code', ''),
+            data.get('exam_code', ''), data.get('exam_category', ''),
+            data.get('training_type', 'special_operation'),
             file_paths.get('photo_path', ''), file_paths.get('diploma_path', ''),
             file_paths.get('cert_front_path', ''), file_paths.get('cert_back_path', ''),
             file_paths.get('id_card_front_path', ''), file_paths.get('id_card_back_path', ''),
+            file_paths.get('training_form_path', '')
             file_paths.get('training_form_path', '')
         ))
         return cursor.lastrowid
 
 
-def get_students(status='unreviewed', search='', company=''):
+def get_students(status='unreviewed', search='', company='', training_type=''):
     """
     Get students with optional filters.
 
@@ -111,6 +203,7 @@ def get_students(status='unreviewed', search='', company=''):
         status: Student status filter
         search: Search term for name, ID card, or phone
         company: Company name filter
+        training_type: Training type filter
 
     Returns:
         list: List of student records as dictionaries
@@ -119,6 +212,12 @@ def get_students(status='unreviewed', search='', company=''):
         # Base query
         query = "SELECT * FROM students WHERE status = ?"
         params = [status]
+        query = "SELECT * FROM students WHERE status = ?"
+        params = [status]
+
+        if training_type:
+            query += " AND training_type = ?"
+            params.append(training_type)
 
         if search:
             query += " AND (name LIKE ? OR id_card LIKE ? OR phone LIKE ?)"
@@ -250,13 +349,14 @@ def approve_students_batch(student_ids):
         )
 
 
-def get_companies(status='', company_filter=''):
+def get_companies(status='', company_filter='', training_type=''):
     """
     Get distinct company names with optional filters.
 
     Args:
         status: Student status filter
         company_filter: Company name filter
+        training_type: Training type filter
 
     Returns:
         list: List of company names
@@ -268,8 +368,13 @@ def get_companies(status='', company_filter=''):
 
         # Handle status filter
         if status:
+        if status:
             query += " AND status = ?"
             params.append(status)
+
+        if training_type:
+            query += " AND training_type = ?"
+            params.append(training_type)
 
         if company_filter:
             query += " AND company LIKE ?"

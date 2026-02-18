@@ -45,9 +45,10 @@ def create_student_route():
             file = files.get(input_name)
             if file and file.filename and id_card_val:
                 try:
+                    training_type = data.get('training_type', 'special_operation')
                     rel = process_and_save_file(
                         file, id_card_val, data.get('name', ''),
-                        input_name, company_val
+                        input_name, company_val, training_type
                     )
                     file_paths[db_key] = rel
                 except Exception as e:
@@ -78,8 +79,9 @@ def get_students_route():
         status = request.args.get('status', 'unreviewed')
         search = request.args.get('search', '')
         company = request.args.get('company', '')
+        training_type = request.args.get('training_type', '')
 
-        students = get_students(status, search, company)
+        students = get_students(status, search, company, training_type)
         return jsonify(students)
 
     except Exception as e:
@@ -132,9 +134,10 @@ def update_student_route(id):
                         delete_student_files({db_key: old_rel}, current_app.config['BASE_DIR'])
 
                     try:
+                        training_type = data.get('training_type', current_student.get('training_type', 'special_operation'))
                         rel = process_and_save_file(
-                            f, id_card_for_name, name_for_save, input_name, company_for_name
-                        )
+                                f, id_card_for_name, name_for_save, input_name, company_for_name, training_type
+                            )
                         updates[db_key] = rel
                     except Exception as e:
                         current_app.logger.error(f'Failed to save file {input_name}: {str(e)}')
@@ -202,8 +205,10 @@ def generate_materials_route(id):
     try:
         student = get_student_by_id(id)
 
-        # Create student folder
-        student_folder_name = f"{student['company']}-{student['name']}"
+        # Create student folder with training type prefix
+        training_type = student.get('training_type', 'special_operation')
+        training_type_name = '特种作业' if training_type == 'special_operation' else '特种设备'
+        student_folder_name = f"{training_type_name}-{student['company']}-{student['name']}"
         student_folder_path = os.path.join(
             current_app.config['STUDENTS_FOLDER'],
             student_folder_name
@@ -213,7 +218,7 @@ def generate_materials_route(id):
         # Generate document
         doc_path = os.path.join(
             student_folder_path,
-            f"{student['id_card']}{student['name']}-体检表.docx"
+            f"{student['id_card']}-{student['name']}-体检表.docx"
         )
 
         photo_abs_path = None
@@ -392,8 +397,9 @@ def get_companies_route():
     try:
         status = request.args.get('status', '')
         company_filter = request.args.get('company', '')
+        training_type = request.args.get('training_type', '')
 
-        companies = get_companies(status, company_filter)
+        companies = get_companies(status, company_filter, training_type)
         return jsonify(companies)
 
     except Exception as e:
