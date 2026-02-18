@@ -11,8 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Filter controls
     let currentFilters = {
-        company: '',
-        passed: ''
+        company: ''
     };
 
     // Init
@@ -29,11 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const queryParams = new URLSearchParams({
                 status: status
             });
-            
-            // Add passed filter if it's set
-            if (currentFilters.passed) {
-                queryParams.append('passed', currentFilters.passed);
-            }
             
             // Load students with current filters to get companies with data
             const res = await fetch(`/api/students?${queryParams.toString()}`);
@@ -95,8 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 companyFilter.value = '';
                 currentFilters.company = '';
             }
-            // Toggle passed filter visibility based on status
-            togglePassedFilterVisibility(currentStatus);
             mainContent.innerHTML = '<div class="empty-state">请选择左侧学员查看详情</div>';
             currentStudentId = null;
             
@@ -117,28 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Filter event listeners
     const companyFilter = document.getElementById('companyFilter');
-    const passedFilter = document.getElementById('passedFilter');
-    const passedFilterContainer = document.getElementById('passedFilterContainer');
     const resetFilters = document.getElementById('resetFilters');
-    
-    // Function to toggle passed filter visibility based on status
-    function togglePassedFilterVisibility(status) {
-        if (passedFilterContainer) {
-            if (status === 'examined') {
-                passedFilterContainer.style.display = 'block';
-            } else {
-                passedFilterContainer.style.display = 'none';
-                // Reset passed filter when hiding
-                if (passedFilter) {
-                    passedFilter.value = '';
-                    currentFilters.passed = '';
-                }
-            }
-        }
-    }
-    
-    // Initial toggle based on current status
-    togglePassedFilterVisibility(currentStatus);
     
     if (companyFilter) {
         companyFilter.addEventListener('change', (e) => {
@@ -147,26 +118,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    if (passedFilter) {
-        passedFilter.addEventListener('change', (e) => {
-            currentFilters.passed = e.target.value;
-            loadStudents();
-            loadCompanies(currentStatus);
-            // Reset company filter when changing passed filter
-            if (companyFilter) {
-                companyFilter.value = '';
-                currentFilters.company = '';
-            }
-        });
-    }
+
     
     if (resetFilters) {
         resetFilters.addEventListener('click', () => {
             if (companyFilter) companyFilter.value = '';
-            if (passedFilter) passedFilter.value = '';
             currentFilters = {
-                company: '',
-                passed: ''
+                company: ''
             };
             loadStudents();
             loadCompanies(currentStatus);
@@ -181,8 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Build query string with filters
             const queryParams = new URLSearchParams({
                 status: currentStatus,
-                company: currentFilters.company,
-                passed: currentFilters.passed
+                company: currentFilters.company
             });
             
             const res = await fetch(`/api/students?${queryParams.toString()}`);
@@ -452,12 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 { value: '高处作业', text: '高处作业' }
             ]},
             { key: 'exam_project', label: '操作项目', required: true, type: 'select', options: [] },
-            { key: 'exam_code', label: '项目代码' },
-            { key: 'exam_category', label: '考试类别', required: true, type: 'select', options: [
-                { value: '初次领证', text: '初次领证' },
-                { value: '复审', text: '复审' },
-                { value: '延期换证', text: '延期换证' }
-            ]}
+            { key: 'exam_code', label: '项目代码' }
         ];
         
         // Store the original student data for comparison
@@ -556,120 +508,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     projectSelect.appendChild(optionElement);
                 });
             }
-        }
-
-        // Add exam-related fields for reviewed students
-        if (student.status === 'reviewed') {
-            const examFields = [
-            { key: 'theory_exam_time', label: '理论考试时间' },
-            { key: 'practical_exam_time', label: '实操考试时间' },
-            { key: 'passed', label: '是否通过', type: 'toggle' },
-            { key: 'theory_makeup_time', label: '理论补考时间' },
-            { key: 'makeup_exam', label: '是否补考', type: 'toggle' }
-        ];
-            
-            examFields.forEach(f => {
-                const item = document.createElement('div');
-                item.className = 'detail-item';
-                item.innerHTML = `<label>${f.label}</label>`;
-                item.style.position = 'relative';
-                
-                const val = student[f.key] || '';
-                
-                if (f.type === 'toggle') {
-                    // Create toggle switch for pass/fail and makeup exam
-                    const toggleContainer = document.createElement('div');
-                    toggleContainer.style.display = 'flex';
-                    toggleContainer.style.alignItems = 'center';
-                    toggleContainer.style.gap = '10px';
-                    
-                    // Hidden input to store the value
-                    const hiddenInput = document.createElement('input');
-                    hiddenInput.setAttribute('data-key', f.key);
-                    hiddenInput.type = 'hidden';
-                    hiddenInput.value = val || '否';
-                    toggleContainer.appendChild(hiddenInput);
-                    
-                    // Create a simple toggle button
-                    const toggleButton = document.createElement('button');
-                    toggleButton.style.width = '60px';
-                    toggleButton.style.height = '24px';
-                    toggleButton.style.border = 'none';
-                    toggleButton.style.borderRadius = '12px';
-                    toggleButton.style.backgroundColor = val === '是' ? '#4f46e5' : '#ccc';
-                    toggleButton.style.color = 'white';
-                    toggleButton.style.fontSize = '12px';
-                    toggleButton.style.fontWeight = 'bold';
-                    toggleButton.style.cursor = 'pointer';
-                    toggleButton.style.transition = 'all 0.3s ease';
-                    toggleButton.style.display = 'flex';
-                    toggleButton.style.alignItems = 'center';
-                    toggleButton.style.justifyContent = val === '是' ? 'flex-end' : 'flex-start';
-                    toggleButton.style.padding = '0 4px';
-                    toggleButton.style.position = 'relative';
-                    toggleButton.style.boxSizing = 'border-box';
-                    
-                    // Create slider
-                    const slider = document.createElement('span');
-                    slider.style.width = '20px';
-                    slider.style.height = '20px';
-                    slider.style.borderRadius = '50%';
-                    slider.style.backgroundColor = 'white';
-                    slider.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-                    slider.style.transition = 'all 0.3s ease';
-                    slider.style.boxSizing = 'border-box';
-                    
-                    toggleButton.appendChild(slider);
-                    toggleContainer.appendChild(toggleButton);
-                    
-                    // Status text
-                    const statusText = document.createElement('span');
-                    statusText.textContent = val === '是' ? '是' : '否';
-                    statusText.style.fontSize = '0.9rem';
-                    statusText.style.color = val === '是' ? '#10b981' : '#666';
-                    toggleContainer.appendChild(statusText);
-                    
-                    // Toggle functionality
-                    toggleButton.addEventListener('click', function() {
-                        const currentValue = hiddenInput.value;
-                        const newValue = currentValue === '是' ? '否' : '是';
-                        
-                        hiddenInput.value = newValue;
-                        statusText.textContent = newValue;
-                        statusText.style.color = newValue === '是' ? '#10b981' : '#666';
-                        
-                        // Update button style
-                        toggleButton.style.backgroundColor = newValue === '是' ? '#4f46e5' : '#ccc';
-                        toggleButton.style.justifyContent = newValue === '是' ? 'flex-end' : 'flex-start';
-                        
-                        // Trigger auto-save
-                        autoSave(student.id);
-                    });
-                    
-                    item.appendChild(toggleContainer);
-                } else {
-                        const input = document.createElement('input');
-                        input.setAttribute('data-key', f.key);
-                        input.value = val;
-                        input.style.width = '100%';
-                        input.style.padding = '8px';
-                        input.style.border = '1px solid #ddd';
-                        input.style.borderRadius = '4px';
-                        input.type = 'date';
-                        item.appendChild(input);
-                        
-                        // Add input event listener for auto-save
-                        input.addEventListener('input', () => {
-                            autoSave(student.id);
-                        });
-                        
-                        input.addEventListener('change', () => {
-                            autoSave(student.id);
-                        });
-                    }
-                
-                grid.appendChild(item);
-            });
         }
 
         // Files

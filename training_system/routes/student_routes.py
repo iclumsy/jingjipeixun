@@ -78,10 +78,8 @@ def get_students_route():
         status = request.args.get('status', 'unreviewed')
         search = request.args.get('search', '')
         company = request.args.get('company', '')
-        passed = request.args.get('passed', '')
-        examined = request.args.get('examined', '')
 
-        students = get_students(status, search, company, passed, examined)
+        students = get_students(status, search, company)
         return jsonify(students)
 
     except Exception as e:
@@ -95,9 +93,7 @@ def update_student_route(id):
     try:
         allowed_text = [
             'name', 'gender', 'education', 'school', 'major', 'id_card', 'phone',
-            'company', 'company_address', 'job_category', 'exam_project', 'exam_code',
-            'exam_category', 'theory_exam_time', 'practical_exam_time', 'passed',
-            'theory_makeup_time', 'makeup_exam'
+            'company', 'company_address', 'job_category', 'exam_project', 'exam_code'
         ]
         file_map = {
             'photo': 'photo_path',
@@ -396,9 +392,8 @@ def get_companies_route():
     try:
         status = request.args.get('status', '')
         company_filter = request.args.get('company', '')
-        passed = request.args.get('passed', '')
 
-        companies = get_companies(status, company_filter, passed)
+        companies = get_companies(status, company_filter)
         return jsonify(companies)
 
     except Exception as e:

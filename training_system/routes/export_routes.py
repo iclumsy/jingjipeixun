@@ -18,10 +18,9 @@ def export_excel():
         # Get query parameters
         status = request.args.get('status', '')
         company = request.args.get('company', '')
-        passed = request.args.get('passed', '')
 
         # Get students
-        students = get_students(status, '', company, passed, '')
+        students = get_students(status, '', company)
 
         # Create workbook
         wb = Workbook()
@@ -32,9 +31,8 @@ def export_excel():
         headers = [
             'ID', '姓名', '性别', '文化程度', '毕业院校', '所学专业',
             '身份证号', '手机号', '单位名称', '单位地址',
-            '作业类别', '操作项目', '项目代码', '考试类别',
-            '状态', '创建时间', '理论考试时间', '实操考试时间',
-            '是否通过', '理论补考时间', '是否补考'
+            '作业类别', '操作项目', '项目代码',
+            '状态', '创建时间'
         ]
 
         # Add headers
@@ -51,8 +49,7 @@ def export_excel():
 
         # Add data rows
         for row_num, student in enumerate(students, 2):
-            status_text = '已审核' if student['status'] == 'reviewed' else \
-                         ('已考试' if student['status'] == 'examined' else '未审核')
+            status_text = '已审核' if student['status'] == 'reviewed' else '未审核'
 
             data = [
                 student['id'],
@@ -68,14 +65,8 @@ def export_excel():
                 student['job_category'],
                 student.get('exam_project', ''),
                 student.get('exam_code', ''),
-                student['exam_category'],
                 status_text,
-                student.get('created_at', ''),
-                student.get('theory_exam_time', ''),
-                student.get('practical_exam_time', ''),
-                student.get('passed', ''),
-                student.get('theory_makeup_time', ''),
-                student.get('makeup_exam', '')
+                student.get('created_at', '')
             ]
 
             for col_num, value in enumerate(data, 1):

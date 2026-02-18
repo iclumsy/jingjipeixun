@@ -688,7 +688,6 @@
             <div class="tabs">
                 <div class="tab active" data-status="unreviewed">未审核</div>
                 <div class="tab" data-status="reviewed">已审核</div>
-                <div class="tab" data-status="examined">已考试</div>
             </div>
             
             <div class="filter-controls" style="padding: 15px; border-bottom: 1px solid #eee;">
@@ -705,14 +704,7 @@
                             <!-- Companies will be populated by JavaScript -->
                         </select>
                     </div>
-                    <div id="passedFilterContainer">
-                        <label style="display: block; font-size: 0.8rem; color: #666; margin-bottom: 4px;">考试是否通过</label>
-                        <select id="passedFilter" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.8rem;">
-                            <option value="">全部</option>
-                            <option value="是">是</option>
-                            <option value="否">否</option>
-                        </select>
-                    </div>
+
                 </div>
             </div>
 
@@ -770,7 +762,6 @@
                             <option value="">全部状态</option>
                             <option value="unreviewed">未审核</option>
                             <option value="reviewed">已审核</option>
-                            <option value="examined">已考试</option>
                         </select>
                     </div>
 
@@ -782,14 +773,7 @@
                         </select>
                     </div>
 
-                    <div id="exportPassedContainer" style="margin-bottom: 20px;">
-                        <label style="display: block; font-size: 0.95rem; color: #4b5563; margin-bottom: 8px; font-weight: 500;">考试是否通过</label>
-                        <select id="exportPassed" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 0.95rem; background-color: #fff; transition: all 0.2s ease; outline: none; height: 44px; line-height: normal; box-sizing: border-box;">
-                            <option value="">全部</option>
-                            <option value="是">是</option>
-                            <option value="否">否</option>
-                        </select>
-                    </div>
+
                 </div>
 
                 <div class="export-actions" style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
@@ -814,7 +798,6 @@
             const startExport = document.getElementById('startExport');
             const exportStatus = document.getElementById('exportStatus');
             const exportCompany = document.getElementById('exportCompany');
-            const exportPassed = document.getElementById('exportPassed');
             const exportBtnText = document.getElementById('exportBtnText');
             const exportSpinner = document.getElementById('exportSpinner');
             
@@ -849,16 +832,13 @@
                     exportSpinner.style.display = 'inline';
                     
                     // 构建查询参数
-                    const params = new URLSearchParams();
-                    if (exportStatus.value) {
-                        params.append('status', exportStatus.value);
-                    }
-                    if (exportCompany.value) {
-                        params.append('company', exportCompany.value);
-                    }
-                    if (exportPassed.value) {
-                        params.append('passed', exportPassed.value);
-                    }
+            const params = new URLSearchParams();
+            if (exportStatus.value) {
+                params.append('status', exportStatus.value);
+            }
+            if (exportCompany.value) {
+                params.append('company', exportCompany.value);
+            }
                     
                     // 发送导出请求
                     const response = await fetch(`/api/export/excel?${params.toString()}`, {
@@ -925,10 +905,8 @@
                 
                 // 仅获取弹窗内的筛选值，完全忽略左侧栏
                 const modalStatus = document.getElementById('exportStatus')?.value || '';
-                const modalPassed = document.getElementById('exportPassed')?.value || '';
                 
                 if (modalStatus) params.append('status', modalStatus);
-                if (modalPassed) params.append('passed', modalPassed);
                 
                 return params;
             }
@@ -999,29 +977,13 @@
             }
             
             // 监听弹窗内筛选变更，实时刷新公司列表
-            function toggleExportPassedVisibility() {
-                const container = document.getElementById('exportPassedContainer');
-                if (!container) return;
-                if (exportStatus.value === 'examined') {
-                    container.style.display = 'block';
-                } else {
-                    container.style.display = 'none';
-                    // Reset passed filter when hiding to avoid stale filtering
-                    exportPassed.value = '';
-                }
-            }
-            exportStatus.addEventListener('change', () => {
-                toggleExportPassedVisibility();
-                updateExportCompanies();
-            });
-            exportPassed.addEventListener('change', updateExportCompanies);
+            exportStatus.addEventListener('change', updateExportCompanies);
             
             // Update company list when the export modal is opened
             document.getElementById('exportExcelBtn').addEventListener('click', async function() {
                 // Wait for modal to be displayed, then update company list
                 // 打开时重置或更新公司列表，不受左侧影响
                 setTimeout(() => {
-                    toggleExportPassedVisibility();
                     updateExportCompanies();
                 }, 100);
             });
