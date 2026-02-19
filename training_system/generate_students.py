@@ -9,10 +9,8 @@ import string
 import requests
 from datetime import datetime
 
-# Database path
 DB_PATH = os.path.join(os.path.dirname(__file__), 'database', 'students.db')
 
-# Lists for generating random data
 FIRST_NAMES = [
     '张', '王', '李', '赵', '刘', '陈', '杨', '黄', '周', '吴',
     '徐', '孙', '马', '朱', '胡', '郭', '何', '高', '林', '罗',
@@ -67,33 +65,17 @@ ADDRESS_PREFIXES = [
     '山西省阳泉市平定县', '山西省阳泉市盂县'
 ]
 
-# Generate random ID card number
 def generate_id_card():
-    """
-    Generate a random ID card number.
-    """
-    # First 6 digits: area code (random)
     area_code = ''.join(random.choices(string.digits, k=6))
-    
-    # Next 8 digits: birth date (random between 1970-2005)
     year = random.randint(1970, 2005)
     month = random.randint(1, 12)
-    day = random.randint(1, 28)  # Simplified, not considering leap years
+    day = random.randint(1, 28)
     birth_date = f'{year:04d}{month:02d}{day:02d}'
-    
-    # Next 3 digits: sequence number
     sequence = ''.join(random.choices(string.digits, k=3))
-    
-    # Last digit: check digit (random)
     check_digit = random.choice(list(string.digits) + ['X'])
-    
     return f'{area_code}{birth_date}{sequence}{check_digit}'
 
-# Generate random phone number
 def generate_phone():
-    """
-    Generate a random phone number.
-    """
     prefix = random.choice(['130', '131', '132', '133', '134', '135', '136', '137', '138', '139',
                            '150', '151', '152', '153', '155', '156', '157', '158', '159',
                            '170', '171', '172', '173', '175', '176', '177', '178',
@@ -101,54 +83,31 @@ def generate_phone():
     suffix = ''.join(random.choices(string.digits, k=8))
     return f'{prefix}{suffix}'
 
-# Generate random address
 def generate_address():
-    """
-    Generate a random address.
-    """
     prefix = random.choice(ADDRESS_PREFIXES)
     street = random.choice(['胜利街', '解放路', '建设路', '青年路', '光明街', '前进街', '和平街', '友谊街'])
     number = random.randint(1, 100)
     unit = random.randint(1, 10) if random.random() > 0.5 else ''
     room = random.randint(101, 999) if unit else ''
-    
     address = f'{prefix}{street}{number}号'
     if unit:
         address += f'{unit}单元'
     if room:
         address += f'{room}室'
-    
     return address
 
-# Generate random exam code
 def generate_exam_code(job_category, exam_project):
-    """
-    Generate a random exam code based on job category and exam project.
-    """
-    # First two letters: job category abbreviation
     job_abbr = ''.join([c for c in job_category if c.isalpha()])[:2].upper()
-    
-    # Next two letters: exam project abbreviation
     project_abbr = ''.join([c for c in exam_project if c.isalpha()])[:2].upper()
-    
-    # Last four digits: random number
     random_num = ''.join(random.choices(string.digits, k=4))
-    
     return f'{job_abbr}{project_abbr}{random_num}'
 
-# Generate random file path
 def generate_file_path(training_type, company, name, id_card, file_type):
-    """
-    Generate a random file path for student attachments.
-    """
-    # Map training type to Chinese name
     training_type_map = {
         'special_operation': '特种作业',
         'special_equipment': '特种设备'
     }
     training_type_name = training_type_map.get(training_type, '特种作业')
-    
-    # Map file type to Chinese name
     file_type_map = {
         'photo': '个人照片',
         'diploma': '学历证书',
@@ -156,100 +115,78 @@ def generate_file_path(training_type, company, name, id_card, file_type):
         'id_back': '身份证反面'
     }
     file_type_name = file_type_map.get(file_type, file_type)
-    
-    # Generate folder name
     folder_name = f"{training_type_name}-{company}-{name}"
-    
-    # Generate file name according to the rule: 身份证号-姓名-附件类型.jpg
     file_name = f"{id_card}-{name}-{file_type_name}.jpg"
-    
     return f"students/{folder_name}/{file_name}"
 
-# Download image from URL and save to path
 def download_image(url, save_path):
-    """
-    Download image from URL and save to specified path.
-    """
     try:
-        # Create directory if it doesn't exist
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        
-        # Download image
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=15)
         response.raise_for_status()
-        
-        # Save image
         with open(save_path, 'wb') as f:
             f.write(response.content)
-        
         print(f"Downloaded image to {save_path}")
         return True
     except Exception as e:
         print(f"Error downloading image: {e}")
         return False
 
-# Generate random student data
-def generate_student(training_type):
-    """
-    Generate a random student data.
-    """
+def get_real_person_photo(gender='male'):
     try:
-        # Generate basic information
+        api_url = f"https://randomuser.me/api/?inc=picture&gender={gender}"
+        response = requests.get(api_url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        if data.get('results') and len(data['results']) > 0:
+            picture_url = data['results'][0]['picture']['large']
+            return picture_url
+    except Exception as e:
+        print(f"Error getting real person photo: {e}")
+    return None
+
+def generate_student(training_type, gender_cn=None):
+    try:
+        if gender_cn is None:
+            gender_cn = random.choice(GENDERS)
+        gender_en = 'male' if gender_cn == '男' else 'female'
         first_name = random.choice(FIRST_NAMES)
         last_name = random.choice(LAST_NAMES)
         name = first_name + last_name
-        gender = random.choice(GENDERS)
         education = random.choice(EDUCATION_LEVELS)
         id_card = generate_id_card()
         phone = generate_phone()
         company = random.choice(COMPANIES)
         company_address = generate_address()
-        
-        # Generate job-related information
         job_category = random.choice(list(EXAM_PROJECTS.keys()))
         exam_project = random.choice(EXAM_PROJECTS[job_category])
         exam_code = generate_exam_code(job_category, exam_project)
         
-        # Image URLs for testing
-        PHOTO_URLS = [
-            'https://picsum.photos/200/300?random=1',
-            'https://picsum.photos/200/300?random=2',
-            'https://picsum.photos/200/300?random=3',
-            'https://picsum.photos/200/300?random=4',
-            'https://picsum.photos/200/300?random=5'
-        ]
-        
-        DIPLOMA_URLS = [
-            'https://picsum.photos/400/300?random=6',
-            'https://picsum.photos/400/300?random=7',
-            'https://picsum.photos/400/300?random=8'
-        ]
-        
-        ID_CARD_URLS = [
-            'https://picsum.photos/400/250?random=9',
-            'https://picsum.photos/400/250?random=10',
-            'https://picsum.photos/400/250?random=11'
-        ]
-        
-        # Generate file paths for attachments
         photo_path = generate_file_path(training_type, company, name, id_card, 'photo')
         diploma_path = generate_file_path(training_type, company, name, id_card, 'diploma')
         id_card_front_path = generate_file_path(training_type, company, name, id_card, 'id_front')
         id_card_back_path = generate_file_path(training_type, company, name, id_card, 'id_back')
         
-        # Download images
         full_photo_path = os.path.join(os.path.dirname(__file__), photo_path)
         full_diploma_path = os.path.join(os.path.dirname(__file__), diploma_path)
         full_id_card_front_path = os.path.join(os.path.dirname(__file__), id_card_front_path)
         full_id_card_back_path = os.path.join(os.path.dirname(__file__), id_card_back_path)
         
-        # Download photos
-        download_image(random.choice(PHOTO_URLS), full_photo_path)
-        download_image(random.choice(DIPLOMA_URLS), full_diploma_path)
-        download_image(random.choice(ID_CARD_URLS), full_id_card_front_path)
-        download_image(random.choice(ID_CARD_URLS), full_id_card_back_path)
+        real_photo_url = get_real_person_photo(gender_en)
+        if real_photo_url:
+            download_image(real_photo_url, full_photo_path)
+        else:
+            fallback_url = f"https://ui-avatars.com/api/?name={name}&size=200&background=random"
+            download_image(fallback_url, full_photo_path)
         
-        # Generate school and major
+        diploma_url = f"https://picsum.photos/400/300?random={random.randint(1, 1000)}"
+        id_front_url = f"https://picsum.photos/400/250?random={random.randint(1, 1000)}"
+        id_back_url = f"https://picsum.photos/400/250?random={random.randint(1, 1000)}"
+        
+        download_image(diploma_url, full_diploma_path)
+        download_image(id_front_url, full_id_card_front_path)
+        download_image(id_back_url, full_id_card_back_path)
+        
         schools = ['阳泉职业技术学院', '阳泉市第一中学', '阳泉市第二中学', '阳泉市第三中学', '阳泉市第四中学']
         majors = ['电气工程', '机械工程', '土木工程', '计算机科学', '会计学']
         school = random.choice(schools) if random.random() > 0.5 else ''
@@ -257,7 +194,7 @@ def generate_student(training_type):
         
         return {
             'name': name,
-            'gender': gender,
+            'gender': gender_cn,
             'education': education,
             'school': school,
             'major': major,
@@ -280,11 +217,7 @@ def generate_student(training_type):
         traceback.print_exc()
         raise
 
-# Insert student data into database
 def insert_student(conn, student_data):
-    """
-    Insert student data into database.
-    """
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO students (
@@ -298,47 +231,41 @@ def insert_student(conn, student_data):
         student_data['school'], student_data['major'], student_data['id_card'],
         student_data['phone'], student_data['company'], student_data['company_address'],
         student_data['job_category'], student_data['exam_project'], student_data['exam_code'],
-        student_data['training_type'], 'unreviewed',  # Default status
+        student_data['training_type'], 'unreviewed',
         student_data['photo_path'], student_data['diploma_path'],
         student_data['id_card_front_path'], student_data['id_card_back_path'],
-        ''  # Empty training_form_path
+        ''
     ))
     conn.commit()
     return cursor.lastrowid
 
-# Main function
 def main():
-    """
-    Main function to generate and insert random student data.
-    """
-    # Connect to database
     conn = sqlite3.connect(DB_PATH)
     
     try:
-        # Clear existing data
         print('Clearing existing data...')
         conn.execute('DELETE FROM students')
         conn.commit()
         print('Existing data cleared successfully!')
         
-        # Generate 50 special operation students
-        print('\nGenerating 50 special operation students...')
-        for i in range(50):
+        print('\nGenerating 20 special operation students...')
+        for i in range(20):
             try:
-                student_data = generate_student('special_operation')
+                gender = random.choice(GENDERS)
+                student_data = generate_student('special_operation', gender)
                 student_id = insert_student(conn, student_data)
-                print(f'Generated special operation student {i+1}: ID={student_id}, Name={student_data["name"]}')
+                print(f'Generated special operation student {i+1}: ID={student_id}, Name={student_data["name"]}, Gender={student_data["gender"]}')
             except Exception as e:
                 print(f'Error generating special operation student {i+1}: {e}')
                 conn.rollback()
         
-        # Generate 50 special equipment students
-        print('\nGenerating 50 special equipment students...')
-        for i in range(50):
+        print('\nGenerating 20 special equipment students...')
+        for i in range(20):
             try:
-                student_data = generate_student('special_equipment')
+                gender = random.choice(GENDERS)
+                student_data = generate_student('special_equipment', gender)
                 student_id = insert_student(conn, student_data)
-                print(f'Generated special equipment student {i+1}: ID={student_id}, Name={student_data["name"]}')
+                print(f'Generated special equipment student {i+1}: ID={student_id}, Name={student_data["name"]}, Gender={student_data["gender"]}')
             except Exception as e:
                 print(f'Error generating special equipment student {i+1}: {e}')
                 conn.rollback()

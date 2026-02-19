@@ -521,7 +521,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ]},
             { key: 'exam_project', label: '操作项目', required: true, type: 'select', options: [] },
             { key: 'exam_code', label: '项目代码' }
-            { key: 'exam_code', label: '项目代码' }
         ];
         
         // Store the original student data for comparison
