@@ -190,7 +190,6 @@ def create_student(data, file_paths):
             file_paths.get('cert_front_path', ''), file_paths.get('cert_back_path', ''),
             file_paths.get('id_card_front_path', ''), file_paths.get('id_card_back_path', ''),
             file_paths.get('training_form_path', '')
-            file_paths.get('training_form_path', '')
         ))
         return cursor.lastrowid
 
@@ -367,7 +366,6 @@ def get_companies(status='', company_filter='', training_type=''):
         params = []
 
         # Handle status filter
-        if status:
         if status:
             query += " AND status = ?"
             params.append(status)
