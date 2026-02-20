@@ -3,22 +3,20 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentStudentId = null;
     let currentTrainingType = 'special_equipment';
     let students = [];
+    let jobCategoriesConfig = null;
 
     const listContainer = document.getElementById('studentList');
     const mainContent = document.getElementById('mainContent');
     const searchInput = document.getElementById('searchInput');
     const detailTemplate = document.getElementById('detail-template');
     
-    // Filter controls
     let currentFilters = {
         company: ''
     };
     
-    // Get training type from global variable if present
     if (window.trainingType) {
         currentTrainingType = window.trainingType;
     } else {
-        // Get training type from URL if present
         const urlParams = new URLSearchParams(window.location.search);
         const urlTrainingType = urlParams.get('training_type');
         if (urlTrainingType) {
@@ -26,7 +24,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // Update training type button active state
+    async function loadJobCategories() {
+        try {
+            const response = await fetch('/api/config/job_categories');
+            if (!response.ok) {
+                throw new Error('Failed to load job categories');
+            }
+            jobCategoriesConfig = await response.json();
+        } catch (error) {
+            console.error('Error loading job categories:', error);
+        }
+    }
+    
     function updateTrainingTypeButtons() {
         const btnSpecialOperation = document.getElementById('btnSpecialOperation');
         const btnSpecialEquipment = document.getElementById('btnSpecialEquipment');
@@ -50,38 +59,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     updateTrainingTypeButtons();
 
-    // Init
-    loadStudents();
-    loadCompanies();
+    loadJobCategories().then(() => {
+        loadStudents();
+        loadCompanies();
+    });
     
-    // Load companies for dropdown
     async function loadCompanies(status = currentStatus) {
         const companyFilter = document.getElementById('companyFilter');
         if (!companyFilter) return;
         
         try {
-            // Build query string with current filters and status
             const queryParams = new URLSearchParams({
                 status: status,
                 training_type: currentTrainingType
             });
             
-            // Load students with current filters to get companies with data
             const res = await fetch(`/api/students?${queryParams.toString()}`);
             if (!res.ok) {
                 throw new Error(`网络错误: ${res.status}`);
             }
             const filteredStudents = await res.json();
             
-            // Get unique companies that have students matching the filters
             const companiesWithData = [...new Set(filteredStudents.map(student => student.company).filter(Boolean))];
             
-            // Clear existing options except the first one
             while (companyFilter.options.length > 1) {
                 companyFilter.remove(1);
             }
             
-            // Add companies to dropdown
             companiesWithData.forEach(company => {
                 const option = document.createElement('option');
                 option.value = company;
@@ -93,7 +97,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Mobile menu toggle
     const mobileMenuToggle = document.getElementById('mobileMenuToggle');
     const sidebar = document.getElementById('sidebar');
     
@@ -102,7 +105,6 @@ document.addEventListener('DOMContentLoaded', () => {
             sidebar.classList.toggle('mobile-open');
         });
         
-        // Close sidebar when clicking on a student
         document.addEventListener('click', (e) => {
             if (window.innerWidth <= 768 && 
                 !sidebar.contains(e.target) && 
@@ -113,7 +115,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Training type button click events
     const btnSpecialOperation = document.getElementById('btnSpecialOperation');
     const btnSpecialEquipment = document.getElementById('btnSpecialEquipment');
     
@@ -147,7 +148,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Update status button active state
     function updateStatusButtons() {
         const btnUnreviewed = document.getElementById('btnUnreviewed');
         const btnReviewed = document.getElementById('btnReviewed');
@@ -171,7 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     updateStatusButtons();
     
-    // Status button click events
     const btnUnreviewed = document.getElementById('btnUnreviewed');
     const btnReviewed = document.getElementById('btnReviewed');
     
@@ -217,7 +216,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Filter event listeners
     const companyFilter = document.getElementById('companyFilter');
     const resetFilters = document.getElementById('resetFilters');
     
@@ -227,8 +225,6 @@ document.addEventListener('DOMContentLoaded', () => {
             loadStudents();
         });
     }
-    
-
     
     if (resetFilters) {
         resetFilters.addEventListener('click', () => {
@@ -240,13 +236,10 @@ document.addEventListener('DOMContentLoaded', () => {
             loadCompanies(currentStatus);
         });
     }
-    
-
 
     async function loadStudents() {
         listContainer.innerHTML = '<div style="padding:20px;text-align:center;">加载中...</div>';
         try {
-            // Build query string with filters
             const queryParams = new URLSearchParams({
                 status: currentStatus,
                 company: currentFilters.company,
@@ -290,7 +283,6 @@ document.addEventListener('DOMContentLoaded', () => {
             el.onclick = () => {
                 showDetail(student);
 
-                // Close sidebar on mobile after selecting a student
                 if (window.innerWidth <= 768 && sidebar) {
                     sidebar.classList.remove('mobile-open');
                 }
@@ -299,7 +291,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Debounce function for auto-save
     function debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
@@ -312,17 +303,14 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
     
-    // Auto-save function with status feedback
     const autoSave = debounce(async (studentId) => {
         if (!studentId) return;
         
-        // Show saving status
         showSaveStatus('保存中...', 'info');
         
         try {
             const formData = new FormData();
             
-            // Get all input elements including those in exam fields
             const allInputs = mainContent.querySelectorAll('input[data-key], select[data-key]');
             allInputs.forEach(input => {
                 const key = input.getAttribute('data-key');
@@ -339,10 +327,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const updated = await res.json();
             
-            // Show success status
             showSaveStatus('保存成功', 'success');
             
-            // Update local student data
             const idx = students.findIndex(s => s.id === studentId);
             if (idx >= 0) students[idx] = updated;
             
@@ -350,17 +336,14 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Auto-save error:', e);
             showSaveStatus('保存失败', 'error');
         }
-    }, 1000); // 1 second debounce
+    }, 1000);
     
-    // Show save status feedback
     function showSaveStatus(message, type = 'info') {
-        // Remove existing status if any
         const existingStatus = mainContent.querySelector('.save-status');
         if (existingStatus) {
             existingStatus.remove();
         }
 
-        // Create status element
         const statusElement = document.createElement('div');
         statusElement.className = `save-status ${type}`;
         statusElement.style.position = 'fixed';
@@ -373,7 +356,6 @@ document.addEventListener('DOMContentLoaded', () => {
         statusElement.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
         statusElement.style.transition = 'all 0.3s ease';
 
-        // Set styles based on type
         if (type === 'success') {
             statusElement.style.backgroundColor = '#dcfce7';
             statusElement.style.color = '#166534';
@@ -391,7 +373,6 @@ document.addEventListener('DOMContentLoaded', () => {
         statusElement.textContent = message;
         mainContent.appendChild(statusElement);
 
-        // Remove after 3 seconds
         setTimeout(() => {
             if (statusElement.parentNode) {
                 statusElement.style.opacity = '0';
@@ -403,15 +384,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3000);
     }
 
-    // Show message function
     function showMessage(message, type = 'info') {
-        // Remove existing message if any
         const existingMessage = document.querySelector('.custom-message');
         if (existingMessage) {
             existingMessage.remove();
         }
 
-        // Create message element
         const messageElement = document.createElement('div');
         messageElement.className = `custom-message ${type}`;
         messageElement.style.position = 'fixed';
@@ -426,7 +404,6 @@ document.addEventListener('DOMContentLoaded', () => {
         messageElement.style.maxWidth = '400px';
         messageElement.style.wordWrap = 'break-word';
 
-        // Set styles based on type
         if (type === 'success') {
             messageElement.style.backgroundColor = '#dcfce7';
             messageElement.style.color = '#166534';
@@ -444,7 +421,6 @@ document.addEventListener('DOMContentLoaded', () => {
         messageElement.textContent = message;
         document.body.appendChild(messageElement);
 
-        // Remove after 4 seconds
         setTimeout(() => {
             if (messageElement.parentNode) {
                 messageElement.style.opacity = '0';
@@ -458,14 +434,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showDetail(student) {
         currentStudentId = student.id;
-        // Highlight in list
         document.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));
-        // Find the clicked one and add active (simple re-render or find index)
-        renderList(students); // Re-render to update active state simply
+        renderList(students);
 
         const clone = detailTemplate.content.cloneNode(true);
         
-        // Populate
         clone.querySelector('.student-name').textContent = student.name;
         clone.querySelector('.student-id').textContent = student.id_card;
         const statusBadge = clone.querySelector('.status-badge');
@@ -476,25 +449,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const grid = clone.querySelector('.detail-grid');
         
-        // 二级联动下拉选项数据
-        const examProjectOptions = {
-            '电工作业': [
-                { value: '低压电工作业', text: '低压电工作业' },
-                { value: '高压电工作业', text: '高压电工作业' },
-                { value: '电力电缆作业', text: '电力电缆作业' },
-                { value: '电气试验作业', text: '电气试验作业' },
-                { value: '继电保护作业', text: '继电保护作业' },
-                { value: '防爆电气作业', text: '防爆电气作业' }
-            ],
-            '焊接与热切割作业': [
-                { value: '熔化焊接与热切割作业', text: '熔化焊接与热切割作业' }
-            ],
-            '高处作业': [
-                { value: '高处安装、维护、拆除作业', text: '高处安装、维护、拆除作业' },
-                { value: '登高架设作业', text: '登高架设作业' }
-            ]
-        };
-
         const editable = [
             { key: 'name', label: '姓名', required: true },
             { key: 'gender', label: '性别', required: true, pattern: '男|女', title: '请输入"男"或"女"' },
@@ -513,17 +467,11 @@ document.addEventListener('DOMContentLoaded', () => {
             { key: 'major', label: '所学专业' },
             { key: 'company', label: '单位名称' },
             { key: 'company_address', label: '单位地址' },
-            { key: 'job_category', label: '作业类别', required: true, type: 'select', options: [
-                { value: '', text: '请选择' },
-                { value: '电工作业', text: '电工作业' },
-                { value: '焊接与热切割作业', text: '焊接与热切割作业' },
-                { value: '高处作业', text: '高处作业' }
-            ]},
+            { key: 'job_category', label: '作业类别', required: true, type: 'select', options: [] },
             { key: 'exam_project', label: '操作项目', required: true, type: 'select', options: [] },
-            { key: 'exam_code', label: '项目代码' }
+            { key: 'project_code', label: '项目代号', readonly: true }
         ];
         
-        // Store the original student data for comparison
         const originalData = {...student};
         
         editable.forEach(f => {
@@ -536,31 +484,57 @@ document.addEventListener('DOMContentLoaded', () => {
                 input = document.createElement('select');
                 input.setAttribute('data-key', f.key);
                 
-                f.options.forEach(option => {
-                    const optionElement = document.createElement('option');
-                    optionElement.value = option.value;
-                    optionElement.textContent = option.text;
-                    if (option.value === val) {
-                        optionElement.selected = true;
-                    }
-                    input.appendChild(optionElement);
-                });
-                
-                // If this is the job_category field, add event listener for secondary联动
                 if (f.key === 'job_category') {
+                    input.innerHTML = '<option value="">请选择</option>';
+                    if (jobCategoriesConfig) {
+                        Object.keys(jobCategoriesConfig).forEach(trainingType => {
+                            const typeConfig = jobCategoriesConfig[trainingType];
+                            const optgroup = document.createElement('optgroup');
+                            optgroup.label = typeConfig.name;
+                            
+                            typeConfig.job_categories.forEach(category => {
+                                const option = document.createElement('option');
+                                option.value = category.name;
+                                option.textContent = category.name;
+                                option.dataset.trainingType = trainingType;
+                                if (category.name === val) {
+                                    option.selected = true;
+                                }
+                                optgroup.appendChild(option);
+                            });
+                            
+                            input.appendChild(optgroup);
+                        });
+                    }
+                    
                     input.addEventListener('change', function() {
-                        updateExamProjectOptions(this, originalData.exam_project);
+                        updateExamProjectOptions(this, '');
                     });
                     
-                    // Initialize the exam_project options based on current job_category
                     setTimeout(() => {
                         updateExamProjectOptions(input, originalData.exam_project);
                     }, 0);
+                } else if (f.key === 'exam_project') {
+                    input.innerHTML = '<option value="">请选择操作项目</option>';
+                } else {
+                    f.options.forEach(option => {
+                        const optionElement = document.createElement('option');
+                        optionElement.value = option.value;
+                        optionElement.textContent = option.text;
+                        if (option.value === val) {
+                            optionElement.selected = true;
+                        }
+                        input.appendChild(optionElement);
+                    });
                 }
             } else {
                 input = document.createElement('input');
                 input.setAttribute('data-key', f.key);
                 input.value = val;
+                if (f.readonly) {
+                    input.readOnly = true;
+                    input.style.backgroundColor = '#f3f4f6';
+                }
                 if (f.required) input.required = true;
                 if (f.pattern) input.pattern = f.pattern;
                 if (f.title) input.title = f.title;
@@ -576,8 +550,6 @@ document.addEventListener('DOMContentLoaded', () => {
             item.appendChild(input);
             grid.appendChild(item);
             
-            // realtime validation
-            const parent = item;
             const showError = () => {
                 input.classList.remove('error');
                 const exist = parent.querySelector('.error-pop');
@@ -597,33 +569,53 @@ document.addEventListener('DOMContentLoaded', () => {
             input.addEventListener('blur', showError);
         });
 
-        // Function to update exam project options based on job category selection
         function updateExamProjectOptions(categorySelect, originalValue) {
             const projectSelect = Array.from(grid.querySelectorAll('select')).find(select => select.getAttribute('data-key') === 'exam_project');
+            const projectCodeInput = Array.from(grid.querySelectorAll('input')).find(input => input.getAttribute('data-key') === 'project_code');
             if (!projectSelect) return;
             
             const selectedCategory = categorySelect.value;
+            const selectedOption = categorySelect.options[categorySelect.selectedIndex];
             
-            // Clear exam project options
             projectSelect.innerHTML = '<option value="">请选择操作项目</option>';
+            if (projectCodeInput) projectCodeInput.value = '';
             
-            if (selectedCategory && examProjectOptions[selectedCategory]) {
-                // Add corresponding exam project options
-                examProjectOptions[selectedCategory].forEach(option => {
-                    const optionElement = document.createElement('option');
-                    optionElement.value = option.value;
-                    optionElement.textContent = option.text;
-                    if (originalValue && option.value === originalValue) {
-                        optionElement.selected = true;
+            if (selectedCategory && jobCategoriesConfig) {
+                let foundProjects = null;
+                
+                Object.keys(jobCategoriesConfig).forEach(trainingType => {
+                    const typeConfig = jobCategoriesConfig[trainingType];
+                    const category = typeConfig.job_categories.find(c => c.name === selectedCategory);
+                    if (category) {
+                        foundProjects = category.exam_projects;
                     }
-                    projectSelect.appendChild(optionElement);
                 });
+                
+                if (foundProjects) {
+                    foundProjects.forEach(project => {
+                        const option = document.createElement('option');
+                        option.value = project.name;
+                        option.textContent = project.code ? `${project.name} (${project.code})` : project.name;
+                        option.dataset.code = project.code || '';
+                        if (originalValue && project.name === originalValue) {
+                            option.selected = true;
+                            if (projectCodeInput) projectCodeInput.value = project.code || '';
+                        }
+                        projectSelect.appendChild(option);
+                    });
+                }
             }
+            
+            projectSelect.onchange = function() {
+                const selectedProjectOption = this.options[this.selectedIndex];
+                if (projectCodeInput && selectedProjectOption && selectedProjectOption.dataset.code) {
+                    projectCodeInput.value = selectedProjectOption.dataset.code;
+                } else if (projectCodeInput) {
+                    projectCodeInput.value = '';
+                }
+            };
         }
 
-
-
-        // Files
         const filesContainer = clone.querySelector('.file-thumbs');
         filesContainer.style.display = 'flex';
         filesContainer.style.flexWrap = 'nowrap';
@@ -649,7 +641,6 @@ document.addEventListener('DOMContentLoaded', () => {
             wrapper.style.gap = '5px';
             wrapper.style.minWidth = '100px';
 
-            // Upload box similar to frontend
             const uploadBox = document.createElement('div');
             uploadBox.className = 'upload-box';
             uploadBox.style.width = '100px';
@@ -716,7 +707,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 img.src = '/' + student[key];
             }
 
-            // map db field to upload field name
             const nameMap = {
                 photo_path: 'photo',
                 diploma_path: 'diploma',
@@ -735,495 +725,223 @@ document.addEventListener('DOMContentLoaded', () => {
             input.addEventListener('change', () => {
                 if (input.files && input.files[0]) {
                     const file = input.files[0];
-                    // If this is the personal photo field, crop to one-inch ratio client-side
-                    if (input.name === 'photo') {
-                        const imgEl = new Image();
-                        const reader = new FileReader();
-                        reader.onload = function(ev) {
-                            imgEl.onload = function() {
-                                try {
-                                    // Target physical size: 2.5cm x 3.5cm -> in inches
-                                    const tgtWIn = 2.5 / 2.54;
-                                    const tgtHIn = 3.5 / 2.54;
-                                    const dpi = 300;
-                                    const pxW = Math.max(120, Math.round(tgtWIn * dpi));
-                                    const pxH = Math.max(160, Math.round(tgtHIn * dpi));
-
-                                    // Scale to fit target box (contain) and center, padding with white
-                                    const srcW = imgEl.naturalWidth;
-                                    const srcH = imgEl.naturalHeight;
-                                    const canvas = document.createElement('canvas');
-                                    canvas.width = pxW;
-                                    canvas.height = pxH;
-                                    const ctx = canvas.getContext('2d');
-                                    // Fill white background
-                                    ctx.fillStyle = '#FFFFFF';
-                                    ctx.fillRect(0, 0, pxW, pxH);
-                                    // Compute scale to fit entire source image into target (no cropping)
-                                    const scale = Math.min(pxW / srcW, pxH / srcH);
-                                    const newW = Math.max(1, Math.round(srcW * scale));
-                                    const newH = Math.max(1, Math.round(srcH * scale));
-                                    const dx = Math.round((pxW - newW) / 2);
-                                    const dy = Math.round((pxH - newH) / 2);
-                                    ctx.drawImage(imgEl, 0, 0, srcW, srcH, dx, dy, newW, newH);
-
-                                    // Convert to blob and replace input.files with the cropped file
-                                    canvas.toBlob(function(blob) {
-                                        if (!blob) {
-                                            // fallback to original preview
-                                            img.src = ev.target.result;
-                                            img.style.display = 'block';
-                                            placeholder.style.display = 'none';
-                                            return;
-                                        }
-                                        const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, '') + '_1inch.jpg', { type: 'image/jpeg' });
-                                        // Update the input's FileList
-                                        try {
-                                            const dt = new DataTransfer();
-                                            dt.items.add(newFile);
-                                            input.files = dt.files;
-                                        } catch (e) {
-                                            // Some browsers may not support DataTransfer constructor
-                                            console.warn('Could not replace FileList programmatically:', e);
-                                        }
-                                        // Update preview
-                                        try {
-                                            const objUrl = URL.createObjectURL(newFile);
-                                            img.src = objUrl;
-                                        } catch (e) {
-                                            // fallback to dataURL
-                                            const reader2 = new FileReader();
-                                            reader2.onload = function(ev2) { img.src = ev2.target.result; };
-                                            reader2.readAsDataURL(newFile);
-                                        }
-                                        img.style.display = 'block';
-                                        placeholder.style.display = 'none';
-                                    }, 'image/jpeg', 0.95);
-                                } catch (err) {
-                                    console.error('Photo processing failed:', err);
-                                    // fallback to original preview
-                                    img.src = ev.target.result;
-                                    img.style.display = 'block';
-                                    placeholder.style.display = 'none';
-                                }
-                            };
-                            imgEl.src = ev.target.result;
-                        };
-                        reader.readAsDataURL(file);
-                    } else {
-                        // Non-photo files: simple preview
-                        const reader = new FileReader();
-                        reader.onload = function(e) {
-                            img.src = e.target.result;
-                            img.style.display = 'block';
-                            placeholder.style.display = 'none';
-                        };
-                        reader.readAsDataURL(file);
-                    }
-                } else {
-                    img.style.display = 'none';
-                    img.src = '';
-                    placeholder.style.display = 'flex';
+                    const reader = new FileReader();
+                    reader.onload = function(ev) {
+                        img.src = ev.target.result;
+                        img.style.display = 'block';
+                        placeholder.style.display = 'none';
+                        
+                        uploadFile(student.id, nameMap[key], file);
+                    };
+                    reader.readAsDataURL(file);
                 }
             });
+
+            const viewBtn = document.createElement('button');
+            viewBtn.textContent = '查看';
+            viewBtn.style.marginTop = '5px';
+            viewBtn.style.fontSize = '12px';
+            viewBtn.style.padding = '2px 8px';
+            viewBtn.style.border = '1px solid #ddd';
+            viewBtn.style.borderRadius = '4px';
+            viewBtn.style.background = '#fff';
+            viewBtn.style.cursor = 'pointer';
+            viewBtn.style.display = student[key] ? 'block' : 'none';
+            viewBtn.onclick = () => {
+                if (student[key]) {
+                    window.open('/' + student[key], '_blank');
+                }
+            };
 
             uploadBox.appendChild(placeholder);
             uploadBox.appendChild(img);
             uploadBox.appendChild(input);
-
             wrapper.appendChild(uploadBox);
-
-            const title = document.createElement('span');
-            title.textContent = label;
-            title.style.fontSize = '11px';
-            title.style.color = '#666';
-            title.style.textAlign = 'center';
-            title.style.maxWidth = '100px';
-            title.style.wordBreak = 'break-all';
-
-            wrapper.appendChild(title);
+            wrapper.appendChild(viewBtn);
             filesContainer.appendChild(wrapper);
         }
-
-        // Buttons
-        const actionBar = clone.querySelector('.action-bar');
-        actionBar.innerHTML = '';
-        const saveBtn = document.createElement('button');
-        saveBtn.className = 'btn';
-        saveBtn.textContent = '保存修改';
-        saveBtn.setAttribute('data-role', 'save');
-        saveBtn.onclick = () => handleSave(student.id);
-        actionBar.appendChild(saveBtn);
         
-        // Delete button
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'btn';
-        deleteBtn.style.background = '#FEE2E2';
-        deleteBtn.style.color = '#EF4444';
-        deleteBtn.textContent = '删除学员';
-        deleteBtn.onclick = () => handleDelete(student.id);
-        actionBar.appendChild(deleteBtn);
-        
-        if (currentStatus === 'unreviewed') {
-            const rejectBtn = document.createElement('button');
-            rejectBtn.className = 'btn';
-            rejectBtn.style.background = '#FEE2E2';
-            rejectBtn.style.color = '#EF4444';
-            rejectBtn.textContent = '审核不通过';
-            rejectBtn.onclick = () => handleReject(student.id);
-            const approveBtn = document.createElement('button');
-            approveBtn.className = 'btn primary';
-            approveBtn.textContent = '审核通过';
-            approveBtn.onclick = () => handleApprove(student.id);
-            actionBar.appendChild(rejectBtn);
-            actionBar.appendChild(approveBtn);
-        } else if (currentStatus === 'reviewed') {
-            const genBtn = document.createElement('button');
-            genBtn.className = 'btn primary';
-            genBtn.textContent = '生成体检表';
-            genBtn.onclick = () => handleGenerate(student.id, genBtn);
-            actionBar.appendChild(genBtn);
+        if (student.status === 'reviewed' && student.training_form_path) {
+            const healthCheckWrapper = document.createElement('div');
+            healthCheckWrapper.className = 'file-item-wrapper';
+            healthCheckWrapper.style.display = 'flex';
+            healthCheckWrapper.style.flexDirection = 'column';
+            healthCheckWrapper.style.alignItems = 'center';
+            healthCheckWrapper.style.gap = '5px';
+            healthCheckWrapper.style.minWidth = '100px';
             
-            const zipBtn = document.createElement('button');
-            zipBtn.className = 'btn';
-            zipBtn.textContent = '附件打包下载';
-            zipBtn.onclick = () => {
-                window.location.href = `/api/students/${student.id}/attachments.zip`;
+            const healthCheckBox = document.createElement('div');
+            healthCheckBox.className = 'upload-box health-check-doc';
+            healthCheckBox.style.width = '100px';
+            healthCheckBox.style.height = '100px';
+            healthCheckBox.style.border = '2px solid #10B981';
+            healthCheckBox.style.borderRadius = '8px';
+            healthCheckBox.style.display = 'flex';
+            healthCheckBox.style.flexDirection = 'column';
+            healthCheckBox.style.alignItems = 'center';
+            healthCheckBox.style.justifyContent = 'center';
+            healthCheckBox.style.cursor = 'pointer';
+            healthCheckBox.style.background = 'linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%)';
+            healthCheckBox.style.transition = 'all 0.3s ease';
+            
+            healthCheckBox.onmouseover = () => {
+                healthCheckBox.style.transform = 'scale(1.05)';
+                healthCheckBox.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
             };
-            actionBar.appendChild(zipBtn);
+            
+            healthCheckBox.onmouseout = () => {
+                healthCheckBox.style.transform = 'scale(1)';
+                healthCheckBox.style.boxShadow = 'none';
+            };
+            
+            const docIcon = document.createElement('span');
+            docIcon.textContent = '📄';
+            docIcon.style.fontSize = '32px';
+            
+            const docLabel = document.createElement('span');
+            docLabel.textContent = '体检表';
+            docLabel.style.fontSize = '12px';
+            docLabel.style.color = '#065F46';
+            docLabel.style.fontWeight = '600';
+            docLabel.style.marginTop = '5px';
+            
+            healthCheckBox.appendChild(docIcon);
+            healthCheckBox.appendChild(docLabel);
+            
+            healthCheckBox.onclick = () => {
+                window.open('/' + student.training_form_path, '_blank');
+            };
+            
+            const downloadBtn = document.createElement('button');
+            downloadBtn.textContent = '下载';
+            downloadBtn.style.marginTop = '5px';
+            downloadBtn.style.fontSize = '12px';
+            downloadBtn.style.padding = '2px 8px';
+            downloadBtn.style.border = '1px solid #10B981';
+            downloadBtn.style.borderRadius = '4px';
+            downloadBtn.style.background = '#dcfce7';
+            downloadBtn.style.color = '#065F46';
+            downloadBtn.style.cursor = 'pointer';
+            downloadBtn.style.fontWeight = '500';
+            
+            downloadBtn.onclick = (e) => {
+                e.stopPropagation();
+                const link = document.createElement('a');
+                link.href = '/' + student.training_form_path;
+                link.download = `${student.id_card}-${student.name}-体检表.docx`;
+                link.click();
+            };
+            
+            healthCheckWrapper.appendChild(healthCheckBox);
+            healthCheckWrapper.appendChild(downloadBtn);
+            filesContainer.appendChild(healthCheckWrapper);
+        }
+        
+        const actionBar = clone.querySelector('.action-bar');
+        if (actionBar) {
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'btn secondary';
+            saveBtn.textContent = '保存修改';
+            saveBtn.style.marginRight = 'auto';
+            saveBtn.onclick = async () => {
+                await saveStudentChanges(student.id);
+            };
+            actionBar.insertBefore(saveBtn, actionBar.firstChild);
         }
 
         mainContent.innerHTML = '';
         mainContent.appendChild(clone);
     }
-
-    function previewSelected(input, img, placeholder) {
-        if (input.files && input.files[0]) {
-            const reader = new FileReader();
-            reader.onload = e => {
-                img.src = e.target.result;
-                img.style.display = 'block';
-                placeholder.style.display = 'none';
-            };
-            reader.readAsDataURL(input.files[0]);
-        } else {
-            img.style.display = 'none';
-            img.src = '';
-            placeholder.style.display = 'block';
-        }
-    }
-
-    function validateDetail() {
-        let ok = true;
-        const inputs = mainContent.querySelectorAll('.detail-item input');
-        inputs.forEach(input => {
-            input.classList.remove('error');
-            const parent = input.parentElement;
-            const existing = parent.querySelector('.error-message');
-            if (existing) existing.remove();
-            if (!input.checkValidity()) {
-                input.classList.add('error');
-                ok = false;
-                const msg = document.createElement('span');
-                msg.className = 'error-message';
-                msg.textContent = input.validationMessage || input.title || '请填写此字段';
-                if (input.validity.patternMismatch && input.title) {
-                    msg.textContent = input.title;
-                }
-                parent.appendChild(msg);
-                input.addEventListener('input', () => {
-                    if (input.checkValidity()) {
-                        input.classList.remove('error');
-                        const m = parent.querySelector('.error-message');
-                        if (m) m.remove();
-                    }
-                });
-            }
-        });
-        return ok;
-    }
-
-    async function handleSave(id) {
-        const saveBtn = mainContent.querySelector('.action-bar .btn[data-role="save"]');
-        if (!validateDetail()) {
-            if (saveBtn) {
-                const prev = saveBtn.textContent;
-                saveBtn.textContent = '请修正后再保存';
-                setTimeout(() => { saveBtn.textContent = prev; }, 1500);
-            }
-            return;
-        }
-        if (saveBtn) {
-            saveBtn.disabled = true;
-            saveBtn.textContent = '正在保存...';
-        }
-        const formData = new FormData();
+    
+    async function saveStudentChanges(studentId) {
+        if (!studentId) return;
         
-        // Get all input elements including those in exam fields
-        const allInputs = mainContent.querySelectorAll('input[data-key], select[data-key]');
-        allInputs.forEach(input => {
-            const key = input.getAttribute('data-key');
-            if (key) {
-                formData.append(key, input.value.trim());
-            }
-        });
-        
-        // Handle file uploads
-        const fileInputs = mainContent.querySelectorAll('input[type="file"]');
-        fileInputs.forEach(fi => {
-            if (fi.files && fi.files[0]) {
-                formData.append(fi.name, fi.files[0]);
-            }
-        });
+        showMessage('正在保存...', 'info');
         
         try {
-            const res = await fetch(`/api/students/${id}`, { method: 'PUT', body: formData });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                console.error('Save failed:', err);
-                if (saveBtn) {
-                    const prev = saveBtn.textContent;
-                    saveBtn.disabled = false;
-                    saveBtn.textContent = '保存失败';
-                    setTimeout(() => { saveBtn.textContent = prev; }, 1500);
+            const formData = new FormData();
+            
+            const allInputs = mainContent.querySelectorAll('input[data-key], select[data-key]');
+            allInputs.forEach(input => {
+                const key = input.getAttribute('data-key');
+                if (key && !input.readOnly) {
+                    formData.append(key, input.value.trim());
                 }
-                return;
+            });
+            
+            const res = await fetch(`/api/students/${studentId}`, { method: 'PUT', body: formData });
+            
+            if (!res.ok) {
+                throw new Error('保存失败');
             }
+            
             const updated = await res.json();
-            if (saveBtn) {
-                saveBtn.textContent = '已保存';
-                setTimeout(() => {
-                    saveBtn.disabled = false;
-                    saveBtn.textContent = '保存修改';
-                }, 1200);
-            }
-            const idx = students.findIndex(s => s.id === id);
+            
+            showMessage('保存成功', 'success');
+            
+            const idx = students.findIndex(s => s.id === studentId);
             if (idx >= 0) students[idx] = updated;
-            showDetail(updated);
-            renderList(students);
+            
         } catch (e) {
             console.error('Save error:', e);
-            if (saveBtn) {
-                const prev = saveBtn.textContent;
-                saveBtn.disabled = false;
-                saveBtn.textContent = '网络错误';
-                setTimeout(() => { saveBtn.textContent = prev; }, 1500);
-            }
+            showMessage('保存失败: ' + e.message, 'error');
         }
     }
 
-    async function handleApprove(id) {
-        // Create custom modalal for confirmation
-        const modalal = document.createElement('div');
-        modalal.style.position = 'fixed';
-        modalal.style.top = '0';
-        modalal.style.left = '0';
-        modalal.style.width = '100%';
-        modalal.style.height = '100%';
-        modalal.style.backgroundColor = 'rgba(0,0,0,0.5)';
-        modalal.style.display = 'flex';
-        modalal.style.justifyContent = 'center';
-        modalal.style.alignItems = 'center';
-        modalal.style.zIndex = '10000';
-        modalal.innerHTML = `
-            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 400px; width: 90%;">
-                <h3 style="margin-top: 0; color: #10b981;">确认操作</h3>
-                <p>确认审核通过？该学员将被标记为已审核。</p>
-                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                    <button id="cancel-approve" style="padding: 8px 16px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">取消</button>
-                    <button id="confirm-approve" style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer;">确认通过</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modalal);
-
-        document.getElementById('cancel-approve').onclick = () => {
-            document.body.removeChild(modalal);
-        };
-
-        document.getElementById('confirm-approve').onclick = async () => {
-            try {
-                const res = await fetch(`/api/students/${id}/approve`, { method: 'POST' });
-                document.body.removeChild(modalal);
-                
-                if (res.ok) {
-                    // Show success message
-                    showMessage('审核通过', 'success');
-                    loadStudents();
-                    mainContent.innerHTML = '<div class="empty-state">操作成功，请选择下一位</div>';
-                } else {
-                    // Show error message
-                    const errorData = await res.json().catch(() => ({}));
-                    showMessage(`操作失败: ${errorData.error || '未知错误'}`, 'error');
-                }
-            } catch (e) {
-                document.body.removeChild(modalal);
-                showMessage(`Error: ${e.message}`, 'error');
-            }
-        };
-    }
-
-    async function handleGenerate(id, btn) {
-        // direct generate without confirmation; show inline status above button
-        const actionBar = btn ? btn.parentElement : null;
-        let statusEl = mainContent.querySelector('.generate-result');
-        if (!statusEl && actionBar) {
-            statusEl = document.createElement('div');
-            statusEl.className = 'generate-result';
-            statusEl.style.marginBottom = '8px';
-            statusEl.style.fontSize = '0.95rem';
-            statusEl.style.color = '#0f172a';
-            statusEl.style.padding = '6px 10px';
-            statusEl.style.borderRadius = '6px';
-            statusEl.style.background = 'rgba(241,245,249,0.8)';
-            actionBar.insertAdjacentElement('beforebegin', statusEl);
-        }
-        if (statusEl) {
-            statusEl.textContent = '正在生成体检表...';
-            statusEl.style.background = 'rgba(219,234,254,0.9)';
-        }
-        if (btn) {
-            btn.disabled = true;
-            btn.textContent = '生成中...';
-        }
+    async function uploadFile(studentId, fieldName, file) {
+        const formData = new FormData();
+        formData.append(fieldName, file);
+        
         try {
-            const res = await fetch(`/api/students/${id}/generate`, { method: 'POST' });
-            if (res.ok) {
-                const data = await res.json().catch(() => ({}));
-                if (btn) {
-                    btn.disabled = false;
-                    btn.textContent = '下载体检表';
-                    btn.onclick = () => {
-                        if (data.download_url) {
-                            window.location.href = data.download_url;
-                        } else {
-                            // fallback: refresh to show link in UI
-                            window.location.reload();
-                        }
-                    };
-                }
-                if (statusEl) {
-                    statusEl.textContent = '生成成功：体检表已生成，点击“下载体检表”下载';
-                    statusEl.style.background = 'rgba(220,253,233,0.9)';
-                }
-            } else {
-                const err = await res.json().catch(() => ({}));
-                console.error('生成失败', err);
-                if (btn) { btn.disabled = false; btn.textContent = '生成体检表'; }
-                if (statusEl) {
-                    statusEl.textContent = '生成失败，请重试';
-                    statusEl.style.background = 'rgba(254,226,226,0.9)';
-                }
+            const res = await fetch(`/api/students/${studentId}/upload`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!res.ok) {
+                throw new Error('上传失败');
+            }
+            
+            const result = await res.json();
+            showSaveStatus('文件上传成功', 'success');
+            
+            const idx = students.findIndex(s => s.id === studentId);
+            if (idx >= 0) {
+                students[idx][`${fieldName}_path`] = result.path;
             }
         } catch (e) {
-            if (btn) { btn.disabled = false; btn.textContent = '生成体检表'; }
-            if (statusEl) {
-                statusEl.textContent = '网络错误，生成失败';
-                statusEl.style.background = 'rgba(254,226,226,0.9)';
-            }
+            console.error('Upload error:', e);
+            showSaveStatus('文件上传失败', 'error');
         }
     }
 
-    async function handleReject(id) {
-        // Create custom modalalal for confirmation
-        const modalalal = document.createElement('div');
-        modalalal.style.position = 'fixed';
-        modalalal.style.top = '0';
-        modalalal.style.left = '0';
-        modalalal.style.width = '100%';
-        modalalal.style.height = '100%';
-        modalalal.style.backgroundColor = 'rgba(0,0,0,0.5)';
-        modalalal.style.display = 'flex';
-        modalalal.style.justifyContent = 'center';
-        modalalal.style.alignItems = 'center';
-        modalalal.style.zIndex = '10000';
-        modalalal.innerHTML = `
-            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 400px; width: 90%;">
-                <h3 style="margin-top: 0; color: #ef4444;">确认操作</h3>
-                <p>确认审核不通过？该学员将被删除。</p>
-                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                    <button id="cancel-reject" style="padding: 8px 16px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">取消</button>
-                    <button id="confirm-reject" style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;">确认删除</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modalalal);
+    window.approveStudent = async function() {
+        if (!currentStudentId) return;
+        try {
+            const res = await fetch(`/api/students/${currentStudentId}/approve`, { method: 'POST' });
+            if (!res.ok) throw new Error('操作失败');
+            showMessage('审核通过', 'success');
+            loadStudents();
+            loadCompanies(currentStatus);
+            mainContent.innerHTML = '<div class="empty-state">请选择左侧学员查看详情</div>';
+            currentStudentId = null;
+        } catch (e) {
+            showMessage('操作失败: ' + e.message, 'error');
+        }
+    };
 
-        document.getElementById('cancel-reject').onclick = () => {
-            document.body.removeChild(modalalal);
-        };
-
-        document.getElementById('confirm-reject').onclick = async () => {
-            try {
-                const res = await fetch(`/api/students/${id}/reject`, { method: 'POST' });
-                document.body.removeChild(modalalal);
-                
-                if (res.ok) {
-                    // Show success message
-                    showMessage('已删除该学员。', 'success');
-                    loadStudents();
-                    mainContent.innerHTML = '<div class="empty-state">已删除，请选择下一位</div>';
-                } else {
-                    // Show error message
-                    const errorData = await res.json().catch(() => ({}));
-                    showMessage(`操作失败: ${errorData.error || '未知错误'}`, 'error');
-                }
-            } catch (e) {
-                document.body.removeChild(modalalal);
-                showMessage(`Error: ${e.message}`, 'error');
-            }
-        };
-    }
-
-    async function handleDelete(id) {
-        // Create custom modalalal for confirmation
-        const modalalal = document.createElement('div');
-        modalalal.style.position = 'fixed';
-        modalalal.style.top = '0';
-        modalalal.style.left = '0';
-        modalalal.style.width = '100%';
-        modalalal.style.height = '100%';
-        modalalal.style.backgroundColor = 'rgba(0,0,0,0.5)';
-        modalalal.style.display = 'flex';
-        modalalal.style.justifyContent = 'center';
-        modalalal.style.alignItems = 'center';
-        modalalal.style.zIndex = '10000';
-        modalalal.innerHTML = `
-            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 400px; width: 90%;">
-                <h3 style="margin-top: 0; color: #ef4444;">确认操作</h3>
-                <p>确认删除该学员？此操作不可恢复。</p>
-                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                    <button id="cancel-delete" style="padding: 8px 16px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">取消</button>
-                    <button id="confirm-delete" style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;">确认删除</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modalalal);
-
-        document.getElementById('cancel-delete').onclick = () => {
-            document.body.removeChild(modalalal);
-        };
-
-        document.getElementById('confirm-delete').onclick = async () => {
-            try {
-                const res = await fetch(`/api/students/${id}/reject`, { method: 'POST' });
-                document.body.removeChild(modalalal);
-                
-                if (res.ok) {
-                    // Show success message
-                    showMessage('已删除该学员。', 'success');
-                    loadStudents();
-                    mainContent.innerHTML = '<div class="empty-state">已删除，请选择下一位</div>';
-                } else {
-                    // Show error message
-                    const errorData = await res.json().catch(() => ({}));
-                    showMessage(`操作失败: ${errorData.error || '未知错误'}`, 'error');
-                }
-            } catch (e) {
-                document.body.removeChild(modalalal);
-                showMessage(`Error: ${e.message}`, 'error');
-            }
-        };
-    }
+    window.rejectStudent = async function() {
+        if (!currentStudentId) return;
+        try {
+            const res = await fetch(`/api/students/${currentStudentId}/reject`, { method: 'POST' });
+            if (!res.ok) throw new Error('操作失败');
+            showMessage('审核不通过', 'success');
+            loadStudents();
+            loadCompanies(currentStatus);
+            mainContent.innerHTML = '<div class="empty-state">请选择左侧学员查看详情</div>';
+            currentStudentId = null;
+        } catch (e) {
+            showMessage('操作失败: ' + e.message, 'error');
+        }
+    };
 });
-

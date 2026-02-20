@@ -6,7 +6,7 @@ from models.student import (
     get_companies
 )
 from services.image_service import process_and_save_file, delete_student_files
-from services.document_service import generate_word_doc
+from services.document_service import generate_word_doc, generate_health_check_form, needs_health_check
 from utils.validators import validate_student_data
 from utils.error_handlers import ValidationError, NotFoundError
 import os
@@ -189,6 +189,18 @@ def approve_student_route(id):
     """Approve a student."""
     try:
         student = approve_student(id)
+        
+        health_check_path = generate_health_check_form(
+            student,
+            current_app.config['BASE_DIR'],
+            current_app.config['STUDENTS_FOLDER']
+        )
+        
+        if health_check_path:
+            update_student(id, {'training_form_path': health_check_path})
+            student['training_form_path'] = health_check_path
+            current_app.logger.info(f'Health check form generated for student ID={id}')
+        
         current_app.logger.info(f'Student approved: ID={id}')
         return jsonify(student)
 
@@ -324,6 +336,20 @@ def batch_approve_students_route():
             raise ValidationError('IDs must be a list')
 
         approve_students_batch(ids)
+        
+        for student_id in ids:
+            try:
+                student = get_student_by_id(student_id)
+                health_check_path = generate_health_check_form(
+                    student,
+                    current_app.config['BASE_DIR'],
+                    current_app.config['STUDENTS_FOLDER']
+                )
+                if health_check_path:
+                    update_student(student_id, {'training_form_path': health_check_path})
+            except Exception as e:
+                current_app.logger.error(f'Failed to generate health check for student {student_id}: {str(e)}')
+        
         current_app.logger.info(f'Batch approved {len(ids)} students')
 
         return jsonify({'message': f'Successfully approved {len(ids)} students'}), 200

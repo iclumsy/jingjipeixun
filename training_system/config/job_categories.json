@@ -1,55 +1,73 @@
 {
-    "job_categories": [
-        {
-            "name": "电工作业",
-            "training_type": "special_operation",
-            "exam_projects": [
-                "低压电工作业",
-                "高压电工作业",
-                "电力电缆作业",
-                "电气试验作业",
-                "继电保护作业",
-                "防爆电气作业"
-            ]
-        },
-        {
-            "name": "焊接与热切割作业",
-            "training_type": "special_operation",
-            "exam_projects": [
-                "熔化焊接与热切割作业"
-            ]
-        },
-        {
-            "name": "高处作业",
-            "training_type": "special_operation",
-            "exam_projects": [
-                "登高架设作业",
-                "高处安装、维护、拆除作业"
-            ]
-        },
-        {
-            "name": "制冷与空调作业",
-            "training_type": "special_equipment",
-            "exam_projects": [
-                "制冷与空调设备运行操作作业",
-                "制冷与空调设备安装修理作业"
-            ]
-        },
-        {
-            "name": "金属非金属矿山安全作业",
-            "training_type": "special_equipment",
-            "exam_projects": [
-                "金属非金属矿井通风作业",
-                "金属非金属矿山安全检查作业"
-            ]
-        },
-        {
-            "name": "危险化学品安全作业",
-            "training_type": "special_equipment",
-            "exam_projects": [
-                "光气及光气化工艺作业",
-                "氯碱电解工艺作业"
-            ]
-        }
-    ]
+    "special_operation": {
+        "name": "特种作业",
+        "job_categories": [
+            {
+                "name": "电工作业",
+                "exam_projects": [
+                    {"name": "低压电工作业", "code": ""},
+                    {"name": "高压电工作业", "code": ""},
+                    {"name": "电力电缆作业", "code": ""},
+                    {"name": "电气试验作业", "code": ""},
+                    {"name": "继电保护作业", "code": ""},
+                    {"name": "防爆电气作业", "code": ""}
+                ]
+            },
+            {
+                "name": "焊接与热切割作业",
+                "exam_projects": [
+                    {"name": "熔化焊接与热切割作业", "code": ""}
+                ]
+            },
+            {
+                "name": "高处作业",
+                "exam_projects": [
+                    {"name": "登高架设作业", "code": ""},
+                    {"name": "高处安装、维护、拆除作业", "code": ""}
+                ]
+            }
+        ]
+    },
+    "special_equipment": {
+        "name": "特种设备",
+        "job_categories": [
+            {
+                "name": "特种设备安全管理",
+                "exam_projects": [
+                    {"name": "电梯管理", "code": "A"},
+                    {"name": "场（厂）内专用机动车辆安全管理", "code": "A"},
+                    {"name": "起重机械管理", "code": "A"},
+                    {"name": "锅炉压力容器压力管道", "code": "A"},
+                    {"name": "特种设备安全管理", "code": "A"}
+                ]
+            },
+            {
+                "name": "锅炉作业",
+                "exam_projects": [
+                    {"name": "工业锅炉司炉", "code": "G1"},
+                    {"name": "锅炉水处理", "code": "G3"}
+                ]
+            },
+            {
+                "name": "压力容器作业",
+                "exam_projects": [
+                    {"name": "快开门式压力容器操作", "code": "R1"}
+                ]
+            },
+            {
+                "name": "起重机作业",
+                "exam_projects": [
+                    {"name": "起重机指挥", "code": "Q1"},
+                    {"name": "桥式起重机司机", "code": "Q2"}
+                ]
+            },
+            {
+                "name": "场(厂)内专用机动车辆作业",
+                "exam_projects": [
+                    {"name": "叉车司机", "code": "N1"},
+                    {"name": "观光车和观光列车司机", "code": "N2"}
+                ]
+            }
+        ]
+    }
 }

@@ -247,68 +247,189 @@ document.addEventListener('DOMContentLoaded', async () => {
         let isValid = true;
         const errors = [];
         const inputs = entry.querySelectorAll('input, select');
+        
+        const errorMessages = {
+            'name': '请输入姓名',
+            'gender': '请选择性别',
+            'education': '请选择文化程度',
+            'id_card': {
+                'valueMissing': '请输入身份证号',
+                'patternMismatch': '身份证号应为18位，最后一位可以是X'
+            },
+            'phone': {
+                'valueMissing': '请输入手机号',
+                'patternMismatch': '手机号应为11位数字'
+            },
+            'job_category': '请选择作业类别',
+            'exam_project': '请选择操作项目',
+            'exam_category': '请选择考试类别',
+            'photo': '请上传个人照片（白底一寸照）',
+            'diploma': '请上传学历证书',
+            'id_card_front': '请上传身份证正面照片',
+            'id_card_back': '请上传身份证反面照片'
+        };
+        
+        function getErrorMessage(input) {
+            const name = input.name;
+            const customMsg = errorMessages[name];
+            
+            if (typeof customMsg === 'object') {
+                if (input.validity.valueMissing) {
+                    return customMsg.valueMissing || '请填写此字段';
+                }
+                if (input.validity.patternMismatch) {
+                    return customMsg.patternMismatch || '格式不正确';
+                }
+            }
+            
+            if (typeof customMsg === 'string') {
+                return customMsg;
+            }
+            
+            return input.title || input.validationMessage || '请填写此字段';
+        }
+        
         inputs.forEach(input => {
-            input.classList.remove('error');
-            const parent = input.closest('.form-group') || input.parentElement;
-            let pop = parent.querySelector('.error-pop');
-            if (pop) pop.remove();
+            clearFieldError(input);
+            
             if (!input.checkValidity()) {
-                input.classList.add('error');
+                showFieldError(input, getErrorMessage(input));
                 isValid = false;
-                const msgText = input.title || input.validationMessage || '请填写此字段';
-                pop = document.createElement('span');
-                pop.className = 'error-pop';
-                pop.textContent = msgText;
-                parent.appendChild(pop);
+                
+                const parent = input.closest('.form-group') || input.parentElement;
                 const labelEl = parent.querySelector('label');
-                const nameMap = {
-                    'photo': '个人照片',
-                    'diploma': '学历证书',
-                    'cert': '所持证件',
-                    'id_card_front': '身份证正面',
-                    'id_card_back': '身份证反面'
-                };
-                const labelText = labelEl ? labelEl.textContent.trim() : (nameMap[input.name] || input.name);
-                errors.push({ input, label: labelText, message: msgText });
-                input.addEventListener('input', () => {
-                    if (input.checkValidity()) {
-                        input.classList.remove('error');
-                        const p = parent.querySelector('.error-pop');
-                        if (p) p.remove();
-                    }
-                });
-                input.addEventListener('change', () => {
-                    if (input.checkValidity()) {
-                        input.classList.remove('error');
-                        const p = parent.querySelector('.error-pop');
-                        if (p) p.remove();
-                    }
+                const labelText = labelEl ? labelEl.textContent.trim() : input.name;
+                errors.push({ 
+                    input, 
+                    label: labelText, 
+                    message: getErrorMessage(input) 
                 });
             }
         });
+        
         return { valid: isValid, errors };
+    }
+    
+    function showFieldError(input, message) {
+        input.classList.add('error');
+        const parent = input.closest('.form-group') || input.parentElement;
+        parent.classList.add('has-error');
+        
+        if (input.type === 'file') {
+            const box = input.closest('.upload-box');
+            if (box) {
+                box.classList.add('has-error');
+            }
+        }
+        
+        let pop = parent.querySelector('.error-pop');
+        if (!pop) {
+            pop = document.createElement('span');
+            pop.className = 'error-pop';
+            parent.appendChild(pop);
+        }
+        pop.textContent = message;
+        pop.classList.remove('hiding');
+        
+        if (pop._autoHideTimer) {
+            clearTimeout(pop._autoHideTimer);
+        }
+        pop._autoHideTimer = setTimeout(() => {
+            if (pop.parentNode && !pop.classList.contains('hiding')) {
+                pop.classList.add('hiding');
+                setTimeout(() => {
+                    if (pop.classList.contains('hiding') && pop.parentNode) {
+                        pop.remove();
+                    }
+                }, 200);
+            }
+        }, 2000);
+    }
+    
+    function clearFieldError(input) {
+        input.classList.remove('error');
+        const parent = input.closest('.form-group') || input.parentElement;
+        parent.classList.remove('has-error');
+        
+        if (input.type === 'file') {
+            const box = input.closest('.upload-box');
+            if (box) {
+                box.classList.remove('has-error');
+            }
+        }
+        
+        const pop = parent.querySelector('.error-pop');
+        if (pop) {
+            pop.classList.add('hiding');
+            setTimeout(() => {
+                if (pop.classList.contains('hiding')) {
+                    pop.remove();
+                }
+            }, 200);
+        }
     }
 
     function attachEntryValidation(entry) {
         const inputs = entry.querySelectorAll('input, select');
-        inputs.forEach(input => {
-            const parent = input.closest('.form-group') || input.parentElement;
-            const showError = () => {
-                input.classList.remove('error');
-                const exist = parent.querySelector('.error-pop');
-                if (exist) exist.remove();
-                if (!input.checkValidity()) {
-                    input.classList.add('error');
-                    const msgText = input.title || input.validationMessage || '请填写此字段';
-                    const pop = document.createElement('span');
-                    pop.className = 'error-pop';
-                    pop.textContent = msgText;
-                    parent.appendChild(pop);
+        
+        const errorMessages = {
+            'name': '请输入姓名',
+            'gender': '请选择性别',
+            'education': '请选择文化程度',
+            'id_card': {
+                'valueMissing': '请输入身份证号',
+                'patternMismatch': '身份证号应为18位，最后一位可以是X'
+            },
+            'phone': {
+                'valueMissing': '请输入手机号',
+                'patternMismatch': '手机号应为11位数字'
+            },
+            'job_category': '请选择作业类别',
+            'exam_project': '请选择操作项目',
+            'exam_category': '请选择考试类别',
+            'photo': '请上传个人照片（白底一寸照）',
+            'diploma': '请上传学历证书',
+            'id_card_front': '请上传身份证正面照片',
+            'id_card_back': '请上传身份证反面照片'
+        };
+        
+        function getErrorMessage(input) {
+            const name = input.name;
+            const customMsg = errorMessages[name];
+            
+            if (typeof customMsg === 'object') {
+                if (input.validity.valueMissing) {
+                    return customMsg.valueMissing || '请填写此字段';
                 }
+                if (input.validity.patternMismatch) {
+                    return customMsg.patternMismatch || '格式不正确';
+                }
+            }
+            
+            if (typeof customMsg === 'string') {
+                return customMsg;
+            }
+            
+            return input.title || input.validationMessage || '请填写此字段';
+        }
+        
+        inputs.forEach(input => {
+            let debounceTimer;
+            
+            const validateField = () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    if (!input.checkValidity()) {
+                        showFieldError(input, getErrorMessage(input));
+                    } else {
+                        clearFieldError(input);
+                    }
+                }, 150);
             };
-            input.addEventListener('input', showError);
-            input.addEventListener('blur', showError);
-            input.addEventListener('change', showError);
+            
+            input.addEventListener('input', validateField);
+            input.addEventListener('blur', validateField);
+            input.addEventListener('change', validateField);
         });
     }
 

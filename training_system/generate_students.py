@@ -7,9 +7,11 @@ import random
 import sqlite3
 import string
 import requests
+import json
 from datetime import datetime
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'database', 'students.db')
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config', 'job_categories.json')
 
 FIRST_NAMES = [
     '张', '王', '李', '赵', '刘', '陈', '杨', '黄', '周', '吴',
@@ -30,23 +32,6 @@ EDUCATION_LEVELS = [
     '中专或同等学历', '高中或同等学历', '初中'
 ]
 
-JOB_CATEGORIES = [
-    '电工作业', '焊接与热切割作业', '高处作业',
-    '制冷与空调作业', '金属非金属矿山安全作业',
-    '危险化学品安全作业', '烟花爆竹安全作业', '建筑施工安全作业'
-]
-
-EXAM_PROJECTS = {
-    '电工作业': ['低压电工', '高压电工', '防爆电气作业'],
-    '焊接与热切割作业': ['熔化焊接与热切割作业', '压力焊作业', '钎焊作业'],
-    '高处作业': ['登高架设作业', '高处安装、维护、拆除作业'],
-    '制冷与空调作业': ['制冷与空调设备运行操作作业', '制冷与空调设备安装修理作业'],
-    '金属非金属矿山安全作业': ['金属非金属矿井通风作业', '金属非金属矿山安全检查作业'],
-    '危险化学品安全作业': ['光气及光气化工艺作业', '氯碱电解工艺作业'],
-    '烟花爆竹安全作业': ['烟火药制造作业', '黑火药制造作业'],
-    '建筑施工安全作业': ['建筑电工', '建筑架子工', '建筑起重信号司索工']
-}
-
 COMPANIES = [
     '阳泉市第一建筑工程有限公司', '阳泉市第二建筑工程有限公司',
     '阳泉市第三建筑工程有限公司', '阳泉市第四建筑工程有限公司',
@@ -64,6 +49,10 @@ ADDRESS_PREFIXES = [
     '山西省阳泉市城区', '山西省阳泉市矿区', '山西省阳泉市郊区',
     '山西省阳泉市平定县', '山西省阳泉市盂县'
 ]
+
+def load_job_categories():
+    with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
 def generate_id_card():
     area_code = ''.join(random.choices(string.digits, k=6))
@@ -95,12 +84,6 @@ def generate_address():
     if room:
         address += f'{room}室'
     return address
-
-def generate_exam_code(job_category, exam_project):
-    job_abbr = ''.join([c for c in job_category if c.isalpha()])[:2].upper()
-    project_abbr = ''.join([c for c in exam_project if c.isalpha()])[:2].upper()
-    random_num = ''.join(random.choices(string.digits, k=4))
-    return f'{job_abbr}{project_abbr}{random_num}'
 
 def generate_file_path(training_type, company, name, id_card, file_type):
     training_type_map = {
@@ -145,7 +128,7 @@ def get_real_person_photo(gender='male'):
         print(f"Error getting real person photo: {e}")
     return None
 
-def generate_student(training_type, gender_cn=None):
+def generate_student(training_type, config, gender_cn=None):
     try:
         if gender_cn is None:
             gender_cn = random.choice(GENDERS)
@@ -158,9 +141,23 @@ def generate_student(training_type, gender_cn=None):
         phone = generate_phone()
         company = random.choice(COMPANIES)
         company_address = generate_address()
-        job_category = random.choice(list(EXAM_PROJECTS.keys()))
-        exam_project = random.choice(EXAM_PROJECTS[job_category])
-        exam_code = generate_exam_code(job_category, exam_project)
+        
+        type_config = config.get(training_type, {})
+        job_categories = type_config.get('job_categories', [])
+        if not job_categories:
+            raise ValueError(f"No job categories found for training type: {training_type}")
+        
+        category = random.choice(job_categories)
+        job_category = category['name']
+        exam_projects = category.get('exam_projects', [])
+        
+        if exam_projects:
+            project = random.choice(exam_projects)
+            exam_project = project['name']
+            project_code = project.get('code', '')
+        else:
+            exam_project = ''
+            project_code = ''
         
         photo_path = generate_file_path(training_type, company, name, id_card, 'photo')
         diploma_path = generate_file_path(training_type, company, name, id_card, 'diploma')
@@ -204,7 +201,7 @@ def generate_student(training_type, gender_cn=None):
             'company_address': company_address,
             'job_category': job_category,
             'exam_project': exam_project,
-            'exam_code': exam_code,
+            'project_code': project_code,
             'training_type': training_type,
             'photo_path': photo_path,
             'diploma_path': diploma_path,
@@ -222,7 +219,7 @@ def insert_student(conn, student_data):
     cursor.execute('''
         INSERT INTO students (
             name, gender, education, school, major, id_card, phone, company, company_address,
-            job_category, exam_project, exam_code, training_type, status,
+            job_category, exam_project, project_code, training_type, status,
             photo_path, diploma_path, id_card_front_path, id_card_back_path,
             training_form_path
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -230,7 +227,7 @@ def insert_student(conn, student_data):
         student_data['name'], student_data['gender'], student_data['education'],
         student_data['school'], student_data['major'], student_data['id_card'],
         student_data['phone'], student_data['company'], student_data['company_address'],
-        student_data['job_category'], student_data['exam_project'], student_data['exam_code'],
+        student_data['job_category'], student_data['exam_project'], student_data['project_code'],
         student_data['training_type'], 'unreviewed',
         student_data['photo_path'], student_data['diploma_path'],
         student_data['id_card_front_path'], student_data['id_card_back_path'],
@@ -240,6 +237,7 @@ def insert_student(conn, student_data):
     return cursor.lastrowid
 
 def main():
+    config = load_job_categories()
     conn = sqlite3.connect(DB_PATH)
     
     try:
@@ -248,24 +246,24 @@ def main():
         conn.commit()
         print('Existing data cleared successfully!')
         
-        print('\nGenerating 20 special operation students...')
-        for i in range(20):
+        print('\nGenerating 10 special operation students...')
+        for i in range(10):
             try:
                 gender = random.choice(GENDERS)
-                student_data = generate_student('special_operation', gender)
+                student_data = generate_student('special_operation', config, gender)
                 student_id = insert_student(conn, student_data)
-                print(f'Generated special operation student {i+1}: ID={student_id}, Name={student_data["name"]}, Gender={student_data["gender"]}')
+                print(f'Generated special operation student {i+1}: ID={student_id}, Name={student_data["name"]}, Category={student_data["job_category"]}, Project={student_data["exam_project"]} ({student_data["project_code"]})')
             except Exception as e:
                 print(f'Error generating special operation student {i+1}: {e}')
                 conn.rollback()
         
-        print('\nGenerating 20 special equipment students...')
-        for i in range(20):
+        print('\nGenerating 10 special equipment students...')
+        for i in range(10):
             try:
                 gender = random.choice(GENDERS)
-                student_data = generate_student('special_equipment', gender)
+                student_data = generate_student('special_equipment', config, gender)
                 student_id = insert_student(conn, student_data)
-                print(f'Generated special equipment student {i+1}: ID={student_id}, Name={student_data["name"]}, Gender={student_data["gender"]}')
+                print(f'Generated special equipment student {i+1}: ID={student_id}, Name={student_data["name"]}, Category={student_data["job_category"]}, Project={student_data["exam_project"]} ({student_data["project_code"]})')
             except Exception as e:
                 print(f'Error generating special equipment student {i+1}: {e}')
                 conn.rollback()

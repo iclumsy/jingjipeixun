@@ -198,6 +198,13 @@ input:focus, select:focus {
 input.error, select.error {
     border-color: var(--danger);
     background-color: #FEF2F2;
+    animation: shake 0.4s ease-in-out;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-4px); }
+    40%, 80% { transform: translateX(4px); }
 }
 
 .error-message {
@@ -217,19 +224,92 @@ input.error, select.error {
 
 .error-pop {
     position: absolute;
-    bottom: 100%;
+    bottom: calc(100% + 8px);
     left: 0;
-    transform: translateY(-4px);
-    background: #FEF2F2;
-    color: var(--danger);
-    border: 1px solid var(--danger);
-    border-radius: 4px;
-    padding: 4px 8px;
-    font-size: 0.75rem;
+    background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%);
+    color: #DC2626;
+    border: 1px solid #FECACA;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
     white-space: nowrap;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-    z-index: 10;
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15), 0 2px 4px rgba(0, 0, 0, 0.05);
+    z-index: 100;
     pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    animation: errorPopIn 0.3s ease forwards;
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.error-pop::before {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 16px;
+    width: 12px;
+    height: 12px;
+    background: linear-gradient(135deg, #FEE2E2 0%, #FEF2F2 100%);
+    border-right: 1px solid #FECACA;
+    border-bottom: 1px solid #FECACA;
+    transform: rotate(45deg);
+}
+
+.error-pop::after {
+    content: '⚠';
+    margin-right: 6px;
+    font-size: 0.9rem;
+}
+
+@keyframes errorPopIn {
+    0% {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes errorPopOut {
+    0% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+}
+
+.error-pop.hiding {
+    animation: errorPopOut 0.2s ease forwards;
+}
+
+.error-pop.wide {
+    white-space: normal;
+    max-width: 300px;
+}
+
+.form-group.has-error {
+    position: relative;
+}
+
+.form-group.has-error label {
+    color: var(--danger);
+}
+
+.upload-box.has-error {
+    border-color: var(--danger);
+    background-color: #FEF2F2;
+    animation: shake 0.4s ease-in-out;
+}
+
+.upload-box.has-error .upload-placeholder {
+    color: var(--danger);
 }
 
 .file-uploads {
@@ -335,6 +415,8 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
     flex-direction: column;
     box-shadow: 0 0 20px rgba(0,0,0,0.05);
     transition: transform 0.3s ease;
+    height: 100vh;
+    overflow: hidden;
 }
 
 .sidebar-header {
@@ -430,6 +512,7 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
     flex: 1;
     overflow-y: auto;
     padding: 8px;
+    min-height: 0;
 }
 
 .list-item {
@@ -515,6 +598,7 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
     overflow-y: auto;
     display: flex;
     flex-direction: column;
+    height: 100vh;
 }
 
 .detail-card {
@@ -913,5 +997,57 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
     button {
         min-height: 44px;
         min-width: 44px;
+    }
+    
+    .error-pop {
+        font-size: 0.75rem;
+        padding: 6px 10px;
+        max-width: 200px;
+        white-space: normal;
+    }
+    
+    .error-pop::after {
+        font-size: 0.8rem;
+    }
+    
+    .form-group.has-error {
+        margin-bottom: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .error-pop {
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: 180px;
+        font-size: 0.7rem;
+        text-align: center;
+    }
+    
+    .error-pop::before {
+        left: 50%;
+        transform: translateX(-50%) rotate(45deg);
+    }
+    
+    .form-grid {
+        gap: 6px;
+    }
+    
+    .form-group {
+        min-width: 0;
+    }
+    
+    .w-xs { width: 70px; }
+    .w-sm { width: 90px; }
+    .w-md { width: 130px; }
+    .w-lg { width: 180px; }
+    .w-upload { width: 70px; }
+    
+    .upload-box {
+        height: 70px;
+    }
+    
+    .upload-placeholder .text {
+        font-size: 9px;
     }
 }

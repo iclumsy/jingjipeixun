@@ -11,6 +11,89 @@ from flask import current_app
 from services.image_service import change_id_photo_bg
 
 
+HEALTH_CHECK_TEMPLATES = {
+    '叉车司机': '叉车司机体检表.docx',
+    '锅炉水处理': '锅炉水处理体检表.docx'
+}
+
+
+def needs_health_check(exam_project):
+    """
+    Check if the exam project requires a health check form.
+    
+    Args:
+        exam_project: The exam project name
+        
+    Returns:
+        tuple: (needs_check: bool, template_key: str or None)
+    """
+    if not exam_project:
+        return False, None
+    
+    for key in HEALTH_CHECK_TEMPLATES.keys():
+        if key in exam_project:
+            return True, key
+    return False, None
+
+
+def generate_health_check_form(student, base_dir, students_folder):
+    """
+    Generate health check form for eligible students.
+    
+    Args:
+        student: Student data dictionary
+        base_dir: Base directory path
+        students_folder: Students folder path
+        
+    Returns:
+        str: Relative path to generated file, or None if not needed
+    """
+    exam_project = student.get('exam_project', '')
+    needs_check, template_key = needs_health_check(exam_project)
+    
+    if not needs_check:
+        return None
+    
+    template_name = HEALTH_CHECK_TEMPLATES.get(template_key)
+    if not template_name:
+        return None
+    
+    template_path = os.path.join(base_dir, template_name)
+    if not os.path.exists(template_path):
+        current_app.logger.warning(f'Health check template not found: {template_path}')
+        return None
+    
+    training_type = student.get('training_type', 'special_operation')
+    training_type_name = '特种作业' if training_type == 'special_operation' else '特种设备'
+    student_folder_name = f"{training_type_name}-{student.get('company', '')}-{student['name']}"
+    student_folder_path = os.path.join(students_folder, student_folder_name)
+    os.makedirs(student_folder_path, exist_ok=True)
+    
+    doc_path = os.path.join(
+        student_folder_path,
+        f"{student['id_card']}-{student['name']}-体检表.docx"
+    )
+    
+    photo_abs_path = None
+    if student.get('photo_path'):
+        if student['photo_path'].startswith('students/'):
+            photo_abs_path = os.path.join(base_dir, student['photo_path'])
+        else:
+            filename = os.path.basename(student['photo_path'])
+            photo_abs_path = os.path.join(base_dir, 'uploads', filename)
+    
+    data = {
+        'name': student['name'],
+        'gender': student['gender'],
+        'id_card': student['id_card']
+    }
+    
+    generate_word_doc(template_path, doc_path, data, photo_abs_path)
+    
+    rel_path = f"students/{student_folder_name}/{os.path.basename(doc_path)}"
+    return rel_path
+
+
 def generate_word_doc(template_path, output_path, data, photo_path=None):
     """
     Generate Word document from template with student data.
@@ -26,11 +109,9 @@ def generate_word_doc(template_path, output_path, data, photo_path=None):
 
         # 1. Text Replacement (Preserving Style)
         replacements = {
-            '姓名': data['name'],
-            '性别': data['gender'],
-            '身份证号': data['id_card'],
-            '申请作业种类': data['job_category'],
-            '申请作业项目（代号）': data['exam_code'],
+            '姓名': data.get('name', ''),
+            '性别': data.get('gender', ''),
+            '身份证号': data.get('id_card', ''),
         }
 
         for table in doc.tables:

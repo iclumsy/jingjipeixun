@@ -32,7 +32,7 @@ def export_excel():
         headers = [
             'ID', '姓名', '性别', '文化程度', '毕业院校', '所学专业',
             '身份证号', '手机号', '单位名称', '单位地址',
-            '作业类别', '操作项目', '项目代码',
+            '作业类别', '操作项目', '项目代号',
             '状态', '创建时间'
         ]
 
@@ -65,7 +65,7 @@ def export_excel():
                 student.get('company_address', ''),
                 student['job_category'],
                 student.get('exam_project', ''),
-                student.get('exam_code', ''),
+                student.get('project_code', ''),
                 status_text,
                 student.get('created_at', '')
             ]
