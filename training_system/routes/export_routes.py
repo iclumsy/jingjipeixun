@@ -21,7 +21,7 @@ def export_excel():
 
         # Get students
         training_type = request.args.get('training_type', '')
-        students = get_students(status or 'unreviewed', '', company, training_type)
+        students = get_students(status, '', company, training_type)
 
         # Create workbook
         wb = Workbook()

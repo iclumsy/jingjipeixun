@@ -345,11 +345,12 @@ def get_students(status='unreviewed', search='', company='', training_type=''):
         list: List of student records as dictionaries
     """
     with get_db_connection() as conn:
-        # Base query
-        query = "SELECT * FROM students WHERE status = ?"
-        params = [status]
-        query = "SELECT * FROM students WHERE status = ?"
-        params = [status]
+        query = "SELECT * FROM students WHERE 1=1"
+        params = []
+
+        if status:
+            query += " AND status = ?"
+            params.append(status)
 
         if training_type:
             query += " AND training_type = ?"

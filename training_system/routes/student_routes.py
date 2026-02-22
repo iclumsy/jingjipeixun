@@ -6,7 +6,7 @@ from models.student import (
     get_companies
 )
 from services.image_service import process_and_save_file, delete_student_files
-from services.document_service import generate_word_doc, generate_health_check_form, needs_health_check
+from services.document_service import generate_health_check_form
 from utils.validators import validate_student_data, validate_file_upload
 from utils.error_handlers import ValidationError, NotFoundError
 import os
@@ -316,59 +316,11 @@ def approve_student_route(id):
 
 @student_bp.route('/api/students/<int:id>/generate', methods=['POST'])
 def generate_materials_route(id):
-    """Generate training materials for a student."""
-    try:
-        student = get_student_by_id(id)
-
-        # Create student folder with training type prefix
-        training_type = student.get('training_type', 'special_operation')
-        training_type_name = '特种作业' if training_type == 'special_operation' else '特种设备'
-        student_folder_name = f"{training_type_name}-{student['company']}-{student['name']}"
-        student_folder_path = os.path.join(
-            current_app.config['STUDENTS_FOLDER'],
-            student_folder_name
-        )
-        os.makedirs(student_folder_path, exist_ok=True)
-
-        # Generate document
-        doc_path = os.path.join(
-            student_folder_path,
-            f"{student['id_card']}-{student['name']}-体检表.docx"
-        )
-
-        photo_abs_path = None
-        if student.get('photo_path'):
-            if student['photo_path'].startswith('students/'):
-                photo_abs_path = os.path.join(current_app.config['BASE_DIR'], student['photo_path'])
-            else:
-                filename = os.path.basename(student['photo_path'])
-                photo_abs_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-
-        generate_word_doc(
-            current_app.config['TEMPLATE_PATH'],
-            doc_path,
-            student,
-            photo_abs_path
-        )
-
-        # Update database
-        rel_path = f"students/{student_folder_name}/{os.path.basename(doc_path)}"
-        update_student(id, {'training_form_path': rel_path})
-
-        download_url = f"/students/{student_folder_name}/{os.path.basename(doc_path)}"
-        current_app.logger.info(f'Materials generated for student ID={id}')
-
-        return jsonify({
-            'message': 'materials generated',
-            'download_url': download_url,
-            'path': rel_path
-        })
-
-    except NotFoundError as e:
-        return jsonify(e.to_dict()), e.status_code
-    except Exception as e:
-        current_app.logger.error(f'Error generating materials for student {id}: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+    """Deprecated endpoint kept for backward compatibility."""
+    current_app.logger.warning('Deprecated generate endpoint called for student ID=%s', id)
+    return jsonify({
+        'error': '该接口已下线，请使用审核通过自动生成体检表流程'
+    }), 410
 
 
 @student_bp.route('/api/students/<int:id>/attachments.zip', methods=['GET'])

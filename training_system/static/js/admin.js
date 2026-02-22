@@ -62,6 +62,31 @@ document.addEventListener('DOMContentLoaded', () => {
         return ATTACHMENT_CONFIG[trainingType] || ATTACHMENT_CONFIG.special_operation;
     }
 
+    function inferTrainingTypeFromCategorySelect(categorySelect) {
+        if (!categorySelect) {
+            return '';
+        }
+
+        const selectedOption = categorySelect.options[categorySelect.selectedIndex];
+        if (selectedOption && selectedOption.dataset.trainingType) {
+            return selectedOption.dataset.trainingType;
+        }
+
+        const selectedCategory = categorySelect.value;
+        if (!selectedCategory || !jobCategoriesConfig) {
+            return '';
+        }
+
+        let inferred = '';
+        Object.keys(jobCategoriesConfig).forEach(trainingType => {
+            const categories = jobCategoriesConfig[trainingType]?.job_categories || [];
+            if (categories.some(category => category.name === selectedCategory)) {
+                inferred = trainingType;
+            }
+        });
+        return inferred;
+    }
+
     function validateAttachmentFile(file, label) {
         const ext = (file.name.split('.').pop() || '').toLowerCase();
         if (!ATTACHMENT_RULES.allowedExtensions.includes(ext)) {
@@ -358,6 +383,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     formData.append(key, input.value.trim());
                 }
             });
+
+            const jobCategorySelect = mainContent.querySelector('select[data-key="job_category"]');
+            const inferredTrainingType = inferTrainingTypeFromCategorySelect(jobCategorySelect);
+            if (inferredTrainingType) {
+                formData.set('training_type', inferredTrainingType);
+            }
             
             const res = await fetch(`/api/students/${studentId}`, { method: 'PUT', body: formData });
             
@@ -370,7 +401,13 @@ document.addEventListener('DOMContentLoaded', () => {
             showSaveStatus('保存成功', 'success');
             
             const idx = students.findIndex(s => s.id === studentId);
-            if (idx >= 0) students[idx] = updated;
+            if (idx >= 0) {
+                const previousTrainingType = students[idx].training_type;
+                students[idx] = updated;
+                if (currentStudentId === studentId && previousTrainingType !== updated.training_type) {
+                    showDetail(updated);
+                }
+            }
             
         } catch (e) {
             console.error('Auto-save error:', e);

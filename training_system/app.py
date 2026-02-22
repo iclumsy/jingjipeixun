@@ -1,6 +1,5 @@
 """Main application entry point."""
 import os
-import shutil
 from flask import Flask, render_template
 from models.student import init_db, migrate_db
 from routes.student_routes import student_bp
@@ -21,10 +20,6 @@ def create_app():
     app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
     app.config['STUDENTS_FOLDER'] = os.path.join(BASE_DIR, 'students')
     app.config['DATABASE'] = os.path.join(BASE_DIR, 'database/students.db')
-    app.config['TEMPLATE_PATH'] = os.path.join(
-        BASE_DIR,
-        '特种设备作业人员考试体检表（锅炉水处理、客运索道司机）-杜臻.docx'
-    )
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
 
     # Ensure directories exist
