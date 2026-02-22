@@ -37,6 +37,27 @@
                 <button type="button" class="btn-delete" onclick="removeStudent(this)">×</button>
             </div>
             <div class="form-section">
+                <div class="section-title">培训信息</div>
+                <div class="form-grid">
+                    <div class="form-group w-xl">
+                        <label>培训项目/作业类别</label>
+                        <span class="hint-slot"></span>
+                        <select name="job_category" required onchange="updateExamProjectOptions(this)">
+                            <option value="">请选择</option>
+                        </select>
+                    </div>
+                    <div class="form-group w-xl">
+                        <label>操作项目</label>
+                        <span class="hint-slot"></span>
+                        <select name="exam_project" required onchange="updateProjectCode(this)">
+                            <option value="">请先选择作业类别</option>
+                        </select>
+                        <input type="hidden" name="project_code">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
                 <div class="section-title">个人信息</div>
                 <div class="form-grid">
                     <div class="form-group w-sm">
@@ -96,36 +117,6 @@
                             <span class="hint-slot"></span>
                             <input type="text" name="company_address" required title="请输入单位地址">
                         </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="form-section">
-                <div class="section-title">培训信息</div>
-                <div class="form-grid">
-                    <div class="form-group w-xl">
-                        <label>培训项目</label>
-                        <span class="hint-slot"></span>
-                        <select name="training_type" required onchange="updateTrainingType(this)">
-                            <option value="">请选择培训项目</option>
-                            <option value="special_operation">特种作业</option>
-                            <option value="special_equipment">特种设备</option>
-                        </select>
-                    </div>
-                    <div class="form-group w-xl">
-                        <label>作业类别</label>
-                        <span class="hint-slot"></span>
-                        <select name="job_category" required onchange="updateExamProjectOptions(this)">
-                            <option value="">请选择</option>
-                        </select>
-                    </div>
-                    <div class="form-group w-xl">
-                        <label>操作项目</label>
-                        <span class="hint-slot"></span>
-                        <select name="exam_project" required onchange="updateProjectCode(this)">
-                            <option value="">请先选择作业类别</option>
-                        </select>
-                        <input type="hidden" name="project_code">
                     </div>
                 </div>
             </div>
@@ -230,83 +221,50 @@
             return found;
         }
 
-        function populateTrainingTypeOptions(entry, keepTrainingType = '') {
-            const trainingTypeSelect = entry.querySelector('select[name="training_type"]');
-            if (!trainingTypeSelect) return;
-
-            trainingTypeSelect.innerHTML = '<option value="">请选择培训项目</option>';
-
-            const addOption = (value, text) => {
-                const option = document.createElement('option');
-                option.value = value;
-                option.textContent = text;
-                trainingTypeSelect.appendChild(option);
-            };
-
-            if (jobCategoriesConfig) {
-                Object.keys(jobCategoriesConfig).forEach(trainingType => {
-                    addOption(trainingType, jobCategoriesConfig[trainingType]?.name || trainingType);
-                });
-            } else {
-                addOption('special_operation', '特种作业');
-                addOption('special_equipment', '特种设备');
-            }
-
-            trainingTypeSelect.value = keepTrainingType || trainingTypeSelect.value || 'special_operation';
-        }
-
-        function populateJobCategories(entry, trainingType, keepCategory = '') {
+        function populateCombinedCategories(entry, keepCategory = '') {
             const categorySelect = entry.querySelector('select[name="job_category"]');
             if (!categorySelect) return;
 
             categorySelect.innerHTML = '<option value="">请选择</option>';
-            const categories = jobCategoriesConfig?.[trainingType]?.job_categories || [];
-            categories.forEach(category => {
-                const option = document.createElement('option');
-                option.value = category.name;
-                option.textContent = category.name;
-                option.dataset.trainingType = trainingType;
-                categorySelect.appendChild(option);
-            });
+
+            if (jobCategoriesConfig) {
+                Object.keys(jobCategoriesConfig).forEach(trainingType => {
+                    const typeConfig = jobCategoriesConfig[trainingType];
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = typeConfig?.name || trainingType;
+
+                    (typeConfig?.job_categories || []).forEach(category => {
+                        const option = document.createElement('option');
+                        option.value = category.name;
+                        option.textContent = category.name;
+                        option.dataset.trainingType = trainingType;
+                        optgroup.appendChild(option);
+                    });
+
+                    categorySelect.appendChild(optgroup);
+                });
+            }
 
             if (keepCategory) {
                 categorySelect.value = keepCategory;
             }
-            if (!categorySelect.value && categories.length > 0) {
-                categorySelect.value = '';
-            }
-        }
-
-        function updateTrainingType(trainingTypeSelect) {
-            const entry = trainingTypeSelect.closest('.student-entry');
-            const selectedTrainingType = trainingTypeSelect.value;
-            const categorySelect = entry.querySelector('select[name="job_category"]');
-            const projectSelect = entry.querySelector('select[name="exam_project"]');
-            const projectCodeInput = entry.querySelector('input[name="project_code"]');
-
-            populateJobCategories(entry, selectedTrainingType);
-            projectSelect.innerHTML = '<option value="">请先选择作业类别</option>';
-            projectCodeInput.value = '';
-            updateAttachmentVisibility(entry, selectedTrainingType);
         }
         
         function updateExamProjectOptions(categorySelect, keepProject = '') {
             const entry = categorySelect.closest('.student-entry');
             const projectSelect = entry.querySelector('select[name="exam_project"]');
-            const trainingTypeSelect = entry.querySelector('select[name="training_type"]');
             const projectCodeInput = entry.querySelector('input[name="project_code"]');
             const selectedCategory = categorySelect.value;
             const selectedOption = categorySelect.options[categorySelect.selectedIndex];
-            let selectedTrainingType = trainingTypeSelect?.value || '';
+            let selectedTrainingType = '';
             
             projectSelect.innerHTML = '<option value="">请选择操作项目</option>';
             projectCodeInput.value = '';
             
             if (selectedOption && selectedOption.dataset.trainingType) {
                 selectedTrainingType = selectedOption.dataset.trainingType;
-                if (trainingTypeSelect) {
-                    trainingTypeSelect.value = selectedTrainingType;
-                }
+            } else {
+                selectedTrainingType = findTrainingTypeByCategory(selectedCategory);
             }
             updateAttachmentVisibility(entry, selectedTrainingType);
             
@@ -383,27 +341,20 @@
         }
 
         function initializeStudentEntry(entry, keepValues = false) {
-            const trainingTypeSelect = entry.querySelector('select[name="training_type"]');
             const categorySelect = entry.querySelector('select[name="job_category"]');
             const currentCategory = keepValues ? (categorySelect?.value || '') : '';
             const currentProject = keepValues ? (entry.querySelector('select[name="exam_project"]')?.value || '') : '';
-            const inferredTrainingType = findTrainingTypeByCategory(currentCategory);
-            const currentTrainingType = keepValues
-                ? (trainingTypeSelect?.value || inferredTrainingType || 'special_operation')
-                : 'special_operation';
 
-            populateTrainingTypeOptions(entry, currentTrainingType);
-            populateJobCategories(entry, currentTrainingType, currentCategory);
+            populateCombinedCategories(entry, currentCategory);
 
             if (currentCategory) {
                 updateExamProjectOptions(categorySelect, currentProject);
             } else {
-                updateAttachmentVisibility(entry, currentTrainingType);
+                updateAttachmentVisibility(entry, '');
             }
         }
         
         document.addEventListener('DOMContentLoaded', function() {
-            window.updateTrainingType = updateTrainingType;
             window.initializeStudentEntry = initializeStudentEntry;
             loadJobCategories();
         });

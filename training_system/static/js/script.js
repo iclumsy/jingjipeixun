@@ -113,11 +113,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function resolveTrainingType(entry) {
-        const trainingTypeSelect = entry.querySelector('select[name="training_type"]');
-        if (trainingTypeSelect && trainingTypeSelect.value) {
-            return trainingTypeSelect.value;
-        }
-
         const jobCategorySelect = entry.querySelector('select[name="job_category"]');
         if (jobCategorySelect) {
             const selectedOption = jobCategorySelect.options[jobCategorySelect.selectedIndex];
@@ -400,7 +395,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             },
             'company': '请输入单位名称',
             'company_address': '请输入单位地址',
-            'training_type': '请选择培训项目',
             'job_category': '请选择作业类别',
             'exam_project': '请选择操作项目',
             'photo': '请上传个人照片（白底一寸照）',
@@ -528,7 +522,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             },
             'company': '请输入单位名称',
             'company_address': '请输入单位地址',
-            'training_type': '请选择培训项目',
             'job_category': '请选择作业类别',
             'exam_project': '请选择操作项目',
             'photo': '请上传个人照片（白底一寸照）',
