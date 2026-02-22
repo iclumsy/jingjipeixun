@@ -57,10 +57,10 @@ def init_db(database_path):
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 photo_path TEXT,
                 diploma_path TEXT,
-                cert_front_path TEXT,
-                cert_back_path TEXT,
                 id_card_front_path TEXT,
                 id_card_back_path TEXT,
+                hukou_residence_path TEXT,
+                hukou_personal_path TEXT,
                 training_form_path TEXT
             )
         ''')
@@ -85,11 +85,15 @@ def migrate_db(database_path):
         
         obsolete_columns = ['exam_code', 'exam_category', 'cert_path', 
                           'theory_exam_time', 'practical_exam_time', 
-                          'passed', 'theory_makeup_time', 'makeup_exam']
+                          'passed', 'theory_makeup_time', 'makeup_exam',
+                          'cert_front_path', 'cert_back_path']
         
-        has_obsolete = any(col in columns for col in obsolete_columns)
+        needs_migration = any(col in columns for col in obsolete_columns)
         
-        if has_obsolete:
+        needs_hukou = 'hukou_residence_path' not in columns or 'hukou_personal_path' not in columns
+        has_old_cert = 'cert_front_path' in columns or 'cert_back_path' in columns
+        
+        if needs_migration or needs_hukou or has_old_cert:
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS students_new (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -110,10 +114,10 @@ def migrate_db(database_path):
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     photo_path TEXT,
                     diploma_path TEXT,
-                    cert_front_path TEXT,
-                    cert_back_path TEXT,
                     id_card_front_path TEXT,
                     id_card_back_path TEXT,
+                    hukou_residence_path TEXT,
+                    hukou_personal_path TEXT,
                     training_form_path TEXT
                 )
             ''')
@@ -126,19 +130,27 @@ def migrate_db(database_path):
                           'cert_back_path', 'id_card_front_path', 'id_card_back_path', 
                           'training_form_path']
             
-            available_columns = [col for col in old_columns if col in columns]
+            new_columns = ['id', 'name', 'gender', 'education', 'school', 'major', 
+                          'id_card', 'phone', 'company', 'company_address', 
+                          'job_category', 'exam_project', 'project_code', 
+                          'training_type', 'status', 'created_at', 
+                          'photo_path', 'diploma_path', 
+                          'id_card_front_path', 'id_card_back_path', 
+                          'hukou_residence_path', 'hukou_personal_path',
+                          'training_form_path']
             
             select_cols = []
-            for col in old_columns:
+            for col in new_columns:
                 if col in columns:
                     select_cols.append(col)
+                elif col == 'hukou_residence_path' or col == 'hukou_personal_path':
+                    select_cols.append("''")
+                elif col == 'project_code' and 'exam_code' in columns:
+                    select_cols.append('exam_code AS project_code')
+                elif col == 'training_type':
+                    select_cols.append("'special_operation' AS training_type")
                 else:
-                    if col == 'project_code' and 'exam_code' in columns:
-                        select_cols.append('exam_code AS project_code')
-                    elif col == 'training_type':
-                        select_cols.append("'special_operation' AS training_type")
-                    else:
-                        select_cols.append("''")
+                    select_cols.append("''")
             
             select_clause = ', '.join(select_cols)
             conn.execute(f'''
@@ -147,8 +159,9 @@ def migrate_db(database_path):
                     id_card, phone, company, company_address, 
                     job_category, exam_project, project_code, 
                     training_type, status, created_at, 
-                    photo_path, diploma_path, cert_front_path, 
-                    cert_back_path, id_card_front_path, id_card_back_path, 
+                    photo_path, diploma_path, 
+                    id_card_front_path, id_card_back_path, 
+                    hukou_residence_path, hukou_personal_path,
                     training_form_path
                 )
                 SELECT {select_clause} FROM students
@@ -157,7 +170,7 @@ def migrate_db(database_path):
             conn.execute('DROP TABLE students')
             conn.execute('ALTER TABLE students_new RENAME TO students')
             conn.commit()
-            print("Database migrated: removed obsolete columns")
+            print("Database migrated: removed obsolete columns, added hukou fields")
         
         elif 'training_type' not in columns:
             conn.execute("ALTER TABLE students ADD COLUMN training_type TEXT DEFAULT 'special_operation'")
@@ -190,8 +203,9 @@ def create_student(data, file_paths):
             INSERT INTO students (
                 name, gender, education, school, major, id_card, phone,
                 company, company_address, job_category, exam_project, project_code,
-                training_type, photo_path, diploma_path, cert_front_path, cert_back_path,
-                id_card_front_path, id_card_back_path, training_form_path
+                training_type, photo_path, diploma_path,
+                id_card_front_path, id_card_back_path,
+                hukou_residence_path, hukou_personal_path, training_form_path
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data['name'], data['gender'], data['education'], data.get('school', ''),
@@ -200,8 +214,8 @@ def create_student(data, file_paths):
             data.get('project_code', ''),
             data.get('training_type', 'special_operation'),
             file_paths.get('photo_path', ''), file_paths.get('diploma_path', ''),
-            file_paths.get('cert_front_path', ''), file_paths.get('cert_back_path', ''),
             file_paths.get('id_card_front_path', ''), file_paths.get('id_card_back_path', ''),
+            file_paths.get('hukou_residence_path', ''), file_paths.get('hukou_personal_path', ''),
             file_paths.get('training_form_path', '')
         ))
         return cursor.lastrowid

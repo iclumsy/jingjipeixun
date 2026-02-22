@@ -1,6 +1,7 @@
 {
     "special_operation": {
         "name": "特种作业",
+        "attachments": ["diploma", "id_card_front", "id_card_back"],
         "job_categories": [
             {
                 "name": "电工作业",
@@ -30,6 +31,7 @@
     },
     "special_equipment": {
         "name": "特种设备",
+        "attachments": ["photo", "diploma", "id_card_front", "id_card_back", "hukou_residence", "hukou_personal"],
         "job_categories": [
             {
                 "name": "特种设备安全管理",

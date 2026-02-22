@@ -32,10 +32,10 @@ def create_student_route():
         file_map = {
             'photo': 'photo_path',
             'diploma': 'diploma_path',
-            'cert_front': 'cert_front_path',
-            'cert_back': 'cert_back_path',
             'id_card_front': 'id_card_front_path',
-            'id_card_back': 'id_card_back_path'
+            'id_card_back': 'id_card_back_path',
+            'hukou_residence': 'hukou_residence_path',
+            'hukou_personal': 'hukou_personal_path'
         }
 
         id_card_val = data.get('id_card', '').strip()
@@ -100,10 +100,10 @@ def update_student_route(id):
         file_map = {
             'photo': 'photo_path',
             'diploma': 'diploma_path',
-            'cert_front': 'cert_front_path',
-            'cert_back': 'cert_back_path',
             'id_card_front': 'id_card_front_path',
-            'id_card_back': 'id_card_back_path'
+            'id_card_back': 'id_card_back_path',
+            'hukou_residence': 'hukou_residence_path',
+            'hukou_personal': 'hukou_personal_path'
         }
 
         current_student = get_student_by_id(id)
@@ -167,15 +167,20 @@ def update_student_route(id):
 
 @student_bp.route('/api/students/<int:id>/reject', methods=['POST'])
 def reject_student_route(id):
-    """Reject and delete a student."""
+    """Reject a student - delete if unreviewed, or move to unreviewed if reviewed."""
     try:
-        student = delete_student(id)
-
-        # Delete files
-        delete_student_files(student, current_app.config['BASE_DIR'])
-
-        current_app.logger.info(f'Student rejected and deleted: ID={id}')
-        return jsonify({'message': 'Student rejected and deleted'})
+        data = request.get_json(silent=True) or {}
+        should_delete = data.get('delete', True)
+        
+        if should_delete:
+            student = delete_student(id)
+            delete_student_files(student, current_app.config['BASE_DIR'])
+            current_app.logger.info(f'Student rejected and deleted: ID={id}')
+            return jsonify({'message': 'Student rejected and deleted'})
+        else:
+            student = update_student(id, {'status': 'unreviewed'})
+            current_app.logger.info(f'Student moved to unreviewed: ID={id}')
+            return jsonify({'message': 'Student moved to unreviewed', 'student': student})
 
     except NotFoundError as e:
         return jsonify(e.to_dict()), e.status_code
@@ -278,8 +283,9 @@ def download_attachments_zip_route(id):
             return jsonify({'error': '仅支持已审核学员打包下载'}), 400
 
         attachment_keys = [
-            'photo_path', 'diploma_path', 'cert_front_path', 'cert_back_path',
-            'id_card_front_path', 'id_card_back_path', 'training_form_path'
+            'photo_path', 'diploma_path',
+            'id_card_front_path', 'id_card_back_path',
+            'hukou_residence_path', 'hukou_personal_path', 'training_form_path'
         ]
 
         files_to_zip = []

@@ -61,7 +61,7 @@ def create_app():
     #     return render_template('admin.html', training_type='special_equipment')
 
     # Run migration if needed
-    migrate_db(app.config['DATABASE'])
+    # migrate_db(app.config['DATABASE'])
 
     app.logger.info('Application initialized successfully')
 

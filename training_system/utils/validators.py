@@ -19,7 +19,7 @@ def validate_student_data(data, required_fields=None):
     """
     if required_fields is None:
         required_fields = ['name', 'gender', 'education', 'id_card', 'phone',
-                          'job_category', 'exam_category']
+                          'job_category']
 
     errors = {}
 

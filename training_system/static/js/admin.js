@@ -847,6 +847,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 await saveStudentChanges(student.id);
             };
             actionBar.insertBefore(saveBtn, actionBar.firstChild);
+            
+            if (student.status === 'unreviewed') {
+                const rejectBtn = document.createElement('button');
+                rejectBtn.className = 'btn';
+                rejectBtn.style.cssText = 'background: #FEE2E2; color: #EF4444;';
+                rejectBtn.textContent = '审核不通过';
+                rejectBtn.onclick = () => rejectStudent(true);
+                actionBar.appendChild(rejectBtn);
+                
+                const approveBtn = document.createElement('button');
+                approveBtn.className = 'btn primary';
+                approveBtn.textContent = '审核通过';
+                approveBtn.onclick = () => approveStudent();
+                actionBar.appendChild(approveBtn);
+            } else {
+                const downloadZipBtn = document.createElement('button');
+                downloadZipBtn.className = 'btn secondary';
+                downloadZipBtn.textContent = '打包下载';
+                downloadZipBtn.style.marginRight = '8px';
+                downloadZipBtn.onclick = () => {
+                    window.open(`/api/students/${student.id}/attachments.zip`, '_blank');
+                };
+                actionBar.appendChild(downloadZipBtn);
+                
+                const rejectBtn = document.createElement('button');
+                rejectBtn.className = 'btn';
+                rejectBtn.style.cssText = 'background: #FEE2E2; color: #EF4444;';
+                rejectBtn.textContent = '审核不通过';
+                rejectBtn.onclick = () => rejectStudent(false);
+                actionBar.appendChild(rejectBtn);
+            }
         }
 
         mainContent.innerHTML = '';
@@ -930,12 +961,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    window.rejectStudent = async function() {
+    window.rejectStudent = async function(shouldDelete) {
         if (!currentStudentId) return;
         try {
-            const res = await fetch(`/api/students/${currentStudentId}/reject`, { method: 'POST' });
+            const res = await fetch(`/api/students/${currentStudentId}/reject`, { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ delete: shouldDelete })
+            });
             if (!res.ok) throw new Error('操作失败');
-            showMessage('审核不通过', 'success');
+            showMessage(shouldDelete ? '已删除学员' : '已移至未审核', 'success');
             loadStudents();
             loadCompanies(currentStatus);
             mainContent.innerHTML = '<div class="empty-state">请选择左侧学员查看详情</div>';

@@ -93,10 +93,10 @@ def process_and_save_file(file_storage, id_card, name, label_key, company='', tr
     label_name_map = {
         'photo': '个人照片',
         'diploma': '学历证书',
-        'cert_front': '所持证件正面',
-        'cert_back': '所持证件反面',
         'id_card_front': '身份证正面',
-        'id_card_back': '身份证反面'
+        'id_card_back': '身份证反面',
+        'hukou_residence': '户口本户籍页',
+        'hukou_personal': '户口本个人页'
     }
 
     label_name = label_name_map.get(label_key, label_key)
@@ -183,8 +183,9 @@ def delete_student_files(student_record, base_dir):
         base_dir: Base directory
     """
     file_keys = [
-        'photo_path', 'diploma_path', 'cert_front_path', 'cert_back_path',
-        'id_card_front_path', 'id_card_back_path', 'training_form_path'
+        'photo_path', 'diploma_path',
+        'id_card_front_path', 'id_card_back_path',
+        'hukou_residence_path', 'hukou_personal_path', 'training_form_path'
     ]
 
     for key in file_keys:

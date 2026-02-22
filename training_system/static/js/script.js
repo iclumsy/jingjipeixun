@@ -6,6 +6,92 @@ document.addEventListener('DOMContentLoaded', async () => {
     const form = document.getElementById('collectionForm');
     const actions = document.querySelector('.actions');
 
+    function showModal(message, type = 'success') {
+        const existingModal = document.querySelector('.result-modal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        const modalOverlay = document.createElement('div');
+        modalOverlay.className = 'result-modal';
+        modalOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        `;
+
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = `
+            background: white;
+            padding: 30px 40px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            max-width: 400px;
+            animation: modalIn 0.3s ease;
+        `;
+
+        const icon = document.createElement('div');
+        icon.style.cssText = `
+            font-size: 48px;
+            margin-bottom: 15px;
+        `;
+        icon.textContent = type === 'success' ? '✓' : '✗';
+
+        const title = document.createElement('div');
+        title.style.cssText = `
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: ${type === 'success' ? '#166534' : '#991b1b'};
+        `;
+        title.textContent = type === 'success' ? '提交成功' : '提交失败';
+
+        const messageEl = document.createElement('div');
+        messageEl.style.cssText = `
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        `;
+        messageEl.textContent = message;
+
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '确定';
+        closeBtn.style.cssText = `
+            padding: 10px 40px;
+            background: ${type === 'success' ? '#10B981' : '#EF4444'};
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+        `;
+        closeBtn.onmouseover = () => closeBtn.style.transform = 'scale(1.05)';
+        closeBtn.onmouseout = () => closeBtn.style.transform = 'scale(1)';
+        closeBtn.onclick = () => modalOverlay.remove();
+
+        modalContent.appendChild(icon);
+        modalContent.appendChild(title);
+        modalContent.appendChild(messageEl);
+        modalContent.appendChild(closeBtn);
+        modalOverlay.appendChild(modalContent);
+        document.body.appendChild(modalOverlay);
+
+        modalOverlay.onclick = (e) => {
+            if (e.target === modalOverlay) {
+                modalOverlay.remove();
+            }
+        };
+    }
+
     // Load job categories configuration from backend API
     let jobCategoriesConfig = null;
     try {
@@ -115,10 +201,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         submitBtn.textContent = '提交所有信息';
 
         if (container.children.length === 0) {
-            showMessage(`成功提交 ${successCount} 位学员信息！`, 'success');
+            showModal(`成功提交 ${successCount} 位学员信息！`, 'success');
             addStudent(); // Reset with one empty form
         } else {
-            showMessage(`提交完成。成功: ${successCount}, 失败: ${failCount}。请检查失败条目。`, failCount > 0 ? 'error' : 'success');
+            showModal(`提交完成。成功: ${successCount}, 失败: ${failCount}。请检查失败条目。`, failCount > 0 ? 'error' : 'success');
         }
     });
 
@@ -262,11 +348,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             },
             'job_category': '请选择作业类别',
             'exam_project': '请选择操作项目',
-            'exam_category': '请选择考试类别',
             'photo': '请上传个人照片（白底一寸照）',
             'diploma': '请上传学历证书',
             'id_card_front': '请上传身份证正面照片',
-            'id_card_back': '请上传身份证反面照片'
+            'id_card_back': '请上传身份证反面照片',
+            'hukou_residence': '请上传户口本户籍页照片',
+            'hukou_personal': '请上传户口本个人页照片'
         };
         
         function getErrorMessage(input) {
@@ -386,11 +473,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             },
             'job_category': '请选择作业类别',
             'exam_project': '请选择操作项目',
-            'exam_category': '请选择考试类别',
             'photo': '请上传个人照片（白底一寸照）',
             'diploma': '请上传学历证书',
             'id_card_front': '请上传身份证正面照片',
-            'id_card_back': '请上传身份证反面照片'
+            'id_card_back': '请上传身份证反面照片',
+            'hukou_residence': '请上传户口本户籍页照片',
+            'hukou_personal': '请上传户口本个人页照片'
         };
         
         function getErrorMessage(input) {
@@ -520,10 +608,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         submitBtn.textContent = '提交所有信息';
 
         if (container.children.length === 0) {
-            showMessage(`成功提交 ${successCount} 位学员信息！`, 'success');
+            showModal(`成功提交 ${successCount} 位学员信息！`, 'success');
             addStudent(); // Reset with one empty form
         } else {
-            showMessage(`提交完成。成功: ${successCount}, 失败: ${failCount}。请检查失败条目。`, failCount > 0 ? 'error' : 'success');
+            showModal(`提交完成。成功: ${successCount}, 失败: ${failCount}。请检查失败条目。`, failCount > 0 ? 'error' : 'success');
         }
     };
 });

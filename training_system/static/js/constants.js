@@ -33,12 +33,6 @@ const JobCategoryOptions = [
     { value: '高处作业', text: '高处作业' }
 ];
 
-const ExamCategoryOptions = [
-    { value: '初次领证', text: '初次领证' },
-    { value: '复审', text: '复审' },
-    { value: '延期换证', text: '延期换证' }
-];
-
 const FileLabelNameMap = {
     'photo': '个人照片',
     'diploma': '学历证书',

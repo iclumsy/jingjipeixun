@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>学员信息采集系统</title>
+    <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
@@ -117,79 +118,70 @@
                         </select>
                         <input type="hidden" name="project_code" id="project_code">
                     </div>
-                    <div class="form-group w-sm">
-                        <label>考试类别</label>
-                        <span class="hint-slot"></span>
-                        <select name="exam_category" required>
-                            <option value="初次领证">初次领证</option>
-                            <option value="复审">复审</option>
-                            <option value="延期换证">延期换证</option>
-                        </select>
-                    </div>
                 </div>
             </div>
             
             <div class="form-section">
                 <div class="section-title">证件上传</div>
-                <div class="upload-grid">
-                    <div class="form-group w-upload">
+                <div class="upload-grid" id="upload-grid">
+                    <div class="form-group w-upload" data-attachment="photo" style="display: none;">
                         <div class="upload-box" onclick="this.querySelector('input').click()">
                             <div class="upload-placeholder">
                                 <span class="icon">+</span>
                                 <span class="text">个人照片</span>
                             </div>
                             <img class="preview-img" style="display: none;">
-                            <input type="file" name="photo" accept="image/*" required title="请上传个人照片" onchange="previewFile(this)">
+                            <input type="file" name="photo" accept="image/*" title="请上传个人照片（白底一寸照）" onchange="previewFile(this)">
                         </div>
                     </div>
-                    <div class="form-group w-upload">
+                    <div class="form-group w-upload" data-attachment="diploma">
                         <div class="upload-box" onclick="this.querySelector('input').click()">
                             <div class="upload-placeholder">
                                 <span class="icon">+</span>
                                 <span class="text">学历证书</span>
                             </div>
                             <img class="preview-img" style="display: none;">
-                            <input type="file" name="diploma" accept="image/*" onchange="previewFile(this)">
+                            <input type="file" name="diploma" accept="image/*" title="请上传学历证书照片" onchange="previewFile(this)">
                         </div>
                     </div>
-                    <div class="form-group w-upload">
-                        <div class="upload-box" onclick="this.querySelector('input').click()">
-                            <div class="upload-placeholder">
-                                <span class="icon">+</span>
-                                <span class="text">所持证件正面</span>
-                            </div>
-                            <img class="preview-img" style="display: none;">
-                            <input type="file" name="cert_front" accept="image/*" onchange="previewFile(this)">
-                        </div>
-                    </div>
-                    <div class="form-group w-upload">
-                        <div class="upload-box" onclick="this.querySelector('input').click()">
-                            <div class="upload-placeholder">
-                                <span class="icon">+</span>
-                                <span class="text">所持证件反面</span>
-                            </div>
-                            <img class="preview-img" style="display: none;">
-                            <input type="file" name="cert_back" accept="image/*" onchange="previewFile(this)">
-                        </div>
-                    </div>
-                    <div class="form-group w-upload">
+                    <div class="form-group w-upload" data-attachment="id_card_front">
                         <div class="upload-box" onclick="this.querySelector('input').click()">
                             <div class="upload-placeholder">
                                 <span class="icon">+</span>
                                 <span class="text">身份证正面</span>
                             </div>
                             <img class="preview-img" style="display: none;">
-                            <input type="file" name="id_card_front" accept="image/*" required title="请上传身份证正面" onchange="previewFile(this)">
+                            <input type="file" name="id_card_front" accept="image/*" title="请上传身份证正面照片" onchange="previewFile(this)">
                         </div>
                     </div>
-                    <div class="form-group w-upload">
+                    <div class="form-group w-upload" data-attachment="id_card_back">
                         <div class="upload-box" onclick="this.querySelector('input').click()">
                             <div class="upload-placeholder">
                                 <span class="icon">+</span>
                                 <span class="text">身份证反面</span>
                             </div>
                             <img class="preview-img" style="display: none;">
-                            <input type="file" name="id_card_back" accept="image/*" required title="请上传身份证反面" onchange="previewFile(this)">
+                            <input type="file" name="id_card_back" accept="image/*" title="请上传身份证反面照片" onchange="previewFile(this)">
+                        </div>
+                    </div>
+                    <div class="form-group w-upload" data-attachment="hukou_residence" style="display: none;">
+                        <div class="upload-box" onclick="this.querySelector('input').click()">
+                            <div class="upload-placeholder">
+                                <span class="icon">+</span>
+                                <span class="text">户口本户籍页</span>
+                            </div>
+                            <img class="preview-img" style="display: none;">
+                            <input type="file" name="hukou_residence" accept="image/*" title="请上传户口本户籍页照片" onchange="previewFile(this)">
+                        </div>
+                    </div>
+                    <div class="form-group w-upload" data-attachment="hukou_personal" style="display: none;">
+                        <div class="upload-box" onclick="this.querySelector('input').click()">
+                            <div class="upload-placeholder">
+                                <span class="icon">+</span>
+                                <span class="text">户口本个人页</span>
+                            </div>
+                            <img class="preview-img" style="display: none;">
+                            <input type="file" name="hukou_personal" accept="image/*" title="请上传户口本个人页照片" onchange="previewFile(this)">
                         </div>
                     </div>
                 </div>
@@ -199,7 +191,6 @@
     </template>
 
     <script src="/static/js/constants.js"></script>
-    <script src="/static/js/utils.js"></script>
     <script src="/static/js/script.js"></script>
     <script>
         let jobCategoriesConfig = null;
@@ -260,6 +251,7 @@
             
             if (selectedOption && selectedOption.dataset.trainingType) {
                 trainingTypeInput.value = selectedOption.dataset.trainingType;
+                updateAttachmentVisibility(entry, selectedOption.dataset.trainingType);
             }
             
             if (selectedCategory && jobCategoriesConfig) {
@@ -297,6 +289,38 @@
             } else {
                 projectCodeInput.value = '';
             }
+        }
+        
+        function updateAttachmentVisibility(entry, trainingType) {
+            const uploadGrid = entry.querySelector('.upload-grid');
+            const attachmentGroups = uploadGrid.querySelectorAll('[data-attachment]');
+            
+            const requiredAttachments = [];
+            if (jobCategoriesConfig && jobCategoriesConfig[trainingType]) {
+                requiredAttachments = jobCategoriesConfig[trainingType].attachments || [];
+            }
+            
+            attachmentGroups.forEach(group => {
+                const attachmentName = group.dataset.attachment;
+                if (requiredAttachments.includes(attachmentName)) {
+                    group.style.display = '';
+                    const input = group.querySelector('input[type="file"]');
+                    if (input) {
+                        input.required = true;
+                    }
+                } else {
+                    group.style.display = 'none';
+                    const input = group.querySelector('input[type="file"]');
+                    if (input) {
+                        input.required = false;
+                        input.value = '';
+                        const img = group.querySelector('.preview-img');
+                        const placeholder = group.querySelector('.upload-placeholder');
+                        if (img) { img.style.display = 'none'; img.src = ''; }
+                        if (placeholder) { placeholder.style.display = 'block'; }
+                    }
+                }
+            });
         }
         
         document.addEventListener('DOMContentLoaded', function() {
