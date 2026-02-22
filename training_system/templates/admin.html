@@ -11,32 +11,32 @@
         window.trainingType = '{{ training_type|default("special_equipment") }}';
     </script>
 </head>
-<body>
+<body class="admin-page">
     <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
     <div class="admin-layout">
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 10px;">
+                <div class="sidebar-title-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 10px;">
                     <h3 style="margin: 0;">学员管理</h3>
                     <input type="text" id="searchInput" class="search-box" placeholder="搜索姓名、身份证..." style="width: 150px;">
                 </div>
             </div>
             <!-- Training Type Toggle Buttons -->
-            <div style="padding: 10px 15px; border-bottom: 1px solid #eee; background-color: #f9fafb;">
+            <div class="toggle-section training-toggle-section" style="padding: 10px 15px; border-bottom: 1px solid #eee; background-color: #f9fafb;">
                 <div style="display: flex; gap: 8px;">
                     <button id="btnSpecialEquipment" class="training-type-btn" data-type="special_equipment" style="flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; background: #fff; font-size: 0.85rem; cursor: pointer; transition: all 0.3s ease; font-weight: 500;">特种设备</button>
                     <button id="btnSpecialOperation" class="training-type-btn" data-type="special_operation" style="flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; background: #fff; font-size: 0.85rem; cursor: pointer; transition: all 0.3s ease; font-weight: 500;">特种作业</button>
                 </div>
             </div>
             <!-- Status Toggle Buttons -->
-            <div style="padding: 8px 15px; border-bottom: 1px solid #eee;">
+            <div class="toggle-section status-toggle-section" style="padding: 8px 15px; border-bottom: 1px solid #eee;">
                 <div style="display: flex; gap: 8px;">
                     <button id="btnUnreviewed" class="status-btn" data-status="unreviewed" style="flex: 1; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; font-size: 0.85rem; cursor: pointer; transition: all 0.3s ease; font-weight: 500;">未审核</button>
                     <button id="btnReviewed" class="status-btn" data-status="reviewed" style="flex: 1; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; font-size: 0.85rem; cursor: pointer; transition: all 0.3s ease; font-weight: 500;">已审核</button>
                 </div>
             </div>
-            <div class="filter-controls" style="padding: 10px 15px; border-bottom: 1px solid #eee;">
-                <div style="display: flex; gap: 10px; align-items: center;">
+            <div class="filter-controls sidebar-filters" style="padding: 10px 15px; border-bottom: 1px solid #eee;">
+                <div class="filter-row" style="display: flex; gap: 10px; align-items: center;">
                     <select id="companyFilter" style="flex: 1; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.8rem;">
                         <option value="">全部公司</option>
                     </select>
