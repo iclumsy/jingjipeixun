@@ -148,13 +148,7 @@ def delete_file_if_exists(file_path, base_dir):
         return False
 
     try:
-        # Handle both old and new path formats
-        if file_path.startswith('students/'):
-            abs_path = os.path.join(base_dir, file_path)
-        else:
-            # Old format: uploads/filename
-            filename = os.path.basename(file_path)
-            abs_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+        abs_path = os.path.join(base_dir, file_path)
 
         if os.path.exists(abs_path):
             os.remove(abs_path)

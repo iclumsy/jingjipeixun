@@ -17,13 +17,11 @@ def create_app():
     # Configuration
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     app.config['BASE_DIR'] = BASE_DIR
-    app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
     app.config['STUDENTS_FOLDER'] = os.path.join(BASE_DIR, 'students')
     app.config['DATABASE'] = os.path.join(BASE_DIR, 'database/students.db')
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
 
     # Ensure directories exist
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs(app.config['STUDENTS_FOLDER'], exist_ok=True)
     os.makedirs(os.path.join(BASE_DIR, 'database'), exist_ok=True)
 

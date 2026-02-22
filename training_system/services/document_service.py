@@ -88,11 +88,7 @@ def generate_health_check_form(student, base_dir, students_folder):
     
     photo_abs_path = None
     if student.get('photo_path'):
-        if student['photo_path'].startswith('students/'):
-            photo_abs_path = os.path.join(base_dir, student['photo_path'])
-        else:
-            filename = os.path.basename(student['photo_path'])
-            photo_abs_path = os.path.join(base_dir, 'uploads', filename)
+        photo_abs_path = os.path.join(base_dir, student['photo_path'])
     
     data = {
         'name': student['name'],
