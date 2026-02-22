@@ -19,7 +19,7 @@ def validate_student_data(data, required_fields=None):
     """
     if required_fields is None:
         required_fields = ['name', 'gender', 'education', 'id_card', 'phone',
-                          'job_category']
+                          'company', 'company_address', 'job_category']
 
     errors = {}
 
@@ -65,7 +65,10 @@ def validate_file_upload(file, allowed_extensions=None):
         ValidationError: If validation fails
     """
     if allowed_extensions is None:
-        allowed_extensions = {'jpg', 'jpeg', 'png', 'pdf', 'docx'}
+        allowed_extensions = {'jpg', 'jpeg', 'png'}
+
+    allowed_mimetypes = {'image/jpeg', 'image/png'}
+    max_size_mb = 10
 
     if not file or not file.filename:
         raise ValidationError('未选择文件')
@@ -77,5 +80,22 @@ def validate_file_upload(file, allowed_extensions=None):
     ext = file.filename.rsplit('.', 1)[1].lower()
     if ext not in allowed_extensions:
         raise ValidationError(f'不支持的文件类型，仅支持: {", ".join(allowed_extensions)}')
+
+    mimetype = (file.mimetype or '').lower()
+    if mimetype and mimetype not in allowed_mimetypes:
+        raise ValidationError('文件MIME类型无效，仅支持 JPG/PNG 图片')
+
+    file_size = getattr(file, 'content_length', None) or 0
+    if not file_size:
+        try:
+            current_pos = file.stream.tell()
+            file.stream.seek(0, 2)
+            file_size = file.stream.tell()
+            file.stream.seek(current_pos)
+        except Exception:
+            file_size = 0
+
+    if file_size and file_size > max_size_mb * 1024 * 1024:
+        raise ValidationError(f'文件大小不能超过 {max_size_mb}MB')
 
     return True

@@ -36,10 +36,10 @@ const JobCategoryOptions = [
 const FileLabelNameMap = {
     'photo': '个人照片',
     'diploma': '学历证书',
-    'cert_front': '所持证件正面',
-    'cert_back': '所持证件反面',
     'id_card_front': '身份证正面',
-    'id_card_back': '身份证反面'
+    'id_card_back': '身份证反面',
+    'hukou_residence': '户口本户籍页',
+    'hukou_personal': '户口本个人页'
 };
 
 function updateExamProjectOptions(categorySelect, projectSelectId) {

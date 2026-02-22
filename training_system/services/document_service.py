@@ -16,22 +16,33 @@ HEALTH_CHECK_TEMPLATES = {
     '锅炉水处理': '锅炉水处理体检表.docx'
 }
 
+HEALTH_CHECK_PROJECT_CODES = {
+    'N1': '叉车司机',
+    'G3': '锅炉水处理'
+}
 
-def needs_health_check(exam_project):
+
+def needs_health_check(exam_project, project_code=''):
     """
     Check if the exam project requires a health check form.
     
     Args:
         exam_project: The exam project name
+        project_code: The project code (e.g. G3)
         
     Returns:
         tuple: (needs_check: bool, template_key: str or None)
     """
+    normalized_code = (project_code or '').strip().upper()
+    if normalized_code in HEALTH_CHECK_PROJECT_CODES:
+        return True, HEALTH_CHECK_PROJECT_CODES[normalized_code]
+
     if not exam_project:
         return False, None
     
+    normalized_project = str(exam_project).strip()
     for key in HEALTH_CHECK_TEMPLATES.keys():
-        if key in exam_project:
+        if key in normalized_project:
             return True, key
     return False, None
 
@@ -49,7 +60,8 @@ def generate_health_check_form(student, base_dir, students_folder):
         str: Relative path to generated file, or None if not needed
     """
     exam_project = student.get('exam_project', '')
-    needs_check, template_key = needs_health_check(exam_project)
+    project_code = student.get('project_code', '')
+    needs_check, template_key = needs_health_check(exam_project, project_code)
     
     if not needs_check:
         return None

@@ -2,12 +2,12 @@
 from flask import Blueprint, request, jsonify, current_app
 from models.student import (
     create_student, get_students, get_student_by_id, update_student,
-    delete_student, delete_students_batch, approve_student, approve_students_batch,
+    delete_student, delete_students_batch,
     get_companies
 )
 from services.image_service import process_and_save_file, delete_student_files
 from services.document_service import generate_word_doc, generate_health_check_form, needs_health_check
-from utils.validators import validate_student_data
+from utils.validators import validate_student_data, validate_file_upload
 from utils.error_handlers import ValidationError, NotFoundError
 import os
 import io
@@ -15,6 +15,28 @@ import zipfile
 
 
 student_bp = Blueprint('student', __name__)
+
+FILE_MAP = {
+    'photo': 'photo_path',
+    'diploma': 'diploma_path',
+    'id_card_front': 'id_card_front_path',
+    'id_card_back': 'id_card_back_path',
+    'hukou_residence': 'hukou_residence_path',
+    'hukou_personal': 'hukou_personal_path'
+}
+
+REQUIRED_ATTACHMENTS = {
+    'special_operation': ['diploma', 'id_card_front', 'id_card_back'],
+    'special_equipment': ['photo', 'diploma', 'id_card_front', 'id_card_back', 'hukou_residence', 'hukou_personal']
+}
+
+
+def normalize_training_type(training_type):
+    """Normalize and validate training type."""
+    value = (training_type or '').strip()
+    if value in REQUIRED_ATTACHMENTS:
+        return value
+    return 'special_operation'
 
 
 @student_bp.route('/api/students', methods=['POST'])
@@ -27,25 +49,27 @@ def create_student_route():
         # Validate data
         validate_student_data(data)
 
+        training_type = normalize_training_type(data.get('training_type', 'special_operation'))
+        required_attachments = REQUIRED_ATTACHMENTS.get(training_type, REQUIRED_ATTACHMENTS['special_operation'])
+        missing_files = [
+            field for field in required_attachments
+            if not files.get(field) or not files.get(field).filename
+        ]
+        if missing_files:
+            fields = {field: '该培训项目下此附件为必传项' for field in missing_files}
+            raise ValidationError('缺少必传附件', fields=fields)
+
         # Save files
         file_paths = {}
-        file_map = {
-            'photo': 'photo_path',
-            'diploma': 'diploma_path',
-            'id_card_front': 'id_card_front_path',
-            'id_card_back': 'id_card_back_path',
-            'hukou_residence': 'hukou_residence_path',
-            'hukou_personal': 'hukou_personal_path'
-        }
 
         id_card_val = data.get('id_card', '').strip()
         company_val = data.get('company', '').strip()
 
-        for input_name, db_key in file_map.items():
+        for input_name, db_key in FILE_MAP.items():
             file = files.get(input_name)
             if file and file.filename and id_card_val:
                 try:
-                    training_type = data.get('training_type', 'special_operation')
+                    validate_file_upload(file)
                     rel = process_and_save_file(
                         file, id_card_val, data.get('name', ''),
                         input_name, company_val, training_type
@@ -60,7 +84,9 @@ def create_student_route():
         file_paths['training_form_path'] = ""
 
         # Create student
-        student_id = create_student(data, file_paths)
+        student_payload = data.to_dict(flat=True)
+        student_payload['training_type'] = training_type
+        student_id = create_student(student_payload, file_paths)
         current_app.logger.info(f'Student created: ID={student_id}')
 
         return jsonify({'message': 'Student added successfully', 'id': student_id}), 201
@@ -95,16 +121,8 @@ def update_student_route(id):
     try:
         allowed_text = [
             'name', 'gender', 'education', 'school', 'major', 'id_card', 'phone',
-            'company', 'company_address', 'job_category', 'exam_project', 'exam_code'
+            'company', 'company_address', 'job_category', 'exam_project', 'project_code', 'training_type'
         ]
-        file_map = {
-            'photo': 'photo_path',
-            'diploma': 'diploma_path',
-            'id_card_front': 'id_card_front_path',
-            'id_card_back': 'id_card_back_path',
-            'hukou_residence': 'hukou_residence_path',
-            'hukou_personal': 'hukou_personal_path'
-        }
 
         current_student = get_student_by_id(id)
         updates = {}
@@ -115,15 +133,28 @@ def update_student_route(id):
             for k in allowed_text:
                 if k in data:
                     updates[k] = data[k]
+            if 'project_code' not in updates and 'exam_code' in data:
+                updates['project_code'] = data.get('exam_code', '')
+            if 'training_type' in updates:
+                updates['training_type'] = normalize_training_type(updates['training_type'])
 
             # Validate partial update
             if updates:
                 validate_student_data(updates, required_fields=[])
 
             # Handle file uploads
-            for input_name, db_key in file_map.items():
+            effective_training_type = normalize_training_type(
+                data.get('training_type', updates.get('training_type', current_student.get('training_type', 'special_operation')))
+            )
+            allowed_attachments = set(REQUIRED_ATTACHMENTS.get(effective_training_type, REQUIRED_ATTACHMENTS['special_operation']))
+
+            for input_name, db_key in FILE_MAP.items():
                 f = request.files.get(input_name)
                 if f and f.filename:
+                    if input_name not in allowed_attachments:
+                        raise ValidationError(f'{effective_training_type} 不允许上传 {input_name}')
+
+                    validate_file_upload(f)
                     id_card_for_name = data.get('id_card', current_student['id_card'])
                     name_for_save = data.get('name', current_student['name'])
                     company_for_name = data.get('company', current_student.get('company', ''))
@@ -134,7 +165,9 @@ def update_student_route(id):
                         delete_student_files({db_key: old_rel}, current_app.config['BASE_DIR'])
 
                     try:
-                        training_type = data.get('training_type', current_student.get('training_type', 'special_operation'))
+                        training_type = normalize_training_type(
+                            data.get('training_type', current_student.get('training_type', 'special_operation'))
+                        )
                         rel = process_and_save_file(
                                 f, id_card_for_name, name_for_save, input_name, company_for_name, training_type
                             )
@@ -147,6 +180,10 @@ def update_student_route(id):
             for k in allowed_text:
                 if k in payload:
                     updates[k] = payload[k]
+            if 'project_code' not in updates and 'exam_code' in payload:
+                updates['project_code'] = payload.get('exam_code', '')
+            if 'training_type' in updates:
+                updates['training_type'] = normalize_training_type(updates['training_type'])
 
             # Validate partial update
             if updates:
@@ -162,6 +199,64 @@ def update_student_route(id):
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         current_app.logger.error(f'Error updating student {id}: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
+
+@student_bp.route('/api/students/<int:id>/upload', methods=['POST'])
+def upload_student_attachment_route(id):
+    """Upload a single attachment for an existing student."""
+    try:
+        student = get_student_by_id(id)
+        training_type = normalize_training_type(student.get('training_type', 'special_operation'))
+        allowed_attachments = set(REQUIRED_ATTACHMENTS.get(training_type, REQUIRED_ATTACHMENTS['special_operation']))
+
+        upload_field = ''
+        upload_file = None
+        for field_name in FILE_MAP:
+            candidate = request.files.get(field_name)
+            if candidate and candidate.filename:
+                upload_field = field_name
+                upload_file = candidate
+                break
+
+        if not upload_field or upload_file is None:
+            raise ValidationError('未检测到有效上传文件')
+
+        if upload_field not in allowed_attachments:
+            raise ValidationError('当前培训项目不需要该附件')
+
+        validate_file_upload(upload_file)
+
+        id_card_for_name = student.get('id_card', '')
+        name_for_save = student.get('name', '')
+        company_for_name = student.get('company', '')
+
+        db_key = FILE_MAP[upload_field]
+        old_rel = student.get(db_key)
+        if old_rel:
+            delete_student_files({db_key: old_rel}, current_app.config['BASE_DIR'])
+
+        rel = process_and_save_file(
+            upload_file,
+            id_card_for_name,
+            name_for_save,
+            upload_field,
+            company_for_name,
+            training_type
+        )
+        updated = update_student(id, {db_key: rel})
+
+        return jsonify({
+            'message': '上传成功',
+            'field': db_key,
+            'path': rel,
+            'student': updated
+        })
+
+    except (ValidationError, NotFoundError) as e:
+        return jsonify(e.to_dict()), e.status_code
+    except Exception as e:
+        current_app.logger.error(f'Error uploading attachment for student {id}: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 
@@ -193,17 +288,20 @@ def reject_student_route(id):
 def approve_student_route(id):
     """Approve a student."""
     try:
-        student = approve_student(id)
+        current_student = get_student_by_id(id)
         
         health_check_path = generate_health_check_form(
-            student,
+            current_student,
             current_app.config['BASE_DIR'],
             current_app.config['STUDENTS_FOLDER']
         )
-        
+
+        updates = {'status': 'reviewed'}
         if health_check_path:
-            update_student(id, {'training_form_path': health_check_path})
-            student['training_form_path'] = health_check_path
+            updates['training_form_path'] = health_check_path
+        student = update_student(id, updates)
+
+        if health_check_path:
             current_app.logger.info(f'Health check form generated for student ID={id}')
         
         current_app.logger.info(f'Student approved: ID={id}')
@@ -341,8 +439,7 @@ def batch_approve_students_route():
         if not isinstance(ids, list):
             raise ValidationError('IDs must be a list')
 
-        approve_students_batch(ids)
-        
+        approved_count = 0
         for student_id in ids:
             try:
                 student = get_student_by_id(student_id)
@@ -351,14 +448,17 @@ def batch_approve_students_route():
                     current_app.config['BASE_DIR'],
                     current_app.config['STUDENTS_FOLDER']
                 )
+                updates = {'status': 'reviewed'}
                 if health_check_path:
-                    update_student(student_id, {'training_form_path': health_check_path})
+                    updates['training_form_path'] = health_check_path
+                update_student(student_id, updates)
+                approved_count += 1
             except Exception as e:
                 current_app.logger.error(f'Failed to generate health check for student {student_id}: {str(e)}')
         
-        current_app.logger.info(f'Batch approved {len(ids)} students')
+        current_app.logger.info(f'Batch approved {approved_count}/{len(ids)} students')
 
-        return jsonify({'message': f'Successfully approved {len(ids)} students'}), 200
+        return jsonify({'message': f'Successfully approved {approved_count} of {len(ids)} students'}), 200
 
     except ValidationError as e:
         return jsonify(e.to_dict()), e.status_code

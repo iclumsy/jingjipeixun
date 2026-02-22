@@ -92,20 +92,89 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     }
 
-    // Load job categories configuration from backend API
-    let jobCategoriesConfig = null;
-    try {
-        const response = await fetch('/api/config/job_categories');
-        if (response.ok) {
-            const config = await response.json();
-            jobCategoriesConfig = config.job_categories;
-            // Store config globally for updateExamProjectOptions function
-            window.jobCategoriesConfig = jobCategoriesConfig;
-        } else {
-            console.error('Failed to load job categories config');
+    const ATTACHMENT_RULES = {
+        maxSizeMb: 10,
+        allowedExtensions: ['jpg', 'jpeg', 'png'],
+        allowedMimeTypes: ['image/jpeg', 'image/png']
+    };
+
+    function findTrainingTypeByCategory(categoryName) {
+        if (!categoryName || !window.jobCategoriesConfigRaw) {
+            return '';
         }
-    } catch (error) {
-        console.error('Error loading job categories config:', error);
+        let found = '';
+        Object.keys(window.jobCategoriesConfigRaw).forEach(trainingType => {
+            const categories = window.jobCategoriesConfigRaw?.[trainingType]?.job_categories || [];
+            if (categories.some(category => category.name === categoryName)) {
+                found = trainingType;
+            }
+        });
+        return found;
+    }
+
+    function resolveTrainingType(entry) {
+        const trainingTypeSelect = entry.querySelector('select[name="training_type"]');
+        if (trainingTypeSelect && trainingTypeSelect.value) {
+            return trainingTypeSelect.value;
+        }
+
+        const jobCategorySelect = entry.querySelector('select[name="job_category"]');
+        if (jobCategorySelect) {
+            const selectedOption = jobCategorySelect.options[jobCategorySelect.selectedIndex];
+            if (selectedOption && selectedOption.dataset.trainingType) {
+                return selectedOption.dataset.trainingType;
+            }
+            const inferredType = findTrainingTypeByCategory(jobCategorySelect.value);
+            if (inferredType) {
+                return inferredType;
+            }
+        }
+
+        return 'special_operation';
+    }
+
+    function resetUploadPreview(box) {
+        const img = box.querySelector('.preview-img');
+        const placeholder = box.querySelector('.upload-placeholder');
+        if (img) {
+            img.style.display = 'none';
+            img.src = '';
+        }
+        if (placeholder) {
+            placeholder.style.display = 'block';
+        }
+    }
+
+    function validateAttachmentFile(input, file) {
+        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        const maxSizeMb = Number(input.dataset.maxSizeMb || ATTACHMENT_RULES.maxSizeMb);
+        const maxSize = maxSizeMb * 1024 * 1024;
+        const allowedExt = ATTACHMENT_RULES.allowedExtensions;
+        const allowedMime = ATTACHMENT_RULES.allowedMimeTypes;
+        const labelText = input.closest('.upload-box')?.querySelector('.upload-placeholder .text')?.textContent || input.name;
+
+        if (!allowedExt.includes(ext)) {
+            return {
+                valid: false,
+                error: `${labelText}仅支持 JPG/PNG 格式`
+            };
+        }
+
+        if (file.type && !allowedMime.includes(file.type)) {
+            return {
+                valid: false,
+                error: `${labelText}格式无效，请上传 JPG/PNG 图片`
+            };
+        }
+
+        if (file.size > maxSize) {
+            return {
+                valid: false,
+                error: `${labelText}大小不能超过 ${maxSizeMb}MB`
+            };
+        }
+
+        return { valid: true };
     }
 
     // Add initial student
@@ -159,22 +228,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 });
 
-                // Determine training type based on job category
-                const jobCategorySelect = entry.querySelector('select[name="job_category"]');
-                let trainingType = 'special_operation'; // Default
-                if (jobCategorySelect && window.jobCategoriesConfig) {
-                    const selectedOption = jobCategorySelect.options[jobCategorySelect.selectedIndex];
-                    if (selectedOption && selectedOption.dataset.trainingType) {
-                        trainingType = selectedOption.dataset.trainingType;
-                    } else {
-                        // Try to find from config
-                        const category = window.jobCategoriesConfig.find(c => c.name === jobCategorySelect.value);
-                        if (category) {
-                            trainingType = category.training_type;
-                        }
-                    }
-                }
-                formData.append('training_type', trainingType);
+                const trainingType = resolveTrainingType(entry);
+                formData.set('training_type', trainingType);
 
                 const response = await fetch('/api/students', {
                     method: 'POST',
@@ -218,18 +273,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         container.appendChild(clone);
         const entry = container.lastElementChild;
         attachEntryValidation(entry);
-        
-        // Populate job category dropdown from config
-        const jobCategorySelect = entry.querySelector('select[name="job_category"]');
-        if (jobCategorySelect && window.jobCategoriesConfig) {
-            jobCategorySelect.innerHTML = '<option value="">请选择</option>';
-            window.jobCategoriesConfig.forEach(category => {
-                const option = document.createElement('option');
-                option.value = category.name;
-                option.textContent = category.name;
-                option.dataset.trainingType = category.training_type;
-                jobCategorySelect.appendChild(option);
-            });
+
+        if (typeof window.initializeStudentEntry === 'function') {
+            window.initializeStudentEntry(entry, false);
         }
     }
 
@@ -237,7 +283,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (container.children.length > 1) {
             btn.closest('.student-entry').remove();
         } else {
-            showMessage('至少保留一个学员信息框。', 'error');
+            showModal('至少保留一个学员信息框。', 'error');
         }
     };
 
@@ -248,6 +294,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (input.files && input.files[0]) {
             const file = input.files[0];
+            const validation = validateAttachmentFile(input, file);
+            if (!validation.valid) {
+                input.value = '';
+                resetUploadPreview(box);
+                showFieldError(input, validation.error);
+                return;
+            }
+
             // If this is the personal photo field, crop to one-inch ratio client-side
             if (input.name === 'photo') {
                 const imgEl = new Image();
@@ -323,9 +377,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 reader.readAsDataURL(file);
             }
         } else {
-            img.style.display = 'none';
-            img.src = '';
-            placeholder.style.display = 'block';
+            resetUploadPreview(box);
         }
     };
 
@@ -346,6 +398,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 'valueMissing': '请输入手机号',
                 'patternMismatch': '手机号应为11位数字'
             },
+            'company': '请输入单位名称',
+            'company_address': '请输入单位地址',
+            'training_type': '请选择培训项目',
             'job_category': '请选择作业类别',
             'exam_project': '请选择操作项目',
             'photo': '请上传个人照片（白底一寸照）',
@@ -471,6 +526,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 'valueMissing': '请输入手机号',
                 'patternMismatch': '手机号应为11位数字'
             },
+            'company': '请输入单位名称',
+            'company_address': '请输入单位地址',
+            'training_type': '请选择培训项目',
             'job_category': '请选择作业类别',
             'exam_project': '请选择操作项目',
             'photo': '请上传个人照片（白底一寸照）',
@@ -566,22 +624,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 });
 
-                // Determine training type based on job category
-                const jobCategorySelect = entry.querySelector('select[name="job_category"]');
-                let trainingType = 'special_operation'; // Default
-                if (jobCategorySelect && window.jobCategoriesConfig) {
-                    const selectedOption = jobCategorySelect.options[jobCategorySelect.selectedIndex];
-                    if (selectedOption && selectedOption.dataset.trainingType) {
-                        trainingType = selectedOption.dataset.trainingType;
-                    } else {
-                        // Try to find from config
-                        const category = window.jobCategoriesConfig.find(c => c.name === jobCategorySelect.value);
-                        if (category) {
-                            trainingType = category.training_type;
-                        }
-                    }
-                }
-                formData.append('training_type', trainingType);
+                const resolvedTrainingType = resolveTrainingType(entry);
+                const targetTrainingType = trainingType || resolvedTrainingType;
+                formData.set('training_type', targetTrainingType);
 
                 const response = await fetch('/api/students', {
                     method: 'POST',

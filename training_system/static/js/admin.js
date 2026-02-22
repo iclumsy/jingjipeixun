@@ -35,6 +35,46 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error loading job categories:', error);
         }
     }
+
+    const ATTACHMENT_RULES = {
+        maxSizeMb: 10,
+        allowedExtensions: ['jpg', 'jpeg', 'png'],
+        allowedMimeTypes: ['image/jpeg', 'image/png']
+    };
+
+    const ATTACHMENT_CONFIG = {
+        special_operation: [
+            { dbKey: 'diploma_path', fieldName: 'diploma', label: '学历证书' },
+            { dbKey: 'id_card_front_path', fieldName: 'id_card_front', label: '身份证正面' },
+            { dbKey: 'id_card_back_path', fieldName: 'id_card_back', label: '身份证反面' }
+        ],
+        special_equipment: [
+            { dbKey: 'photo_path', fieldName: 'photo', label: '个人照片' },
+            { dbKey: 'diploma_path', fieldName: 'diploma', label: '学历证书' },
+            { dbKey: 'id_card_front_path', fieldName: 'id_card_front', label: '身份证正面' },
+            { dbKey: 'id_card_back_path', fieldName: 'id_card_back', label: '身份证反面' },
+            { dbKey: 'hukou_residence_path', fieldName: 'hukou_residence', label: '户口本户籍页' },
+            { dbKey: 'hukou_personal_path', fieldName: 'hukou_personal', label: '户口本个人页' }
+        ]
+    };
+
+    function getAttachmentConfig(trainingType) {
+        return ATTACHMENT_CONFIG[trainingType] || ATTACHMENT_CONFIG.special_operation;
+    }
+
+    function validateAttachmentFile(file, label) {
+        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        if (!ATTACHMENT_RULES.allowedExtensions.includes(ext)) {
+            return `${label}仅支持 JPG/PNG 格式`;
+        }
+        if (file.type && !ATTACHMENT_RULES.allowedMimeTypes.includes(file.type)) {
+            return `${label}格式无效，请上传 JPG/PNG 图片`;
+        }
+        if (file.size > ATTACHMENT_RULES.maxSizeMb * 1024 * 1024) {
+            return `${label}大小不能超过 ${ATTACHMENT_RULES.maxSizeMb}MB`;
+        }
+        return '';
+    }
     
     function updateTrainingTypeButtons() {
         const btnSpecialOperation = document.getElementById('btnSpecialOperation');
@@ -552,6 +592,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const showError = () => {
                 input.classList.remove('error');
+                const parent = item;
                 const exist = parent.querySelector('.error-pop');
                 if (exist) exist.remove();
                 if (!input.checkValidity()) {
@@ -567,6 +608,24 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             input.addEventListener('input', showError);
             input.addEventListener('blur', showError);
+
+            if (!f.readonly) {
+                if (f.type === 'select') {
+                    input.addEventListener('change', () => {
+                        showError();
+                        if (input.checkValidity()) {
+                            autoSave(student.id);
+                        }
+                    });
+                } else {
+                    input.addEventListener('blur', () => {
+                        showError();
+                        if (input.checkValidity()) {
+                            autoSave(student.id);
+                        }
+                    });
+                }
+            }
         });
 
         function updateExamProjectOptions(categorySelect, originalValue) {
@@ -622,17 +681,12 @@ document.addEventListener('DOMContentLoaded', () => {
         filesContainer.style.gap = '15px';
         filesContainer.style.overflowX = 'auto';
         filesContainer.style.padding = '10px 0';
-        
-        const fileMap = {
-            'photo_path': '个人照片',
-            'diploma_path': '学历证书',
-            'cert_front_path': '所持证件正面',
-            'cert_back_path': '所持证件反面',
-            'id_card_front_path': '身份证正面',
-            'id_card_back_path': '身份证反面'
-        };
-        
-        for (const [key, label] of Object.entries(fileMap)) {
+
+        const studentTrainingType = student.training_type || currentTrainingType || 'special_operation';
+        const attachments = getAttachmentConfig(studentTrainingType);
+
+        attachments.forEach(attachment => {
+            const existingPath = student[attachment.dbKey] || '';
             const wrapper = document.createElement('div');
             wrapper.className = 'file-item-wrapper';
             wrapper.style.display = 'flex';
@@ -670,10 +724,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 uploadBox.style.borderColor = '#ddd';
                 uploadBox.style.backgroundColor = 'transparent';
             };
-
+            
             const placeholder = document.createElement('div');
             placeholder.className = 'upload-placeholder';
-            placeholder.style.display = student[key] ? 'none' : 'flex';
+            placeholder.style.display = existingPath ? 'none' : 'flex';
             placeholder.style.flexDirection = 'column';
             placeholder.style.alignItems = 'center';
             placeholder.style.justifyContent = 'center';
@@ -687,7 +741,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const text = document.createElement('span');
             text.className = 'text';
-            text.textContent = label;
+            text.textContent = attachment.label;
             text.style.fontSize = '12px';
             text.style.color = '#666';
             text.style.textAlign = 'center';
@@ -699,39 +753,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const img = document.createElement('img');
             img.className = 'preview-img';
-            img.style.display = student[key] ? 'block' : 'none';
+            img.style.display = existingPath ? 'block' : 'none';
             img.style.width = '100%';
             img.style.height = '100%';
             img.style.objectFit = 'cover';
-            if (student[key]) {
-                img.src = '/' + student[key];
+            if (existingPath) {
+                img.src = '/' + existingPath;
             }
-
-            const nameMap = {
-                photo_path: 'photo',
-                diploma_path: 'diploma',
-                cert_front_path: 'cert_front',
-                cert_back_path: 'cert_back',
-                id_card_front_path: 'id_card_front',
-                id_card_back_path: 'id_card_back'
-            };
             
             const input = document.createElement('input');
             input.type = 'file';
-            input.name = nameMap[key] || '';
-            input.accept = 'image/*';
+            input.name = attachment.fieldName;
+            input.accept = '.jpg,.jpeg,.png,image/jpeg,image/png';
             input.style.display = 'none';
+            input.title = `${attachment.label}（JPG/PNG，≤10MB）`;
             
             input.addEventListener('change', () => {
                 if (input.files && input.files[0]) {
                     const file = input.files[0];
+                    const validationError = validateAttachmentFile(file, attachment.label);
+                    if (validationError) {
+                        input.value = '';
+                        showMessage(validationError, 'error');
+                        return;
+                    }
+
                     const reader = new FileReader();
                     reader.onload = function(ev) {
                         img.src = ev.target.result;
                         img.style.display = 'block';
                         placeholder.style.display = 'none';
                         
-                        uploadFile(student.id, nameMap[key], file);
+                        uploadFile(student.id, attachment.fieldName, file, attachment.dbKey);
                     };
                     reader.readAsDataURL(file);
                 }
@@ -746,20 +799,34 @@ document.addEventListener('DOMContentLoaded', () => {
             viewBtn.style.borderRadius = '4px';
             viewBtn.style.background = '#fff';
             viewBtn.style.cursor = 'pointer';
-            viewBtn.style.display = student[key] ? 'block' : 'none';
+            viewBtn.style.display = existingPath ? 'block' : 'none';
             viewBtn.onclick = () => {
-                if (student[key]) {
-                    window.open('/' + student[key], '_blank');
+                const latest = students.find(s => s.id === student.id) || student;
+                const latestPath = latest[attachment.dbKey];
+                if (latestPath) {
+                    window.open('/' + latestPath, '_blank');
                 }
             };
+
+            const caption = document.createElement('div');
+            caption.textContent = attachment.label;
+            caption.style.marginTop = '6px';
+            caption.style.fontSize = '12px';
+            caption.style.color = '#374151';
+            caption.style.textAlign = 'center';
+            caption.style.lineHeight = '1.3';
+            caption.style.width = '100px';
+            caption.style.minHeight = '30px';
+            caption.style.wordBreak = 'break-all';
 
             uploadBox.appendChild(placeholder);
             uploadBox.appendChild(img);
             uploadBox.appendChild(input);
             wrapper.appendChild(uploadBox);
+            wrapper.appendChild(caption);
             wrapper.appendChild(viewBtn);
             filesContainer.appendChild(wrapper);
-        }
+        });
         
         if (student.status === 'reviewed' && student.training_form_path) {
             const healthCheckWrapper = document.createElement('div');
@@ -839,15 +906,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const actionBar = clone.querySelector('.action-bar');
         if (actionBar) {
-            const saveBtn = document.createElement('button');
-            saveBtn.className = 'btn secondary';
-            saveBtn.textContent = '保存修改';
-            saveBtn.style.marginRight = 'auto';
-            saveBtn.onclick = async () => {
-                await saveStudentChanges(student.id);
-            };
-            actionBar.insertBefore(saveBtn, actionBar.firstChild);
-            
             if (student.status === 'unreviewed') {
                 const rejectBtn = document.createElement('button');
                 rejectBtn.className = 'btn';
@@ -883,43 +941,8 @@ document.addEventListener('DOMContentLoaded', () => {
         mainContent.innerHTML = '';
         mainContent.appendChild(clone);
     }
-    
-    async function saveStudentChanges(studentId) {
-        if (!studentId) return;
-        
-        showMessage('正在保存...', 'info');
-        
-        try {
-            const formData = new FormData();
-            
-            const allInputs = mainContent.querySelectorAll('input[data-key], select[data-key]');
-            allInputs.forEach(input => {
-                const key = input.getAttribute('data-key');
-                if (key && !input.readOnly) {
-                    formData.append(key, input.value.trim());
-                }
-            });
-            
-            const res = await fetch(`/api/students/${studentId}`, { method: 'PUT', body: formData });
-            
-            if (!res.ok) {
-                throw new Error('保存失败');
-            }
-            
-            const updated = await res.json();
-            
-            showMessage('保存成功', 'success');
-            
-            const idx = students.findIndex(s => s.id === studentId);
-            if (idx >= 0) students[idx] = updated;
-            
-        } catch (e) {
-            console.error('Save error:', e);
-            showMessage('保存失败: ' + e.message, 'error');
-        }
-    }
 
-    async function uploadFile(studentId, fieldName, file) {
+    async function uploadFile(studentId, fieldName, file, dbKey) {
         const formData = new FormData();
         formData.append(fieldName, file);
         
@@ -938,7 +961,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const idx = students.findIndex(s => s.id === studentId);
             if (idx >= 0) {
-                students[idx][`${fieldName}_path`] = result.path;
+                students[idx][dbKey || result.field] = result.path;
+                if (result.student) {
+                    students[idx] = result.student;
+                }
+            }
+            if (currentStudentId === studentId && idx >= 0) {
+                showDetail(students[idx]);
             }
         } catch (e) {
             console.error('Upload error:', e);

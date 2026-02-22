@@ -60,8 +60,14 @@ def create_app():
     # def admin_special_equipment():
     #     return render_template('admin.html', training_type='special_equipment')
 
-    # Run migration if needed
-    # migrate_db(app.config['DATABASE'])
+    # Run migration to keep schema and legacy data aligned
+    migration_report = migrate_db(app.config['DATABASE'], create_backup=False)
+    app.logger.info(
+        'Database migration checked. rebuilt_table=%s added_columns=%s removed_columns=%s',
+        migration_report.get('rebuilt_table'),
+        migration_report.get('added_columns'),
+        migration_report.get('removed_columns')
+    )
 
     app.logger.info('Application initialized successfully')
 
