@@ -11,10 +11,15 @@
     <div class="container">
         <header>
             <div class="header-brand" style="display: flex; align-items: center; gap: 20px;">
-                <img class="header-logo" src="/static/images/logo.jpg" alt="Logo" style="height: 60px; width: auto;">
-                <div>
-                    <h1>学员信息采集系统</h1>
-                    <p>阳泉精技特种作业人员培训有限公司</p>
+                <img class="header-logo" src="/static/images/logo.png" alt="Logo" style="height: 84px; width: auto;">
+                <div class="header-main">
+                    <div class="header-title-row">
+                        <h1>学员信息采集</h1>
+                    </div>
+                    <div class="header-subline">
+                        <p class="header-company">阳泉精技特种作业人员培训有限公司</p>
+                        <div class="header-contact">联系人：霍老师 <a class="header-contact-phone" href="tel:13703531055">13703531055</a></div>
+                    </div>
                 </div>
             </div>
         </header>
@@ -46,7 +51,7 @@
                             <option value="">请选择</option>
                         </select>
                     </div>
-                    <div class="form-group w-xl">
+                    <div class="form-group w-lg">
                         <label>操作项目</label>
                         <span class="hint-slot"></span>
                         <select name="exam_project" required onchange="updateProjectCode(this)">
