@@ -1,7 +1,7 @@
 """Main application entry point."""
 import os
 from flask import Flask, render_template
-from models.student import init_db, migrate_db
+from models.student import init_db
 from routes.student_routes import student_bp
 from routes.file_routes import file_bp
 from routes.export_routes import export_bp
@@ -48,19 +48,6 @@ def create_app():
     @app.route('/admin')
     def admin():
         return render_template('admin.html', training_type='special_equipment')
-
-    # @app.route('/admin/special_equipment')
-    # def admin_special_equipment():
-    #     return render_template('admin.html', training_type='special_equipment')
-
-    # Run migration to keep schema and legacy data aligned
-    migration_report = migrate_db(app.config['DATABASE'], create_backup=False)
-    app.logger.info(
-        'Database migration checked. rebuilt_table=%s added_columns=%s removed_columns=%s',
-        migration_report.get('rebuilt_table'),
-        migration_report.get('added_columns'),
-        migration_report.get('removed_columns')
-    )
 
     app.logger.info('Application initialized successfully')
 

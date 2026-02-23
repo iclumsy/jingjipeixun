@@ -136,11 +136,23 @@
             const exportCompany = document.getElementById('exportCompany');
             const exportBtnText = document.getElementById('exportBtnText');
             const exportSpinner = document.getElementById('exportSpinner');
-            
+
+            let exportCompanyReqId = 0;
+
+            function getCurrentTrainingType() {
+                return window.trainingType || document.body?.dataset?.trainingType || '';
+            }
+
+            function getCurrentStatus() {
+                return window.currentStatus || document.body?.dataset?.status || '';
+            }
+
             // 显示导出模态框
             exportBtn.addEventListener('click', async function() {
-                // 加载公司列表
-                await loadExportCompanies();
+                const activeStatus = getCurrentStatus();
+                exportStatus.value = activeStatus || '';
+                exportCompany.value = '';
+                await refreshExportCompanies(false);
                 exportModal.style.display = 'flex';
             });
             
@@ -175,9 +187,9 @@
                     if (exportCompany.value) {
                         params.append('company', exportCompany.value);
                     }
-                    // Add training type from global variable
-                    if (window.trainingType) {
-                        params.append('training_type', window.trainingType);
+                    const trainingType = getCurrentTrainingType();
+                    if (trainingType) {
+                        params.append('training_type', trainingType);
                     }
                     
                     // 发送导出请求
@@ -245,55 +257,34 @@
                 const modalStatus = document.getElementById('exportStatus')?.value || '';
                 
                 if (modalStatus) params.append('status', modalStatus);
+
+                const trainingType = getCurrentTrainingType();
+                if (trainingType) params.append('training_type', trainingType);
                 
                 return params;
             }
             
-            // 加载公司列表（根据当前筛选条件，实时）
-            async function loadExportCompanies() {
+            // 刷新公司列表（根据当前筛选条件，实时）
+            async function refreshExportCompanies(preserveSelection = true) {
                 try {
+                    const requestId = ++exportCompanyReqId;
                     const params = getExportFilterParams();
                     const response = await fetch(`/api/companies?${params.toString()}`);
                     if (!response.ok) {
                         throw new Error(`网络错误: ${response.status}`);
                     }
                     const companies = await response.json();
+                    if (requestId !== exportCompanyReqId) {
+                        return;
+                    }
+
+                    const currentSelection = preserveSelection ? exportCompany.value : '';
 
                     // 清空现有选项（保留第一个）
                     while (exportCompany.options.length > 1) {
                         exportCompany.remove(1);
                     }
 
-                    // 添加公司到下拉菜单
-                    companies.forEach(company => {
-                        const option = document.createElement('option');
-                        option.value = company;
-                        option.textContent = company;
-                        exportCompany.appendChild(option);
-                    });
-                } catch (err) {
-                    console.error('加载公司列表失败:', err);
-                }
-            }
-            
-            // 实时更新公司列表（基于当前筛选条件）
-            async function updateExportCompanies() {
-                try {
-                    const params = getExportFilterParams();
-                    const response = await fetch(`/api/companies?${params.toString()}`);
-                    if (!response.ok) {
-                        throw new Error(`网络错误: ${response.status}`);
-                    }
-                    const companies = await response.json();
-                    
-                    // 保存当前选中的值
-                    const currentSelection = exportCompany.value;
-                    
-                    // 清空现有选项（保留第一个）
-                    while (exportCompany.options.length > 1) {
-                        exportCompany.remove(1);
-                    }
-                    
                     // 添加公司到下拉菜单
                     companies.forEach(company => {
                         const option = document.createElement('option');
@@ -310,20 +301,14 @@
                         }
                     }
                 } catch (err) {
-                    console.error('更新公司列表失败:', err);
+                    console.error('刷新公司列表失败:', err);
                 }
             }
             
             // 监听弹窗内筛选变更，实时刷新公司列表
-            exportStatus.addEventListener('change', updateExportCompanies);
-            
-            // Update company list when the export modal is opened
-            document.getElementById('exportExcelBtn').addEventListener('click', async function() {
-                // Wait for modal to be displayed, then update company list
-                // 打开时重置或更新公司列表，不受左侧影响
-                setTimeout(() => {
-                    updateExportCompanies();
-                }, 100);
+            exportStatus.addEventListener('change', function() {
+                exportCompany.value = '';
+                refreshExportCompanies(false);
             });
         });
         

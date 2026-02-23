@@ -44,7 +44,7 @@
         v
 [Flask app + Blueprints]
   | routes/*         -> API 编排
-  | models/student   -> SQLite 读写与迁移
+  | models/student   -> SQLite 读写
   | services/*       -> 附件/文档业务处理
   | utils/*          -> 校验、日志、异常
         |
@@ -209,12 +209,12 @@ curl -i http://127.0.0.1:5001/api/config/job_categories
 
 ```text
 training_system/
-├── app.py                       # Flask 入口，初始化配置/日志/异常/蓝图/迁移
+├── app.py                       # Flask 入口，初始化配置/日志/异常/蓝图
 ├── requirements.txt             # Python 依赖
 ├── config/
 │   └── job_categories.json      # 培训类别、作业类别、操作项目、附件规则配置
 ├── models/
-│   └── student.py               # students 表结构、CRUD、迁移与公司聚合查询
+│   └── student.py               # students 表结构、CRUD 与公司聚合查询
 ├── routes/
 │   ├── student_routes.py        # 学员核心业务接口
 │   ├── export_routes.py         # Excel 导出接口
@@ -233,7 +233,6 @@ training_system/
 ├── static/
 │   ├── js/script.js             # 采集页交互逻辑
 │   ├── js/admin.js              # 管理页交互逻辑
-│   ├── js/constants.js          # 前端常量（历史兼容）
 │   └── css/style.css            # 样式文件
 ├── database/
 │   └── students.db              # SQLite 数据库
@@ -284,27 +283,9 @@ CREATE TABLE IF NOT EXISTS students (
 
 服务启动时自动执行:
 
-1. `init_db()`：确保表存在。
-2. `migrate_db(create_backup=False)`：补齐字段、清理旧字段、规范旧数据。
+1. `init_db()`：确保表存在（仅建表，不做历史数据迁移）。
 
-### 5.4 手动安全迁移（推荐生产执行）
-
-脚本: `scripts/migrate_students_db.py`
-
-```bash
-cd /Users/ditto/Documents/jingjipeixun/training_system
-python scripts/migrate_students_db.py \
-  --db database/students.db \
-  --report database/migration_report_manual.json
-```
-
-该命令会:
-
-1. 生成数据库备份 `students.db.bak.<timestamp>`
-2. 执行迁移
-3. 输出迁移报告 JSON
-
-### 5.5 常用数据库检查命令
+### 5.4 常用数据库检查命令
 
 ```bash
 cd /Users/ditto/Documents/jingjipeixun/training_system
@@ -780,13 +761,13 @@ tail -f /Users/ditto/Documents/jingjipeixun/training_system/logs/error.log
 1. 在支持的 Python 版本重新安装。
 2. 或在容器/虚拟机中统一环境。
 
-### 9.5 迁移失败或数据异常
+### 9.5 历史迁移已下线
 
-处理顺序:
+当前版本不再提供历史库迁移脚本。若数据库结构与当前版本不一致，建议:
 
-1. 先执行手动迁移脚本（会自动备份）。
-2. 检查迁移报告中的 `before/after`。
-3. 必要时回滚备份 `students.db.bak.<timestamp>`。
+1. 先备份 `database/students.db`。
+2. 使用 `sqlite3` 手动校验并补齐字段。
+3. 或回退到兼容版本完成一次性迁移后再升级。
 
 ### 9.6 导出“全部状态”结果不完整
 

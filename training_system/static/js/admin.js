@@ -23,6 +23,17 @@ document.addEventListener('DOMContentLoaded', () => {
             currentTrainingType = urlTrainingType;
         }
     }
+
+    function syncGlobalAdminState() {
+        window.trainingType = currentTrainingType;
+        window.currentStatus = currentStatus;
+        if (document.body) {
+            document.body.dataset.trainingType = currentTrainingType;
+            document.body.dataset.status = currentStatus;
+        }
+    }
+
+    syncGlobalAdminState();
     
     async function loadJobCategories() {
         try {
@@ -186,6 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnSpecialOperation) {
         btnSpecialOperation.addEventListener('click', () => {
             currentTrainingType = 'special_operation';
+            syncGlobalAdminState();
             updateTrainingTypeButtons();
             loadStudents();
             loadCompanies(currentStatus);
@@ -201,6 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnSpecialEquipment) {
         btnSpecialEquipment.addEventListener('click', () => {
             currentTrainingType = 'special_equipment';
+            syncGlobalAdminState();
             updateTrainingTypeButtons();
             loadStudents();
             loadCompanies(currentStatus);
@@ -242,6 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnUnreviewed) {
         btnUnreviewed.addEventListener('click', () => {
             currentStatus = 'unreviewed';
+            syncGlobalAdminState();
             updateStatusButtons();
             loadStudents();
             loadCompanies(currentStatus);
@@ -257,6 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnReviewed) {
         btnReviewed.addEventListener('click', () => {
             currentStatus = 'reviewed';
+            syncGlobalAdminState();
             updateStatusButtons();
             loadStudents();
             loadCompanies(currentStatus);
@@ -340,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span style="font-size: 0.8rem; color: #666; margin-left: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${student.company || ''}</span>
                     </h4>
                     <div style="font-size: 0.75rem; color: #666; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-                        <span style="flex: 1; min-width: 100px;">${student.job_category}</span>
+                        <span style="flex: 1; min-width: 100px;">${student.exam_project || student.job_category || ''}</span>
                         <span>ID: ${student.id_card.slice(-4)}</span>
                     </div>
                 </div>
