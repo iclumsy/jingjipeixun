@@ -16,6 +16,10 @@ Component({
       type: Boolean,
       value: false
     },
+    compact: {
+      type: Boolean,
+      value: false
+    },
     value: {
       type: String,
       value: '',

@@ -1,7 +1,4 @@
 {
   "navigationBarTitleText": "审核管理",
-  "enablePullDownRefresh": true,
-  "usingComponents": {
-    "student-card": "/components/student-card/student-card"
-  }
+  "enablePullDownRefresh": true
 }

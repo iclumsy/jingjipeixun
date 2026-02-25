@@ -1,6 +1,7 @@
 // pages/user/detail/detail.js
 const api = require('../../../utils/api')
 const { STATUS_LABELS, TRAINING_TYPE_LABELS } = require('../../../utils/constants')
+const EDIT_STUDENT_ID_KEY = 'submit_edit_student_id'
 
 Page({
   data: {
@@ -70,9 +71,16 @@ Page({
   },
 
   editStudent() {
-    // 跳转到编辑页面，传递学员ID
-    wx.navigateTo({
-      url: `/pages/user/submit/submit?id=${this.data.studentId}`
+    // submit 是 tabBar 页面，使用 switchTab 并通过本地缓存传递编辑ID
+    wx.setStorageSync(EDIT_STUDENT_ID_KEY, this.data.studentId)
+    wx.switchTab({
+      url: '/pages/user/submit/submit',
+      fail: () => {
+        wx.showToast({
+          title: '跳转失败，请重试',
+          icon: 'none'
+        })
+      }
     })
   }
 })

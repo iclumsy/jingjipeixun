@@ -1,5 +1,5 @@
 <!-- components/file-uploader/file-uploader.wxml -->
-<view class="file-uploader">
+<view class="file-uploader {{compact ? 'compact' : ''}}">
   <view class="uploader-label">
     <text>{{label}}</text>
     <text class="required" wx:if="{{required}}">*</text>
@@ -17,7 +17,7 @@
 
     <!-- 上传按钮 -->
     <view class="upload-btn" wx:else bindtap="chooseFile">
-      <view class="upload-icon">📷</view>
+      <view class="upload-icon">上传</view>
       <view class="upload-text">点击上传</view>
       <view class="upload-hint">支持JPG/PNG，最大10MB</view>
     </view>

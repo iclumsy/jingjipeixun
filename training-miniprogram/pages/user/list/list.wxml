@@ -1,8 +1,18 @@
 <!-- pages/user/list/list.wxml -->
 <view class="container">
+  <view class="list-header" wx:if="{{students.length > 0}}">
+    <view class="header-title">我的提交</view>
+    <view class="header-count">当前 {{students.length}} 条</view>
+  </view>
+
   <view class="student-list">
     <block wx:for="{{students}}" wx:key="_id">
-      <student-card student="{{item}}" bind:tap="onStudentTap" />
+      <student-card
+        student="{{item}}"
+        data-id="{{item._id}}"
+        data-student="{{item}}"
+        bind:cardtap="onStudentTap"
+      />
     </block>
 
     <view class="loading" wx:if="{{loading}}">
@@ -14,7 +24,7 @@
     </view>
 
     <view class="empty" wx:if="{{!loading && students.length === 0}}">
-      <view class="empty-icon">📋</view>
+      <view class="empty-dot"></view>
       <view class="empty-text">暂无提交记录</view>
       <button class="btn btn-primary mt-24" bindtap="goToSubmit">去提交</button>
     </view>

@@ -4,6 +4,8 @@
   "description": "更新学员信息云函数",
   "main": "index.js",
   "dependencies": {
+    "axios": "^1.8.4",
+    "form-data": "^4.0.2",
     "wx-server-sdk": "latest"
   }
 }

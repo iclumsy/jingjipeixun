@@ -70,7 +70,16 @@
 }
 
 .upload-icon {
-  font-size: 96rpx;
+  width: 86rpx;
+  height: 86rpx;
+  border: 2rpx dashed #c2cad8;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  color: #5f6b7a;
+  font-weight: 500;
   margin-bottom: 16rpx;
 }
 
@@ -101,4 +110,60 @@
   color: var(--danger-color);
   font-size: 24rpx;
   margin-top: 8rpx;
+}
+
+/* 紧凑模式：用于表单 3 列展示 */
+.file-uploader.compact {
+  margin-bottom: 0;
+}
+
+.file-uploader.compact .uploader-label {
+  font-size: 22rpx;
+  margin-bottom: 10rpx;
+  min-height: 60rpx;
+  line-height: 30rpx;
+}
+
+.file-uploader.compact .upload-btn {
+  height: 170rpx;
+}
+
+.file-uploader.compact .upload-icon {
+  width: 52rpx;
+  height: 52rpx;
+  font-size: 18rpx;
+  margin-bottom: 6rpx;
+}
+
+.file-uploader.compact .upload-text {
+  font-size: 22rpx;
+  margin-bottom: 4rpx;
+}
+
+.file-uploader.compact .upload-hint {
+  display: none;
+}
+
+.file-uploader.compact .preview-image {
+  height: 170rpx;
+}
+
+.file-uploader.compact .preview-actions {
+  gap: 8rpx;
+  padding: 8rpx;
+}
+
+.file-uploader.compact .btn-reupload,
+.file-uploader.compact .btn-delete {
+  font-size: 20rpx;
+  line-height: 1.2;
+  padding: 8rpx 0;
+}
+
+.file-uploader.compact .progress-text {
+  font-size: 20rpx;
+}
+
+.file-uploader.compact .error-message {
+  font-size: 20rpx;
 }

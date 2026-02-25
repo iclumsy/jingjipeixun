@@ -22,21 +22,52 @@
 
 /* 页面标题 */
 .page-header {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 32rpx;
   color: white;
 }
 
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.brand-logo {
+  width: 180rpx;
+  height: 64rpx;
+  display: block;
+}
+
 .page-header .title {
-  font-size: 40rpx;
+  font-size: 38rpx;
   font-weight: 700;
-  margin-bottom: 12rpx;
   letter-spacing: 1rpx;
 }
 
-.page-header .subtitle {
-  font-size: 26rpx;
-  opacity: 0.95;
+.back-btn {
+  margin: 0;
+  width: 92rpx;
+  min-width: 92rpx;
+  max-width: 92rpx;
+  padding: 0;
+  height: 48rpx;
+  line-height: 48rpx;
+  font-size: 20rpx;
+  color: #3558d8;
+  background: #ffffff;
+  border-radius: 24rpx;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.back-btn::after {
+  border: none;
 }
 
 /* 卡片样式 */
@@ -54,11 +85,6 @@
   margin-bottom: 28rpx;
   padding-bottom: 16rpx;
   border-bottom: 2rpx solid #f0f0f0;
-}
-
-.card-header .icon {
-  font-size: 36rpx;
-  margin-right: 12rpx;
 }
 
 .card-header .card-title {
@@ -96,11 +122,6 @@
   box-shadow: 0 4rpx 12rpx rgba(102, 126, 234, 0.2);
 }
 
-.type-icon {
-  font-size: 32rpx;
-  margin-right: 8rpx;
-}
-
 .type-name {
   font-size: 26rpx;
   font-weight: 500;
@@ -120,11 +141,30 @@
   margin-bottom: 0;
 }
 
+.form-inline {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
 .label {
   font-size: 26rpx;
   color: #666;
   margin-bottom: 12rpx;
   font-weight: 500;
+}
+
+.form-inline .label {
+  margin-bottom: 0;
+}
+
+.inline-label {
+  flex: 0 0 148rpx;
+}
+
+.inline-control {
+  flex: 1;
+  min-width: 0;
 }
 
 .label.required::before {
@@ -151,10 +191,20 @@
   box-shadow: 0 0 0 3rpx rgba(102, 126, 234, 0.1);
 }
 
+.field-error {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #ef4444;
+}
+
 /* 性别选择器 */
 .gender-selector {
   display: flex;
   gap: 16rpx;
+}
+
+.form-inline .gender-selector {
+  gap: 12rpx;
 }
 
 .gender-option {
@@ -200,6 +250,28 @@
   font-size: 36rpx;
   color: #999;
   font-weight: 300;
+}
+
+/* 附件区域 */
+.attachments-tip {
+  margin: -8rpx 0 20rpx;
+  font-size: 22rpx;
+  color: #8a8f99;
+  line-height: 1.5;
+}
+
+.attachments-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14rpx;
+}
+
+.attachment-item {
+  min-width: 0;
+  border: 2rpx solid #edf1f7;
+  border-radius: 14rpx;
+  padding: 12rpx;
+  background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
 }
 
 /* 提交按钮 - 底部居中 */

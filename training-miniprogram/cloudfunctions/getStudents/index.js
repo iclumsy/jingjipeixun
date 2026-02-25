@@ -8,6 +8,22 @@ cloud.init({
 const db = cloud.database()
 const _ = db.command
 
+function parseBoolean(value) {
+  if (typeof value === 'boolean') {
+    return value
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+      return true
+    }
+    if (['0', 'false', 'no', 'off'].includes(normalized)) {
+      return false
+    }
+  }
+  return false
+}
+
 /**
  * 获取学员列表云函数
  * 支持分页、筛选、搜索
@@ -19,6 +35,7 @@ exports.main = async (event, context) => {
     search = '',
     company = '',
     training_type = '',
+    myOnly = false,
     page = 1,
     limit = 20
   } = event
@@ -63,9 +80,11 @@ exports.main = async (event, context) => {
       .get()
 
     const isAdmin = adminResult.data.length > 0
+    const forceMyOnly = parseBoolean(myOnly)
 
-    // 如果不是管理员，只能查看自己提交的
-    if (!isAdmin) {
+    // myOnly=true 时，无论是否管理员都只查自己的提交
+    // 非管理员默认也只能查看自己的提交
+    if (forceMyOnly || !isAdmin) {
       where._openid = wxContext.OPENID
     }
 

@@ -1,4 +1,31 @@
 /* pages/user/list/list.wxss */
+.container {
+  background: linear-gradient(180deg, #f4f7fb 0%, #ffffff 35%);
+  min-height: 100vh;
+}
+
+.list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14rpx;
+  padding: 6rpx 2rpx 2rpx;
+}
+
+.header-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.header-count {
+  font-size: 22rpx;
+  color: #64748b;
+  background: #eef2ff;
+  padding: 6rpx 12rpx;
+  border-radius: 16rpx;
+}
+
 .student-list {
   min-height: 400rpx;
 }
@@ -6,7 +33,25 @@
 .loading,
 .no-more {
   text-align: center;
-  padding: 48rpx;
+  padding: 30rpx;
   color: var(--text-light);
-  font-size: 28rpx;
+  font-size: 24rpx;
+}
+
+.empty {
+  text-align: center;
+  padding: 120rpx 0;
+}
+
+.empty-dot {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #7ea1ff 0%, #4f6ae7 80%);
+  margin: 0 auto 22rpx;
+}
+
+.empty-text {
+  color: #8a94a6;
+  font-size: 26rpx;
 }

@@ -37,6 +37,24 @@ exports.main = async (event, context) => {
 
     const student = result.data
 
+    // 查询管理员权限
+    const adminResult = await db.collection('admins')
+      .where({
+        openid: wxContext.OPENID,
+        is_active: true
+      })
+      .get()
+
+    const isAdmin = adminResult.data.length > 0
+
+    // 非管理员只能查看自己提交的记录
+    if (!isAdmin && student._openid !== wxContext.OPENID) {
+      return {
+        error: '权限不足',
+        message: '只能查看自己提交的学员信息'
+      }
+    }
+
     // 生成附件临时下载链接
     const fileList = []
     const fileFields = [

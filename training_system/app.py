@@ -10,6 +10,23 @@ from utils.logger import setup_logger
 from utils.error_handlers import register_error_handlers
 
 
+def get_max_content_length():
+    """
+    Build MAX_CONTENT_LENGTH from env var MAX_CONTENT_LENGTH_MB.
+    Default 64MB to support multi-attachment sync uploads.
+    """
+    raw_mb = os.getenv('MAX_CONTENT_LENGTH_MB', '64')
+    try:
+        mb = int(raw_mb)
+    except (TypeError, ValueError):
+        mb = 64
+
+    if mb <= 0:
+        mb = 64
+
+    return mb * 1024 * 1024
+
+
 def create_app():
     """Create and configure the Flask application."""
     app = Flask(__name__)
@@ -19,7 +36,7 @@ def create_app():
     app.config['BASE_DIR'] = BASE_DIR
     app.config['STUDENTS_FOLDER'] = os.path.join(BASE_DIR, 'students')
     app.config['DATABASE'] = os.path.join(BASE_DIR, 'database/students.db')
-    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
+    app.config['MAX_CONTENT_LENGTH'] = get_max_content_length()
 
     # Ensure directories exist
     os.makedirs(app.config['STUDENTS_FOLDER'], exist_ok=True)

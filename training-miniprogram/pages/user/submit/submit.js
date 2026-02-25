@@ -1,35 +1,51 @@
 // pages/user/submit/submit.js
 const api = require('../../../utils/api')
-const { validateStudent } = require('../../../utils/validators')
+const {
+  validateStudent,
+  normalizeIdCard,
+  normalizePhone,
+  getIdCardError,
+  getPhoneError
+} = require('../../../utils/validators')
 const { EDUCATION_OPTIONS } = require('../../../utils/constants')
+const EDIT_STUDENT_ID_KEY = 'submit_edit_student_id'
+
+function createEmptyStudent() {
+  return {
+    name: '',
+    gender: '男',
+    education: '',
+    educationIndex: -1,
+    school: '',
+    major: '',
+    id_card: '',
+    phone: '',
+    company: '',
+    company_address: '',
+    job_category: '',
+    jobCategoryIndex: -1,
+    exam_project: '',
+    examProjectIndex: -1,
+    project_code: '',
+    examProjects: [],
+    files: {}
+  }
+}
 
 Page({
   data: {
     editMode: false,
+    showBackButton: false,
     studentId: '',
-    trainingType: 'special_operation',
+    trainingType: 'special_equipment',
     educationOptions: EDUCATION_OPTIONS,
+    fieldErrors: {
+      id_card: '',
+      phone: ''
+    },
     jobCategories: {},
     jobCategoryNames: [],
-    student: {
-      name: '',
-      gender: '男',
-      education: '',
-      educationIndex: -1,
-      school: '',
-      major: '',
-      id_card: '',
-      phone: '',
-      company: '',
-      company_address: '',
-      job_category: '',
-      jobCategoryIndex: -1,
-      exam_project: '',
-      examProjectIndex: -1,
-      project_code: '',
-      examProjects: [],
-      files: {}
-    }
+    student: createEmptyStudent()
   },
 
   onLoad(options) {
@@ -37,19 +53,68 @@ Page({
       // 编辑模式
       this.setData({
         editMode: true,
+        showBackButton: true,
         studentId: options.id
       })
     }
     this.loadJobCategories()
   },
 
-  onShow() {
+  async onShow() {
     // 更新 TabBar 选中状态
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({
         selected: 0
       })
     }
+
+    const handled = await this.handlePendingEditStudent()
+    if (!handled) {
+      this.resetToCreateMode()
+    }
+  },
+
+  async handlePendingEditStudent() {
+    const studentId = wx.getStorageSync(EDIT_STUDENT_ID_KEY)
+    if (!studentId) return false
+
+    wx.removeStorageSync(EDIT_STUDENT_ID_KEY)
+
+    this.setData({
+      editMode: true,
+      showBackButton: true,
+      studentId: String(studentId)
+    })
+
+    const hasJobCategories = this.data.jobCategories && Object.keys(this.data.jobCategories).length > 0
+    if (!hasJobCategories) {
+      await this.loadJobCategories()
+      return true
+    }
+
+    await this.loadStudentData()
+    return true
+  },
+
+  resetToCreateMode() {
+    this.setData({
+      editMode: false,
+      showBackButton: false,
+      studentId: '',
+      trainingType: 'special_equipment',
+      fieldErrors: {
+        id_card: '',
+        phone: ''
+      },
+      student: createEmptyStudent()
+    })
+    this.updateJobCategoryNames()
+  },
+
+  backToList() {
+    wx.switchTab({
+      url: '/pages/user/list/list'
+    })
   },
 
   async loadJobCategories() {
@@ -108,9 +173,15 @@ Page({
 
         // 查找学历索引
         const educationIndex = this.data.educationOptions.indexOf(student.education)
+        const normalizedIdCard = normalizeIdCard(student.id_card)
+        const normalizedPhone = normalizePhone(student.phone)
 
         // 设置学员数据
         this.setData({
+          fieldErrors: {
+            id_card: getIdCardError(normalizedIdCard),
+            phone: getPhoneError(normalizedPhone)
+          },
           student: {
             name: student.name,
             gender: student.gender,
@@ -118,8 +189,8 @@ Page({
             educationIndex: educationIndex,
             school: student.school || '',
             major: student.major || '',
-            id_card: student.id_card,
-            phone: student.phone,
+            id_card: normalizedIdCard,
+            phone: normalizedPhone,
             company: student.company,
             company_address: student.company_address,
             job_category: student.job_category,
@@ -129,12 +200,12 @@ Page({
             project_code: student.project_code || '',
             examProjects: examProjects,
             files: {
-              photo_path: student.photo_path,
-              diploma_path: student.diploma_path,
-              id_card_front_path: student.id_card_front_path,
-              id_card_back_path: student.id_card_back_path,
-              hukou_residence_path: student.hukou_residence_path,
-              hukou_personal_path: student.hukou_personal_path
+              photo: student.photo_path || student.files?.photo || student.files?.photo_path || '',
+              diploma: student.diploma_path || student.files?.diploma || student.files?.diploma_path || '',
+              id_card_front: student.id_card_front_path || student.files?.id_card_front || student.files?.id_card_front_path || '',
+              id_card_back: student.id_card_back_path || student.files?.id_card_back || student.files?.id_card_back_path || '',
+              hukou_residence: student.hukou_residence_path || student.files?.hukou_residence || student.files?.hukou_residence_path || '',
+              hukou_personal: student.hukou_personal_path || student.files?.hukou_personal || student.files?.hukou_personal_path || ''
             }
           }
         })
@@ -181,9 +252,42 @@ Page({
   // 输入框变化
   onInputChange(e) {
     const { field } = e.currentTarget.dataset
-    const value = e.detail.value
+    let value = e.detail.value
+
+    if (field === 'id_card') {
+      value = normalizeIdCard(value).slice(0, 18)
+    }
+
+    if (field === 'phone') {
+      value = normalizePhone(value).slice(0, 11)
+    }
+
     this.setData({
       [`student.${field}`]: value
+    })
+
+    if (field === 'id_card') {
+      this.setData({
+        'fieldErrors.id_card': getIdCardError(value)
+      })
+    }
+
+    if (field === 'phone') {
+      this.setData({
+        'fieldErrors.phone': getPhoneError(value)
+      })
+    }
+  },
+
+  onIdCardBlur() {
+    this.setData({
+      'fieldErrors.id_card': getIdCardError(this.data.student.id_card)
+    })
+  },
+
+  onPhoneBlur() {
+    this.setData({
+      'fieldErrors.phone': getPhoneError(this.data.student.phone)
     })
   },
 
@@ -266,8 +370,21 @@ Page({
 
   // 提交表单
   async submitForm() {
+    const normalizedStudent = {
+      ...this.data.student,
+      id_card: normalizeIdCard(this.data.student.id_card),
+      phone: normalizePhone(this.data.student.phone)
+    }
+
+    this.setData({
+      'student.id_card': normalizedStudent.id_card,
+      'student.phone': normalizedStudent.phone,
+      'fieldErrors.id_card': getIdCardError(normalizedStudent.id_card),
+      'fieldErrors.phone': getPhoneError(normalizedStudent.phone)
+    })
+
     // 验证数据
-    const validation = validateStudent(this.data.student, this.data.trainingType)
+    const validation = validateStudent(normalizedStudent, this.data.trainingType)
 
     if (!validation.valid) {
       const errorMsg = Object.values(validation.errors)[0]
@@ -287,21 +404,47 @@ Page({
       if (this.data.editMode) {
         // 编辑模式：更新现有记录
         result = await api.updateStudent(this.data.studentId, {
-          ...this.data.student,
+          ...normalizedStudent,
           training_type: this.data.trainingType,
           status: 'unreviewed' // 重新提交后状态改为未审核
         })
       } else {
         // 新建模式：创建新记录
-        result = await api.submitStudent([this.data.student], this.data.trainingType)
+        result = await api.submitStudent([normalizedStudent], this.data.trainingType)
       }
 
       wx.hideLoading()
 
       if (result.success) {
+        let successContent = this.data.editMode ? '学员信息已更新,等待重新审核' : '学员信息已提交,等待审核'
+
+        if (result.sync) {
+          if (result.sync.enabled) {
+            if (typeof result.sync.success === 'boolean') {
+              if (result.sync.success) {
+                successContent += '\n原系统同步：已完成'
+              } else {
+                const syncMessage = result.sync.message || '同步失败，请稍后重试'
+                successContent += `\n原系统同步：失败（${syncMessage}）`
+              }
+            } else {
+              const successCount = result.sync.success_count || 0
+              const failedCount = result.sync.failed_count || 0
+              if (failedCount > 0) {
+                successContent += `\n原系统同步：成功 ${successCount} 条，失败 ${failedCount} 条`
+              } else {
+                successContent += '\n原系统同步：已完成'
+              }
+            }
+          } else {
+            const reason = result.sync.disabled_reason || '未启用'
+            successContent += `\n原系统同步：未启用（${reason}）`
+          }
+        }
+
         wx.showModal({
           title: this.data.editMode ? '更新成功' : '提交成功',
-          content: this.data.editMode ? '学员信息已更新,等待重新审核' : '学员信息已提交,等待审核',
+          content: successContent,
           showCancel: false,
           success: () => {
             // 跳转到列表页

@@ -8,7 +8,7 @@ from models.student import (
 from services.image_service import process_and_save_file, delete_student_files
 from services.document_service import generate_health_check_form
 from utils.validators import validate_student_data, validate_file_upload
-from utils.error_handlers import ValidationError, NotFoundError
+from utils.error_handlers import AppError, ValidationError, NotFoundError
 import os
 import io
 import zipfile
@@ -30,6 +30,24 @@ REQUIRED_ATTACHMENTS = {
     'special_equipment': ['photo', 'diploma', 'id_card_front', 'id_card_back', 'hukou_residence', 'hukou_personal']
 }
 
+EDUCATION_NORMALIZATION_MAP = {
+    '初中': '初中',
+    '初中或同等学历': '初中',
+    '高中': '高中或同等学历',
+    '高中或同等学历': '高中或同等学历',
+    '中专': '中专或同等学历',
+    '中专或同等学历': '中专或同等学历',
+    '专科': '专科或同等学历',
+    '大专': '专科或同等学历',
+    '专科或同等学历': '专科或同等学历',
+    '大专或同等学历': '专科或同等学历',
+    '本科': '本科或同等学历',
+    '本科或同等学历': '本科或同等学历',
+    '研究生': '研究生及以上',
+    '研究生及以上': '研究生及以上',
+    '研究生或同等学历': '研究生及以上'
+}
+
 
 def normalize_training_type(training_type):
     """Normalize and validate training type."""
@@ -37,6 +55,14 @@ def normalize_training_type(training_type):
     if value in REQUIRED_ATTACHMENTS:
         return value
     return 'special_operation'
+
+
+def normalize_education(education):
+    """Normalize education text from different clients to canonical values."""
+    value = (education or '').strip()
+    if not value:
+        return value
+    return EDUCATION_NORMALIZATION_MAP.get(value, value)
 
 
 @student_bp.route('/api/students', methods=['POST'])
@@ -86,6 +112,7 @@ def create_student_route():
         # Create student
         student_payload = data.to_dict(flat=True)
         student_payload['training_type'] = training_type
+        student_payload['education'] = normalize_education(student_payload.get('education', ''))
         student_id = create_student(student_payload, file_paths)
         current_app.logger.info(f'Student created: ID={student_id}')
 
@@ -93,8 +120,11 @@ def create_student_route():
 
     except ValidationError as e:
         return jsonify(e.to_dict()), e.status_code
+    except AppError as e:
+        current_app.logger.error(f'Error creating student (app error): {e.message}')
+        return jsonify(e.to_dict()), e.status_code
     except Exception as e:
-        current_app.logger.error(f'Error creating student: {str(e)}')
+        current_app.logger.exception('Error creating student')
         return jsonify({'error': str(e)}), 500
 
 
@@ -137,6 +167,8 @@ def update_student_route(id):
                 updates['project_code'] = data.get('exam_code', '')
             if 'training_type' in updates:
                 updates['training_type'] = normalize_training_type(updates['training_type'])
+            if 'education' in updates:
+                updates['education'] = normalize_education(updates['education'])
 
             # Validate partial update
             if updates:
@@ -184,6 +216,8 @@ def update_student_route(id):
                 updates['project_code'] = payload.get('exam_code', '')
             if 'training_type' in updates:
                 updates['training_type'] = normalize_training_type(updates['training_type'])
+            if 'education' in updates:
+                updates['education'] = normalize_education(updates['education'])
 
             # Validate partial update
             if updates:

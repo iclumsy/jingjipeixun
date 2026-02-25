@@ -1,145 +1,97 @@
-<!-- pages/admin/review/review.wxml -->
-<view class="container">
-  <!-- 筛选栏 -->
-  <view class="filter-bar card">
-    <!-- 状态筛选 -->
-    <view class="filter-section">
-      <view class="filter-label">
-        <text class="label-icon">📊</text>
-        <text>审核状态</text>
-      </view>
-      <view class="filter-buttons">
+<view class="page">
+  <view class="filter-card card">
+    <view class="filter-group">
+      <view class="group-title">审核状态</view>
+      <view class="chip-list">
         <view
-          class="filter-btn {{filters.status === '' ? 'active' : ''}}"
-          bindtap="onStatusSelect"
-          data-value="">
-          <text class="btn-icon">📋</text>
-          <text>全部</text>
-        </view>
-        <view
-          class="filter-btn {{filters.status === 'unreviewed' ? 'active' : ''}}"
-          bindtap="onStatusSelect"
-          data-value="unreviewed">
-          <text class="btn-icon">⏳</text>
-          <text>待审核</text>
-        </view>
-        <view
-          class="filter-btn {{filters.status === 'reviewed' ? 'active' : ''}}"
-          bindtap="onStatusSelect"
-          data-value="reviewed">
-          <text class="btn-icon">✅</text>
-          <text>已通过</text>
-        </view>
-        <view
-          class="filter-btn {{filters.status === 'rejected' ? 'active' : ''}}"
-          bindtap="onStatusSelect"
-          data-value="rejected">
-          <text class="btn-icon">❌</text>
-          <text>已驳回</text>
+          wx:for="{{statusFilters}}"
+          wx:key="value"
+          class="chip {{filters.status === item.value ? 'active' : ''}}"
+          bindtap="onStatusFilterTap"
+          data-value="{{item.value}}"
+        >
+          {{item.label}}
         </view>
       </view>
     </view>
 
-    <!-- 培训类型筛选 -->
-    <view class="filter-section">
-      <view class="filter-label">
-        <text class="label-icon">🎓</text>
-        <text>培训类型</text>
-      </view>
-      <view class="filter-buttons">
+    <view class="filter-group">
+      <view class="group-title">培训类型</view>
+      <view class="chip-list">
         <view
-          class="filter-btn {{filters.training_type === '' ? 'active' : ''}}"
-          bindtap="onTrainingTypeSelect"
-          data-value="">
-          <text class="btn-icon">📋</text>
-          <text>全部</text>
-        </view>
-        <view
-          class="filter-btn {{filters.training_type === 'special_operation' ? 'active' : ''}}"
-          bindtap="onTrainingTypeSelect"
-          data-value="special_operation">
-          <text class="btn-icon">⚡</text>
-          <text>特种作业</text>
-        </view>
-        <view
-          class="filter-btn {{filters.training_type === 'special_equipment' ? 'active' : ''}}"
-          bindtap="onTrainingTypeSelect"
-          data-value="special_equipment">
-          <text class="btn-icon">🔧</text>
-          <text>特种设备</text>
+          wx:for="{{trainingTypeFilters}}"
+          wx:key="value"
+          class="chip {{filters.training_type === item.value ? 'active' : ''}}"
+          bindtap="onTrainingTypeFilterTap"
+          data-value="{{item.value}}"
+        >
+          {{item.label}}
         </view>
       </view>
     </view>
 
-    <!-- 公司筛选 -->
-    <view class="filter-section" wx:if="{{companies.length > 1}}">
-      <view class="filter-label">
-        <text class="label-icon">🏢</text>
-        <text>公司筛选</text>
-      </view>
-      <view class="picker-wrapper">
-        <picker mode="selector" range="{{companies}}" value="{{companyIndex}}" bindchange="onCompanyChange">
-          <view class="picker-value">
-            <text class="picker-icon">🏢</text>
-            <text>{{companies[companyIndex] || '全部'}}</text>
-          </view>
-        </picker>
-      </view>
-    </view>
-
-    <!-- 搜索框 -->
-    <view class="search-box">
-      <view class="search-input-wrapper">
-        <text class="search-icon">🔍</text>
-        <input class="search-input" placeholder="搜索姓名/身份证/手机号" value="{{filters.search}}" bindinput="onSearchInput" bindconfirm="onSearchConfirm" />
-      </view>
-      <button class="search-btn" size="mini" bindtap="onSearchConfirm">搜索</button>
+    <view class="filter-group">
+      <view class="group-title">公司</view>
+      <picker mode="selector" range="{{companyOptions}}" value="{{companyIndex}}" bindchange="onCompanyChange">
+        <view class="picker-value">{{companyOptions[companyIndex] || '全部'}}</view>
+      </picker>
     </view>
   </view>
 
-  <!-- 学员列表 -->
-  <view class="student-list">
-    <block wx:for="{{students}}" wx:key="_id">
-      <view class="student-banner">
-        <view class="banner-left">
-          <view class="student-info-row">
-            <text class="student-name">{{item.name}}</text>
-            <view class="status-tag status-{{item.status}}">
-              <text wx:if="{{item.status === 'unreviewed'}}">待审核</text>
-              <text wx:if="{{item.status === 'reviewed'}}">已通过</text>
-              <text wx:if="{{item.status === 'rejected'}}">已驳回</text>
-            </view>
-          </view>
-          <view class="student-detail-row">
-            <text class="detail-item">{{item.company}}</text>
-            <text class="detail-separator">|</text>
-            <text class="detail-item">{{item.job_category}}</text>
-          </view>
-          <view class="student-meta-row">
-            <text class="meta-text">身份证：{{item.id_card}}</text>
-          </view>
-        </view>
-        <view class="banner-right" wx:if="{{item.status === 'unreviewed'}}">
-          <button class="action-btn btn-approve" size="mini" catchtap="quickApprove" data-id="{{item._id}}">通过</button>
-          <button class="action-btn btn-reject" size="mini" catchtap="quickReject" data-id="{{item._id}}">驳回</button>
-        </view>
+  <view class="record-list">
+    <view
+      wx:for="{{records}}"
+      wx:key="_id"
+      class="record-card card"
+      bindtap="openDetail"
+      data-id="{{item._id}}"
+    >
+      <view class="record-header">
+        <view class="submitter">提交人：{{item.name || '-'}}</view>
+        <view class="status-tag status-{{item.status}}">{{item.statusText}}</view>
       </view>
-    </block>
 
-    <!-- 加载状态 -->
-    <view class="loading" wx:if="{{loading && !refreshing}}">
-      <text>加载中...</text>
+      <view class="record-meta">培训类型：{{item.trainingTypeText}}</view>
+      <view class="record-meta">公司：{{item.company || '-'}}</view>
+      <view class="record-meta">提交时间：{{item.submitTimeText}}</view>
+
+      <view class="record-actions">
+        <button
+          class="action-btn btn-sync"
+          size="mini"
+          catchtap="onSyncTap"
+          data-id="{{item._id}}"
+        >同步网页端</button>
+        <button
+          class="action-btn btn-delete"
+          size="mini"
+          catchtap="onDeleteTap"
+          data-id="{{item._id}}"
+        >删除记录</button>
+        <button
+          class="action-btn btn-approve {{item.status !== 'unreviewed' ? 'disabled' : ''}}"
+          size="mini"
+          catchtap="onApproveTap"
+          data-id="{{item._id}}"
+          data-status="{{item.status}}"
+          disabled="{{item.status !== 'unreviewed'}}"
+        >审核通过</button>
+        <button
+          class="action-btn btn-reject {{item.status !== 'unreviewed' ? 'disabled' : ''}}"
+          size="mini"
+          catchtap="onRejectTap"
+          data-id="{{item._id}}"
+          data-status="{{item.status}}"
+          disabled="{{item.status !== 'unreviewed'}}"
+        >驳回</button>
+      </view>
     </view>
 
-    <!-- 没有更多 -->
-    <view class="no-more" wx:if="{{!loading && !hasMore && students.length > 0}}">
-      <text>没有更多了</text>
-    </view>
+    <view class="loading" wx:if="{{loading && !refreshing}}">加载中...</view>
+    <view class="no-more" wx:if="{{!loading && !hasMore && records.length > 0}}">没有更多记录了</view>
 
-    <!-- 空状态 -->
-    <view class="empty" wx:if="{{!loading && students.length === 0}}">
-      <view class="empty-icon">📋</view>
-      <view class="empty-text">暂无学员信息</view>
+    <view class="empty" wx:if="{{!loading && records.length === 0}}">
+      <view class="empty-text">暂无符合条件的审核记录</view>
     </view>
   </view>
 </view>

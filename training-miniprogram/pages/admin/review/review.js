@@ -1,52 +1,93 @@
-// pages/admin/review/review.js
 const api = require('../../../utils/api')
+const { TRAINING_TYPE_LABELS } = require('../../../utils/constants')
+
+const STATUS_FILTERS = [
+  { label: '全部', value: '' },
+  { label: '待审核', value: 'unreviewed' },
+  { label: '已通过', value: 'reviewed' },
+  { label: '已驳回', value: 'rejected' }
+]
+
+const TRAINING_TYPE_FILTERS = [
+  { label: '全部', value: '' },
+  { label: '特种作业', value: 'special_operation' },
+  { label: '特种设备', value: 'special_equipment' }
+]
+
+const STATUS_TEXT_MAP = {
+  unreviewed: '待审核',
+  reviewed: '已通过',
+  rejected: '已驳回'
+}
+
+function formatTime(value) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hour}:${minute}`
+}
+
+function mapRecord(item) {
+  return {
+    ...item,
+    statusText: STATUS_TEXT_MAP[item.status] || item.status || '-',
+    trainingTypeText: TRAINING_TYPE_LABELS[item.training_type] || item.training_type || '-',
+    submitTimeText: formatTime(item.created_at)
+  }
+}
 
 Page({
   data: {
-    students: [],
+    statusFilters: STATUS_FILTERS,
+    trainingTypeFilters: TRAINING_TYPE_FILTERS,
     filters: {
-      status: 'unreviewed',
+      status: '',
       training_type: '',
-      company: '',
-      search: ''
+      company: ''
     },
-    statusOptions: ['全部', '未审核', '已审核', '已驳回'],
-    statusValues: ['', 'unreviewed', 'reviewed', 'rejected'],
-    statusIndex: 1,
-    trainingTypeOptions: ['全部', '特种作业', '特种设备'],
-    trainingTypeValues: ['', 'special_operation', 'special_equipment'],
-    trainingTypeIndex: 0,
-    companies: [],
+    companyOptions: ['全部'],
     companyIndex: 0,
+    records: [],
     page: 1,
     limit: 20,
     hasMore: true,
     loading: false,
-    refreshing: false
+    refreshing: false,
+    initialized: false
   },
 
-  onLoad() {
-    this.loadCompanies()
-    this.loadStudents(true)
+  async onLoad() {
+    await this.refreshAll()
+    this.setData({ initialized: true })
   },
 
-  onShow() {
-    // 更新 TabBar 选中状态
+  async onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({
-        selected: 2
-      })
+      this.getTabBar().setData({ selected: 2 })
+    }
+    if (this.data.initialized) {
+      await this.loadRecords(true)
     }
   },
 
   onPullDownRefresh() {
-    this.loadStudents(true)
+    this.refreshAll()
   },
 
   onReachBottom() {
     if (!this.data.loading && this.data.hasMore) {
-      this.loadStudents(false)
+      this.loadRecords(false)
     }
+  },
+
+  async refreshAll() {
+    await this.loadCompanies()
+    await this.loadRecords(true)
   },
 
   async loadCompanies() {
@@ -56,17 +97,26 @@ Page({
         training_type: this.data.filters.training_type
       })
 
-      if (result.companies) {
-        this.setData({
-          companies: ['全部', ...result.companies]
-        })
-      }
+      const companies = ['全部', ...(result.companies || [])]
+      const selectedCompany = this.data.filters.company
+      const nextIndex = Math.max(0, companies.findIndex(item => item === selectedCompany))
+
+      this.setData({
+        companyOptions: companies,
+        companyIndex: nextIndex,
+        'filters.company': nextIndex === 0 ? '' : companies[nextIndex]
+      })
     } catch (err) {
-      console.error('加载公司列表失败:', err)
+      console.error('加载公司筛选失败:', err)
+      this.setData({
+        companyOptions: ['全部'],
+        companyIndex: 0,
+        'filters.company': ''
+      })
     }
   },
 
-  async loadStudents(refresh = false) {
+  async loadRecords(refresh = false) {
     if (this.data.loading) return
 
     this.setData({
@@ -82,174 +132,183 @@ Page({
         limit: this.data.limit
       })
 
-      const students = refresh ? result.list : [...this.data.students, ...result.list]
+      const currentList = Array.isArray(result.list) ? result.list.map(mapRecord) : []
+      const records = refresh ? currentList : this.data.records.concat(currentList)
 
       this.setData({
-        students,
+        records,
         page: page + 1,
-        hasMore: result.hasMore,
+        hasMore: !!result.hasMore,
         loading: false,
         refreshing: false
       })
-
-      if (refresh) {
-        wx.stopPullDownRefresh()
-      }
     } catch (err) {
-      console.error('加载学员列表失败:', err)
+      console.error('加载审核记录失败:', err)
       this.setData({
         loading: false,
         refreshing: false
       })
-
-      wx.showToast({
-        title: '加载失败',
-        icon: 'none'
-      })
-
-      if (refresh) {
-        wx.stopPullDownRefresh()
-      }
+      wx.showToast({ title: '加载失败', icon: 'none' })
+    } finally {
+      wx.stopPullDownRefresh()
     }
   },
 
-  onStatusChange(e) {
-    const index = parseInt(e.detail.value)
-    this.setData({
-      statusIndex: index,
-      'filters.status': this.data.statusValues[index],
-      page: 1
-    })
-    this.loadStudents(true)
-    this.loadCompanies()
-  },
+  async onStatusFilterTap(e) {
+    const { value } = e.currentTarget.dataset
+    if (value === this.data.filters.status) return
 
-  onStatusSelect(e) {
-    const value = e.currentTarget.dataset.value
     this.setData({
       'filters.status': value,
       page: 1
     })
-    this.loadStudents(true)
-    this.loadCompanies()
+    await this.refreshAll()
   },
 
-  onTrainingTypeChange(e) {
-    const index = parseInt(e.detail.value)
-    this.setData({
-      trainingTypeIndex: index,
-      'filters.training_type': this.data.trainingTypeValues[index],
-      page: 1
-    })
-    this.loadStudents(true)
-    this.loadCompanies()
-  },
+  async onTrainingTypeFilterTap(e) {
+    const { value } = e.currentTarget.dataset
+    if (value === this.data.filters.training_type) return
 
-  onTrainingTypeSelect(e) {
-    const value = e.currentTarget.dataset.value
     this.setData({
       'filters.training_type': value,
       page: 1
     })
-    this.loadStudents(true)
-    this.loadCompanies()
+    await this.refreshAll()
   },
 
-  onCompanyChange(e) {
-    const index = parseInt(e.detail.value)
-    const company = index === 0 ? '' : this.data.companies[index]
+  async onCompanyChange(e) {
+    const index = Number(e.detail.value)
+    const company = index === 0 ? '' : this.data.companyOptions[index]
+
     this.setData({
       companyIndex: index,
       'filters.company': company,
       page: 1
     })
-    this.loadStudents(true)
+    await this.loadRecords(true)
   },
 
-  onSearchInput(e) {
-    this.setData({
-      'filters.search': e.detail.value
-    })
-  },
-
-  onSearchConfirm() {
-    this.setData({ page: 1 })
-    this.loadStudents(true)
-  },
-
-  onStudentTap(e) {
-    const { student } = e.detail
-    wx.navigateTo({
-      url: `/pages/admin/detail/detail?id=${student._id}`
-    })
-  },
-
-  viewDetail(e) {
+  openDetail(e) {
     const { id } = e.currentTarget.dataset
+    if (!id) {
+      wx.showToast({ title: '记录ID不存在', icon: 'none' })
+      return
+    }
     wx.navigateTo({
       url: `/pages/admin/detail/detail?id=${id}`
     })
   },
 
-  async quickApprove(e) {
+  async onSyncTap(e) {
     const { id } = e.currentTarget.dataset
+    if (!id) return
 
-    wx.showModal({
-      title: '确认通过',
-      content: '确定通过该学员的审核吗？',
-      success: async (res) => {
-        if (res.confirm) {
-          wx.showLoading({ title: '审核中...' })
-          try {
-            await api.reviewStudent(id, 'approve')
-            wx.hideLoading()
-            wx.showToast({
-              title: '审核通过',
-              icon: 'success'
-            })
-            this.loadStudents(true)
-          } catch (err) {
-            wx.hideLoading()
-            wx.showToast({
-              title: '操作失败',
-              icon: 'none'
-            })
-          }
-        }
-      }
-    })
+    const confirmed = await this.confirmAction(
+      '同步网页端',
+      '将该记录同步到网页端系统，是否继续？'
+    )
+
+    if (!confirmed) return
+
+    wx.showLoading({ title: '同步中...' })
+    try {
+      const result = await api.syncStudent(id)
+      wx.hideLoading()
+      wx.showModal({
+        title: result.success ? '同步成功' : '同步结果',
+        content: result.message || (result.success ? '同步已完成' : '同步失败'),
+        showCancel: false
+      })
+      await this.loadRecords(true)
+    } catch (err) {
+      wx.hideLoading()
+      wx.showModal({
+        title: '同步失败',
+        content: err.message || '请稍后重试',
+        showCancel: false
+      })
+    }
   },
 
-  async quickReject(e) {
+  async onDeleteTap(e) {
     const { id } = e.currentTarget.dataset
+    if (!id) return
 
-    wx.showModal({
-      title: '确认驳回',
-      content: '确定驳回该学员的审核吗？',
-      success: async (res) => {
-        if (res.confirm) {
-          wx.showLoading({ title: '处理中...' })
-          try {
-            await api.reviewStudent(id, 'reject')
-            wx.hideLoading()
-            wx.showToast({
-              title: '已驳回',
-              icon: 'success'
-            })
-            this.loadStudents(true)
-          } catch (err) {
-            wx.hideLoading()
-            wx.showToast({
-              title: '操作失败',
-              icon: 'none'
-            })
-          }
-        }
-      }
-    })
+    const confirmed = await this.confirmAction(
+      '删除记录',
+      '删除后不可恢复，是否继续？'
+    )
+
+    if (!confirmed) return
+
+    wx.showLoading({ title: '删除中...' })
+    try {
+      await api.deleteStudent(id)
+      wx.hideLoading()
+      wx.showToast({ title: '已删除', icon: 'success' })
+      await this.refreshAll()
+    } catch (err) {
+      wx.hideLoading()
+      wx.showToast({ title: err.message || '删除失败', icon: 'none' })
+    }
   },
 
-  stopPropagation() {
-    // 阻止事件冒泡
+  async onApproveTap(e) {
+    const { id, status } = e.currentTarget.dataset
+    if (!id) return
+
+    if (status !== 'unreviewed') {
+      wx.showToast({ title: '仅待审核记录可操作', icon: 'none' })
+      return
+    }
+
+    const confirmed = await this.confirmAction('审核通过', '确认通过该记录吗？')
+    if (!confirmed) return
+
+    wx.showLoading({ title: '审核中...' })
+    try {
+      await api.reviewStudent(id, 'approve')
+      wx.hideLoading()
+      wx.showToast({ title: '已通过', icon: 'success' })
+      await this.refreshAll()
+    } catch (err) {
+      wx.hideLoading()
+      wx.showToast({ title: err.message || '操作失败', icon: 'none' })
+    }
+  },
+
+  async onRejectTap(e) {
+    const { id, status } = e.currentTarget.dataset
+    if (!id) return
+
+    if (status !== 'unreviewed') {
+      wx.showToast({ title: '仅待审核记录可操作', icon: 'none' })
+      return
+    }
+
+    const confirmed = await this.confirmAction('驳回记录', '确认驳回该记录吗？')
+    if (!confirmed) return
+
+    wx.showLoading({ title: '处理中...' })
+    try {
+      await api.reviewStudent(id, 'reject')
+      wx.hideLoading()
+      wx.showToast({ title: '已驳回', icon: 'success' })
+      await this.refreshAll()
+    } catch (err) {
+      wx.hideLoading()
+      wx.showToast({ title: err.message || '操作失败', icon: 'none' })
+    }
+  },
+
+  confirmAction(title, content) {
+    return new Promise(resolve => {
+      wx.showModal({
+        title,
+        content,
+        success: res => resolve(!!res.confirm),
+        fail: () => resolve(false)
+      })
+    })
   }
 })

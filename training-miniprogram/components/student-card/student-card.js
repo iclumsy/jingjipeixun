@@ -31,8 +31,11 @@ Component({
 
   methods: {
     onTap() {
-      this.triggerEvent('tap', {
-        student: this.data.student
+      const student = this.data.student || {}
+      const studentId = student._id || student.id || ''
+      this.triggerEvent('cardtap', {
+        student,
+        id: studentId
       })
     },
 

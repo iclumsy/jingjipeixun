@@ -89,7 +89,12 @@
       </view>
     </view>
 
-    <!-- 操作按钮 -->\n    <view class="action-section" wx:if="{{student.status === 'rejected'}}">\n      <button class="edit-btn" bindtap="editStudent">重新编辑</button>\n    </view>\n\n    <!-- 附件预览 -->
+    <!-- 操作按钮 -->
+    <view class="action-section" wx:if="{{student.status === 'rejected'}}">
+      <button class="edit-btn" bindtap="editStudent">重新编辑</button>
+    </view>
+
+    <!-- 附件预览 -->
     <view class="section">
       <view class="section-title">附件预览</view>
       <view class="attachments-grid">

@@ -1,17 +1,30 @@
 // utils/validators.js
 // 表单验证工具函数
 
+function normalizeText(value) {
+  return String(value || '').replace(/\s+/g, '').trim()
+}
+
+function normalizeIdCard(idCard) {
+  return normalizeText(idCard).toUpperCase()
+}
+
+function normalizePhone(phone) {
+  return normalizeText(phone).replace(/\D/g, '')
+}
+
 /**
  * 验证身份证号
  * @param {string} idCard - 身份证号
  * @returns {boolean}
  */
 function validateIdCard(idCard) {
-  if (!idCard) return false
+  const normalized = normalizeIdCard(idCard)
+  if (!normalized) return false
 
-  // 18位身份证号，最后一位可以是X或x
-  const pattern = /^\d{17}[\dXx]$/
-  return pattern.test(idCard)
+  // 18位身份证号，最后一位可以是数字或X
+  const pattern = /^\d{17}[\dX]$/
+  return pattern.test(normalized)
 }
 
 /**
@@ -20,11 +33,34 @@ function validateIdCard(idCard) {
  * @returns {boolean}
  */
 function validatePhone(phone) {
-  if (!phone) return false
+  const normalized = normalizePhone(phone)
+  if (!normalized) return false
 
-  // 11位数字
-  const pattern = /^\d{11}$/
-  return pattern.test(phone)
+  // 简单校验：11位数字且以1开头
+  const pattern = /^1\d{10}$/
+  return pattern.test(normalized)
+}
+
+function getIdCardError(idCard) {
+  const normalized = normalizeIdCard(idCard)
+  if (!normalized) {
+    return '请输入身份证号'
+  }
+  if (!validateIdCard(normalized)) {
+    return '请输入正确的身份证号（18位）'
+  }
+  return ''
+}
+
+function getPhoneError(phone) {
+  const normalized = normalizePhone(phone)
+  if (!normalized) {
+    return '请输入手机号'
+  }
+  if (!validatePhone(normalized)) {
+    return '请输入正确的手机号（11位）'
+  }
+  return ''
 }
 
 /**
@@ -69,12 +105,14 @@ function validateStudent(student, trainingType) {
     errors.education = '请选择文化程度'
   }
 
-  if (!validateIdCard(student.id_card)) {
-    errors.id_card = '请输入正确的身份证号（18位）'
+  const idCardError = getIdCardError(student.id_card)
+  if (idCardError) {
+    errors.id_card = idCardError
   }
 
-  if (!validatePhone(student.phone)) {
-    errors.phone = '请输入正确的手机号（11位）'
+  const phoneError = getPhoneError(student.phone)
+  if (phoneError) {
+    errors.phone = phoneError
   }
 
   if (!validateRequired(student.company)) {
@@ -156,8 +194,12 @@ function validateFileType(filePath) {
 }
 
 module.exports = {
+  normalizeIdCard,
+  normalizePhone,
   validateIdCard,
   validatePhone,
+  getIdCardError,
+  getPhoneError,
   validateGender,
   validateRequired,
   validateStudent,

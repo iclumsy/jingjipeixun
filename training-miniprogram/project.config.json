@@ -47,7 +47,7 @@
     "disableSWC": true
   },
   "compileType": "miniprogram",
-  "libVersion": "2.19.4",
+  "libVersion": "3.8.8",
   "appid": "wxea71cec93859e421",
   "projectname": "training-miniprogram",
   "condition": {},

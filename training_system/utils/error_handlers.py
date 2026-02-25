@@ -8,7 +8,7 @@ class AppError(Exception):
     """Base application error class."""
 
     def __init__(self, message, status_code=500, payload=None):
-        super().__init__()
+        super().__init__(message)
         self.message = message
         self.status_code = status_code
         self.payload = payload
@@ -69,8 +69,11 @@ def register_error_handlers(app):
     def handle_http_exception(error):
         """Handle HTTP exceptions."""
         app.logger.warning(f'HTTP {error.code}: {error.description}')
+        description = error.description
+        if error.code == 413:
+            description = '请求体过大，请压缩附件或提高服务端上传上限'
         response = jsonify({
-            'error': error.description
+            'error': description
         })
         response.status_code = error.code
         return response

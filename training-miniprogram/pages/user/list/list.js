@@ -1,5 +1,6 @@
 // pages/user/list/list.js
 const api = require('../../../utils/api')
+const EDIT_STUDENT_ID_KEY = 'submit_edit_student_id'
 
 Page({
   data: {
@@ -74,9 +75,30 @@ Page({
   },
 
   onStudentTap(e) {
-    const { student } = e.detail
-    wx.navigateTo({
-      url: `/pages/user/detail/detail?id=${student._id}`
+    const detail = e && e.detail ? e.detail : {}
+    const dataset = e && e.currentTarget && e.currentTarget.dataset ? e.currentTarget.dataset : {}
+    const student = detail.student || dataset.student || null
+    const studentId = detail.id || (student && (student._id || student.id)) || dataset.id
+
+    if (!studentId) {
+      console.warn('onStudentTap missing student id:', { detail, dataset, student })
+      wx.showToast({
+        title: '学员ID缺失',
+        icon: 'none'
+      })
+      return
+    }
+
+    // 我的提交所有状态均复用信息采集页面
+    wx.setStorageSync(EDIT_STUDENT_ID_KEY, studentId)
+    wx.switchTab({
+      url: '/pages/user/submit/submit',
+      fail: () => {
+        wx.showToast({
+          title: '跳转失败，请重试',
+          icon: 'none'
+        })
+      }
     })
   },
 

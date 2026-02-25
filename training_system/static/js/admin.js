@@ -547,11 +547,14 @@ document.addEventListener('DOMContentLoaded', () => {
             { key: 'education', label: '文化程度', required: true, type: 'select', options: [
                 { value: '', text: '请选择' },
                 { value: '研究生及以上', text: '研究生及以上' },
+                { value: '研究生或同等学历', text: '研究生或同等学历' },
                 { value: '本科或同等学历', text: '本科或同等学历' },
                 { value: '专科或同等学历', text: '专科或同等学历' },
+                { value: '大专或同等学历', text: '大专或同等学历' },
                 { value: '中专或同等学历', text: '中专或同等学历' },
                 { value: '高中或同等学历', text: '高中或同等学历' },
-                { value: '初中', text: '初中' }
+                { value: '初中', text: '初中' },
+                { value: '初中或同等学历', text: '初中或同等学历' }
             ]},
             { key: 'id_card', label: '身份证号', required: true, pattern: '\\d{17}[\\dXx]', title: '请输入正确的18位身份证号' },
             { key: 'phone', label: '手机号', required: true, pattern: '\\d{11}', title: '请输入11位手机号' },

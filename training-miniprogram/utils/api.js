@@ -51,6 +51,20 @@ function submitStudent(students, trainingType) {
 }
 
 /**
+ * 手动同步已存在学员到网页端
+ * 复用 submitStudent 云函数的同步逻辑
+ * @param {string} studentId - 学员ID
+ * @returns {Promise}
+ */
+function syncStudent(studentId) {
+  return callFunction('submitStudent', {
+    sync_existing: 'true',
+    mode: 'sync_existing',
+    student_id: studentId
+  })
+}
+
+/**
  * 获取学员列表
  * @param {object} params - 查询参数
  * @returns {Promise}
@@ -231,6 +245,7 @@ module.exports = {
   callFunction,
   login,
   submitStudent,
+  syncStudent,
   getStudents,
   getStudentDetail,
   reviewStudent,

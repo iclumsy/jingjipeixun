@@ -191,6 +191,8 @@
 - **语言**：JavaScript
 - **依赖**：
   - wx-server-sdk（云函数SDK）
+  - axios（同步提交HTTP请求）
+  - form-data（构造multipart请求）
   - node-xlsx（Excel导出）
   - docxtemplater（Word文档生成）
   - jszip（文件压缩）
@@ -250,6 +252,30 @@ training-miniprogram/
 5. **云函数超时**：默认超时时间为20秒，复杂操作需要注意
 6. **数据库权限**：需要正确配置数据库权限规则
 7. **临时链接有效期**：文件临时链接有效期为1小时
+
+## 原系统同步配置（新增）
+
+`submitStudent` 云函数已支持“提交到小程序系统后，同步提交到原信息采集系统”。
+
+可在 `config` 集合新增文档：
+
+```json
+{
+  "_id": "origin_system_sync",
+  "data": {
+    "enabled": true,
+    "base_url": "https://your-origin-system.example.com",
+    "submit_path": "/api/students",
+    "timeout_ms": 20000
+  }
+}
+```
+
+也支持使用云函数环境变量覆盖：
+- `ORIGIN_SYSTEM_SYNC_ENABLED`
+- `ORIGIN_SYSTEM_BASE_URL`
+- `ORIGIN_SYSTEM_SUBMIT_PATH`
+- `ORIGIN_SYSTEM_TIMEOUT_MS`
 
 ## 下一步工作
 
