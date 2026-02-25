@@ -1,0 +1,34 @@
+<!-- components/student-card/student-card.wxml -->
+<view class="student-card" bindtap="onTap">
+  <view class="card-header">
+    <view class="student-name">{{student.name}}</view>
+    <view class="status-badge badge-{{statusClass}}">{{statusText}}</view>
+  </view>
+
+  <view class="card-body">
+    <view class="info-row">
+      <text class="info-label">身份证：</text>
+      <text class="info-value">{{student.id_card}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">手机号：</text>
+      <text class="info-value">{{student.phone}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">单位：</text>
+      <text class="info-value">{{student.company}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">培训类型：</text>
+      <text class="info-value">{{trainingTypeText}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">作业类别：</text>
+      <text class="info-value">{{student.job_category}}</text>
+    </view>
+  </view>
+
+  <view class="card-footer">
+    <text class="time-text">提交时间：{{createTime}}</text>
+  </view>
+</view>

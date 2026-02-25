@@ -1,0 +1,22 @@
+<!-- pages/user/list/list.wxml -->
+<view class="container">
+  <view class="student-list">
+    <block wx:for="{{students}}" wx:key="_id">
+      <student-card student="{{item}}" bind:tap="onStudentTap" />
+    </block>
+
+    <view class="loading" wx:if="{{loading}}">
+      <text>加载中...</text>
+    </view>
+
+    <view class="no-more" wx:if="{{!loading && !hasMore && students.length > 0}}">
+      <text>没有更多了</text>
+    </view>
+
+    <view class="empty" wx:if="{{!loading && students.length === 0}}">
+      <view class="empty-icon">📋</view>
+      <view class="empty-text">暂无提交记录</view>
+      <button class="btn btn-primary mt-24" bindtap="goToSubmit">去提交</button>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,10 @@
+{
+  "name": "downloadAttachments",
+  "version": "1.0.0",
+  "description": "打包下载附件云函数",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest",
+    "jszip": "^3.10.1"
+  }
+}

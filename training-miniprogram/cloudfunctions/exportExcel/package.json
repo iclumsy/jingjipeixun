@@ -1,0 +1,10 @@
+{
+  "name": "exportExcel",
+  "version": "1.0.0",
+  "description": "导出Excel云函数",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest",
+    "node-xlsx": "^0.21.0"
+  }
+}

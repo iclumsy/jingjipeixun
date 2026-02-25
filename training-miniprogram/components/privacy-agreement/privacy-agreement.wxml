@@ -1,0 +1,50 @@
+<!-- components/privacy-agreement/privacy-agreement.wxml -->
+<view class="privacy-mask" wx:if="{{show}}" catchtouchmove="preventTouchMove">
+  <view class="privacy-dialog">
+    <view class="dialog-header">
+      <text class="dialog-title">用户隐私保护提示</text>
+    </view>
+
+    <scroll-view class="dialog-content" scroll-y>
+      <view class="content-text">
+        <text>感谢您使用培训管理系统小程序！</text>
+      </view>
+
+      <view class="content-text">
+        <text>在使用本小程序前，请您仔细阅读并同意</text>
+        <text class="link" bindtap="openPrivacyPolicy">《隐私政策》</text>
+        <text>。我们将严格按照您同意的各项条款使用您的个人信息，以便为您提供更好的服务。</text>
+      </view>
+
+      <view class="section-title">我们会收集以下信息：</view>
+      <view class="info-list">
+        <text class="info-item">• 学员基本信息（姓名、性别、身份证号等）</text>
+        <text class="info-item">• 联系方式（手机号）</text>
+        <text class="info-item">• 证件照片（身份证、学历证书等）</text>
+        <text class="info-item">• 微信OpenID（用于身份识别）</text>
+      </view>
+
+      <view class="section-title">信息用途：</view>
+      <view class="info-list">
+        <text class="info-item">• 提供培训管理服务</text>
+        <text class="info-item">• 学员信息审核</text>
+        <text class="info-item">• 生成培训相关文档</text>
+      </view>
+
+      <view class="section-title">您的权利：</view>
+      <view class="info-list">
+        <text class="info-item">• 查询、更正、删除您的个人信息</text>
+        <text class="info-item">• 随时撤回授权同意</text>
+      </view>
+
+      <view class="content-text highlight">
+        <text>点击"同意"即表示您已阅读并同意上述内容。</text>
+      </view>
+    </scroll-view>
+
+    <view class="dialog-footer">
+      <button class="btn btn-secondary" bindtap="onDisagree">不同意</button>
+      <button class="btn btn-primary" bindtap="onAgree">同意</button>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,44 @@
+<!-- pages/admin/export/export.wxml -->
+<view class="container">
+  <view class="header card">
+    <view class="header-title">数据导出</view>
+    <view class="header-desc">导出学员数据为Excel文件</view>
+  </view>
+
+  <view class="filter-section card">
+    <view class="section-title">导出条件</view>
+
+    <view class="form-group">
+      <view class="form-label">状态</view>
+      <picker mode="selector" range="{{statusOptions}}" value="{{statusIndex}}" bindchange="onStatusChange">
+        <view class="picker-value">{{statusOptions[statusIndex]}}</view>
+      </picker>
+    </view>
+
+    <view class="form-group">
+      <view class="form-label">培训类型</view>
+      <picker mode="selector" range="{{trainingTypeOptions}}" value="{{trainingTypeIndex}}" bindchange="onTrainingTypeChange">
+        <view class="picker-value">{{trainingTypeOptions[trainingTypeIndex]}}</view>
+      </picker>
+    </view>
+
+    <view class="form-group">
+      <view class="form-label">公司</view>
+      <picker mode="selector" range="{{companies}}" value="{{companyIndex}}" bindchange="onCompanyChange">
+        <view class="picker-value">{{companies[companyIndex]}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <view class="info-section card">
+    <view class="info-item">
+      <text class="info-label">预计导出数量：</text>
+      <text class="info-value">{{estimatedCount}} 条</text>
+    </view>
+    <view class="info-hint">最多导出1000条记录</view>
+  </view>
+
+  <view class="actions">
+    <button class="btn btn-primary" bindtap="onExport">导出Excel</button>
+  </view>
+</view>

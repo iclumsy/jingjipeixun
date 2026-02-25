@@ -1,0 +1,326 @@
+// pages/user/submit/submit.js
+const api = require('../../../utils/api')
+const { validateStudent } = require('../../../utils/validators')
+const { EDUCATION_OPTIONS } = require('../../../utils/constants')
+
+Page({
+  data: {
+    editMode: false,
+    studentId: '',
+    trainingType: 'special_operation',
+    educationOptions: EDUCATION_OPTIONS,
+    jobCategories: {},
+    jobCategoryNames: [],
+    student: {
+      name: '',
+      gender: '男',
+      education: '',
+      educationIndex: -1,
+      school: '',
+      major: '',
+      id_card: '',
+      phone: '',
+      company: '',
+      company_address: '',
+      job_category: '',
+      jobCategoryIndex: -1,
+      exam_project: '',
+      examProjectIndex: -1,
+      project_code: '',
+      examProjects: [],
+      files: {}
+    }
+  },
+
+  onLoad(options) {
+    if (options.id) {
+      // 编辑模式
+      this.setData({
+        editMode: true,
+        studentId: options.id
+      })
+    }
+    this.loadJobCategories()
+  },
+
+  onShow() {
+    // 更新 TabBar 选中状态
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({
+        selected: 0
+      })
+    }
+  },
+
+  async loadJobCategories() {
+    try {
+      const db = wx.cloud.database()
+      const res = await db.collection('config').doc('job_categories').get()
+
+      if (res.data && res.data.data) {
+        this.setData({
+          jobCategories: res.data.data
+        })
+        this.updateJobCategoryNames()
+
+        // 如果是编辑模式，加载学员数据
+        if (this.data.editMode) {
+          await this.loadStudentData()
+        }
+      }
+    } catch (err) {
+      console.error('加载作业类别失败:', err)
+      wx.showToast({
+        title: '加载配置失败',
+        icon: 'none'
+      })
+    }
+  },
+
+  async loadStudentData() {
+    try {
+      wx.showLoading({ title: '加载中...' })
+      const result = await api.getStudentDetail(this.data.studentId)
+
+      if (result.student) {
+        const student = result.student
+
+        // 设置培训类型
+        this.setData({
+          trainingType: student.training_type
+        })
+        this.updateJobCategoryNames()
+
+        // 查找作业类别索引
+        const categories = this.data.jobCategories[student.training_type]
+        let jobCategoryIndex = -1
+        let examProjects = []
+        let examProjectIndex = -1
+
+        if (categories && categories.job_categories) {
+          jobCategoryIndex = categories.job_categories.findIndex(c => c.name === student.job_category)
+
+          if (jobCategoryIndex >= 0) {
+            examProjects = categories.job_categories[jobCategoryIndex].exam_projects || []
+            examProjectIndex = examProjects.findIndex(p => p.name === student.exam_project)
+          }
+        }
+
+        // 查找学历索引
+        const educationIndex = this.data.educationOptions.indexOf(student.education)
+
+        // 设置学员数据
+        this.setData({
+          student: {
+            name: student.name,
+            gender: student.gender,
+            education: student.education,
+            educationIndex: educationIndex,
+            school: student.school || '',
+            major: student.major || '',
+            id_card: student.id_card,
+            phone: student.phone,
+            company: student.company,
+            company_address: student.company_address,
+            job_category: student.job_category,
+            jobCategoryIndex: jobCategoryIndex,
+            exam_project: student.exam_project || '',
+            examProjectIndex: examProjectIndex,
+            project_code: student.project_code || '',
+            examProjects: examProjects,
+            files: {
+              photo_path: student.photo_path,
+              diploma_path: student.diploma_path,
+              id_card_front_path: student.id_card_front_path,
+              id_card_back_path: student.id_card_back_path,
+              hukou_residence_path: student.hukou_residence_path,
+              hukou_personal_path: student.hukou_personal_path
+            }
+          }
+        })
+      }
+
+      wx.hideLoading()
+    } catch (err) {
+      wx.hideLoading()
+      console.error('加载学员数据失败:', err)
+      wx.showToast({
+        title: '加载失败',
+        icon: 'none'
+      })
+    }
+  },
+
+  updateJobCategoryNames() {
+    const categories = this.data.jobCategories[this.data.trainingType]
+    if (categories && categories.job_categories) {
+      const names = categories.job_categories.map(c => c.name)
+      this.setData({
+        jobCategoryNames: names
+      })
+    }
+  },
+
+  // 选择培训类型
+  selectTrainingType(e) {
+    const type = e.currentTarget.dataset.type
+    this.setData({
+      trainingType: type
+    })
+    this.updateJobCategoryNames()
+  },
+
+  // 选择性别
+  selectGender(e) {
+    const gender = e.currentTarget.dataset.gender
+    this.setData({
+      'student.gender': gender
+    })
+  },
+
+  // 输入框变化
+  onInputChange(e) {
+    const { field } = e.currentTarget.dataset
+    const value = e.detail.value
+    this.setData({
+      [`student.${field}`]: value
+    })
+  },
+
+  // 选择器变化
+  onPickerChange(e) {
+    const { field } = e.currentTarget.dataset
+    const pickerIndex = parseInt(e.detail.value)
+
+    if (field === 'education') {
+      this.setData({
+        'student.education': this.data.educationOptions[pickerIndex],
+        'student.educationIndex': pickerIndex
+      })
+    }
+  },
+
+  // 作业类别变化
+  onJobCategoryChange(e) {
+    const categoryIndex = parseInt(e.detail.value)
+    const categories = this.data.jobCategories[this.data.trainingType]
+
+    if (categories && categories.job_categories) {
+      const category = categories.job_categories[categoryIndex]
+      const examProjects = category.exam_projects || []
+
+      // 如果只有一个操作项目,自动选中
+      if (examProjects.length === 1) {
+        this.setData({
+          'student.job_category': category.name,
+          'student.jobCategoryIndex': categoryIndex,
+          'student.examProjects': examProjects,
+          'student.exam_project': examProjects[0].name,
+          'student.examProjectIndex': 0,
+          'student.project_code': examProjects[0].code
+        })
+      } else {
+        this.setData({
+          'student.job_category': category.name,
+          'student.jobCategoryIndex': categoryIndex,
+          'student.examProjects': examProjects,
+          'student.exam_project': '',
+          'student.examProjectIndex': -1,
+          'student.project_code': ''
+        })
+      }
+    }
+  },
+
+  // 操作项目变化
+  onExamProjectChange(e) {
+    const projectIndex = parseInt(e.detail.value)
+    const project = this.data.student.examProjects[projectIndex]
+
+    if (project) {
+      this.setData({
+        'student.exam_project': project.name,
+        'student.examProjectIndex': projectIndex,
+        'student.project_code': project.code
+      })
+    }
+  },
+
+  // 文件上传成功
+  onFileUploaded(e) {
+    const { fileType, cloudPath } = e.detail
+    this.setData({
+      [`student.files.${fileType}`]: cloudPath
+    })
+  },
+
+  // 文件删除
+  onFileDeleted(e) {
+    const { fileType } = e.detail
+    const files = { ...this.data.student.files }
+    delete files[fileType]
+    this.setData({
+      'student.files': files
+    })
+  },
+
+  // 提交表单
+  async submitForm() {
+    // 验证数据
+    const validation = validateStudent(this.data.student, this.data.trainingType)
+
+    if (!validation.valid) {
+      const errorMsg = Object.values(validation.errors)[0]
+      wx.showModal({
+        title: '信息不完整',
+        content: errorMsg,
+        showCancel: false
+      })
+      return
+    }
+
+    wx.showLoading({ title: this.data.editMode ? '更新中...' : '提交中...' })
+
+    try {
+      let result
+
+      if (this.data.editMode) {
+        // 编辑模式：更新现有记录
+        result = await api.updateStudent(this.data.studentId, {
+          ...this.data.student,
+          training_type: this.data.trainingType,
+          status: 'unreviewed' // 重新提交后状态改为未审核
+        })
+      } else {
+        // 新建模式：创建新记录
+        result = await api.submitStudent([this.data.student], this.data.trainingType)
+      }
+
+      wx.hideLoading()
+
+      if (result.success) {
+        wx.showModal({
+          title: this.data.editMode ? '更新成功' : '提交成功',
+          content: this.data.editMode ? '学员信息已更新,等待重新审核' : '学员信息已提交,等待审核',
+          showCancel: false,
+          success: () => {
+            // 跳转到列表页
+            wx.switchTab({
+              url: '/pages/user/list/list'
+            })
+          }
+        })
+      } else {
+        throw new Error(result.message || (this.data.editMode ? '更新失败' : '提交失败'))
+      }
+    } catch (err) {
+      wx.hideLoading()
+      console.error(this.data.editMode ? '更新失败:' : '提交失败:', err)
+      wx.showModal({
+        title: this.data.editMode ? '更新失败' : '提交失败',
+        content: err.message || '请检查网络连接后重试',
+        showCancel: false
+      })
+    }
+  }
+})

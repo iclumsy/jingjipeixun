@@ -1,0 +1,191 @@
+<!-- pages/privacy/privacy.wxml -->
+<view class="container">
+  <view class="privacy-content">
+    <view class="title">隐私政策</view>
+
+    <view class="update-time">更新日期：2026年2月25日</view>
+    <view class="effective-time">生效日期：2026年2月25日</view>
+
+    <view class="section">
+      <view class="section-title">引言</view>
+      <text class="section-text">
+        欢迎使用培训管理系统小程序（以下简称"本小程序"）。我们非常重视用户的隐私保护和个人信息安全。本隐私政策将帮助您了解我们如何收集、使用、存储和保护您的个人信息。
+      </text>
+    </view>
+
+    <view class="section">
+      <view class="section-title">一、我们收集的信息</view>
+
+      <view class="subsection">
+        <view class="subsection-title">1.1 您主动提供的信息</view>
+        <text class="section-text">
+          当您使用本小程序提交学员信息时，我们会收集以下信息：
+        </text>
+        <view class="list">
+          <text class="list-item">• 学员基本信息：姓名、性别、文化程度、毕业学校、所学专业</text>
+          <text class="list-item">• 身份信息：身份证号码</text>
+          <text class="list-item">• 联系方式：手机号码</text>
+          <text class="list-item">• 单位信息：单位名称、单位地址</text>
+          <text class="list-item">• 培训信息：培训类型、作业类别、操作项目</text>
+          <text class="list-item">• 证件照片：个人照片、学历证书、身份证正反面照片、户口本照片</text>
+        </view>
+      </view>
+
+      <view class="subsection">
+        <view class="subsection-title">1.2 自动收集的信息</view>
+        <text class="section-text">
+          为了提供服务，我们会自动收集以下信息：
+        </text>
+        <view class="list">
+          <text class="list-item">• 微信OpenID：用于识别用户身份</text>
+          <text class="list-item">• 提交时间：记录信息提交的时间</text>
+          <text class="list-item">• 设备信息：用于优化用户体验</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">二、信息的使用目的</view>
+      <text class="section-text">
+        我们收集和使用您的个人信息仅用于以下目的：
+      </text>
+      <view class="list">
+        <text class="list-item">• 提供培训管理服务：处理学员信息采集和审核</text>
+        <text class="list-item">• 身份验证：确认学员身份信息的真实性</text>
+        <text class="list-item">• 生成培训相关文档：如体检表等</text>
+        <text class="list-item">• 数据统计和分析：优化服务质量</text>
+        <text class="list-item">• 履行法律义务：配合监管部门的要求</text>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">三、信息的存储</view>
+
+      <view class="subsection">
+        <view class="subsection-title">3.1 存储位置</view>
+        <text class="section-text">
+          您的个人信息存储在微信云开发平台的云数据库和云存储中，数据中心位于中国境内。
+        </text>
+      </view>
+
+      <view class="subsection">
+        <view class="subsection-title">3.2 存储期限</view>
+        <text class="section-text">
+          我们会在实现信息收集目的所必需的期限内保留您的个人信息：
+        </text>
+        <view class="list">
+          <text class="list-item">• 学员信息：自提交之日起保存3年</text>
+          <text class="list-item">• 附件文件：自上传之日起保存3年</text>
+          <text class="list-item">• 临时文件（导出的Excel、ZIP等）：保存7天后自动删除</text>
+        </view>
+        <text class="section-text">
+          超过保存期限后，我们将删除或匿名化处理您的个人信息。
+        </text>
+      </view>
+
+      <view class="subsection">
+        <view class="subsection-title">3.3 安全措施</view>
+        <text class="section-text">
+          我们采取以下安全措施保护您的个人信息：
+        </text>
+        <view class="list">
+          <text class="list-item">• 数据加密：使用HTTPS加密传输</text>
+          <text class="list-item">• 访问控制：仅授权人员可访问</text>
+          <text class="list-item">• 权限管理：严格的数据库权限控制</text>
+          <text class="list-item">• 定期备份：防止数据丢失</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">四、信息的共享和披露</view>
+      <text class="section-text">
+        我们不会向第三方出售、出租或共享您的个人信息，除非：
+      </text>
+      <view class="list">
+        <text class="list-item">• 获得您的明确同意</text>
+        <text class="list-item">• 根据法律法规的要求</text>
+        <text class="list-item">• 应政府部门、司法机关的要求</text>
+        <text class="list-item">• 为维护本小程序的合法权益</text>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">五、您的权利</view>
+      <text class="section-text">
+        您对自己的个人信息享有以下权利：
+      </text>
+
+      <view class="subsection">
+        <view class="subsection-title">5.1 查询权</view>
+        <text class="section-text">
+          您可以在"我的提交"页面查看您提交的所有学员信息。
+        </text>
+      </view>
+
+      <view class="subsection">
+        <view class="subsection-title">5.2 更正权</view>
+        <text class="section-text">
+          如发现信息有误，您可以联系管理员进行更正。
+        </text>
+      </view>
+
+      <view class="subsection">
+        <view class="subsection-title">5.3 删除权</view>
+        <text class="section-text">
+          您可以通过以下方式删除您的个人信息：
+        </text>
+        <view class="list">
+          <text class="list-item">• 联系管理员删除特定学员信息</text>
+          <text class="list-item">• 联系我们删除您的所有信息</text>
+        </view>
+        <text class="section-text">
+          删除后，我们将在30天内从系统中彻底删除您的信息（法律要求保留的除外）。
+        </text>
+      </view>
+
+      <view class="subsection">
+        <view class="subsection-title">5.4 撤回同意权</view>
+        <text class="section-text">
+          您可以随时撤回对本隐私政策的同意。撤回同意后，我们将停止处理您的个人信息，但不影响撤回前的信息处理。
+        </text>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">六、未成年人保护</view>
+      <text class="section-text">
+        我们非常重视未成年人的个人信息保护。如果您是未成年人，请在监护人的陪同下阅读本政策，并在监护人同意的情况下使用本小程序。
+      </text>
+    </view>
+
+    <view class="section">
+      <view class="section-title">七、隐私政策的更新</view>
+      <text class="section-text">
+        我们可能会适时修订本隐私政策。当隐私政策发生重大变更时，我们会通过小程序通知或其他方式告知您。未经您明确同意，我们不会削减您按照本隐私政策所应享有的权利。
+      </text>
+    </view>
+
+    <view class="section">
+      <view class="section-title">八、联系我们</view>
+      <text class="section-text">
+        如果您对本隐私政策有任何疑问、意见或建议，或需要行使您的权利，请通过以下方式联系我们：
+      </text>
+      <view class="contact-info">
+        <text class="contact-item">联系电话：[您的联系电话]</text>
+        <text class="contact-item">电子邮箱：[您的邮箱]</text>
+        <text class="contact-item">联系地址：[您的地址]</text>
+      </view>
+      <text class="section-text">
+        我们将在15个工作日内回复您的请求。
+      </text>
+    </view>
+
+    <view class="section">
+      <view class="section-title">九、其他</view>
+      <text class="section-text">
+        本隐私政策的解释权归本小程序所有。如果本隐私政策的任何条款被认定为无效或不可执行，该条款应在最小必要范围内进行调整，其余条款继续有效。
+      </text>
+    </view>
+  </view>
+</view>

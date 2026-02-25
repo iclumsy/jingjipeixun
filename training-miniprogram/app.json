@@ -1,0 +1,44 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/user/submit/submit",
+    "pages/user/list/list",
+    "pages/user/detail/detail",
+    "pages/admin/review/review",
+    "pages/admin/detail/detail",
+    "pages/admin/batch/batch",
+    "pages/admin/export/export",
+    "pages/privacy/privacy"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#6366f1",
+    "navigationBarTitleText": "培训管理系统",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f5f5f5"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#999999",
+    "selectedColor": "#667eea",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/user/submit/submit",
+        "text": "信息采集"
+      },
+      {
+        "pagePath": "pages/user/list/list",
+        "text": "我的提交"
+      },
+      {
+        "pagePath": "pages/admin/review/review",
+        "text": "审核管理"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

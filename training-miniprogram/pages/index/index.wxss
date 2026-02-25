@@ -1,0 +1,14 @@
+.loading {
+  text-align: center;
+  padding: 200rpx 0;
+}
+
+.loading-icon {
+  font-size: 96rpx;
+  margin-bottom: 32rpx;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: var(--text-light);
+}

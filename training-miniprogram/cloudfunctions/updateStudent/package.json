@@ -1,0 +1,9 @@
+{
+  "name": "updateStudent",
+  "version": "1.0.0",
+  "description": "更新学员信息云函数",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

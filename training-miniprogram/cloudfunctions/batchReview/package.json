@@ -1,0 +1,9 @@
+{
+  "name": "batchReview",
+  "version": "1.0.0",
+  "description": "批量审核云函数",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

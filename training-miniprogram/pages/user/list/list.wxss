@@ -1,0 +1,12 @@
+/* pages/user/list/list.wxss */
+.student-list {
+  min-height: 400rpx;
+}
+
+.loading,
+.no-more {
+  text-align: center;
+  padding: 48rpx;
+  color: var(--text-light);
+  font-size: 28rpx;
+}

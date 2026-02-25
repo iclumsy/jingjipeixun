@@ -1,0 +1,51 @@
+<!-- pages/admin/batch/batch.wxml -->
+<view class="container">
+  <view class="header card">
+    <view class="header-title">批量操作</view>
+    <view class="header-desc">选择学员进行批量审核或删除</view>
+  </view>
+
+  <view class="filter-section card">
+    <view class="section-title">筛选条件</view>
+    <view class="filter-row">
+      <picker mode="selector" range="{{statusOptions}}" value="{{statusIndex}}" bindchange="onStatusChange">
+        <view class="picker-value">状态：{{statusOptions[statusIndex]}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <view class="student-list">
+    <view class="list-header">
+      <checkbox-group bindchange="onSelectAll">
+        <label>
+          <checkbox value="all" checked="{{allSelected}}" />
+          <text>全选</text>
+        </label>
+      </checkbox-group>
+      <text class="selected-count">已选择 {{selectedCount}} 人</text>
+    </view>
+
+    <checkbox-group bindchange="onStudentSelect">
+      <block wx:for="{{students}}" wx:key="_id">
+        <view class="student-item">
+          <checkbox value="{{item._id}}" checked="{{item.selected}}" />
+          <view class="student-info">
+            <view class="student-name">{{item.name}}</view>
+            <view class="student-detail">{{item.id_card}} | {{item.company}}</view>
+          </view>
+          <view class="status-badge badge-{{item.status}}">{{item.statusText}}</view>
+        </view>
+      </block>
+    </checkbox-group>
+
+    <view class="empty" wx:if="{{students.length === 0}}">
+      <view class="empty-icon">📋</view>
+      <view class="empty-text">暂无学员</view>
+    </view>
+  </view>
+
+  <view class="actions" wx:if="{{selectedCount > 0}}">
+    <button class="btn btn-success" bindtap="onBatchApprove">批量通过</button>
+    <button class="btn btn-danger" bindtap="onBatchReject">批量驳回</button>
+  </view>
+</view>

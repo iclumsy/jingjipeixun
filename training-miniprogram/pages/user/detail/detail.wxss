@@ -1,0 +1,144 @@
+/* pages/user/detail/detail.wxss */
+.status-banner {
+  display: flex;
+  align-items: center;
+  padding: 32rpx;
+  border-radius: var(--radius-lg);
+  margin-bottom: 32rpx;
+}
+
+.status-unreviewed {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+}
+
+.status-reviewed {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+}
+
+.status-rejected {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+}
+
+.status-icon {
+  font-size: 64rpx;
+  margin-right: 24rpx;
+}
+
+.status-info {
+  flex: 1;
+}
+
+.status-text {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8rpx;
+}
+
+.status-hint {
+  display: block;
+  font-size: 24rpx;
+  color: var(--text-secondary);
+}
+
+.section {
+  margin-bottom: 48rpx;
+}
+
+.section:last-child {
+  margin-bottom: 0;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 32rpx;
+  padding-left: 16rpx;
+  border-left: 6rpx solid var(--primary-color);
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 32rpx;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.info-label {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  margin-bottom: 8rpx;
+}
+
+.info-value {
+  font-size: 28rpx;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.attachments-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24rpx;
+}
+
+.attachment-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-color: var(--bg-gray);
+}
+
+.attachment-image {
+  width: 100%;
+  height: 300rpx;
+  display: block;
+}
+
+.attachment-label {
+  width: 100%;
+  padding: 16rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.loading {
+  text-align: center;
+  padding: 200rpx 0;
+  color: var(--text-light);
+}
+
+.action-section {
+  margin-top: 48rpx;
+  padding-top: 48rpx;
+  border-top: 2rpx solid var(--border-color);
+}
+
+.edit-btn {
+  width: 100%;
+  height: 88rpx;
+  background: linear-gradient(135deg, var(--primary-color) 0%, #667eea 100%);
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.edit-btn::after {
+  border: none;
+}

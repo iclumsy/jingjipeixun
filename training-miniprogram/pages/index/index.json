@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "培训管理系统",
+  "usingComponents": {
+    "privacy-agreement": "/components/privacy-agreement/privacy-agreement"
+  }
+}

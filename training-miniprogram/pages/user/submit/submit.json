@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "信息采集",
+  "usingComponents": {
+    "file-uploader": "/components/file-uploader/file-uploader"
+  }
+}

@@ -1,0 +1,69 @@
+/* pages/admin/export/export.wxss */
+.header {
+  margin-bottom: 24rpx;
+}
+
+.header-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8rpx;
+}
+
+.header-desc {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+}
+
+.filter-section {
+  margin-bottom: 24rpx;
+}
+
+.section-title {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 24rpx;
+}
+
+.picker-value {
+  padding: 16rpx 24rpx;
+  border: 2rpx solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 28rpx;
+  background-color: var(--bg-white);
+}
+
+.info-section {
+  margin-bottom: 24rpx;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.info-label {
+  font-size: 28rpx;
+  color: var(--text-secondary);
+}
+
+.info-value {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.info-hint {
+  font-size: 24rpx;
+  color: var(--text-light);
+}
+
+.actions {
+  padding: 24rpx 0;
+}
+
+.actions .btn {
+  width: 100%;
+}

@@ -1,0 +1,10 @@
+<view class="container">
+  <!-- 隐私协议弹窗 -->
+  <privacy-agreement show="{{showPrivacyAgreement}}" bind:agree="onPrivacyAgree" />
+
+  <!-- 加载状态 -->
+  <view class="loading" wx:if="{{loading && !showPrivacyAgreement}}">
+    <view class="loading-icon">⏳</view>
+    <view class="loading-text">加载中...</view>
+  </view>
+</view>

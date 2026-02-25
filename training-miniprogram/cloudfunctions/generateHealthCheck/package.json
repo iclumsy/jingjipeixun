@@ -1,0 +1,11 @@
+{
+  "name": "generateHealthCheck",
+  "version": "1.0.0",
+  "description": "生成体检表云函数",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest",
+    "docxtemplater": "^3.37.0",
+    "pizzip": "^3.1.4"
+  }
+}
