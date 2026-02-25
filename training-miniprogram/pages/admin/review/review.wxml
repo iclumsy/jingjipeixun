@@ -6,7 +6,7 @@
         <view
           wx:for="{{statusFilters}}"
           wx:key="value"
-          class="chip {{filters.status === item.value ? 'active' : ''}}"
+          class="filter-chip {{filters.status === item.value ? 'active' : ''}}"
           bindtap="onStatusFilterTap"
           data-value="{{item.value}}"
         >
@@ -21,7 +21,7 @@
         <view
           wx:for="{{trainingTypeFilters}}"
           wx:key="value"
-          class="chip {{filters.training_type === item.value ? 'active' : ''}}"
+          class="filter-chip {{filters.training_type === item.value ? 'active' : ''}}"
           bindtap="onTrainingTypeFilterTap"
           data-value="{{item.value}}"
         >
@@ -42,18 +42,37 @@
     <view
       wx:for="{{records}}"
       wx:key="_id"
-      class="record-card card"
+      class="record-card"
       bindtap="openDetail"
       data-id="{{item._id}}"
     >
-      <view class="record-header">
-        <view class="submitter">提交人：{{item.name || '-'}}</view>
-        <view class="status-tag status-{{item.status}}">{{item.statusText}}</view>
+      <view class="card-top">
+        <view class="name-wrap">
+          <view class="student-name">{{item.name || '-'}}</view>
+          <view class="time-mini">{{item.submitTimeText}}</view>
+        </view>
+        <view class="status-badge badge-{{item.status}}">{{item.statusText}}</view>
       </view>
 
-      <view class="record-meta">培训类型：{{item.trainingTypeText}}</view>
-      <view class="record-meta">公司：{{item.company || '-'}}</view>
-      <view class="record-meta">提交时间：{{item.submitTimeText}}</view>
+      <view class="meta-chips">
+        <view class="meta-chip">{{item.trainingTypeText}}</view>
+        <view class="meta-chip">{{item.job_category || '-'}}</view>
+      </view>
+
+      <view class="info-list">
+        <view class="info-line">
+          <text class="info-label">单位</text>
+          <text class="info-value">{{item.company || '-'}}</text>
+        </view>
+        <view class="info-line">
+          <text class="info-label">证件</text>
+          <text class="info-value">{{item.id_card || '-'}}</text>
+        </view>
+        <view class="info-line">
+          <text class="info-label">手机</text>
+          <text class="info-value">{{item.phone || '-'}}</text>
+        </view>
+      </view>
 
       <view class="record-actions">
         <button

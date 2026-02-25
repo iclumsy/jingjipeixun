@@ -26,6 +26,8 @@ App({
       this.globalData.userInfo = result
       this.globalData.isAdmin = result.isAdmin
       this.globalData.openid = result.openid
+      wx.setStorageSync('is_admin', !!result.isAdmin)
+      wx.setStorageSync('openid', result.openid || '')
 
       wx.hideLoading()
       console.log('登录成功', result)

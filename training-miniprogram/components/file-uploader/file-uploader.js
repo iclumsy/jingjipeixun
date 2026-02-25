@@ -1,6 +1,26 @@
 // components/file-uploader/file-uploader.js
 const { validateFileSize, validateFileType } = require('../../utils/validators')
 const { MAX_FILE_SIZE } = require('../../utils/constants')
+const TEMP_URL_CACHE_TTL_MS = 45 * 60 * 1000
+const tempUrlCache = new Map()
+
+function readTempUrlCache(fileID) {
+  const cached = tempUrlCache.get(fileID)
+  if (!cached) return ''
+  if (cached.expireAt <= Date.now()) {
+    tempUrlCache.delete(fileID)
+    return ''
+  }
+  return cached.url
+}
+
+function writeTempUrlCache(fileID, url) {
+  if (!fileID || !url) return
+  tempUrlCache.set(fileID, {
+    url,
+    expireAt: Date.now() + TEMP_URL_CACHE_TTL_MS
+  })
+}
 
 Component({
   properties: {
@@ -27,11 +47,21 @@ Component({
         if (newVal) {
           // 如果是云存储路径，获取临时下载链接
           if (newVal.startsWith('cloud://')) {
+            const cachedUrl = readTempUrlCache(newVal)
+            if (cachedUrl) {
+              this.setData({
+                fileUrl: cachedUrl,
+                cloudPath: newVal
+              })
+              return
+            }
+
             try {
               const res = await wx.cloud.getTempFileURL({
                 fileList: [newVal]
               })
               if (res.fileList && res.fileList.length > 0) {
+                writeTempUrlCache(newVal, res.fileList[0].tempFileURL)
                 this.setData({
                   fileUrl: res.fileList[0].tempFileURL,
                   cloudPath: newVal

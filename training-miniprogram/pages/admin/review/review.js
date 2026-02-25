@@ -62,7 +62,8 @@ Page({
   },
 
   async onLoad() {
-    await this.refreshAll()
+    await this.refreshAll(true)
+    this._skipRefreshOnShow = true
     this.setData({ initialized: true })
   },
 
@@ -71,12 +72,16 @@ Page({
       this.getTabBar().setData({ selected: 2 })
     }
     if (this.data.initialized) {
+      if (this._skipRefreshOnShow) {
+        this._skipRefreshOnShow = false
+        return
+      }
       await this.loadRecords(true)
     }
   },
 
   onPullDownRefresh() {
-    this.refreshAll()
+    this.refreshAll(true)
   },
 
   onReachBottom() {
@@ -85,12 +90,17 @@ Page({
     }
   },
 
-  async refreshAll() {
-    await this.loadCompanies()
+  async refreshAll(forceCompanyReload = false) {
+    await this.loadCompanies(forceCompanyReload)
     await this.loadRecords(true)
   },
 
-  async loadCompanies() {
+  async loadCompanies(forceReload = false) {
+    const filterKey = `${this.data.filters.status}|${this.data.filters.training_type}`
+    if (!forceReload && this._companyFilterKey === filterKey && this.data.companyOptions.length > 0) {
+      return
+    }
+
     try {
       const result = await api.getCompanies({
         status: this.data.filters.status,
@@ -106,6 +116,7 @@ Page({
         companyIndex: nextIndex,
         'filters.company': nextIndex === 0 ? '' : companies[nextIndex]
       })
+      this._companyFilterKey = filterKey
     } catch (err) {
       console.error('加载公司筛选失败:', err)
       this.setData({
@@ -162,7 +173,7 @@ Page({
       'filters.status': value,
       page: 1
     })
-    await this.refreshAll()
+    await this.refreshAll(true)
   },
 
   async onTrainingTypeFilterTap(e) {
@@ -173,7 +184,7 @@ Page({
       'filters.training_type': value,
       page: 1
     })
-    await this.refreshAll()
+    await this.refreshAll(true)
   },
 
   async onCompanyChange(e) {
@@ -246,7 +257,7 @@ Page({
       await api.deleteStudent(id)
       wx.hideLoading()
       wx.showToast({ title: '已删除', icon: 'success' })
-      await this.refreshAll()
+      await this.loadRecords(true)
     } catch (err) {
       wx.hideLoading()
       wx.showToast({ title: err.message || '删除失败', icon: 'none' })
@@ -270,7 +281,7 @@ Page({
       await api.reviewStudent(id, 'approve')
       wx.hideLoading()
       wx.showToast({ title: '已通过', icon: 'success' })
-      await this.refreshAll()
+      await this.loadRecords(true)
     } catch (err) {
       wx.hideLoading()
       wx.showToast({ title: err.message || '操作失败', icon: 'none' })
@@ -294,7 +305,7 @@ Page({
       await api.reviewStudent(id, 'reject')
       wx.hideLoading()
       wx.showToast({ title: '已驳回', icon: 'success' })
-      await this.refreshAll()
+      await this.loadRecords(true)
     } catch (err) {
       wx.hideLoading()
       wx.showToast({ title: err.message || '操作失败', icon: 'none' })

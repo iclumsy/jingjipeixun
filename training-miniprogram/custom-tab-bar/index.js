@@ -10,10 +10,32 @@ Component({
     this.updateTabBar()
   },
 
+  pageLifetimes: {
+    show() {
+      this.updateTabBar()
+    }
+  },
+
   methods: {
+    getCurrentRoute() {
+      const pages = getCurrentPages()
+      if (!pages || pages.length === 0) return ''
+      const current = pages[pages.length - 1]
+      return current && current.route ? `/${current.route}` : ''
+    },
+
+    getSelectedIndex(list, route) {
+      const index = list.findIndex(item => item.pagePath === route)
+      return index >= 0 ? index : 0
+    },
+
     updateTabBar() {
       const app = getApp()
-      const isAdmin = app.globalData.isAdmin
+      const currentRoute = this.getCurrentRoute()
+      const isAdminFromGlobal = !!(app && app.globalData && app.globalData.isAdmin)
+      const isAdminFromStorage = wx.getStorageSync('is_admin') === true
+      const isAdminPage = currentRoute.indexOf('/pages/admin/') === 0
+      const isAdmin = isAdminFromGlobal || isAdminFromStorage || isAdminPage
 
       // 根据用户角色动态设置 TabBar
       const allTabs = [
@@ -36,8 +58,9 @@ Component({
 
       // 非管理员只显示前两个标签
       const list = isAdmin ? allTabs : allTabs.slice(0, 2)
+      const selected = this.getSelectedIndex(list, currentRoute)
 
-      this.setData({ list })
+      this.setData({ list, selected })
     },
 
     switchTab(e) {

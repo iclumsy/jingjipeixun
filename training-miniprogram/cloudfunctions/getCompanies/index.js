@@ -6,6 +6,31 @@ cloud.init({
 })
 
 const db = cloud.database()
+const ADMIN_CACHE_TTL_MS = 60 * 1000
+const adminCache = new Map()
+
+async function isActiveAdmin(openid) {
+  const now = Date.now()
+  const cached = adminCache.get(openid)
+  if (cached && cached.expireAt > now) {
+    return cached.value
+  }
+
+  const adminResult = await db.collection('admins')
+    .where({
+      openid,
+      is_active: true
+    })
+    .limit(1)
+    .get()
+
+  const value = adminResult.data.length > 0
+  adminCache.set(openid, {
+    value,
+    expireAt: now + ADMIN_CACHE_TTL_MS
+  })
+  return value
+}
 
 /**
  * 获取公司列表云函数
@@ -28,14 +53,7 @@ exports.main = async (event, context) => {
     }
 
     // 查询管理员权限
-    const adminResult = await db.collection('admins')
-      .where({
-        openid: wxContext.OPENID,
-        is_active: true
-      })
-      .get()
-
-    const isAdmin = adminResult.data.length > 0
+    const isAdmin = await isActiveAdmin(wxContext.OPENID)
 
     // 非管理员只返回自己提交记录里的公司
     if (!isAdmin) {

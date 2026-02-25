@@ -9,6 +9,10 @@ const {
 } = require('../../../utils/validators')
 const { EDUCATION_OPTIONS } = require('../../../utils/constants')
 const EDIT_STUDENT_ID_KEY = 'submit_edit_student_id'
+const JOB_CATEGORIES_CACHE_KEY = 'job_categories_cache_v1'
+const JOB_CATEGORIES_CACHE_TTL_MS = 5 * 60 * 1000
+let memoryJobCategories = null
+let memoryJobCategoriesAt = 0
 
 function createEmptyStudent() {
   return {
@@ -30,6 +34,38 @@ function createEmptyStudent() {
     examProjects: [],
     files: {}
   }
+}
+
+function readCachedJobCategories() {
+  const now = Date.now()
+  if (memoryJobCategories && now - memoryJobCategoriesAt < JOB_CATEGORIES_CACHE_TTL_MS) {
+    return memoryJobCategories
+  }
+
+  const cached = wx.getStorageSync(JOB_CATEGORIES_CACHE_KEY)
+  if (!cached || !cached.data || !cached.updatedAt) {
+    return null
+  }
+  if (now - Number(cached.updatedAt) >= JOB_CATEGORIES_CACHE_TTL_MS) {
+    return null
+  }
+
+  memoryJobCategories = cached.data
+  memoryJobCategoriesAt = Number(cached.updatedAt)
+  return memoryJobCategories
+}
+
+function writeCachedJobCategories(data) {
+  if (!data || typeof data !== 'object') {
+    return
+  }
+  const updatedAt = Date.now()
+  memoryJobCategories = data
+  memoryJobCategoriesAt = updatedAt
+  wx.setStorageSync(JOB_CATEGORIES_CACHE_KEY, {
+    data,
+    updatedAt
+  })
 }
 
 Page({
@@ -119,10 +155,23 @@ Page({
 
   async loadJobCategories() {
     try {
+      const cachedCategories = readCachedJobCategories()
+      if (cachedCategories) {
+        this.setData({
+          jobCategories: cachedCategories
+        })
+        this.updateJobCategoryNames()
+        if (this.data.editMode) {
+          await this.loadStudentData()
+        }
+        return
+      }
+
       const db = wx.cloud.database()
       const res = await db.collection('config').doc('job_categories').get()
 
       if (res.data && res.data.data) {
+        writeCachedJobCategories(res.data.data)
         this.setData({
           jobCategories: res.data.data
         })

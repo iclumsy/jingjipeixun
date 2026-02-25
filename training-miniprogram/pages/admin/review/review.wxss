@@ -1,5 +1,7 @@
 .page {
   padding: 24rpx;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f4f7fb 0%, #ffffff 35%);
 }
 
 .filter-card {
@@ -27,7 +29,7 @@
   gap: 10rpx;
 }
 
-.chip {
+.filter-chip {
   font-size: 24rpx;
   color: var(--text-secondary);
   border: 2rpx solid #d8deea;
@@ -36,7 +38,7 @@
   padding: 10rpx 20rpx;
 }
 
-.chip.active {
+.filter-chip.active {
   color: #ffffff;
   border-color: #3558d8;
   background: linear-gradient(135deg, #3558d8 0%, #4d6ef2 100%);
@@ -59,48 +61,110 @@
 }
 
 .record-card {
-  margin-bottom: 16rpx;
+  background: linear-gradient(180deg, #ffffff 0%, #fafbfd 100%);
+  border-radius: 14rpx;
+  padding: 20rpx 18rpx;
+  margin-bottom: 14rpx;
+  box-shadow: 0 4rpx 14rpx rgba(30, 41, 59, 0.06);
+  border: 1rpx solid #e8edf4;
 }
 
-.record-header {
+.record-card:active {
+  transform: scale(0.99);
+}
+
+.card-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12rpx;
 }
 
-.submitter {
-  font-size: 30rpx;
-  color: var(--text-primary);
-  font-weight: 600;
+.name-wrap {
+  min-width: 0;
 }
 
-.status-tag {
-  border-radius: 24rpx;
-  padding: 6rpx 16rpx;
-  font-size: 22rpx;
+.time-mini {
+  font-size: 20rpx;
+  color: #94a3b8;
+  margin-top: 4rpx;
+}
+
+.student-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.status-badge {
+  padding: 4rpx 14rpx;
+  border-radius: 20rpx;
+  font-size: 20rpx;
   font-weight: 500;
 }
 
-.status-unreviewed {
-  background: #fff5db;
+.badge-unreviewed {
+  background-color: #fff5db;
   color: #a35b00;
 }
 
-.status-reviewed {
-  background: #e6f8ed;
+.badge-reviewed {
+  background-color: #e6f8ed;
   color: #1a7f42;
 }
 
-.status-rejected {
-  background: #feeceb;
+.badge-rejected {
+  background-color: #feeceb;
   color: #bc2a25;
 }
 
-.record-meta {
-  font-size: 24rpx;
-  color: var(--text-secondary);
-  line-height: 1.8;
+.meta-chips {
+  display: flex;
+  gap: 8rpx;
+  margin-bottom: 12rpx;
+}
+
+.meta-chip {
+  max-width: 50%;
+  padding: 4rpx 10rpx;
+  border-radius: 8rpx;
+  background: #eef2ff;
+  color: #4258a9;
+  font-size: 20rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.info-line {
+  display: flex;
+  align-items: center;
+  font-size: 23rpx;
+  line-height: 1.4;
+  min-width: 0;
+}
+
+.info-label {
+  color: #64748b;
+  width: 72rpx;
+  flex: 0 0 72rpx;
+}
+
+.info-value {
+  color: #1f2937;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: break-all;
 }
 
 .record-actions {

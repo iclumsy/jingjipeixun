@@ -38,6 +38,7 @@ Page({
         status: this.data.statusValues[this.data.statusIndex],
         training_type: this.data.trainingTypeValues[this.data.trainingTypeIndex],
         company: this.data.companyIndex === 0 ? '' : this.data.companies[this.data.companyIndex],
+        include_total: true,
         limit: 1
       }
 
