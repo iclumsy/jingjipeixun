@@ -175,6 +175,14 @@ function getCompanies(params = {}) {
 }
 
 /**
+ * 获取作业类别配置
+ * @returns {Promise}
+ */
+function getJobCategories() {
+  return callFunction('getJobCategories')
+}
+
+/**
  * 上传文件到云存储
  * @param {string} cloudPath - 云存储路径
  * @param {string} filePath - 本地文件路径
@@ -256,6 +264,7 @@ module.exports = {
   updateStudent,
   deleteStudent,
   getCompanies,
+  getJobCategories,
   uploadFile,
   downloadFile,
   getTempFileURL

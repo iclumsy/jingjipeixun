@@ -8,7 +8,7 @@ const db = cloud.database()
 const CONFIG_COLLECTION = 'config'
 const BASE_URL_CONFIG_DOC_ID = 'origin_system_sync'
 
-const DEFAULT_TIMEOUT_MS = 60000
+const DEFAULT_TIMEOUT_MS = 30000
 
 function trimSlash(value = '') {
   return String(value || '').trim().replace(/\/+$/, '')
@@ -32,23 +32,7 @@ async function getBaseUrl(event = {}) {
   }
 }
 
-function toAbsoluteUrl(baseUrl, pathValue) {
-  const raw = String(pathValue || '').trim()
-  if (!raw) return ''
-  if (/^https?:\/\//i.test(raw)) return raw
-  if (raw.startsWith('/')) return `${baseUrl}${raw}`
-  return `${baseUrl}/${raw}`
-}
-
 exports.main = async (event = {}) => {
-  const studentId = String(event.student_id || '').trim()
-  if (!studentId) {
-    return {
-      error: '参数错误',
-      message: '学员ID不能为空'
-    }
-  }
-
   const baseUrl = await getBaseUrl(event)
   if (!baseUrl) {
     return {
@@ -58,35 +42,26 @@ exports.main = async (event = {}) => {
   }
 
   try {
-    const approveResponse = await axios.post(
-      `${baseUrl}/api/students/${encodeURIComponent(studentId)}/approve`,
-      {},
-      {
-        timeout: DEFAULT_TIMEOUT_MS,
-        validateStatus: () => true
-      }
-    )
+    const response = await axios.get(`${baseUrl}/api/config/job_categories`, {
+      timeout: DEFAULT_TIMEOUT_MS,
+      validateStatus: () => true
+    })
 
-    if (approveResponse.status < 200 || approveResponse.status >= 300) {
-      const msg = approveResponse.data && (approveResponse.data.error || approveResponse.data.message)
+    if (response.status < 200 || response.status >= 300) {
+      const msg = response.data && (response.data.error || response.data.message)
       return {
-        error: '生成失败',
-        message: msg || `HTTP ${approveResponse.status}`
+        error: '查询失败',
+        message: msg || `HTTP ${response.status}`
       }
     }
-
-    const student = approveResponse.data || {}
-    const formPath = student.training_form_path || ''
 
     return {
       success: true,
-      fileID: formPath,
-      downloadUrl: formPath ? toAbsoluteUrl(baseUrl, formPath) : '',
-      message: formPath ? '体检表生成成功' : '审核通过，但未生成体检表'
+      data: response.data
     }
   } catch (err) {
     return {
-      error: '生成失败',
+      error: '查询失败',
       message: err.message || '请求网页系统失败'
     }
   }

@@ -169,13 +169,11 @@ Page({
         return
       }
 
-      const db = wx.cloud.database()
-      const res = await db.collection('config').doc('job_categories').get()
-
-      if (res.data && res.data.data) {
-        writeCachedJobCategories(res.data.data)
+      const res = await api.getJobCategories()
+      if (res && res.success && res.data) {
+        writeCachedJobCategories(res.data)
         this.setData({
-          jobCategories: res.data.data
+          jobCategories: res.data
         })
         this.updateJobCategoryNames()
 
