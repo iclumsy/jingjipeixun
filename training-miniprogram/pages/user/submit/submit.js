@@ -105,9 +105,11 @@ Page({
     }
 
     const handled = await this.handlePendingEditStudent()
-    if (!handled) {
-      this.resetToCreateMode()
+    if (handled) {
+      return
     }
+
+    // 不在 onShow 中自动重置表单，避免选择/上传附件后触发页面恢复时清空已选文件。
   },
 
   async handlePendingEditStudent() {
