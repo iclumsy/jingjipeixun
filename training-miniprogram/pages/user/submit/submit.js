@@ -9,6 +9,7 @@ const {
 } = require('../../../utils/validators')
 const { EDUCATION_OPTIONS } = require('../../../utils/constants')
 const EDIT_STUDENT_ID_KEY = 'submit_edit_student_id'
+const FORCE_CREATE_SUBMIT_KEY = 'submit_force_create_mode'
 const JOB_CATEGORIES_CACHE_KEY = 'job_categories_cache_v1'
 const JOB_CATEGORIES_CACHE_TTL_MS = 5 * 60 * 1000
 let memoryJobCategories = null
@@ -104,12 +105,27 @@ Page({
       })
     }
 
+    const forced = await this.handleForceCreateEntry()
+    if (forced) {
+      return
+    }
+
     const handled = await this.handlePendingEditStudent()
     if (handled) {
       return
     }
 
     // 不在 onShow 中自动重置表单，避免选择/上传附件后触发页面恢复时清空已选文件。
+  },
+
+  async handleForceCreateEntry() {
+    const shouldForceCreate = wx.getStorageSync(FORCE_CREATE_SUBMIT_KEY) === true
+    if (!shouldForceCreate) return false
+
+    wx.removeStorageSync(FORCE_CREATE_SUBMIT_KEY)
+    wx.removeStorageSync(EDIT_STUDENT_ID_KEY)
+    this.resetToCreateMode()
+    return true
   },
 
   async handlePendingEditStudent() {
@@ -147,6 +163,12 @@ Page({
       student: createEmptyStudent()
     })
     this.updateJobCategoryNames()
+  },
+
+  forceEnterCreateMode() {
+    wx.removeStorageSync(FORCE_CREATE_SUBMIT_KEY)
+    wx.removeStorageSync(EDIT_STUDENT_ID_KEY)
+    this.resetToCreateMode()
   },
 
   backToList() {

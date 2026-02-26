@@ -89,10 +89,25 @@ Page({
       return
     }
 
-    // 我的提交所有状态均复用信息采集页面
-    wx.setStorageSync(EDIT_STUDENT_ID_KEY, studentId)
-    wx.switchTab({
-      url: '/pages/user/submit/submit',
+    const status = (student && student.status) || detail.status || dataset.status || ''
+
+    // 仅驳回记录允许修改，其他状态只能查看
+    if (status === 'rejected') {
+      wx.setStorageSync(EDIT_STUDENT_ID_KEY, studentId)
+      wx.switchTab({
+        url: '/pages/user/submit/submit',
+        fail: () => {
+          wx.showToast({
+            title: '跳转失败，请重试',
+            icon: 'none'
+          })
+        }
+      })
+      return
+    }
+
+    wx.navigateTo({
+      url: `/pages/user/detail/detail?id=${studentId}`,
       fail: () => {
         wx.showToast({
           title: '跳转失败，请重试',

@@ -1,40 +1,48 @@
 <view class="page">
   <view class="filter-card card">
     <view class="filter-group">
-      <view class="group-title">审核状态</view>
-      <view class="chip-list">
-        <view
-          wx:for="{{statusFilters}}"
-          wx:key="value"
-          class="filter-chip {{filters.status === item.value ? 'active' : ''}}"
-          bindtap="onStatusFilterTap"
-          data-value="{{item.value}}"
-        >
-          {{item.label}}
+      <view class="filter-inline">
+        <view class="group-title">审核状态</view>
+        <view class="chip-list">
+          <view
+            wx:for="{{statusFilters}}"
+            wx:key="value"
+            class="filter-chip {{filters.status === item.value ? 'active' : ''}}"
+            bindtap="onStatusFilterTap"
+            data-value="{{item.value}}"
+          >
+            {{item.label}}
+          </view>
         </view>
       </view>
     </view>
 
     <view class="filter-group">
-      <view class="group-title">培训类型</view>
-      <view class="chip-list">
-        <view
-          wx:for="{{trainingTypeFilters}}"
-          wx:key="value"
-          class="filter-chip {{filters.training_type === item.value ? 'active' : ''}}"
-          bindtap="onTrainingTypeFilterTap"
-          data-value="{{item.value}}"
-        >
-          {{item.label}}
+      <view class="filter-inline">
+        <view class="group-title">培训类型</view>
+        <view class="chip-list">
+          <view
+            wx:for="{{trainingTypeFilters}}"
+            wx:key="value"
+            class="filter-chip {{filters.training_type === item.value ? 'active' : ''}}"
+            bindtap="onTrainingTypeFilterTap"
+            data-value="{{item.value}}"
+          >
+            {{item.label}}
+          </view>
         </view>
       </view>
     </view>
 
     <view class="filter-group">
-      <view class="group-title">公司</view>
-      <picker mode="selector" range="{{companyOptions}}" value="{{companyIndex}}" bindchange="onCompanyChange">
-        <view class="picker-value">{{companyOptions[companyIndex] || '全部'}}</view>
-      </picker>
+      <view class="filter-inline">
+        <view class="group-title">公司</view>
+        <view class="picker-wrap">
+          <picker mode="selector" range="{{companyOptions}}" value="{{companyIndex}}" bindchange="onCompanyChange">
+            <view class="picker-value">{{companyOptions[companyIndex] || '全部'}}</view>
+          </picker>
+        </view>
+      </view>
     </view>
   </view>
 
@@ -76,18 +84,6 @@
 
       <view class="record-actions">
         <button
-          class="action-btn btn-sync"
-          size="mini"
-          catchtap="onSyncTap"
-          data-id="{{item._id}}"
-        >同步网页端</button>
-        <button
-          class="action-btn btn-delete"
-          size="mini"
-          catchtap="onDeleteTap"
-          data-id="{{item._id}}"
-        >删除记录</button>
-        <button
           class="action-btn btn-approve {{item.status !== 'unreviewed' ? 'disabled' : ''}}"
           size="mini"
           catchtap="onApproveTap"
@@ -103,6 +99,12 @@
           data-status="{{item.status}}"
           disabled="{{item.status !== 'unreviewed'}}"
         >驳回</button>
+        <button
+          class="action-btn btn-delete"
+          size="mini"
+          catchtap="onDeleteTap"
+          data-id="{{item._id}}"
+        >删除</button>
       </view>
     </view>
 

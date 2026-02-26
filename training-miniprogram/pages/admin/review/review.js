@@ -2,16 +2,13 @@ const api = require('../../../utils/api')
 const { TRAINING_TYPE_LABELS } = require('../../../utils/constants')
 
 const STATUS_FILTERS = [
-  { label: '全部', value: '' },
   { label: '待审核', value: 'unreviewed' },
-  { label: '已通过', value: 'reviewed' },
-  { label: '已驳回', value: 'rejected' }
+  { label: '已通过', value: 'reviewed' }
 ]
 
 const TRAINING_TYPE_FILTERS = [
-  { label: '全部', value: '' },
-  { label: '特种作业', value: 'special_operation' },
-  { label: '特种设备', value: 'special_equipment' }
+  { label: '特种设备', value: 'special_equipment' },
+  { label: '特种作业', value: 'special_operation' }
 ]
 
 const STATUS_TEXT_MAP = {
@@ -46,8 +43,8 @@ Page({
     statusFilters: STATUS_FILTERS,
     trainingTypeFilters: TRAINING_TYPE_FILTERS,
     filters: {
-      status: '',
-      training_type: '',
+      status: 'unreviewed',
+      training_type: 'special_equipment',
       company: ''
     },
     companyOptions: ['全部'],
@@ -208,37 +205,6 @@ Page({
     wx.navigateTo({
       url: `/pages/admin/detail/detail?id=${id}`
     })
-  },
-
-  async onSyncTap(e) {
-    const { id } = e.currentTarget.dataset
-    if (!id) return
-
-    const confirmed = await this.confirmAction(
-      '同步网页端',
-      '将该记录同步到网页端系统，是否继续？'
-    )
-
-    if (!confirmed) return
-
-    wx.showLoading({ title: '同步中...' })
-    try {
-      const result = await api.syncStudent(id)
-      wx.hideLoading()
-      wx.showModal({
-        title: result.success ? '同步成功' : '同步结果',
-        content: result.message || (result.success ? '同步已完成' : '同步失败'),
-        showCancel: false
-      })
-      await this.loadRecords(true)
-    } catch (err) {
-      wx.hideLoading()
-      wx.showModal({
-        title: '同步失败',
-        content: err.message || '请稍后重试',
-        showCancel: false
-      })
-    }
   },
 
   async onDeleteTap(e) {

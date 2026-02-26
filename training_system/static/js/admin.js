@@ -33,6 +33,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function buildStatusQueryParam(status) {
+        return status === 'unreviewed' ? 'pending' : status;
+    }
+
+    function getStatusMeta(status) {
+        if (status === 'reviewed') {
+            return { label: '已审核', className: 'reviewed' };
+        }
+        if (status === 'rejected') {
+            return { label: '已驳回', className: 'rejected' };
+        }
+        return { label: '未审核', className: 'unreviewed' };
+    }
+
     syncGlobalAdminState();
     
     async function loadJobCategories() {
@@ -146,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         try {
             const queryParams = new URLSearchParams({
-                status: status,
+                status: buildStatusQueryParam(status),
                 training_type: currentTrainingType
             });
             
@@ -321,7 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
         listContainer.innerHTML = '<div style="padding:20px;text-align:center;">加载中...</div>';
         try {
             const queryParams = new URLSearchParams({
-                status: currentStatus,
+                status: buildStatusQueryParam(currentStatus),
                 company: currentFilters.company,
                 training_type: currentTrainingType
             });
@@ -341,17 +355,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderList(list) {
         listContainer.innerHTML = '';
         if (!list || list.length === 0) {
-            listContainer.innerHTML = `<div style="padding:20px;text-align:center;color:#999">暂无数据 (${currentStatus === 'unreviewed' ? '未审核' : '已审核'})</div>`;
+            listContainer.innerHTML = `<div style="padding:20px;text-align:center;color:#999">暂无数据 (${currentStatus === 'unreviewed' ? '未审核/已驳回' : '已审核'})</div>`;
             return;
         }
 
         list.forEach(student => {
+            const rejectedMark = student.status === 'rejected'
+                ? '<span class="list-rejected-tag">已驳回</span>'
+                : '';
             const el = document.createElement('div');
             el.className = `list-item ${currentStudentId === student.id ? 'active' : ''}`;
             el.innerHTML = `
                 <div style="flex: 1;">
                     <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: baseline;">
-                        <span>${student.name}</span>
+                        <span style="display:flex; align-items:center; gap:8px;">${student.name}${rejectedMark}</span>
                         <span style="font-size: 0.8rem; color: #666; margin-left: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${student.company || ''}</span>
                     </h4>
                     <div style="font-size: 0.75rem; color: #666; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
@@ -535,8 +552,8 @@ document.addEventListener('DOMContentLoaded', () => {
         clone.querySelector('.student-id').textContent = student.id_card;
         const statusBadge = clone.querySelector('.status-badge');
         if (statusBadge) {
-            const reviewed = student.status === 'reviewed';
-            statusBadge.innerHTML = `<span class="badge ${reviewed ? 'reviewed' : 'unreviewed'}">${reviewed ? '已审核' : '未审核'}</span>`;
+            const statusMeta = getStatusMeta(student.status);
+            statusBadge.innerHTML = `<span class="badge ${statusMeta.className}">${statusMeta.label}</span>`;
         }
         
         const grid = clone.querySelector('.detail-grid');
@@ -966,7 +983,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 rejectBtn.className = 'btn';
                 rejectBtn.style.cssText = 'background: #FEE2E2; color: #EF4444;';
                 rejectBtn.textContent = '审核不通过';
-                rejectBtn.onclick = () => rejectStudent(true);
+                rejectBtn.onclick = () => rejectStudent(false);
                 actionBar.appendChild(rejectBtn);
                 
                 const approveBtn = document.createElement('button');
@@ -1048,15 +1065,18 @@ document.addEventListener('DOMContentLoaded', () => {
     window.rejectStudent = async function(shouldDelete) {
         if (!currentStudentId) return;
         try {
+            const payload = shouldDelete
+                ? { delete: true }
+                : { delete: false, status: 'rejected' };
             const res = await fetch(`/api/students/${currentStudentId}/reject`, { 
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ delete: shouldDelete })
+                body: JSON.stringify(payload)
             });
             if (!res.ok) throw new Error('操作失败');
-            showMessage(shouldDelete ? '已删除学员' : '已移至未审核', 'success');
+            showMessage(shouldDelete ? '已删除学员' : '已驳回学员', 'success');
             loadStudents();
             loadCompanies(currentStatus);
             mainContent.innerHTML = '<div class="empty-state">请选择左侧学员查看详情</div>';

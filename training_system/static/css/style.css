@@ -672,6 +672,20 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
     align-items: center;
 }
 
+.list-rejected-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    line-height: 1.4;
+    color: #991b1b;
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
 .list-item .student-info {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -1039,6 +1053,12 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
     background: #DCFCE7;
     color: #065F46;
     border: 1px solid #10B981;
+}
+
+.badge.rejected {
+    background: #FEE2E2;
+    color: #991B1B;
+    border: 1px solid #EF4444;
 }
 
 @media (max-width: 900px) {

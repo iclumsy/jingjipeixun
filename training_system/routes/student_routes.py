@@ -323,13 +323,21 @@ def upload_student_attachment_route(id):
 
 @student_bp.route('/api/students/<int:id>/reject', methods=['POST'])
 def reject_student_route(id):
-    """Reject a student - delete if unreviewed, or move to unreviewed if reviewed."""
+    """Reject a student: update status by default, delete only when explicitly requested."""
     try:
-        data = request.get_json(silent=True) or {}
-        should_delete = data.get('delete', True)
-        target_status = str(data.get('status', 'unreviewed')).strip() or 'unreviewed'
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            data = {}
+
+        should_delete_raw = data.get('delete', False)
+        if isinstance(should_delete_raw, str):
+            should_delete = should_delete_raw.strip().lower() in ('1', 'true', 'yes', 'y')
+        else:
+            should_delete = bool(should_delete_raw)
+
+        target_status = str(data.get('status', 'rejected')).strip() or 'rejected'
         if target_status not in ('unreviewed', 'rejected'):
-            target_status = 'unreviewed'
+            target_status = 'rejected'
         
         if should_delete:
             student = delete_student(id)

@@ -1,3 +1,6 @@
+const EDIT_STUDENT_ID_KEY = 'submit_edit_student_id'
+const FORCE_CREATE_SUBMIT_KEY = 'submit_force_create_mode'
+
 Component({
   data: {
     selected: 0,
@@ -63,10 +66,36 @@ Component({
       this.setData({ list, selected })
     },
 
+    triggerForceCreateOnCurrentSubmitPage() {
+      const pages = getCurrentPages()
+      if (!pages || pages.length === 0) return
+      const currentPage = pages[pages.length - 1]
+      if (!currentPage || currentPage.route !== 'pages/user/submit/submit') return
+
+      if (typeof currentPage.forceEnterCreateMode === 'function') {
+        currentPage.forceEnterCreateMode()
+      }
+    },
+
+    markForceCreateSubmitEntry(url) {
+      if (url !== '/pages/user/submit/submit') return
+      wx.removeStorageSync(EDIT_STUDENT_ID_KEY)
+      wx.setStorageSync(FORCE_CREATE_SUBMIT_KEY, true)
+    },
+
     switchTab(e) {
       const data = e.currentTarget.dataset
       const url = data.path
-      wx.switchTab({ url })
+
+      this.markForceCreateSubmitEntry(url)
+
+      const currentRoute = this.getCurrentRoute()
+      if (url === '/pages/user/submit/submit' && currentRoute === url) {
+        this.triggerForceCreateOnCurrentSubmitPage()
+      } else {
+        wx.switchTab({ url })
+      }
+
       this.setData({
         selected: data.index
       })

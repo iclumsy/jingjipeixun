@@ -1,6 +1,8 @@
 <view class="page">
-  <view wx:if="{{student}}" class="content">
-    <view class="section-card">
+  <view class="header-bg"></view>
+
+  <view wx:if="{{student}}" class="container">
+    <view class="section-card summary-card">
       <view class="summary-row">
         <view class="summary-title">审核详情</view>
         <view class="status-tag status-{{student.status}}">{{statusText}}</view>
@@ -12,103 +14,166 @@
       <view class="summary-meta" wx:if="{{student.reviewed_at}}">审核时间：{{reviewTimeText}}</view>
     </view>
 
-    <view class="section-card">
-      <view class="section-title">培训信息</view>
-      <view class="field-row">
-        <view class="field-label">作业类别</view>
-        <view class="field-value">{{student.job_category || '-'}}</view>
+    <view class="section-card type-selector">
+      <view class="card-header">
+        <view class="card-title">培训信息</view>
       </view>
-      <view class="field-row">
-        <view class="field-label">操作项目</view>
-        <view class="field-value">{{student.exam_project || '-'}}</view>
+
+      <view class="type-options">
+        <view class="type-option {{trainingType === 'special_equipment' ? 'active' : ''}}" bindtap="selectTrainingType" data-type="special_equipment">
+          <text class="type-name">特种设备</text>
+        </view>
+        <view class="type-option {{trainingType === 'special_operation' ? 'active' : ''}}" bindtap="selectTrainingType" data-type="special_operation">
+          <text class="type-name">特种作业</text>
+        </view>
       </view>
-      <view class="field-row">
-        <view class="field-label">项目代码</view>
-        <view class="field-value">{{student.project_code || '-'}}</view>
+
+      <view class="form-item mt-24">
+        <view class="label required">作业类别</view>
+        <picker mode="selector" range="{{jobCategoryNames}}" value="{{editStudent.jobCategoryIndex}}" bindchange="onJobCategoryChange">
+          <view class="picker-input">
+            <text class="{{editStudent.job_category ? '' : 'placeholder'}}">{{editStudent.job_category || '请选择作业类别'}}</text>
+            <text class="arrow">›</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="form-item" wx:if="{{editStudent.examProjects && editStudent.examProjects.length > 0}}">
+        <view class="label">操作项目</view>
+        <picker mode="selector" range="{{editStudent.examProjects}}" range-key="name" value="{{editStudent.examProjectIndex}}" bindchange="onExamProjectChange">
+          <view class="picker-input">
+            <text class="{{editStudent.exam_project ? '' : 'placeholder'}}">{{editStudent.exam_project || '请选择操作项目'}}</text>
+            <text class="arrow">›</text>
+          </view>
+        </picker>
       </view>
     </view>
 
     <view class="section-card">
-      <view class="section-title">基本信息</view>
-      <view class="field-row">
-        <view class="field-label">姓名</view>
-        <view class="field-value">{{student.name || '-'}}</view>
+      <view class="card-header">
+        <view class="card-title">基本信息</view>
       </view>
-      <view class="field-row">
-        <view class="field-label">性别</view>
-        <view class="field-value">{{student.gender || '-'}}</view>
+
+      <view class="form-item form-inline">
+        <view class="label required inline-label">姓名</view>
+        <input class="input inline-control" placeholder="请输入姓名" value="{{editStudent.name}}" bindinput="onInputChange" data-field="name" />
       </view>
-      <view class="field-row">
-        <view class="field-label">文化程度</view>
-        <view class="field-value">{{student.education || '-'}}</view>
+
+      <view class="form-item form-inline">
+        <view class="label required inline-label">性别</view>
+        <view class="gender-selector inline-control">
+          <view class="gender-option {{editStudent.gender === '男' ? 'active' : ''}}" bindtap="selectGender" data-gender="男">
+            <text>男</text>
+          </view>
+          <view class="gender-option {{editStudent.gender === '女' ? 'active' : ''}}" bindtap="selectGender" data-gender="女">
+            <text>女</text>
+          </view>
+        </view>
       </view>
-      <view class="field-row">
-        <view class="field-label">毕业学校</view>
-        <view class="field-value">{{student.school || '-'}}</view>
+
+      <view class="form-item form-inline">
+        <view class="label required inline-label">文化程度</view>
+        <picker class="inline-control" mode="selector" range="{{educationOptions}}" value="{{editStudent.educationIndex}}" bindchange="onEducationChange">
+          <view class="picker-input">
+            <text class="{{editStudent.education ? '' : 'placeholder'}}">{{editStudent.education || '请选择文化程度'}}</text>
+            <text class="arrow">›</text>
+          </view>
+        </picker>
       </view>
-      <view class="field-row">
-        <view class="field-label">所学专业</view>
-        <view class="field-value">{{student.major || '-'}}</view>
+
+      <view class="form-item">
+        <view class="label required">身份证号</view>
+        <input class="input" placeholder="请输入18位身份证号" value="{{editStudent.id_card}}" bindinput="onInputChange" bindblur="onIdCardBlur" data-field="id_card" maxlength="18" />
+        <view class="field-error" wx:if="{{fieldErrors.id_card}}">{{fieldErrors.id_card}}</view>
       </view>
-      <view class="field-row">
-        <view class="field-label">身份证号</view>
-        <view class="field-value">{{student.id_card || '-'}}</view>
+
+      <view class="form-item">
+        <view class="label required">手机号</view>
+        <input class="input" type="number" placeholder="请输入11位手机号" value="{{editStudent.phone}}" bindinput="onInputChange" bindblur="onPhoneBlur" data-field="phone" maxlength="11" />
+        <view class="field-error" wx:if="{{fieldErrors.phone}}">{{fieldErrors.phone}}</view>
       </view>
-      <view class="field-row">
-        <view class="field-label">手机号</view>
-        <view class="field-value">{{student.phone || '-'}}</view>
+
+      <view class="form-item">
+        <view class="label">毕业学校</view>
+        <input class="input" placeholder="请输入毕业学校（选填）" value="{{editStudent.school}}" bindinput="onInputChange" data-field="school" />
+      </view>
+
+      <view class="form-item">
+        <view class="label">所学专业</view>
+        <input class="input" placeholder="请输入所学专业（选填）" value="{{editStudent.major}}" bindinput="onInputChange" data-field="major" />
       </view>
     </view>
 
     <view class="section-card">
-      <view class="section-title">单位信息</view>
-      <view class="field-row">
-        <view class="field-label">单位名称</view>
-        <view class="field-value">{{student.company || '-'}}</view>
+      <view class="card-header">
+        <view class="card-title">单位信息</view>
       </view>
-      <view class="field-row">
-        <view class="field-label">单位地址</view>
-        <view class="field-value">{{student.company_address || '-'}}</view>
+
+      <view class="form-item">
+        <view class="label required">单位名称</view>
+        <input class="input" placeholder="请输入单位名称" value="{{editStudent.company}}" bindinput="onInputChange" data-field="company" />
+      </view>
+
+      <view class="form-item">
+        <view class="label required">单位地址</view>
+        <input class="input" placeholder="请输入单位地址" value="{{editStudent.company_address}}" bindinput="onInputChange" data-field="company_address" />
       </view>
     </view>
 
     <view class="section-card">
-      <view class="section-title">附件资料</view>
+      <view class="card-header">
+        <view class="card-title">附件上传</view>
+      </view>
+      <view class="attachments-tip">可直接替换附件，未替换的附件会保留原记录。</view>
       <view class="attachments-grid">
-        <view class="attachment-item" wx:if="{{downloadUrls.photo_path}}" bindtap="previewImage" data-url="{{downloadUrls.photo_path}}">
-          <image class="attachment-image" src="{{downloadUrls.photo_path}}" mode="aspectFill" />
-          <view class="attachment-label">个人照片</view>
+        <view class="attachment-item" wx:if="{{trainingType === 'special_equipment'}}">
+          <file-uploader compact="{{true}}" fileType="photo" label="个人照片" required="{{true}}" value="{{editStudent.files.photo}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
         </view>
-        <view class="attachment-item" wx:if="{{downloadUrls.diploma_path}}" bindtap="previewImage" data-url="{{downloadUrls.diploma_path}}">
-          <image class="attachment-image" src="{{downloadUrls.diploma_path}}" mode="aspectFill" />
-          <view class="attachment-label">学历证书</view>
+
+        <view class="attachment-item">
+          <file-uploader compact="{{true}}" fileType="diploma" label="学历证书" required="{{true}}" value="{{editStudent.files.diploma}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
         </view>
-        <view class="attachment-item" wx:if="{{downloadUrls.id_card_front_path}}" bindtap="previewImage" data-url="{{downloadUrls.id_card_front_path}}">
-          <image class="attachment-image" src="{{downloadUrls.id_card_front_path}}" mode="aspectFill" />
-          <view class="attachment-label">身份证正面</view>
+
+        <view class="attachment-item">
+          <file-uploader compact="{{true}}" fileType="id_card_front" label="身份证正面" required="{{true}}" value="{{editStudent.files.id_card_front}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
         </view>
-        <view class="attachment-item" wx:if="{{downloadUrls.id_card_back_path}}" bindtap="previewImage" data-url="{{downloadUrls.id_card_back_path}}">
-          <image class="attachment-image" src="{{downloadUrls.id_card_back_path}}" mode="aspectFill" />
-          <view class="attachment-label">身份证反面</view>
+
+        <view class="attachment-item">
+          <file-uploader compact="{{true}}" fileType="id_card_back" label="身份证反面" required="{{true}}" value="{{editStudent.files.id_card_back}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
         </view>
-        <view class="attachment-item" wx:if="{{downloadUrls.hukou_residence_path}}" bindtap="previewImage" data-url="{{downloadUrls.hukou_residence_path}}">
-          <image class="attachment-image" src="{{downloadUrls.hukou_residence_path}}" mode="aspectFill" />
-          <view class="attachment-label">户口本户籍页</view>
+
+        <view class="attachment-item" wx:if="{{trainingType === 'special_equipment'}}">
+          <file-uploader compact="{{true}}" fileType="hukou_residence" label="户口本户籍页" required="{{true}}" value="{{editStudent.files.hukou_residence}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
         </view>
-        <view class="attachment-item" wx:if="{{downloadUrls.hukou_personal_path}}" bindtap="previewImage" data-url="{{downloadUrls.hukou_personal_path}}">
-          <image class="attachment-image" src="{{downloadUrls.hukou_personal_path}}" mode="aspectFill" />
-          <view class="attachment-label">户口本个人页</view>
+
+        <view class="attachment-item" wx:if="{{trainingType === 'special_equipment'}}">
+          <file-uploader compact="{{true}}" fileType="hukou_personal" label="户口本个人页" required="{{true}}" value="{{editStudent.files.hukou_personal}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
         </view>
       </view>
     </view>
   </view>
 
-  <view class="bottom-actions" wx:if="{{student && student.status === 'unreviewed'}}">
-    <button class="action-btn btn-reject" bindtap="onReject">驳回</button>
-    <button class="action-btn btn-approve" bindtap="onApprove">审核通过</button>
+  <view class="bottom-actions" wx:if="{{student}}">
+    <button
+      class="action-btn btn-save"
+      bindtap="onSave"
+      loading="{{saving}}"
+      disabled="{{saving || actionLoading || loading}}"
+    >保存</button>
+    <button
+      class="action-btn btn-approve {{!canReview ? 'disabled' : ''}}"
+      bindtap="onApprove"
+      loading="{{actionLoading && actionType === 'approve'}}"
+      disabled="{{!canReview || saving || actionLoading || loading}}"
+    >审核通过</button>
+    <button
+      class="action-btn btn-reject {{!canReview ? 'disabled' : ''}}"
+      bindtap="onReject"
+      loading="{{actionLoading && actionType === 'reject'}}"
+      disabled="{{!canReview || saving || actionLoading || loading}}"
+    >驳回</button>
   </view>
 
-  <view class="readonly-hint" wx:if="{{student && student.status !== 'unreviewed'}}">当前记录不是待审核状态，仅支持查看</view>
-
+  <view class="readonly-hint" wx:if="{{student && !canReview}}">当前不是待审核状态，仅支持保存</view>
   <view class="loading" wx:if="{{loading}}">加载中...</view>
 </view>

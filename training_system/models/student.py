@@ -133,8 +133,12 @@ def get_students(status='unreviewed', search='', company='', training_type='', s
         params = []
 
         if status:
-            query += " AND status = ?"
-            params.append(status)
+            if status == 'pending':
+                query += " AND status IN (?, ?)"
+                params.extend(['unreviewed', 'rejected'])
+            else:
+                query += " AND status = ?"
+                params.append(status)
 
         if training_type:
             query += " AND training_type = ?"
@@ -295,8 +299,12 @@ def get_companies(status='', company_filter='', training_type=''):
 
         # Handle status filter
         if status:
-            query += " AND status = ?"
-            params.append(status)
+            if status == 'pending':
+                query += " AND status IN (?, ?)"
+                params.extend(['unreviewed', 'rejected'])
+            else:
+                query += " AND status = ?"
+                params.append(status)
 
         if training_type:
             query += " AND training_type = ?"

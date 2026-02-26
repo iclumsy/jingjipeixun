@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "审核详情"
+  "navigationBarTitleText": "审核详情",
+  "usingComponents": {
+    "file-uploader": "/components/file-uploader/file-uploader"
+  }
 }

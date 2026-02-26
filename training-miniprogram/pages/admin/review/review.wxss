@@ -9,33 +9,42 @@
 }
 
 .filter-group {
-  margin-bottom: 20rpx;
+  margin-bottom: 14rpx;
 }
 
 .filter-group:last-child {
   margin-bottom: 0;
 }
 
+.filter-inline {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+
 .group-title {
   font-size: 26rpx;
   color: var(--text-primary);
   font-weight: 600;
-  margin-bottom: 12rpx;
+  line-height: 56rpx;
+  flex: 0 0 108rpx;
 }
 
 .chip-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 10rpx;
+  gap: 8rpx;
+  flex: 1;
+  min-width: 0;
 }
 
 .filter-chip {
-  font-size: 24rpx;
+  font-size: 22rpx;
   color: var(--text-secondary);
   border: 2rpx solid #d8deea;
   background: #f7f9fc;
-  border-radius: 26rpx;
-  padding: 10rpx 20rpx;
+  border-radius: 24rpx;
+  padding: 8rpx 18rpx;
 }
 
 .filter-chip.active {
@@ -44,15 +53,19 @@
   background: linear-gradient(135deg, #3558d8 0%, #4d6ef2 100%);
 }
 
+.picker-wrap {
+  flex: 1;
+}
+
 .picker-value {
-  height: 72rpx;
+  height: 56rpx;
   border-radius: 12rpx;
   border: 2rpx solid #d8deea;
   background: #f7f9fc;
-  padding: 0 20rpx;
+  padding: 0 16rpx;
   display: flex;
   align-items: center;
-  font-size: 26rpx;
+  font-size: 24rpx;
   color: var(--text-primary);
 }
 
@@ -170,27 +183,22 @@
 .record-actions {
   margin-top: 16rpx;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12rpx;
 }
 
 .action-btn {
   margin: 0;
   border-radius: 10rpx;
-  font-size: 24rpx;
-  line-height: 58rpx;
-  height: 58rpx;
+  font-size: 22rpx;
+  line-height: 56rpx;
+  height: 56rpx;
   padding: 0;
   border: none;
 }
 
 .action-btn::after {
   border: none;
-}
-
-.btn-sync {
-  color: #2c4dc4;
-  background: #e9efff;
 }
 
 .btn-delete {
