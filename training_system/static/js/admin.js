@@ -1011,6 +1011,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     window.open(`/api/students/${student.id}/attachments.zip`, '_blank');
                 };
                 actionBar.appendChild(downloadZipBtn);
+
+                if (student.status === 'rejected') {
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'btn';
+                    deleteBtn.style.cssText = 'background: #FFF1F2; color: #BE123C;';
+                    deleteBtn.textContent = '删除学员';
+                    deleteBtn.onclick = () => {
+                        const confirmed = window.confirm('确认删除该学员吗？删除后不可恢复。');
+                        if (!confirmed) return;
+                        rejectStudent(true);
+                    };
+                    actionBar.appendChild(deleteBtn);
+                }
                 
                 const rejectBtn = document.createElement('button');
                 rejectBtn.className = 'btn';
