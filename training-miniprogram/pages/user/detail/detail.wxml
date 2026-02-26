@@ -1,24 +1,29 @@
-<!-- pages/user/detail/detail.wxml -->
-<view class="container">
-  <view class="detail-card card" wx:if="{{student}}">
-    <!-- 审核状态 -->
-    <view class="status-banner status-{{student.status}}">
-      <view class="status-icon">
-        <text wx:if="{{student.status === 'unreviewed'}}">⏳</text>
-        <text wx:if="{{student.status === 'reviewed'}}">✅</text>
-        <text wx:if="{{student.status === 'rejected'}}">❌</text>
+<view class="page">
+  <view class="header-bg"></view>
+
+  <view class="container" wx:if="{{student}}">
+    <view class="page-header">
+      <view class="title-wrap">
+        <view class="title">提交详情</view>
+        <view class="subtitle">查看审核进度与提交内容</view>
       </view>
-      <view class="status-info">
-        <text class="status-text">{{statusText}}</text>
-        <text class="status-hint" wx:if="{{student.status === 'unreviewed'}}">请耐心等待审核</text>
-        <text class="status-hint" wx:if="{{student.status === 'reviewed'}}">审核已通过</text>
-        <text class="status-hint" wx:if="{{student.status === 'rejected'}}">申请已被驳回</text>
-      </view>
+      <button class="back-btn" bindtap="goBack">返回</button>
     </view>
 
-    <!-- 学员基本信息 -->
-    <view class="section">
-      <view class="section-title">基本信息</view>
+    <view class="section-card summary-card">
+      <view class="summary-row">
+        <view class="summary-title">审核状态</view>
+        <view class="status-tag status-{{student.status}}">{{statusText}}</view>
+      </view>
+      <view class="summary-hint">{{statusHint}}</view>
+      <view class="summary-meta">培训类型：{{trainingTypeText}}</view>
+      <view class="summary-meta">提交时间：{{createTime}}</view>
+    </view>
+
+    <view class="section-card">
+      <view class="card-header">
+        <view class="card-title">基本信息</view>
+      </view>
       <view class="info-grid">
         <view class="info-item">
           <text class="info-label">姓名</text>
@@ -33,14 +38,6 @@
           <text class="info-value">{{student.education}}</text>
         </view>
         <view class="info-item">
-          <text class="info-label">毕业学校</text>
-          <text class="info-value">{{student.school || '-'}}</text>
-        </view>
-        <view class="info-item">
-          <text class="info-label">所学专业</text>
-          <text class="info-value">{{student.major || '-'}}</text>
-        </view>
-        <view class="info-item">
           <text class="info-label">身份证号</text>
           <text class="info-value">{{student.id_card}}</text>
         </view>
@@ -48,27 +45,37 @@
           <text class="info-label">手机号</text>
           <text class="info-value">{{student.phone}}</text>
         </view>
+        <view class="info-item">
+          <text class="info-label">毕业学校</text>
+          <text class="info-value">{{student.school || '-'}}</text>
+        </view>
+        <view class="info-item full-width">
+          <text class="info-label">所学专业</text>
+          <text class="info-value">{{student.major || '-'}}</text>
+        </view>
       </view>
     </view>
 
-    <!-- 单位信息 -->
-    <view class="section">
-      <view class="section-title">单位信息</view>
+    <view class="section-card">
+      <view class="card-header">
+        <view class="card-title">单位信息</view>
+      </view>
       <view class="info-grid">
         <view class="info-item full-width">
           <text class="info-label">单位名称</text>
-          <text class="info-value">{{student.company}}</text>
+          <text class="info-value">{{student.company || '-'}}</text>
         </view>
         <view class="info-item full-width">
           <text class="info-label">单位地址</text>
-          <text class="info-value">{{student.company_address}}</text>
+          <text class="info-value">{{student.company_address || '-'}}</text>
         </view>
       </view>
     </view>
 
-    <!-- 培训信息 -->
-    <view class="section">
-      <view class="section-title">培训信息</view>
+    <view class="section-card">
+      <view class="card-header">
+        <view class="card-title">培训信息</view>
+      </view>
       <view class="info-grid">
         <view class="info-item">
           <text class="info-label">培训类型</text>
@@ -76,27 +83,24 @@
         </view>
         <view class="info-item">
           <text class="info-label">作业类别</text>
-          <text class="info-value">{{student.job_category}}</text>
+          <text class="info-value">{{student.job_category || '-'}}</text>
         </view>
-        <view class="info-item">
+        <view class="info-item full-width">
           <text class="info-label">操作项目</text>
           <text class="info-value">{{student.exam_project || '-'}}</text>
-        </view>
-        <view class="info-item">
-          <text class="info-label">提交时间</text>
-          <text class="info-value">{{createTime}}</text>
         </view>
       </view>
     </view>
 
-    <!-- 操作按钮 -->
-    <view class="action-section" wx:if="{{student.status === 'rejected'}}">
+    <view class="section-card action-card" wx:if="{{student.status === 'rejected'}}">
+      <view class="action-title">该记录已驳回，可修改后重新提交</view>
       <button class="edit-btn" bindtap="editStudent">重新编辑</button>
     </view>
 
-    <!-- 附件预览 -->
-    <view class="section">
-      <view class="section-title">附件预览</view>
+    <view class="section-card">
+      <view class="card-header">
+        <view class="card-title">附件预览</view>
+      </view>
       <view class="attachments-grid">
         <view class="attachment-item" wx:if="{{downloadUrls.photo_path}}" bindtap="previewImage" data-url="{{downloadUrls.photo_path}}">
           <image class="attachment-image" src="{{downloadUrls.photo_path}}" mode="aspectFill" />
@@ -126,7 +130,6 @@
     </view>
   </view>
 
-  <!-- 加载状态 -->
   <view class="loading" wx:if="{{loading}}">
     <text>加载中...</text>
   </view>

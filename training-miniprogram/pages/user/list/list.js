@@ -13,6 +13,7 @@ Page({
 
   onLoad() {
     this.loadMyStudents(true)
+    this._skipRefreshOnShow = true
   },
 
   onShow() {
@@ -22,6 +23,14 @@ Page({
         selected: 1
       })
     }
+
+    if (this._skipRefreshOnShow) {
+      this._skipRefreshOnShow = false
+      return
+    }
+
+    // 每次回到标签页都刷新，确保状态最新
+    this.loadMyStudents(true)
   },
 
   onPullDownRefresh() {
@@ -121,5 +130,9 @@ Page({
     wx.switchTab({
       url: '/pages/user/submit/submit'
     })
+  },
+
+  onTabReselect() {
+    this.loadMyStudents(true)
   }
 })

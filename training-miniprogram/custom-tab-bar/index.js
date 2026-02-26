@@ -77,6 +77,19 @@ Component({
       }
     },
 
+    triggerCurrentPageRefresh(route) {
+      const pages = getCurrentPages()
+      if (!pages || pages.length === 0) return
+      const currentPage = pages[pages.length - 1]
+      if (!currentPage || !currentPage.route) return
+      const currentRoute = `/${currentPage.route}`
+      if (currentRoute !== route) return
+
+      if (typeof currentPage.onTabReselect === 'function') {
+        currentPage.onTabReselect()
+      }
+    },
+
     markForceCreateSubmitEntry(url) {
       if (url !== '/pages/user/submit/submit') return
       wx.removeStorageSync(EDIT_STUDENT_ID_KEY)
@@ -90,8 +103,11 @@ Component({
       this.markForceCreateSubmitEntry(url)
 
       const currentRoute = this.getCurrentRoute()
-      if (url === '/pages/user/submit/submit' && currentRoute === url) {
-        this.triggerForceCreateOnCurrentSubmitPage()
+      if (currentRoute === url) {
+        if (url === '/pages/user/submit/submit') {
+          this.triggerForceCreateOnCurrentSubmitPage()
+        }
+        this.triggerCurrentPageRefresh(url)
       } else {
         wx.switchTab({ url })
       }

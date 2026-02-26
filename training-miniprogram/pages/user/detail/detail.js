@@ -3,12 +3,19 @@ const api = require('../../../utils/api')
 const { STATUS_LABELS, TRAINING_TYPE_LABELS } = require('../../../utils/constants')
 const EDIT_STUDENT_ID_KEY = 'submit_edit_student_id'
 
+const STATUS_HINTS = {
+  unreviewed: '资料已提交，正在等待管理员审核',
+  reviewed: '资料已审核通过，可在后台继续办理',
+  rejected: '资料已被驳回，可修改后重新提交'
+}
+
 Page({
   data: {
     studentId: '',
     student: null,
     downloadUrls: {},
     statusText: '',
+    statusHint: '',
     trainingTypeText: '',
     createTime: '',
     loading: true
@@ -32,6 +39,7 @@ Page({
           student: result.student,
           downloadUrls: result.downloadUrls || {},
           statusText: STATUS_LABELS[result.student.status] || result.student.status,
+          statusHint: STATUS_HINTS[result.student.status] || '',
           trainingTypeText: TRAINING_TYPE_LABELS[result.student.training_type] || result.student.training_type,
           createTime: this.formatTime(result.student.created_at),
           loading: false
@@ -67,6 +75,17 @@ Page({
     wx.previewImage({
       urls: urls,
       current: url
+    })
+  },
+
+  goBack() {
+    const pages = getCurrentPages()
+    if (pages.length > 1) {
+      wx.navigateBack()
+      return
+    }
+    wx.switchTab({
+      url: '/pages/user/list/list'
     })
   },
 

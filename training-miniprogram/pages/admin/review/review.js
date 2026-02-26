@@ -3,7 +3,8 @@ const { TRAINING_TYPE_LABELS } = require('../../../utils/constants')
 
 const STATUS_FILTERS = [
   { label: '待审核', value: 'unreviewed' },
-  { label: '已通过', value: 'reviewed' }
+  { label: '已通过', value: 'reviewed' },
+  { label: '已驳回', value: 'rejected' }
 ]
 
 const TRAINING_TYPE_FILTERS = [
@@ -73,7 +74,7 @@ Page({
         this._skipRefreshOnShow = false
         return
       }
-      await this.loadRecords(true)
+      await this.refreshAll(true)
     }
   },
 
@@ -287,5 +288,10 @@ Page({
         fail: () => resolve(false)
       })
     })
+  },
+
+  async onTabReselect() {
+    if (this.data.loading) return
+    await this.refreshAll(true)
   }
 })

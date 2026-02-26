@@ -979,6 +979,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const actionBar = clone.querySelector('.action-bar');
         if (actionBar) {
             if (student.status === 'unreviewed') {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn';
+                deleteBtn.style.cssText = 'background: #FFF1F2; color: #BE123C;';
+                deleteBtn.textContent = '删除学员';
+                deleteBtn.onclick = () => {
+                    const confirmed = window.confirm('确认删除该学员吗？删除后不可恢复。');
+                    if (!confirmed) return;
+                    rejectStudent(true);
+                };
+                actionBar.appendChild(deleteBtn);
+
                 const rejectBtn = document.createElement('button');
                 rejectBtn.className = 'btn';
                 rejectBtn.style.cssText = 'background: #FEE2E2; color: #EF4444;';
