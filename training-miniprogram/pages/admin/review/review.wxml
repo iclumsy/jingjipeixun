@@ -10,13 +10,13 @@
 
     <view class="filter-card card fade-enter">
       <view class="filter-row">
-        <view class="filter-title">状态</view>
+        <view class="filter-title">类型</view>
         <view class="chip-list">
           <view
-            wx:for="{{statusFilters}}"
+            wx:for="{{trainingTypeFilters}}"
             wx:key="value"
-            class="filter-chip {{filters.status === item.value ? 'active' : ''}}"
-            bindtap="onStatusFilterTap"
+            class="filter-chip {{filters.training_type === item.value ? 'active' : ''}}"
+            bindtap="onTrainingTypeFilterTap"
             data-value="{{item.value}}"
           >
             {{item.label}}
@@ -25,13 +25,13 @@
       </view>
 
       <view class="filter-row">
-        <view class="filter-title">类型</view>
+        <view class="filter-title">状态</view>
         <view class="chip-list">
           <view
-            wx:for="{{trainingTypeFilters}}"
+            wx:for="{{statusFilters}}"
             wx:key="value"
-            class="filter-chip {{filters.training_type === item.value ? 'active' : ''}}"
-            bindtap="onTrainingTypeFilterTap"
+            class="filter-chip {{filters.status === item.value ? 'active' : ''}}"
+            bindtap="onStatusFilterTap"
             data-value="{{item.value}}"
           >
             {{item.label}}
