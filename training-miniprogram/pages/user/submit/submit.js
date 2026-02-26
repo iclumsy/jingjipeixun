@@ -197,6 +197,7 @@ Page({
     try {
       wx.showLoading({ title: '加载中...' })
       const result = await api.getStudentDetail(this.data.studentId)
+      const downloadUrls = result.downloadUrls || {}
 
       if (result.student) {
         const student = result.student
@@ -251,12 +252,12 @@ Page({
             project_code: student.project_code || '',
             examProjects: examProjects,
             files: {
-              photo: student.photo_path || student.files?.photo || student.files?.photo_path || '',
-              diploma: student.diploma_path || student.files?.diploma || student.files?.diploma_path || '',
-              id_card_front: student.id_card_front_path || student.files?.id_card_front || student.files?.id_card_front_path || '',
-              id_card_back: student.id_card_back_path || student.files?.id_card_back || student.files?.id_card_back_path || '',
-              hukou_residence: student.hukou_residence_path || student.files?.hukou_residence || student.files?.hukou_residence_path || '',
-              hukou_personal: student.hukou_personal_path || student.files?.hukou_personal || student.files?.hukou_personal_path || ''
+              photo: downloadUrls.photo_path || student.photo_path || student.files?.photo || student.files?.photo_path || '',
+              diploma: downloadUrls.diploma_path || student.diploma_path || student.files?.diploma || student.files?.diploma_path || '',
+              id_card_front: downloadUrls.id_card_front_path || student.id_card_front_path || student.files?.id_card_front || student.files?.id_card_front_path || '',
+              id_card_back: downloadUrls.id_card_back_path || student.id_card_back_path || student.files?.id_card_back || student.files?.id_card_back_path || '',
+              hukou_residence: downloadUrls.hukou_residence_path || student.hukou_residence_path || student.files?.hukou_residence || student.files?.hukou_residence_path || '',
+              hukou_personal: downloadUrls.hukou_personal_path || student.hukou_personal_path || student.files?.hukou_personal || student.files?.hukou_personal_path || ''
             }
           }
         })

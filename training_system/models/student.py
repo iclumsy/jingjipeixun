@@ -27,6 +27,14 @@ def get_db_connection():
             conn.close()
 
 
+def _ensure_column_exists(conn, table_name, column_name, column_definition):
+    """Add column when missing for lightweight schema migration."""
+    columns = conn.execute(f'PRAGMA table_info({table_name})').fetchall()
+    existed = any(str(col[1]) == column_name for col in columns)
+    if not existed:
+        conn.execute(f'ALTER TABLE {table_name} ADD COLUMN {column_definition}')
+
+
 def init_db(database_path):
     """
     Initialize the database with required tables.
@@ -60,9 +68,11 @@ def init_db(database_path):
                 id_card_back_path TEXT,
                 hukou_residence_path TEXT,
                 hukou_personal_path TEXT,
-                training_form_path TEXT
+                training_form_path TEXT,
+                submitter_openid TEXT
             )
         ''')
+        _ensure_column_exists(conn, 'students', 'submitter_openid', 'submitter_openid TEXT')
         conn.commit()
     except sqlite3.Error as e:
         raise DatabaseError(f'Failed to initialize database: {str(e)}')
@@ -89,8 +99,8 @@ def create_student(data, file_paths):
                 company, company_address, job_category, exam_project, project_code,
                 training_type, photo_path, diploma_path,
                 id_card_front_path, id_card_back_path,
-                hukou_residence_path, hukou_personal_path, training_form_path
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                hukou_residence_path, hukou_personal_path, training_form_path, submitter_openid
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data['name'], data['gender'], data['education'], data.get('school', ''),
             data.get('major', ''), data['id_card'], data['phone'], data.get('company', ''),
@@ -100,12 +110,12 @@ def create_student(data, file_paths):
             file_paths.get('photo_path', ''), file_paths.get('diploma_path', ''),
             file_paths.get('id_card_front_path', ''), file_paths.get('id_card_back_path', ''),
             file_paths.get('hukou_residence_path', ''), file_paths.get('hukou_personal_path', ''),
-            file_paths.get('training_form_path', '')
+            file_paths.get('training_form_path', ''), data.get('submitter_openid', '')
         ))
         return cursor.lastrowid
 
 
-def get_students(status='unreviewed', search='', company='', training_type=''):
+def get_students(status='unreviewed', search='', company='', training_type='', submitter_openid=''):
     """
     Get students with optional filters.
 
@@ -137,6 +147,12 @@ def get_students(status='unreviewed', search='', company='', training_type=''):
         if company:
             query += " AND company LIKE ?"
             params.append(f"%{company}%")
+
+        if submitter_openid:
+            query += " AND submitter_openid = ?"
+            params.append(submitter_openid)
+
+        query += " ORDER BY id DESC"
 
         students = conn.execute(query, params).fetchall()
         return [dict(s) for s in students]

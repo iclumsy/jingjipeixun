@@ -1,100 +1,64 @@
-// cloudfunctions/deleteStudent/index.js
-const cloud = require('wx-server-sdk')
+const axios = require('axios')
 
-cloud.init({
-  env: cloud.DYNAMIC_CURRENT_ENV
-})
+const DEFAULT_TIMEOUT_MS = 30000
 
-const db = cloud.database()
+function trimSlash(value = '') {
+  return String(value || '').trim().replace(/\/+$/, '')
+}
 
-/**
- * 删除学员云函数
- * 仅管理员可调用
- */
-exports.main = async (event, context) => {
-  const wxContext = cloud.getWXContext()
-  const { student_id } = event
+function getBaseUrl(event) {
+  return trimSlash(
+    event.api_base_url ||
+    process.env.WEB_API_BASE_URL ||
+    process.env.ORIGIN_SYSTEM_BASE_URL ||
+    ''
+  )
+}
 
-  if (!student_id) {
+exports.main = async (event = {}) => {
+  const studentId = String(event.student_id || '').trim()
+
+  if (!studentId) {
     return {
       error: '参数错误',
       message: '学员ID不能为空'
     }
   }
 
+  const baseUrl = getBaseUrl(event)
+  if (!baseUrl) {
+    return {
+      error: '配置错误',
+      message: '未配置网页系统 API 地址（WEB_API_BASE_URL）'
+    }
+  }
+
   try {
-    // 检查管理员权限
-    const adminResult = await db.collection('admins')
-      .where({
-        openid: wxContext.OPENID,
-        is_active: true
-      })
-      .get()
+    const response = await axios.post(
+      `${baseUrl}/api/students/${encodeURIComponent(studentId)}/reject`,
+      { delete: true },
+      {
+        timeout: DEFAULT_TIMEOUT_MS,
+        validateStatus: () => true
+      }
+    )
 
-    if (adminResult.data.length === 0) {
+    if (response.status < 200 || response.status >= 300) {
+      const msg = response.data && (response.data.error || response.data.message)
       return {
-        error: '权限不足',
-        message: '只有管理员可以删除学员'
+        error: '删除失败',
+        message: msg || `HTTP ${response.status}`
       }
     }
-
-    // 查询学员信息
-    const studentResult = await db.collection('students')
-      .doc(student_id)
-      .get()
-
-    if (!studentResult.data) {
-      return {
-        error: '学员不存在',
-        message: '未找到该学员信息'
-      }
-    }
-
-    const student = studentResult.data
-
-    // 删除云存储文件
-    const fileFields = [
-      'photo_path',
-      'diploma_path',
-      'id_card_front_path',
-      'id_card_back_path',
-      'hukou_residence_path',
-      'hukou_personal_path',
-      'training_form_path'
-    ]
-
-    const filesToDelete = []
-    fileFields.forEach(field => {
-      if (student[field]) {
-        filesToDelete.push(student[field])
-      }
-    })
-
-    if (filesToDelete.length > 0) {
-      try {
-        await cloud.deleteFile({
-          fileList: filesToDelete
-        })
-      } catch (err) {
-        console.error('删除文件失败:', err)
-        // 继续删除数据库记录
-      }
-    }
-
-    // 删除数据库记录
-    await db.collection('students')
-      .doc(student_id)
-      .remove()
 
     return {
       success: true,
-      message: '删除成功'
+      message: (response.data && response.data.message) || '删除成功'
     }
   } catch (err) {
-    console.error('删除学员失败:', err)
     return {
       error: '删除失败',
-      message: err.message
+      message: err.message || '请求网页系统失败'
     }
   }
 }

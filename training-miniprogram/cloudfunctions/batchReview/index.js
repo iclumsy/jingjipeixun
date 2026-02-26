@@ -1,21 +1,32 @@
-// cloudfunctions/batchReview/index.js
-const cloud = require('wx-server-sdk')
+const axios = require('axios')
 
-cloud.init({
-  env: cloud.DYNAMIC_CURRENT_ENV
-})
+const DEFAULT_TIMEOUT_MS = 60000
 
-const db = cloud.database()
+function trimSlash(value = '') {
+  return String(value || '').trim().replace(/\/+$/, '')
+}
 
-/**
- * 批量审核云函数
- * 支持批量审核通过和驳回
- */
-exports.main = async (event, context) => {
-  const wxContext = cloud.getWXContext()
+function getBaseUrl(event) {
+  return trimSlash(
+    event.api_base_url ||
+    process.env.WEB_API_BASE_URL ||
+    process.env.ORIGIN_SYSTEM_BASE_URL ||
+    ''
+  )
+}
+
+function normalizeIds(ids) {
+  if (!Array.isArray(ids)) return []
+  return ids
+    .map(item => Number(item))
+    .filter(item => Number.isFinite(item) && item > 0)
+}
+
+exports.main = async (event = {}) => {
   const { student_ids, action } = event
+  const ids = normalizeIds(student_ids)
 
-  if (!student_ids || !Array.isArray(student_ids) || student_ids.length === 0) {
+  if (!ids.length) {
     return {
       error: '参数错误',
       message: '学员ID列表不能为空'
@@ -29,87 +40,64 @@ exports.main = async (event, context) => {
     }
   }
 
-  try {
-    // 检查管理员权限
-    const adminResult = await db.collection('admins')
-      .where({
-        openid: wxContext.OPENID,
-        is_active: true
-      })
-      .get()
-
-    if (adminResult.data.length === 0) {
-      return {
-        error: '权限不足',
-        message: '只有管理员可以批量审核学员'
-      }
+  const baseUrl = getBaseUrl(event)
+  if (!baseUrl) {
+    return {
+      error: '配置错误',
+      message: '未配置网页系统 API 地址（WEB_API_BASE_URL）'
     }
+  }
 
-    // 批量更新学员状态
-    const updateData = {
-      reviewed_at: new Date(),
-      reviewed_by: wxContext.OPENID,
-      updated_at: new Date(),
-      status: action === 'approve' ? 'reviewed' : 'rejected'
-    }
+  const errors = []
+  let successCount = 0
 
-    let successCount = 0
-    const errors = []
-
-    for (const studentId of student_ids) {
-      try {
-        await db.collection('students')
-          .doc(studentId)
-          .update({
-            data: updateData
-          })
-
-        successCount++
-
-        // 如果是审核通过，检查是否需要生成体检表
-        if (action === 'approve') {
-          try {
-            const studentResult = await db.collection('students')
-              .doc(studentId)
-              .get()
-
-            const student = studentResult.data
-            const projectCode = student.project_code
-
-            // N1叉车司机、G3锅炉水处理需要生成体检表
-            if (projectCode === 'N1' || projectCode === 'G3') {
-              await cloud.callFunction({
-                name: 'generateHealthCheck',
-                data: {
-                  student_id: studentId
-                }
-              })
-            }
-          } catch (err) {
-            console.error('生成体检表失败:', err)
-            // 不影响审核流程
+  for (const id of ids) {
+    try {
+      if (action === 'approve') {
+        const response = await axios.post(
+          `${baseUrl}/api/students/${id}/approve`,
+          {},
+          {
+            timeout: DEFAULT_TIMEOUT_MS,
+            validateStatus: () => true
           }
-        }
-      } catch (err) {
-        console.error(`审核学员 ${studentId} 失败:`, err)
-        errors.push({
-          studentId,
-          error: err.message
-        })
-      }
-    }
+        )
 
-    return {
-      success: true,
-      successCount,
-      totalCount: student_ids.length,
-      errors: errors.length > 0 ? errors : undefined
+        if (response.status < 200 || response.status >= 300) {
+          const msg = response.data && (response.data.error || response.data.message)
+          errors.push({ studentId: String(id), error: msg || `HTTP ${response.status}` })
+          continue
+        }
+      } else {
+        const response = await axios.post(
+          `${baseUrl}/api/students/${id}/reject`,
+          {
+            delete: false,
+            status: 'rejected'
+          },
+          {
+            timeout: DEFAULT_TIMEOUT_MS,
+            validateStatus: () => true
+          }
+        )
+
+        if (response.status < 200 || response.status >= 300) {
+          const msg = response.data && (response.data.error || response.data.message)
+          errors.push({ studentId: String(id), error: msg || `HTTP ${response.status}` })
+          continue
+        }
+      }
+
+      successCount += 1
+    } catch (err) {
+      errors.push({ studentId: String(id), error: err.message || '请求失败' })
     }
-  } catch (err) {
-    console.error('批量审核失败:', err)
-    return {
-      error: '批量审核失败',
-      message: err.message
-    }
+  }
+
+  return {
+    success: true,
+    successCount,
+    totalCount: ids.length,
+    errors: errors.length ? errors : undefined
   }
 }

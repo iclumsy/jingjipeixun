@@ -1,107 +1,108 @@
-// cloudfunctions/reviewStudent/index.js
-const cloud = require('wx-server-sdk')
+const axios = require('axios')
 
-cloud.init({
-  env: cloud.DYNAMIC_CURRENT_ENV
-})
+const DEFAULT_TIMEOUT_MS = 60000
 
-const db = cloud.database()
+function trimSlash(value = '') {
+  return String(value || '').trim().replace(/\/+$/, '')
+}
 
-/**
- * 审核学员云函数
- * 支持审核通过和驳回
- */
-exports.main = async (event, context) => {
-  const wxContext = cloud.getWXContext()
+function getBaseUrl(event) {
+  return trimSlash(
+    event.api_base_url ||
+    process.env.WEB_API_BASE_URL ||
+    process.env.ORIGIN_SYSTEM_BASE_URL ||
+    ''
+  )
+}
+
+function withClientId(student) {
+  if (!student || typeof student !== 'object') return student
+  return {
+    ...student,
+    _id: student.id !== undefined && student.id !== null ? String(student.id) : ''
+  }
+}
+
+exports.main = async (event = {}) => {
   const { student_id, action } = event
+  const studentId = String(student_id || '').trim()
 
-  if (!student_id || !action) {
+  if (!studentId || !action) {
     return {
       error: '参数错误',
       message: '学员ID和操作类型不能为空'
     }
   }
 
+  const baseUrl = getBaseUrl(event)
+  if (!baseUrl) {
+    return {
+      error: '配置错误',
+      message: '未配置网页系统 API 地址（WEB_API_BASE_URL）'
+    }
+  }
+
   try {
-    // 检查管理员权限
-    const adminResult = await db.collection('admins')
-      .where({
-        openid: wxContext.OPENID,
-        is_active: true
-      })
-      .get()
-
-    if (adminResult.data.length === 0) {
-      return {
-        error: '权限不足',
-        message: '只有管理员可以审核学员'
-      }
-    }
-
-    // 更新学员状态
-    const updateData = {
-      reviewed_at: new Date(),
-      reviewed_by: wxContext.OPENID,
-      updated_at: new Date()
-    }
-
     if (action === 'approve') {
-      updateData.status = 'reviewed'
-    } else if (action === 'reject') {
-      updateData.status = 'rejected'
-    } else {
-      return {
-        error: '参数错误',
-        message: '操作类型必须是 approve 或 reject'
-      }
-    }
+      const response = await axios.post(
+        `${baseUrl}/api/students/${encodeURIComponent(studentId)}/approve`,
+        {},
+        {
+          timeout: DEFAULT_TIMEOUT_MS,
+          validateStatus: () => true
+        }
+      )
 
-    await db.collection('students')
-      .doc(student_id)
-      .update({
-        data: updateData
-      })
-
-    // 如果是审核通过，检查是否需要生成体检表
-    if (action === 'approve') {
-      const studentResult = await db.collection('students')
-        .doc(student_id)
-        .get()
-
-      const student = studentResult.data
-      const projectCode = student.project_code
-
-      // N1叉车司机、G3锅炉水处理需要生成体检表
-      if (projectCode === 'N1' || projectCode === 'G3') {
-        // 调用生成体检表云函数
-        try {
-          await cloud.callFunction({
-            name: 'generateHealthCheck',
-            data: {
-              student_id: student_id
-            }
-          })
-        } catch (err) {
-          console.error('生成体检表失败:', err)
-          // 不影响审核流程
+      if (response.status < 200 || response.status >= 300) {
+        const msg = response.data && (response.data.error || response.data.message)
+        return {
+          error: '审核失败',
+          message: msg || `HTTP ${response.status}`
         }
       }
+
+      return {
+        success: true,
+        student: withClientId(response.data)
+      }
     }
 
-    // 返回更新后的学员信息
-    const result = await db.collection('students')
-      .doc(student_id)
-      .get()
+    if (action === 'reject') {
+      const response = await axios.post(
+        `${baseUrl}/api/students/${encodeURIComponent(studentId)}/reject`,
+        {
+          delete: false,
+          status: 'rejected'
+        },
+        {
+          timeout: DEFAULT_TIMEOUT_MS,
+          validateStatus: () => true
+        }
+      )
+
+      if (response.status < 200 || response.status >= 300) {
+        const msg = response.data && (response.data.error || response.data.message)
+        return {
+          error: '审核失败',
+          message: msg || `HTTP ${response.status}`
+        }
+      }
+
+      return {
+        success: true,
+        student: withClientId(response.data && response.data.student),
+        message: response.data && response.data.message
+      }
+    }
 
     return {
-      success: true,
-      student: result.data
+      error: '参数错误',
+      message: '操作类型必须是 approve 或 reject'
     }
   } catch (err) {
-    console.error('审核学员失败:', err)
     return {
       error: '审核失败',
-      message: err.message
+      message: err.message || '请求网页系统失败'
     }
   }
 }

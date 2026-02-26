@@ -1,80 +1,65 @@
-// cloudfunctions/getStudentDetail/index.js
-const cloud = require('wx-server-sdk')
+const axios = require('axios')
 
-cloud.init({
-  env: cloud.DYNAMIC_CURRENT_ENV
-})
+const DEFAULT_TIMEOUT_MS = 60000
 
-const db = cloud.database()
-const ADMIN_CACHE_TTL_MS = 60 * 1000
-const adminCache = new Map()
-
-async function isActiveAdmin(openid) {
-  const now = Date.now()
-  const cached = adminCache.get(openid)
-  if (cached && cached.expireAt > now) {
-    return cached.value
-  }
-
-  const adminResult = await db.collection('admins')
-    .where({
-      openid,
-      is_active: true
-    })
-    .limit(1)
-    .get()
-
-  const value = adminResult.data.length > 0
-  adminCache.set(openid, {
-    value,
-    expireAt: now + ADMIN_CACHE_TTL_MS
-  })
-  return value
+function trimSlash(value = '') {
+  return String(value || '').trim().replace(/\/+$/, '')
 }
 
-/**
- * 获取学员详情云函数
- * 返回学员信息和附件临时链接
- */
-exports.main = async (event, context) => {
-  const wxContext = cloud.getWXContext()
-  const { student_id } = event
+function getBaseUrl(event) {
+  return trimSlash(
+    event.api_base_url ||
+    process.env.WEB_API_BASE_URL ||
+    process.env.ORIGIN_SYSTEM_BASE_URL ||
+    ''
+  )
+}
 
-  if (!student_id) {
+function toAbsoluteUrl(baseUrl, pathValue) {
+  const raw = String(pathValue || '').trim()
+  if (!raw) return ''
+  if (/^https?:\/\//i.test(raw)) return raw
+  if (raw.startsWith('/')) return `${baseUrl}${raw}`
+  return `${baseUrl}/${raw}`
+}
+
+exports.main = async (event = {}) => {
+  const studentId = String(event.student_id || '').trim()
+  if (!studentId) {
     return {
       error: '参数错误',
       message: '学员ID不能为空'
     }
   }
 
+  const baseUrl = getBaseUrl(event)
+  if (!baseUrl) {
+    return {
+      error: '配置错误',
+      message: '未配置网页系统 API 地址（WEB_API_BASE_URL）'
+    }
+  }
+
   try {
-    // 查询学员信息
-    const result = await db.collection('students')
-      .doc(student_id)
-      .get()
+    const response = await axios.get(`${baseUrl}/api/students/${encodeURIComponent(studentId)}`, {
+      timeout: DEFAULT_TIMEOUT_MS,
+      validateStatus: () => true
+    })
 
-    if (!result.data) {
+    if (response.status < 200 || response.status >= 300) {
+      const msg = response.data && (response.data.error || response.data.message)
       return {
-        error: '学员不存在',
-        message: '未找到该学员信息'
+        error: '查询失败',
+        message: msg || `HTTP ${response.status}`
       }
     }
 
-    const student = result.data
-
-    // 非管理员只能查看自己提交的记录
-    if (student._openid !== wxContext.OPENID) {
-      const isAdmin = await isActiveAdmin(wxContext.OPENID)
-      if (!isAdmin) {
-        return {
-          error: '权限不足',
-          message: '只能查看自己提交的学员信息'
-        }
-      }
+    const student = response.data || {}
+    const withClientId = {
+      ...student,
+      _id: student.id !== undefined && student.id !== null ? String(student.id) : ''
     }
 
-    // 生成附件临时下载链接
-    const fileList = []
     const fileFields = [
       'photo_path',
       'diploma_path',
@@ -85,38 +70,21 @@ exports.main = async (event, context) => {
       'training_form_path'
     ]
 
+    const downloadUrls = {}
     fileFields.forEach(field => {
       if (student[field]) {
-        fileList.push({
-          fileID: student[field],
-          maxAge: 3600 // 1小时有效期
-        })
+        downloadUrls[field] = toAbsoluteUrl(baseUrl, student[field])
       }
     })
 
-    let downloadUrls = {}
-    if (fileList.length > 0) {
-      const tempFileResult = await cloud.getTempFileURL({
-        fileList: fileList
-      })
-
-      tempFileResult.fileList.forEach(file => {
-        const field = fileFields.find(f => student[f] === file.fileID)
-        if (field) {
-          downloadUrls[field] = file.tempFileURL
-        }
-      })
-    }
-
     return {
-      student: student,
-      downloadUrls: downloadUrls
+      student: withClientId,
+      downloadUrls
     }
   } catch (err) {
-    console.error('获取学员详情失败:', err)
     return {
       error: '查询失败',
-      message: err.message
+      message: err.message || '请求网页系统失败'
     }
   }
 }

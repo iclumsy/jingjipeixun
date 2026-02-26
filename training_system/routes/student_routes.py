@@ -65,6 +65,14 @@ def normalize_education(education):
     return EDUCATION_NORMALIZATION_MAP.get(value, value)
 
 
+def parse_bool(value):
+    """Parse truthy query value."""
+    if isinstance(value, bool):
+        return value
+    normalized = str(value or '').strip().lower()
+    return normalized in ('1', 'true', 'yes', 'on')
+
+
 @student_bp.route('/api/students', methods=['POST'])
 def create_student_route():
     """Create a new student."""
@@ -113,6 +121,7 @@ def create_student_route():
         student_payload = data.to_dict(flat=True)
         student_payload['training_type'] = training_type
         student_payload['education'] = normalize_education(student_payload.get('education', ''))
+        student_payload['submitter_openid'] = (data.get('submitter_openid', '') or '').strip()
         student_id = create_student(student_payload, file_paths)
         current_app.logger.info(f'Student created: ID={student_id}')
 
@@ -136,12 +145,30 @@ def get_students_route():
         search = request.args.get('search', '')
         company = request.args.get('company', '')
         training_type = request.args.get('training_type', '')
+        my_only = parse_bool(request.args.get('my_only', False))
+        submitter_openid = (request.args.get('submitter_openid', '') or '').strip()
+        if my_only and not submitter_openid:
+            # fallback: allow openid query alias
+            submitter_openid = (request.args.get('openid', '') or '').strip()
 
-        students = get_students(status, search, company, training_type)
+        students = get_students(status, search, company, training_type, submitter_openid if my_only else '')
         return jsonify(students)
 
     except Exception as e:
         current_app.logger.error(f'Error getting students: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
+
+@student_bp.route('/api/students/<int:id>', methods=['GET'])
+def get_student_route(id):
+    """Get single student detail."""
+    try:
+        student = get_student_by_id(id)
+        return jsonify(student)
+    except NotFoundError as e:
+        return jsonify(e.to_dict()), e.status_code
+    except Exception as e:
+        current_app.logger.error(f'Error getting student {id}: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 
@@ -151,7 +178,7 @@ def update_student_route(id):
     try:
         allowed_text = [
             'name', 'gender', 'education', 'school', 'major', 'id_card', 'phone',
-            'company', 'company_address', 'job_category', 'exam_project', 'project_code', 'training_type'
+            'company', 'company_address', 'job_category', 'exam_project', 'project_code', 'training_type', 'status'
         ]
 
         current_student = get_student_by_id(id)
@@ -300,6 +327,9 @@ def reject_student_route(id):
     try:
         data = request.get_json(silent=True) or {}
         should_delete = data.get('delete', True)
+        target_status = str(data.get('status', 'unreviewed')).strip() or 'unreviewed'
+        if target_status not in ('unreviewed', 'rejected'):
+            target_status = 'unreviewed'
         
         if should_delete:
             student = delete_student(id)
@@ -307,9 +337,9 @@ def reject_student_route(id):
             current_app.logger.info(f'Student rejected and deleted: ID={id}')
             return jsonify({'message': 'Student rejected and deleted'})
         else:
-            student = update_student(id, {'status': 'unreviewed'})
-            current_app.logger.info(f'Student moved to unreviewed: ID={id}')
-            return jsonify({'message': 'Student moved to unreviewed', 'student': student})
+            student = update_student(id, {'status': target_status})
+            current_app.logger.info(f'Student moved to {target_status}: ID={id}')
+            return jsonify({'message': f'Student moved to {target_status}', 'student': student})
 
     except NotFoundError as e:
         return jsonify(e.to_dict()), e.status_code

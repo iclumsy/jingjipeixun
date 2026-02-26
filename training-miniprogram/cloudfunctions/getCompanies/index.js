@@ -1,84 +1,58 @@
-// cloudfunctions/getCompanies/index.js
-const cloud = require('wx-server-sdk')
+const axios = require('axios')
 
-cloud.init({
-  env: cloud.DYNAMIC_CURRENT_ENV
-})
+const DEFAULT_TIMEOUT_MS = 30000
 
-const db = cloud.database()
-const ADMIN_CACHE_TTL_MS = 60 * 1000
-const adminCache = new Map()
-
-async function isActiveAdmin(openid) {
-  const now = Date.now()
-  const cached = adminCache.get(openid)
-  if (cached && cached.expireAt > now) {
-    return cached.value
-  }
-
-  const adminResult = await db.collection('admins')
-    .where({
-      openid,
-      is_active: true
-    })
-    .limit(1)
-    .get()
-
-  const value = adminResult.data.length > 0
-  adminCache.set(openid, {
-    value,
-    expireAt: now + ADMIN_CACHE_TTL_MS
-  })
-  return value
+function trimSlash(value = '') {
+  return String(value || '').trim().replace(/\/+$/, '')
 }
 
-/**
- * 获取公司列表云函数
- * 返回去重后的公司名称列表
- */
-exports.main = async (event, context) => {
-  const wxContext = cloud.getWXContext()
-  const { status = '', training_type = '' } = event
+function getBaseUrl(event) {
+  return trimSlash(
+    event.api_base_url ||
+    process.env.WEB_API_BASE_URL ||
+    process.env.ORIGIN_SYSTEM_BASE_URL ||
+    ''
+  )
+}
+
+exports.main = async (event = {}) => {
+  const { status = '', training_type = '', company = '' } = event
+
+  const baseUrl = getBaseUrl(event)
+  if (!baseUrl) {
+    return {
+      error: '配置错误',
+      message: '未配置网页系统 API 地址（WEB_API_BASE_URL）'
+    }
+  }
 
   try {
-    // 构建查询条件
-    const where = {}
+    const response = await axios.get(`${baseUrl}/api/companies`, {
+      params: {
+        status,
+        training_type,
+        company
+      },
+      timeout: DEFAULT_TIMEOUT_MS,
+      validateStatus: () => true
+    })
 
-    if (status) {
-      where.status = status
+    if (response.status < 200 || response.status >= 300) {
+      const msg = response.data && (response.data.error || response.data.message)
+      return {
+        error: '查询失败',
+        message: msg || `HTTP ${response.status}`
+      }
     }
 
-    if (training_type) {
-      where.training_type = training_type
-    }
-
-    // 查询管理员权限
-    const isAdmin = await isActiveAdmin(wxContext.OPENID)
-
-    // 非管理员只返回自己提交记录里的公司
-    if (!isAdmin) {
-      where._openid = wxContext.OPENID
-    }
-
-    // 查询所有学员
-    const result = await db.collection('students')
-      .where(where)
-      .field({
-        company: true
-      })
-      .get()
-
-    // 去重
-    const companies = [...new Set(result.data.map(item => item.company).filter(c => c))]
-
+    const companies = Array.isArray(response.data) ? response.data : []
     return {
-      companies: companies.sort()
+      companies
     }
   } catch (err) {
-    console.error('获取公司列表失败:', err)
     return {
       error: '查询失败',
-      message: err.message
+      message: err.message || '请求网页系统失败'
     }
   }
 }
