@@ -1,10 +1,11 @@
-<view class="container">
+<view class="container page-entry">
   <!-- 隐私协议弹窗 -->
   <privacy-agreement show="{{showPrivacyAgreement}}" bind:agree="onPrivacyAgree" />
 
   <!-- 加载状态 -->
-  <view class="loading" wx:if="{{loading && !showPrivacyAgreement}}">
-    <view class="loading-icon">⏳</view>
-    <view class="loading-text">加载中...</view>
+  <view class="entry-loading" wx:if="{{loading && !showPrivacyAgreement}}">
+    <view class="loading-ring"></view>
+    <view class="loading-title">正在进入系统</view>
+    <view class="loading-text">请稍候，正在同步账户信息</view>
   </view>
 </view>

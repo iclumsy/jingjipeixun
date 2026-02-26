@@ -1,30 +1,31 @@
-<!-- components/student-card/student-card.wxml -->
-<view class="student-card card-{{statusClass}}" bindtap="onTap">
-  <view class="card-top">
-    <view class="name-wrap">
-      <view class="student-name">{{student.name || '-'}}</view>
-      <view class="time-mini">{{createTime}}</view>
-    </view>
-    <view class="status-badge badge-{{statusClass}}">{{statusText}}</view>
+<view class="student-card card-{{statusClass}} tap-feedback fade-enter" bindtap="onTap">
+  <view class="card-head">
+    <view class="student-name">{{student.name || '未填写姓名'}}</view>
+    <view class="status-badge badge-{{statusClass}}">{{statusText || '-'}}</view>
   </view>
 
-  <view class="meta-chips">
-    <view class="chip">{{trainingTypeText || '-'}}</view>
-    <view class="chip">{{student.job_category || '-'}}</view>
+  <view class="meta-row">
+    <text class="meta-chip">{{trainingTypeText || '-'}}</text>
+    <text class="meta-chip">{{student.job_category || '-'}}</text>
   </view>
 
-  <view class="info-list">
-    <view class="info-line">
-      <text class="info-label">单位</text>
-      <text class="info-value">{{student.company || '-'}}</text>
+  <view class="detail-list">
+    <view class="detail-line">
+      <text class="detail-label">单位</text>
+      <text class="detail-value">{{student.company || '-'}}</text>
     </view>
-    <view class="info-line">
-      <text class="info-label">证件</text>
-      <text class="info-value">{{student.id_card || '-'}}</text>
+    <view class="detail-line">
+      <text class="detail-label">证件</text>
+      <text class="detail-value">{{student.id_card || '-'}}</text>
     </view>
-    <view class="info-line">
-      <text class="info-label">手机</text>
-      <text class="info-value">{{student.phone || '-'}}</text>
+    <view class="detail-line">
+      <text class="detail-label">手机</text>
+      <text class="detail-value">{{student.phone || '-'}}</text>
     </view>
+  </view>
+
+  <view class="card-foot">
+    <text class="time-text">{{createTime || '-'}}</text>
+    <text class="entry-text">查看详情</text>
   </view>
 </view>

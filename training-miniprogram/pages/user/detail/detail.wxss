@@ -1,17 +1,17 @@
 .page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #f5f7fa 0%, #ffffff 100%);
+  background: linear-gradient(180deg, #f4f8ff 0%, #f6f9ff 35%);
   position: relative;
 }
 
 .header-bg {
   position: absolute;
-  top: 0;
   left: 0;
   right: 0;
+  top: 0;
   height: 220rpx;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 0 0 40rpx 40rpx;
+  border-radius: 0 0 44rpx 44rpx;
+  background: linear-gradient(135deg, #2f6af5 0%, #43a6ff 100%);
 }
 
 .container {
@@ -21,107 +21,99 @@
 }
 
 .page-header {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  margin-bottom: 24rpx;
+  margin-bottom: 22rpx;
   color: #ffffff;
-}
-
-.title-wrap {
-  min-width: 0;
 }
 
 .title {
   font-size: 38rpx;
   font-weight: 700;
-  letter-spacing: 1rpx;
+  letter-spacing: 0.5rpx;
 }
 
 .subtitle {
-  margin-top: 6rpx;
+  margin-top: 8rpx;
   font-size: 22rpx;
-  opacity: 0.9;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .section-card {
   background: #ffffff;
-  border-radius: 20rpx;
-  padding: 28rpx 24rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.05);
+  border-radius: 24rpx;
+  border: 1rpx solid #dce6f2;
+  box-shadow: 0 8rpx 24rpx rgba(26, 41, 67, 0.08);
+  padding: 26rpx 22rpx;
+  margin-bottom: 18rpx;
 }
 
 .summary-card {
-  background: linear-gradient(180deg, #ffffff 0%, #f8f9ff 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
 }
 
 .summary-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 12rpx;
+  justify-content: space-between;
+  gap: 10rpx;
 }
 
 .summary-title {
-  font-size: 32rpx;
+  font-size: 31rpx;
   font-weight: 700;
-  color: #1f2937;
+  color: #0f172a;
 }
 
 .status-tag {
-  border-radius: 20rpx;
+  border-radius: 999rpx;
   padding: 6rpx 16rpx;
   font-size: 22rpx;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .status-unreviewed {
-  background: #fff5db;
-  color: #a35b00;
+  background: #fff6df;
+  color: #9a5600;
 }
 
 .status-reviewed {
-  background: #e6f8ed;
-  color: #1a7f42;
+  background: #eaf9ef;
+  color: #15803d;
 }
 
 .status-rejected {
-  background: #feeceb;
-  color: #bc2a25;
+  background: #ffeceb;
+  color: #b42318;
 }
 
 .summary-hint {
-  font-size: 24rpx;
-  color: #52607a;
-  line-height: 1.5;
-  margin-bottom: 8rpx;
+  margin-top: 10rpx;
+  font-size: 23rpx;
+  line-height: 1.55;
+  color: #6b7c93;
 }
 
 .summary-meta {
-  font-size: 24rpx;
-  color: #64748b;
-  line-height: 1.8;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #6b7c93;
 }
 
 .card-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 24rpx;
-  padding-bottom: 14rpx;
-  border-bottom: 2rpx solid #f0f0f0;
+  margin-bottom: 20rpx;
+  padding-bottom: 12rpx;
+  border-bottom: 1rpx solid #e9eff7;
 }
 
 .card-title {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #333;
+  font-size: 29rpx;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .info-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20rpx 18rpx;
+  gap: 16rpx;
 }
 
 .info-item {
@@ -134,40 +126,39 @@
 
 .info-label {
   display: block;
-  font-size: 22rpx;
-  color: #64748b;
-  margin-bottom: 8rpx;
+  font-size: 21rpx;
+  color: #9aa8bc;
+  margin-bottom: 6rpx;
 }
 
 .info-value {
   display: block;
-  font-size: 27rpx;
-  color: #1f2937;
-  line-height: 1.4;
+  font-size: 26rpx;
+  color: #334155;
+  line-height: 1.45;
   word-break: break-all;
 }
 
 .action-card {
-  padding: 24rpx;
+  background: linear-gradient(180deg, #f7fbff 0%, #ffffff 100%);
 }
 
 .action-title {
   font-size: 24rpx;
-  color: #52607a;
-  margin-bottom: 16rpx;
+  color: #6b7c93;
 }
 
 .edit-btn {
-  margin: 0;
+  margin-top: 14rpx;
   width: 100%;
-  height: 80rpx;
-  line-height: 80rpx;
+  height: 78rpx;
+  line-height: 78rpx;
   border: none;
-  border-radius: 40rpx;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #2f6af5 0%, #3a82ff 100%);
   color: #ffffff;
   font-size: 28rpx;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .edit-btn::after {
@@ -177,34 +168,33 @@
 .attachments-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14rpx;
+  gap: 12rpx;
 }
 
 .attachment-item {
-  border: 2rpx solid #edf1f7;
-  border-radius: 14rpx;
+  border-radius: 12rpx;
   overflow: hidden;
-  background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+  border: 1rpx solid #dce6f2;
+  background: #f8fbff;
 }
 
 .attachment-image {
   width: 100%;
-  height: 250rpx;
+  height: 220rpx;
   display: block;
 }
 
 .attachment-label {
   display: block;
-  padding: 12rpx;
   text-align: center;
-  font-size: 22rpx;
-  color: #52607a;
-  background: rgba(15, 23, 42, 0.03);
+  padding: 10rpx 8rpx;
+  font-size: 21rpx;
+  color: #6b7c93;
 }
 
 .loading {
   text-align: center;
-  padding: 200rpx 0;
-  color: #94a3b8;
-  font-size: 26rpx;
+  padding: 150rpx 0 100rpx;
+  color: #9aa8bc;
+  font-size: 24rpx;
 }

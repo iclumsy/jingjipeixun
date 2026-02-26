@@ -1,11 +1,11 @@
 <!-- pages/admin/export/export.wxml -->
-<view class="container">
-  <view class="header card">
+<view class="page container">
+  <view class="header card fade-enter">
     <view class="header-title">数据导出</view>
     <view class="header-desc">导出学员数据为Excel文件</view>
   </view>
 
-  <view class="filter-section card">
+  <view class="filter-section card fade-enter">
     <view class="section-title">导出条件</view>
 
     <view class="form-group">
@@ -30,7 +30,7 @@
     </view>
   </view>
 
-  <view class="info-section card">
+  <view class="info-section card fade-enter">
     <view class="info-item">
       <text class="info-label">预计导出数量：</text>
       <text class="info-value">{{estimatedCount}} 条</text>

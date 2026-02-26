@@ -7,6 +7,10 @@ const {
   getIdCardError,
   getPhoneError
 } = require('../../../utils/validators')
+const {
+  readJobCategoriesCache,
+  writeJobCategoriesCache
+} = require('../../../utils/job-categories-cache')
 
 const STATUS_TEXT_MAP = {
   unreviewed: '待审核',
@@ -88,8 +92,18 @@ Page({
 
   async loadJobCategories() {
     try {
+      const cachedCategories = readJobCategoriesCache()
+      if (cachedCategories) {
+        this.setData({
+          jobCategories: cachedCategories
+        })
+        this.updateJobCategoryNames()
+        return
+      }
+
       const res = await api.getJobCategories()
       if (res && res.success && res.data) {
+        writeJobCategoriesCache(res.data)
         this.setData({
           jobCategories: res.data
         })

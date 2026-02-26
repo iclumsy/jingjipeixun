@@ -1,8 +1,10 @@
-<!-- pages/user/list/list.wxml -->
-<view class="container">
-  <view class="list-header" wx:if="{{students.length > 0}}">
-    <view class="header-title">我的提交</view>
-    <view class="header-count">当前 {{students.length}} 条</view>
+<view class="page container">
+  <view class="summary-card card fade-enter">
+    <view class="summary-top">
+      <view class="summary-title">我的提交</view>
+      <view class="summary-count">{{students.length}} 条</view>
+    </view>
+    <view class="summary-desc">待审核和已通过记录仅查看，已驳回记录可进入编辑后重新提交。</view>
   </view>
 
   <view class="student-list">
@@ -20,13 +22,14 @@
     </view>
 
     <view class="no-more" wx:if="{{!loading && !hasMore && students.length > 0}}">
-      <text>没有更多了</text>
+      <text>已显示全部记录</text>
     </view>
 
-    <view class="empty" wx:if="{{!loading && students.length === 0}}">
-      <view class="empty-dot"></view>
-      <view class="empty-text">暂无提交记录</view>
-      <button class="btn btn-primary mt-24" bindtap="goToSubmit">去提交</button>
+    <view class="state-wrap" wx:if="{{!loading && students.length === 0}}">
+      <view class="state-dot"></view>
+      <view class="state-title">暂无提交记录</view>
+      <view class="state-desc">填写学员信息后会显示在这里</view>
+      <button class="btn btn-primary action-btn" bindtap="goToSubmit">去提交</button>
     </view>
   </view>
 </view>

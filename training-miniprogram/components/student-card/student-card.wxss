@@ -1,108 +1,146 @@
-/* components/student-card/student-card.wxss */
 .student-card {
-  background: linear-gradient(180deg, #ffffff 0%, #fafbfd 100%);
-  border-radius: 14rpx;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  border-radius: 18rpx;
+  border: 1rpx solid #dce6f2;
+  box-shadow: 0 8rpx 24rpx rgba(26, 41, 67, 0.08);
   padding: 20rpx 18rpx;
   margin-bottom: 14rpx;
-  box-shadow: 0 4rpx 14rpx rgba(30, 41, 59, 0.06);
-  border: 1rpx solid #e8edf4;
-  transition: transform 0.2s;
+  box-sizing: border-box;
 }
 
-.student-card:active {
+.tap-feedback {
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.tap-feedback:active {
   transform: scale(0.99);
+  opacity: 0.92;
 }
 
-.card-top {
+.fade-enter {
+  animation: fadeEnter 0.24s ease both;
+}
+
+.card-head {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 12rpx;
-}
-
-.name-wrap {
-  min-width: 0;
-}
-
-.time-mini {
-  font-size: 20rpx;
-  color: #94a3b8;
-  margin-top: 4rpx;
+  justify-content: space-between;
+  gap: 12rpx;
 }
 
 .student-name {
+  flex: 1;
+  min-width: 0;
   font-size: 30rpx;
-  font-weight: 600;
-  color: var(--text-primary);
-  line-height: 1.2;
+  font-weight: 700;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .status-badge {
+  border-radius: 999rpx;
   padding: 4rpx 14rpx;
-  border-radius: 20rpx;
   font-size: 20rpx;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .badge-unreviewed {
-  background-color: #fff5db;
-  color: #a35b00;
+  background: #fff6df;
+  color: #9a5600;
 }
 
 .badge-reviewed {
-  background-color: #e6f8ed;
-  color: #1a7f42;
+  background: #eaf9ef;
+  color: #15803d;
 }
 
 .badge-rejected {
-  background-color: #feeceb;
-  color: #bc2a25;
+  background: #ffeceb;
+  color: #b42318;
 }
 
-.meta-chips {
-  display: flex;
-  gap: 8rpx;
-  margin-bottom: 12rpx;
-}
-
-.chip {
-  max-width: 50%;
-  padding: 4rpx 10rpx;
-  border-radius: 8rpx;
-  background: #eef2ff;
-  color: #4258a9;
-  font-size: 20rpx;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.info-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6rpx;
-}
-
-.info-line {
+.meta-row {
   display: flex;
   align-items: center;
-  font-size: 23rpx;
-  line-height: 1.4;
-  min-width: 0;
+  gap: 8rpx;
+  margin-top: 12rpx;
 }
 
-.info-label {
-  color: #64748b;
-  width: 72rpx;
-  flex: 0 0 72rpx;
-}
-
-.info-value {
-  color: #1f2937;
-  flex: 1;
-  min-width: 0;
+.meta-chip {
+  max-width: 50%;
+  border-radius: 10rpx;
+  border: 1rpx solid #dfe9f6;
+  background: #f2f7ff;
+  color: #2f5fc8;
+  font-size: 20rpx;
+  line-height: 1;
+  padding: 8rpx 10rpx;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  word-break: break-all;
+}
+
+.detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  margin-top: 14rpx;
+}
+
+.detail-line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-size: 23rpx;
+  line-height: 1.45;
+}
+
+.detail-label {
+  width: 72rpx;
+  flex: 0 0 72rpx;
+  color: #6b7c93;
+}
+
+.detail-value {
+  flex: 1;
+  min-width: 0;
+  color: #334155;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-foot {
+  margin-top: 14rpx;
+  padding-top: 12rpx;
+  border-top: 1rpx dashed #e9eff7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10rpx;
+}
+
+.time-text {
+  font-size: 20rpx;
+  color: #9aa8bc;
+}
+
+.entry-text {
+  font-size: 22rpx;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+@keyframes fadeEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8rpx);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

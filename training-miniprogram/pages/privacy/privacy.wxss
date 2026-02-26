@@ -1,85 +1,90 @@
-/* pages/privacy/privacy.wxss */
+.container {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f4f8ff 0%, #f6f9ff 38%);
+}
+
 .privacy-content {
-  padding: 32rpx;
-  padding-bottom: 100rpx;
+  padding: 24rpx;
+  padding-bottom: calc(100rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(100rpx + constant(safe-area-inset-bottom));
 }
 
 .title {
-  font-size: 48rpx;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #0f172a;
   text-align: center;
-  margin-bottom: 32rpx;
+  margin-bottom: 14rpx;
 }
 
 .update-time,
 .effective-time {
-  font-size: 24rpx;
-  color: var(--text-secondary);
+  font-size: 22rpx;
+  color: #9aa8bc;
   text-align: center;
-  margin-bottom: 8rpx;
+  line-height: 1.5;
 }
 
 .section {
-  margin-bottom: 48rpx;
+  margin-top: 18rpx;
+  padding: 22rpx 20rpx;
+  border-radius: 18rpx;
+  border: 1rpx solid #dce6f2;
+  background: #ffffff;
+  box-shadow: 0 4rpx 14rpx rgba(21, 36, 64, 0.05);
 }
 
 .section-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 24rpx;
-  padding-left: 16rpx;
-  border-left: 6rpx solid var(--primary-color);
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 14rpx;
 }
 
 .subsection {
-  margin-bottom: 32rpx;
+  margin-bottom: 20rpx;
+}
+
+.subsection:last-child {
+  margin-bottom: 0;
 }
 
 .subsection-title {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: 16rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 10rpx;
 }
 
 .section-text {
-  font-size: 28rpx;
-  line-height: 1.8;
-  color: var(--text-secondary);
   display: block;
-  margin-bottom: 16rpx;
+  font-size: 24rpx;
+  color: #6b7c93;
+  line-height: 1.75;
 }
 
 .list {
-  margin: 16rpx 0;
+  margin-top: 10rpx;
 }
 
 .list-item {
-  font-size: 28rpx;
-  line-height: 1.8;
-  color: var(--text-secondary);
   display: block;
-  margin-bottom: 12rpx;
-  padding-left: 16rpx;
+  font-size: 24rpx;
+  color: #6b7c93;
+  line-height: 1.75;
 }
 
 .contact-info {
-  background-color: var(--bg-gray);
-  padding: 24rpx;
-  border-radius: var(--radius-md);
-  margin: 16rpx 0;
+  margin: 10rpx 0;
+  background: #f6faff;
+  border: 1rpx solid #dde8f6;
+  border-radius: 12rpx;
+  padding: 14rpx 16rpx;
 }
 
 .contact-item {
-  font-size: 28rpx;
-  line-height: 1.8;
-  color: var(--text-primary);
   display: block;
-  margin-bottom: 8rpx;
-}
-
-.contact-item:last-child {
-  margin-bottom: 0;
+  font-size: 24rpx;
+  color: #334155;
+  line-height: 1.7;
 }

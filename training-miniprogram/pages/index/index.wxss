@@ -1,14 +1,45 @@
-.loading {
-  text-align: center;
-  padding: 200rpx 0;
+.page-entry {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f4f8ff 0%, #f6f9ff 45%);
 }
 
-.loading-icon {
-  font-size: 96rpx;
-  margin-bottom: 32rpx;
+.entry-loading {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.loading-ring {
+  width: 78rpx;
+  height: 78rpx;
+  border-radius: 50%;
+  border: 6rpx solid #d9e7ff;
+  border-top-color: #2f6af5;
+  animation: spin 0.9s linear infinite;
+}
+
+.loading-title {
+  margin-top: 22rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .loading-text {
-  font-size: 28rpx;
-  color: var(--text-light);
+  margin-top: 10rpx;
+  font-size: 23rpx;
+  color: #6b7c93;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }

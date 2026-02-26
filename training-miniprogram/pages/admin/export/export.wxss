@@ -1,69 +1,81 @@
-/* pages/admin/export/export.wxss */
+.page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f4f8ff 0%, #f6f9ff 35%);
+}
+
 .header {
-  margin-bottom: 24rpx;
+  margin-bottom: 14rpx;
 }
 
 .header-title {
-  font-size: 36rpx;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 8rpx;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .header-desc {
-  font-size: 24rpx;
-  color: var(--text-secondary);
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #6b7c93;
 }
 
 .filter-section {
-  margin-bottom: 24rpx;
+  margin-bottom: 14rpx;
 }
 
 .section-title {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: 24rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 18rpx;
 }
 
 .picker-value {
-  padding: 16rpx 24rpx;
-  border: 2rpx solid var(--border-color);
-  border-radius: var(--radius-md);
-  font-size: 28rpx;
-  background-color: var(--bg-white);
+  height: 74rpx;
+  padding: 0 18rpx;
+  border: 2rpx solid #dce6f2;
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  color: #334155;
+  background: #f7fbff;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
 }
 
 .info-section {
-  margin-bottom: 24rpx;
+  margin-bottom: 16rpx;
 }
 
 .info-item {
   display: flex;
   align-items: center;
-  margin-bottom: 16rpx;
+  gap: 8rpx;
 }
 
 .info-label {
-  font-size: 28rpx;
-  color: var(--text-secondary);
+  font-size: 24rpx;
+  color: #6b7c93;
 }
 
 .info-value {
   font-size: 32rpx;
-  font-weight: 600;
-  color: var(--primary-color);
+  font-weight: 700;
+  color: #1d4ed8;
 }
 
 .info-hint {
-  font-size: 24rpx;
-  color: var(--text-light);
+  margin-top: 8rpx;
+  font-size: 21rpx;
+  color: #9aa8bc;
 }
 
 .actions {
-  padding: 24rpx 0;
+  padding: 6rpx 0 24rpx;
 }
 
 .actions .btn {
   width: 100%;
+  height: 80rpx;
+  font-size: 28rpx;
 }

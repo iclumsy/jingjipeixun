@@ -8,12 +8,12 @@ const {
   getPhoneError
 } = require('../../../utils/validators')
 const { EDUCATION_OPTIONS } = require('../../../utils/constants')
+const {
+  readJobCategoriesCache,
+  writeJobCategoriesCache
+} = require('../../../utils/job-categories-cache')
 
 const FORCE_CREATE_SUBMIT_KEY = 'submit_force_create_mode'
-const JOB_CATEGORIES_CACHE_KEY = 'job_categories_cache_v1'
-const JOB_CATEGORIES_CACHE_TTL_MS = 5 * 60 * 1000
-let memoryJobCategories = null
-let memoryJobCategoriesAt = 0
 
 function createEmptyStudent() {
   return {
@@ -35,38 +35,6 @@ function createEmptyStudent() {
     examProjects: [],
     files: {}
   }
-}
-
-function readCachedJobCategories() {
-  const now = Date.now()
-  if (memoryJobCategories && now - memoryJobCategoriesAt < JOB_CATEGORIES_CACHE_TTL_MS) {
-    return memoryJobCategories
-  }
-
-  const cached = wx.getStorageSync(JOB_CATEGORIES_CACHE_KEY)
-  if (!cached || !cached.data || !cached.updatedAt) {
-    return null
-  }
-  if (now - Number(cached.updatedAt) >= JOB_CATEGORIES_CACHE_TTL_MS) {
-    return null
-  }
-
-  memoryJobCategories = cached.data
-  memoryJobCategoriesAt = Number(cached.updatedAt)
-  return memoryJobCategories
-}
-
-function writeCachedJobCategories(data) {
-  if (!data || typeof data !== 'object') {
-    return
-  }
-  const updatedAt = Date.now()
-  memoryJobCategories = data
-  memoryJobCategoriesAt = updatedAt
-  wx.setStorageSync(JOB_CATEGORIES_CACHE_KEY, {
-    data,
-    updatedAt
-  })
 }
 
 Page({
@@ -124,7 +92,7 @@ Page({
 
   async loadJobCategories() {
     try {
-      const cachedCategories = readCachedJobCategories()
+      const cachedCategories = readJobCategoriesCache()
       if (cachedCategories) {
         this.setData({
           jobCategories: cachedCategories
@@ -135,7 +103,7 @@ Page({
 
       const res = await api.getJobCategories()
       if (res && res.success && res.data) {
-        writeCachedJobCategories(res.data)
+        writeJobCategoriesCache(res.data)
         this.setData({
           jobCategories: res.data
         })

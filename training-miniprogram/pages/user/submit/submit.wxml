@@ -8,12 +8,15 @@
     <view class="page-header">
       <view class="brand-row">
         <image class="brand-logo" src="/images/logo.png" mode="aspectFit"></image>
-        <view class="title">学员信息采集</view>
+        <view>
+          <view class="title">学员信息采集</view>
+          <view class="page-subtitle">提交后可在我的提交中查看审核状态</view>
+        </view>
       </view>
     </view>
 
     <!-- 培训类型选择 -->
-    <view class="section-card type-selector">
+    <view class="section-card type-selector fade-enter">
       <view class="card-header">
         <view class="card-title">培训类型</view>
       </view>
@@ -48,7 +51,7 @@
     </view>
 
     <!-- 基本信息 -->
-    <view class="section-card">
+    <view class="section-card fade-enter">
       <view class="card-header">
         <view class="card-title">基本信息</view>
       </view>
@@ -104,7 +107,7 @@
     </view>
 
     <!-- 单位信息 -->
-    <view class="section-card">
+    <view class="section-card fade-enter">
       <view class="card-header">
         <view class="card-title">单位信息</view>
       </view>
@@ -121,7 +124,7 @@
     </view>
 
     <!-- 附件上传 -->
-    <view class="section-card">
+    <view class="section-card fade-enter">
       <view class="card-header">
         <view class="card-title">附件上传</view>
       </view>

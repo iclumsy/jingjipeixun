@@ -1,11 +1,11 @@
 <!-- pages/admin/batch/batch.wxml -->
-<view class="container">
-  <view class="header card">
+<view class="page container">
+  <view class="header card fade-enter">
     <view class="header-title">批量操作</view>
     <view class="header-desc">选择学员进行批量审核或删除</view>
   </view>
 
-  <view class="filter-section card">
+  <view class="filter-section card fade-enter">
     <view class="section-title">筛选条件</view>
     <view class="filter-row">
       <picker mode="selector" range="{{statusOptions}}" value="{{statusIndex}}" bindchange="onStatusChange">
@@ -38,9 +38,10 @@
       </block>
     </checkbox-group>
 
-    <view class="empty" wx:if="{{students.length === 0}}">
-      <view class="empty-icon">📋</view>
-      <view class="empty-text">暂无学员</view>
+    <view class="state-wrap" wx:if="{{students.length === 0}}">
+      <view class="state-dot"></view>
+      <view class="state-title">暂无学员</view>
+      <view class="state-desc">请切换筛选条件后重试</view>
     </view>
   </view>
 

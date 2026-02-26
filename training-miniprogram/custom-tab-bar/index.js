@@ -1,4 +1,3 @@
-const EDIT_STUDENT_ID_KEY = 'submit_edit_student_id'
 const FORCE_CREATE_SUBMIT_KEY = 'submit_force_create_mode'
 
 Component({
@@ -45,17 +44,17 @@ Component({
         {
           pagePath: "/pages/user/submit/submit",
           text: "信息采集",
-          icon: "📝"
+          iconText: "填"
         },
         {
           pagePath: "/pages/user/list/list",
           text: "我的提交",
-          icon: "📋"
+          iconText: "单"
         },
         {
           pagePath: "/pages/admin/review/review",
           text: "审核管理",
-          icon: "✅"
+          iconText: "审"
         }
       ]
 
@@ -92,7 +91,6 @@ Component({
 
     markForceCreateSubmitEntry(url) {
       if (url !== '/pages/user/submit/submit') return
-      wx.removeStorageSync(EDIT_STUDENT_ID_KEY)
       wx.setStorageSync(FORCE_CREATE_SUBMIT_KEY, true)
     },
 

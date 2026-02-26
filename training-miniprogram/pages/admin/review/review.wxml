@@ -1,8 +1,16 @@
 <view class="page">
-  <view class="filter-card card">
-    <view class="filter-group">
-      <view class="filter-inline">
-        <view class="group-title">审核状态</view>
+  <view class="container">
+    <view class="top-card card fade-enter">
+      <view class="top-row">
+        <view class="top-title">审核管理</view>
+        <view class="top-count">当前 {{records.length}} 条</view>
+      </view>
+      <view class="top-desc">支持按状态、培训类型、公司筛选；可直接通过、驳回或删除记录。</view>
+    </view>
+
+    <view class="filter-card card fade-enter">
+      <view class="filter-row">
+        <view class="filter-title">状态</view>
         <view class="chip-list">
           <view
             wx:for="{{statusFilters}}"
@@ -15,11 +23,9 @@
           </view>
         </view>
       </view>
-    </view>
 
-    <view class="filter-group">
-      <view class="filter-inline">
-        <view class="group-title">培训类型</view>
+      <view class="filter-row">
+        <view class="filter-title">类型</view>
         <view class="chip-list">
           <view
             wx:for="{{trainingTypeFilters}}"
@@ -32,87 +38,87 @@
           </view>
         </view>
       </view>
-    </view>
 
-    <view class="filter-group">
-      <view class="filter-inline">
-        <view class="group-title">公司</view>
-        <view class="picker-wrap">
+      <view class="filter-row">
+        <view class="filter-title">公司</view>
+        <view class="company-picker">
           <picker mode="selector" range="{{companyOptions}}" value="{{companyIndex}}" bindchange="onCompanyChange">
             <view class="picker-value">{{companyOptions[companyIndex] || '全部'}}</view>
           </picker>
         </view>
       </view>
     </view>
-  </view>
 
-  <view class="record-list">
-    <view
-      wx:for="{{records}}"
-      wx:key="_id"
-      class="record-card"
-      bindtap="openDetail"
-      data-id="{{item._id}}"
-    >
-      <view class="card-top">
-        <view class="name-wrap">
-          <view class="student-name">{{item.name || '-'}}</view>
-          <view class="time-mini">{{item.submitTimeText}}</view>
+    <view class="record-list">
+      <view
+        wx:for="{{records}}"
+        wx:key="_id"
+        class="record-card tap-feedback fade-enter"
+        bindtap="openDetail"
+        data-id="{{item._id}}"
+      >
+        <view class="card-head">
+          <view class="name-wrap">
+            <view class="student-name">{{item.name || '-'}}</view>
+            <view class="time-text">{{item.submitTimeText}}</view>
+          </view>
+          <view class="status-badge badge-{{item.status}}">{{item.statusText}}</view>
         </view>
-        <view class="status-badge badge-{{item.status}}">{{item.statusText}}</view>
+
+        <view class="meta-row">
+          <text class="meta-chip">{{item.trainingTypeText || '-'}}</text>
+          <text class="meta-chip">{{item.job_category || '-'}}</text>
+        </view>
+
+        <view class="detail-list">
+          <view class="detail-line">
+            <text class="detail-label">单位</text>
+            <text class="detail-value">{{item.company || '-'}}</text>
+          </view>
+          <view class="detail-line">
+            <text class="detail-label">证件</text>
+            <text class="detail-value">{{item.id_card || '-'}}</text>
+          </view>
+          <view class="detail-line">
+            <text class="detail-label">手机</text>
+            <text class="detail-value">{{item.phone || '-'}}</text>
+          </view>
+        </view>
+
+        <view class="record-actions">
+          <button
+            class="action-btn btn-approve {{item.status !== 'unreviewed' ? 'disabled' : ''}}"
+            size="mini"
+            catchtap="onApproveTap"
+            data-id="{{item._id}}"
+            data-status="{{item.status}}"
+            disabled="{{item.status !== 'unreviewed'}}"
+          >审核通过</button>
+          <button
+            class="action-btn btn-reject {{item.status !== 'unreviewed' ? 'disabled' : ''}}"
+            size="mini"
+            catchtap="onRejectTap"
+            data-id="{{item._id}}"
+            data-status="{{item.status}}"
+            disabled="{{item.status !== 'unreviewed'}}"
+          >驳回</button>
+          <button
+            class="action-btn btn-delete"
+            size="mini"
+            catchtap="onDeleteTap"
+            data-id="{{item._id}}"
+          >删除</button>
+        </view>
       </view>
 
-      <view class="meta-chips">
-        <view class="meta-chip">{{item.trainingTypeText}}</view>
-        <view class="meta-chip">{{item.job_category || '-'}}</view>
+      <view class="loading" wx:if="{{loading && !refreshing}}">加载中...</view>
+      <view class="no-more" wx:if="{{!loading && !hasMore && records.length > 0}}">已显示全部记录</view>
+
+      <view class="state-wrap" wx:if="{{!loading && records.length === 0}}">
+        <view class="state-dot"></view>
+        <view class="state-title">暂无符合条件的记录</view>
+        <view class="state-desc">可切换筛选项或下拉刷新后重试</view>
       </view>
-
-      <view class="info-list">
-        <view class="info-line">
-          <text class="info-label">单位</text>
-          <text class="info-value">{{item.company || '-'}}</text>
-        </view>
-        <view class="info-line">
-          <text class="info-label">证件</text>
-          <text class="info-value">{{item.id_card || '-'}}</text>
-        </view>
-        <view class="info-line">
-          <text class="info-label">手机</text>
-          <text class="info-value">{{item.phone || '-'}}</text>
-        </view>
-      </view>
-
-      <view class="record-actions">
-        <button
-          class="action-btn btn-approve {{item.status !== 'unreviewed' ? 'disabled' : ''}}"
-          size="mini"
-          catchtap="onApproveTap"
-          data-id="{{item._id}}"
-          data-status="{{item.status}}"
-          disabled="{{item.status !== 'unreviewed'}}"
-        >审核通过</button>
-        <button
-          class="action-btn btn-reject {{item.status !== 'unreviewed' ? 'disabled' : ''}}"
-          size="mini"
-          catchtap="onRejectTap"
-          data-id="{{item._id}}"
-          data-status="{{item.status}}"
-          disabled="{{item.status !== 'unreviewed'}}"
-        >驳回</button>
-        <button
-          class="action-btn btn-delete"
-          size="mini"
-          catchtap="onDeleteTap"
-          data-id="{{item._id}}"
-        >删除</button>
-      </view>
-    </view>
-
-    <view class="loading" wx:if="{{loading && !refreshing}}">加载中...</view>
-    <view class="no-more" wx:if="{{!loading && !hasMore && records.length > 0}}">没有更多记录了</view>
-
-    <view class="empty" wx:if="{{!loading && records.length === 0}}">
-      <view class="empty-text">暂无符合条件的审核记录</view>
     </view>
   </view>
 </view>

@@ -1,219 +1,262 @@
 .page {
-  padding: 24rpx;
   min-height: 100vh;
-  background: linear-gradient(180deg, #f4f7fb 0%, #ffffff 35%);
+  background: linear-gradient(180deg, #f4f8ff 0%, #f6f9ff 35%);
 }
 
-.filter-card {
-  margin-bottom: 20rpx;
+.container {
+  padding: 24rpx;
+  box-sizing: border-box;
+  padding-bottom: calc(150rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(150rpx + constant(safe-area-inset-bottom));
 }
 
-.filter-group {
+.top-card {
   margin-bottom: 14rpx;
 }
 
-.filter-group:last-child {
-  margin-bottom: 0;
+.top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10rpx;
 }
 
-.filter-inline {
+.top-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.top-count {
+  border-radius: 999rpx;
+  background: #e8f1ff;
+  color: #1d4ed8;
+  font-size: 22rpx;
+  font-weight: 600;
+  padding: 8rpx 14rpx;
+}
+
+.top-desc {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: #6b7c93;
+  line-height: 1.6;
+}
+
+.filter-card {
+  margin-bottom: 16rpx;
+}
+
+.filter-row {
   display: flex;
   align-items: flex-start;
   gap: 12rpx;
+  margin-bottom: 12rpx;
 }
 
-.group-title {
-  font-size: 26rpx;
-  color: var(--text-primary);
+.filter-row:last-child {
+  margin-bottom: 0;
+}
+
+.filter-title {
+  width: 76rpx;
+  flex: 0 0 76rpx;
+  line-height: 54rpx;
+  font-size: 24rpx;
+  color: #334155;
   font-weight: 600;
-  line-height: 56rpx;
-  flex: 0 0 108rpx;
 }
 
 .chip-list {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 8rpx;
+}
+
+.filter-chip {
+  border-radius: 999rpx;
+  border: 2rpx solid #d0def0;
+  background: #f7fbff;
+  color: #6b7c93;
+  padding: 8rpx 16rpx;
+  font-size: 22rpx;
+  line-height: 1;
+}
+
+.filter-chip.active {
+  border-color: transparent;
+  background: linear-gradient(135deg, #2f6af5 0%, #3a82ff 100%);
+  color: #ffffff;
+}
+
+.company-picker {
   flex: 1;
   min-width: 0;
 }
 
-.filter-chip {
-  font-size: 22rpx;
-  color: var(--text-secondary);
-  border: 2rpx solid #d8deea;
-  background: #f7f9fc;
-  border-radius: 24rpx;
-  padding: 8rpx 18rpx;
-}
-
-.filter-chip.active {
-  color: #ffffff;
-  border-color: #3558d8;
-  background: linear-gradient(135deg, #3558d8 0%, #4d6ef2 100%);
-}
-
-.picker-wrap {
-  flex: 1;
-}
-
 .picker-value {
-  height: 56rpx;
+  width: 100%;
+  height: 54rpx;
   border-radius: 12rpx;
-  border: 2rpx solid #d8deea;
-  background: #f7f9fc;
-  padding: 0 16rpx;
+  border: 2rpx solid #d0def0;
+  background: #f7fbff;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  font-size: 24rpx;
-  color: var(--text-primary);
+  padding: 0 14rpx;
+  font-size: 23rpx;
+  color: #334155;
 }
 
 .record-list {
-  padding-bottom: 40rpx;
+  min-height: 420rpx;
 }
 
 .record-card {
-  background: linear-gradient(180deg, #ffffff 0%, #fafbfd 100%);
-  border-radius: 14rpx;
-  padding: 20rpx 18rpx;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  border: 1rpx solid #dce6f2;
+  border-radius: 18rpx;
+  box-shadow: 0 8rpx 24rpx rgba(26, 41, 67, 0.08);
+  padding: 18rpx;
   margin-bottom: 14rpx;
-  box-shadow: 0 4rpx 14rpx rgba(30, 41, 59, 0.06);
-  border: 1rpx solid #e8edf4;
+  box-sizing: border-box;
 }
 
-.record-card:active {
-  transform: scale(0.99);
-}
-
-.card-top {
+.card-head {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 12rpx;
+  justify-content: space-between;
+  gap: 10rpx;
 }
 
 .name-wrap {
   min-width: 0;
-}
-
-.time-mini {
-  font-size: 20rpx;
-  color: #94a3b8;
-  margin-top: 4rpx;
+  flex: 1;
 }
 
 .student-name {
   font-size: 30rpx;
-  font-weight: 600;
-  color: var(--text-primary);
-  line-height: 1.2;
+  font-weight: 700;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time-text {
+  margin-top: 4rpx;
+  font-size: 20rpx;
+  color: #9aa8bc;
 }
 
 .status-badge {
-  padding: 4rpx 14rpx;
-  border-radius: 20rpx;
+  border-radius: 999rpx;
+  padding: 5rpx 14rpx;
   font-size: 20rpx;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .badge-unreviewed {
-  background-color: #fff5db;
-  color: #a35b00;
+  background: #fff6df;
+  color: #9a5600;
 }
 
 .badge-reviewed {
-  background-color: #e6f8ed;
-  color: #1a7f42;
+  background: #eaf9ef;
+  color: #15803d;
 }
 
 .badge-rejected {
-  background-color: #feeceb;
-  color: #bc2a25;
+  background: #ffeceb;
+  color: #b42318;
 }
 
-.meta-chips {
+.meta-row {
+  margin-top: 10rpx;
   display: flex;
   gap: 8rpx;
-  margin-bottom: 12rpx;
 }
 
 .meta-chip {
   max-width: 50%;
-  padding: 4rpx 10rpx;
-  border-radius: 8rpx;
-  background: #eef2ff;
-  color: #4258a9;
+  border-radius: 10rpx;
+  border: 1rpx solid #dfe9f6;
+  background: #f2f7ff;
+  color: #2f5fc8;
   font-size: 20rpx;
+  line-height: 1;
+  padding: 8rpx 10rpx;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.info-list {
+.detail-list {
+  margin-top: 12rpx;
   display: flex;
   flex-direction: column;
-  gap: 6rpx;
+  gap: 7rpx;
 }
 
-.info-line {
+.detail-line {
   display: flex;
   align-items: center;
   font-size: 23rpx;
-  line-height: 1.4;
-  min-width: 0;
+  line-height: 1.45;
 }
 
-.info-label {
-  color: #64748b;
+.detail-label {
   width: 72rpx;
   flex: 0 0 72rpx;
+  color: #6b7c93;
 }
 
-.info-value {
-  color: #1f2937;
+.detail-value {
   flex: 1;
   min-width: 0;
+  color: #334155;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  word-break: break-all;
 }
 
 .record-actions {
-  margin-top: 16rpx;
+  margin-top: 14rpx;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12rpx;
+  gap: 10rpx;
 }
 
 .action-btn {
   margin: 0;
-  border-radius: 10rpx;
-  font-size: 22rpx;
-  line-height: 56rpx;
-  height: 56rpx;
-  padding: 0;
   border: none;
+  border-radius: 12rpx;
+  height: 58rpx;
+  line-height: 58rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  padding: 0;
 }
 
 .action-btn::after {
   border: none;
 }
 
-.btn-delete {
-  color: #c12b22;
-  background: #ffefee;
-}
-
 .btn-approve {
-  color: #176d36;
-  background: #e6f8ed;
+  background: #eaf9ef;
+  color: #15803d;
 }
 
 .btn-reject {
-  color: #b32924;
-  background: #feeceb;
+  background: #ffeceb;
+  color: #b42318;
+}
+
+.btn-delete {
+  background: #fff2eb;
+  color: #c2410c;
 }
 
 .action-btn.disabled {
@@ -223,17 +266,7 @@
 .loading,
 .no-more {
   text-align: center;
-  color: var(--text-light);
-  font-size: 24rpx;
   padding: 20rpx 0;
-}
-
-.empty {
-  text-align: center;
-  padding: 120rpx 0;
-}
-
-.empty-text {
-  color: var(--text-light);
-  font-size: 26rpx;
+  color: #9aa8bc;
+  font-size: 22rpx;
 }

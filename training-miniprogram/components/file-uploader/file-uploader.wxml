@@ -1,34 +1,33 @@
-<!-- components/file-uploader/file-uploader.wxml -->
 <view class="file-uploader {{compact ? 'compact' : ''}}">
   <view class="uploader-label">
-    <text>{{label}}</text>
+    <text class="label-text">{{label}}</text>
     <text class="required" wx:if="{{required}}">*</text>
   </view>
 
   <view class="uploader-content">
-    <!-- 已上传的文件预览 -->
     <view class="file-preview" wx:if="{{fileUrl}}">
       <image class="preview-image" src="{{fileUrl}}" mode="aspectFill" bindtap="previewImage"></image>
+      <view class="preview-mask"></view>
       <view class="preview-actions">
-        <button class="btn-reupload" size="mini" bindtap="chooseFile">重新上传</button>
-        <button class="btn-delete" size="mini" bindtap="deleteFile">删除</button>
+        <button class="btn-reupload" size="mini" bindtap="chooseFile">替换</button>
+        <button class="btn-delete" size="mini" bindtap="deleteFile">移除</button>
       </view>
     </view>
 
-    <!-- 上传按钮 -->
-    <view class="upload-btn" wx:else bindtap="chooseFile">
-      <view class="upload-icon">上传</view>
+    <view class="upload-btn tap-feedback" wx:else bindtap="chooseFile">
+      <view class="upload-icon">
+        <view class="icon-plus-h"></view>
+        <view class="icon-plus-v"></view>
+      </view>
       <view class="upload-text">点击上传</view>
-      <view class="upload-hint">支持JPG/PNG，最大10MB</view>
+      <view class="upload-hint">JPG/PNG，最大 10MB</view>
     </view>
 
-    <!-- 上传进度 -->
     <view class="upload-progress" wx:if="{{uploading}}">
-      <progress percent="{{progress}}" stroke-width="4" activeColor="#6366f1" />
+      <progress percent="{{progress}}" stroke-width="4" activeColor="#2f6af5" />
       <text class="progress-text">上传中 {{progress}}%</text>
     </view>
   </view>
 
-  <!-- 错误提示 -->
   <view class="error-message" wx:if="{{error}}">{{error}}</view>
 </view>
