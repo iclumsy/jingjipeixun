@@ -1,7 +1,6 @@
 // pages/user/detail/detail.js
 const api = require('../../../utils/api')
 const { STATUS_LABELS, TRAINING_TYPE_LABELS } = require('../../../utils/constants')
-const EDIT_STUDENT_ID_KEY = 'submit_edit_student_id'
 
 const STATUS_HINTS = {
   unreviewed: '资料已提交，正在等待管理员审核',
@@ -78,22 +77,9 @@ Page({
     })
   },
 
-  goBack() {
-    const pages = getCurrentPages()
-    if (pages.length > 1) {
-      wx.navigateBack()
-      return
-    }
-    wx.switchTab({
-      url: '/pages/user/list/list'
-    })
-  },
-
   editStudent() {
-    // submit 是 tabBar 页面，使用 switchTab 并通过本地缓存传递编辑ID
-    wx.setStorageSync(EDIT_STUDENT_ID_KEY, this.data.studentId)
-    wx.switchTab({
-      url: '/pages/user/submit/submit',
+    wx.navigateTo({
+      url: `/pages/user/edit/edit?id=${this.data.studentId}`,
       fail: () => {
         wx.showToast({
           title: '跳转失败，请重试',

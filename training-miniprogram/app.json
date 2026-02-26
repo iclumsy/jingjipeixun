@@ -4,6 +4,7 @@
     "pages/user/submit/submit",
     "pages/user/list/list",
     "pages/user/detail/detail",
+    "pages/user/edit/edit",
     "pages/admin/review/review",
     "pages/admin/detail/detail",
     "pages/admin/batch/batch",

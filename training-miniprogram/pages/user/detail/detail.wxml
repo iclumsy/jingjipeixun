@@ -7,7 +7,6 @@
         <view class="title">提交详情</view>
         <view class="subtitle">查看审核进度与提交内容</view>
       </view>
-      <button class="back-btn" bindtap="goBack">返回</button>
     </view>
 
     <view class="section-card summary-card">

@@ -1,4 +1,4 @@
-<!-- pages/user/submit/submit.wxml -->
+<!-- pages/user/edit/edit.wxml -->
 <view class="page">
   <!-- 顶部渐变背景 -->
   <view class="header-bg"></view>
@@ -8,7 +8,7 @@
     <view class="page-header">
       <view class="brand-row">
         <image class="brand-logo" src="/images/logo.png" mode="aspectFit"></image>
-        <view class="title">学员信息采集</view>
+        <view class="title">编辑学员信息</view>
       </view>
     </view>
 
@@ -155,7 +155,7 @@
 
     <!-- 提交按钮 -->
     <view class="submit-bar">
-      <button class="submit-btn" bindtap="submitForm">提交信息</button>
+      <button class="submit-btn" bindtap="submitForm">更新信息</button>
     </view>
   </view>
 </view>

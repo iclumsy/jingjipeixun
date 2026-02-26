@@ -1,4 +1,4 @@
-// pages/user/submit/submit.js
+// pages/user/edit/edit.js
 const api = require('../../../utils/api')
 const {
   validateStudent,
@@ -9,7 +9,6 @@ const {
 } = require('../../../utils/validators')
 const { EDUCATION_OPTIONS } = require('../../../utils/constants')
 
-const FORCE_CREATE_SUBMIT_KEY = 'submit_force_create_mode'
 const JOB_CATEGORIES_CACHE_KEY = 'job_categories_cache_v1'
 const JOB_CATEGORIES_CACHE_TTL_MS = 5 * 60 * 1000
 let memoryJobCategories = null
@@ -71,6 +70,7 @@ function writeCachedJobCategories(data) {
 
 Page({
   data: {
+    studentId: '',
     trainingType: 'special_equipment',
     educationOptions: EDUCATION_OPTIONS,
     fieldErrors: {
@@ -82,44 +82,34 @@ Page({
     student: createEmptyStudent()
   },
 
-  onLoad() {
-    this.loadJobCategories()
-  },
-
-  async onShow() {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({
-        selected: 0
+  async onLoad(options) {
+    const studentId = String((options && options.id) || '').trim()
+    if (!studentId) {
+      wx.showToast({
+        title: '记录ID不存在',
+        icon: 'none'
       })
+      this.safeBackToList()
+      return
     }
 
-    await this.handleForceCreateEntry()
-  },
-
-  async handleForceCreateEntry() {
-    const shouldForceCreate = wx.getStorageSync(FORCE_CREATE_SUBMIT_KEY) === true
-    if (!shouldForceCreate) return false
-
-    wx.removeStorageSync(FORCE_CREATE_SUBMIT_KEY)
-    this.resetToCreateMode()
-    return true
-  },
-
-  resetToCreateMode() {
     this.setData({
-      trainingType: 'special_equipment',
-      fieldErrors: {
-        id_card: '',
-        phone: ''
-      },
-      student: createEmptyStudent()
+      studentId
     })
-    this.updateJobCategoryNames()
+
+    await this.loadJobCategories()
   },
 
-  forceEnterCreateMode() {
-    wx.removeStorageSync(FORCE_CREATE_SUBMIT_KEY)
-    this.resetToCreateMode()
+  safeBackToList() {
+    const pages = getCurrentPages()
+    if (pages.length > 1) {
+      wx.navigateBack()
+      return
+    }
+
+    wx.switchTab({
+      url: '/pages/user/list/list'
+    })
   },
 
   async loadJobCategories() {
@@ -130,6 +120,7 @@ Page({
           jobCategories: cachedCategories
         })
         this.updateJobCategoryNames()
+        await this.loadStudentData()
         return
       }
 
@@ -140,11 +131,90 @@ Page({
           jobCategories: res.data
         })
         this.updateJobCategoryNames()
+        await this.loadStudentData()
       }
     } catch (err) {
       console.error('加载作业类别失败:', err)
       wx.showToast({
         title: '加载配置失败',
+        icon: 'none'
+      })
+    }
+  },
+
+  async loadStudentData() {
+    try {
+      wx.showLoading({ title: '加载中...' })
+      const result = await api.getStudentDetail(this.data.studentId)
+      const downloadUrls = result.downloadUrls || {}
+
+      if (!result.student) {
+        throw new Error('学员不存在')
+      }
+
+      const student = result.student
+
+      this.setData({
+        trainingType: student.training_type
+      })
+      this.updateJobCategoryNames()
+
+      const categories = this.data.jobCategories[student.training_type]
+      let jobCategoryIndex = -1
+      let examProjects = []
+      let examProjectIndex = -1
+
+      if (categories && categories.job_categories) {
+        jobCategoryIndex = categories.job_categories.findIndex(c => c.name === student.job_category)
+
+        if (jobCategoryIndex >= 0) {
+          examProjects = categories.job_categories[jobCategoryIndex].exam_projects || []
+          examProjectIndex = examProjects.findIndex(p => p.name === student.exam_project)
+        }
+      }
+
+      const educationIndex = this.data.educationOptions.indexOf(student.education)
+      const normalizedIdCard = normalizeIdCard(student.id_card)
+      const normalizedPhone = normalizePhone(student.phone)
+
+      this.setData({
+        fieldErrors: {
+          id_card: getIdCardError(normalizedIdCard),
+          phone: getPhoneError(normalizedPhone)
+        },
+        student: {
+          name: student.name,
+          gender: student.gender,
+          education: student.education,
+          educationIndex,
+          school: student.school || '',
+          major: student.major || '',
+          id_card: normalizedIdCard,
+          phone: normalizedPhone,
+          company: student.company,
+          company_address: student.company_address,
+          job_category: student.job_category,
+          jobCategoryIndex,
+          exam_project: student.exam_project || '',
+          examProjectIndex,
+          project_code: student.project_code || '',
+          examProjects,
+          files: {
+            photo: downloadUrls.photo_path || student.photo_path || student.files?.photo || student.files?.photo_path || '',
+            diploma: downloadUrls.diploma_path || student.diploma_path || student.files?.diploma || student.files?.diploma_path || '',
+            id_card_front: downloadUrls.id_card_front_path || student.id_card_front_path || student.files?.id_card_front || student.files?.id_card_front_path || '',
+            id_card_back: downloadUrls.id_card_back_path || student.id_card_back_path || student.files?.id_card_back || student.files?.id_card_back_path || '',
+            hukou_residence: downloadUrls.hukou_residence_path || student.hukou_residence_path || student.files?.hukou_residence || student.files?.hukou_residence_path || '',
+            hukou_personal: downloadUrls.hukou_personal_path || student.hukou_personal_path || student.files?.hukou_personal || student.files?.hukou_personal_path || ''
+          }
+        }
+      })
+      wx.hideLoading()
+    } catch (err) {
+      wx.hideLoading()
+      console.error('加载学员数据失败:', err)
+      wx.showToast({
+        title: err.message || '加载失败',
         icon: 'none'
       })
     }
@@ -296,7 +366,7 @@ Page({
 
     this.setData({
       'student.id_card': normalizedStudent.id_card,
-      'student.phone': normalizedPhone(normalizedStudent.phone),
+      'student.phone': normalizedStudent.phone,
       'fieldErrors.id_card': getIdCardError(normalizedStudent.id_card),
       'fieldErrors.phone': getPhoneError(normalizedStudent.phone)
     })
@@ -313,50 +383,34 @@ Page({
       return
     }
 
-    wx.showLoading({ title: '提交中...' })
+    wx.showLoading({ title: '更新中...' })
 
     try {
-      const result = await api.submitStudent([normalizedStudent], this.data.trainingType)
+      const result = await api.updateStudent(this.data.studentId, {
+        ...normalizedStudent,
+        training_type: this.data.trainingType,
+        status: 'unreviewed'
+      })
+
       wx.hideLoading()
 
       if (!result.success) {
-        throw new Error(result.message || '提交失败')
-      }
-
-      let successContent = '学员信息已提交，等待审核'
-      if (result.sync) {
-        if (result.sync.enabled) {
-          if (typeof result.sync.success === 'boolean') {
-            successContent += result.sync.success
-              ? '\n原系统同步：已完成'
-              : `\n原系统同步：失败（${result.sync.message || '同步失败，请稍后重试'}）`
-          } else {
-            const successCount = result.sync.success_count || 0
-            const failedCount = result.sync.failed_count || 0
-            successContent += failedCount > 0
-              ? `\n原系统同步：成功 ${successCount} 条，失败 ${failedCount} 条`
-              : '\n原系统同步：已完成'
-          }
-        } else {
-          successContent += `\n原系统同步：未启用（${result.sync.disabled_reason || '未启用'}）`
-        }
+        throw new Error(result.message || '更新失败')
       }
 
       wx.showModal({
-        title: '提交成功',
-        content: successContent,
+        title: '更新成功',
+        content: '学员信息已更新，等待重新审核',
         showCancel: false,
         success: () => {
-          wx.switchTab({
-            url: '/pages/user/list/list'
-          })
+          this.safeBackToList()
         }
       })
     } catch (err) {
       wx.hideLoading()
-      console.error('提交失败:', err)
+      console.error('更新失败:', err)
       wx.showModal({
-        title: '提交失败',
+        title: '更新失败',
         content: err.message || '请检查网络连接后重试',
         showCancel: false
       })

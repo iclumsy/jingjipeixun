@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "编辑学员信息",
+  "usingComponents": {
+    "file-uploader": "/components/file-uploader/file-uploader"
+  }
+}

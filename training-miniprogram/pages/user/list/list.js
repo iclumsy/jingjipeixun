@@ -1,6 +1,5 @@
 // pages/user/list/list.js
 const api = require('../../../utils/api')
-const EDIT_STUDENT_ID_KEY = 'submit_edit_student_id'
 
 Page({
   data: {
@@ -102,9 +101,8 @@ Page({
 
     // 仅驳回记录允许修改，其他状态只能查看
     if (status === 'rejected') {
-      wx.setStorageSync(EDIT_STUDENT_ID_KEY, studentId)
-      wx.switchTab({
-        url: '/pages/user/submit/submit',
+      wx.navigateTo({
+        url: `/pages/user/edit/edit?id=${studentId}`,
         fail: () => {
           wx.showToast({
             title: '跳转失败，请重试',

@@ -1,4 +1,4 @@
-/* pages/user/submit/submit.wxss */
+/* pages/user/edit/edit.wxss */
 .page {
   min-height: 100vh;
   background: linear-gradient(180deg, #f5f7fa 0%, #ffffff 100%);
