@@ -39,9 +39,13 @@ function toAbsoluteUrl(baseUrl, pathValue) {
     ? raw
     : (raw.startsWith('/') ? `${baseUrl}${raw}` : `${baseUrl}/${raw}`)
   try {
-    return encodeURI(absolute)
+    return encodeURI(decodeURI(absolute))
   } catch (err) {
-    return absolute
+    try {
+      return encodeURI(absolute)
+    } catch (innerErr) {
+      return absolute
+    }
   }
 }
 

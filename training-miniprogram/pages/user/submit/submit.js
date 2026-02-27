@@ -264,7 +264,7 @@ Page({
 
     this.setData({
       'student.id_card': normalizedStudent.id_card,
-      'student.phone': normalizedPhone(normalizedStudent.phone),
+      'student.phone': normalizedStudent.phone,
       'fieldErrors.id_card': getIdCardError(normalizedStudent.id_card),
       'fieldErrors.phone': getPhoneError(normalizedStudent.phone)
     })

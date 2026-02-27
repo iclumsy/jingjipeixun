@@ -9,9 +9,13 @@ function normalizeFileUrl(value = '') {
   if (!raw) return ''
   if (!/^https?:\/\//i.test(raw)) return raw
   try {
-    return encodeURI(raw)
+    return encodeURI(decodeURI(raw))
   } catch (err) {
-    return raw
+    try {
+      return encodeURI(raw)
+    } catch (innerErr) {
+      return raw
+    }
   }
 }
 

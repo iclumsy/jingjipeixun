@@ -47,13 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return { label: '未审核', className: 'unreviewed' };
     }
 
-    function formatOpenId(openid, maxLength = 18) {
-        const value = String(openid || '').trim();
-        if (!value) return '-';
-        if (value.length <= maxLength) return value;
-        return `${value.slice(0, 8)}...${value.slice(-6)}`;
-    }
-
     syncGlobalAdminState();
     
     async function loadJobCategories() {
@@ -380,7 +373,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     </h4>
                     <div style="font-size: 0.75rem; color: #666; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
                         <span style="flex: 1; min-width: 100px;">${student.exam_project || student.job_category || ''}</span>
-                        <span style="max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${student.submitter_openid || ''}">OpenID: ${formatOpenId(student.submitter_openid, 14)}</span>
                         <span>ID: ${student.id_card.slice(-4)}</span>
                     </div>
                 </div>
