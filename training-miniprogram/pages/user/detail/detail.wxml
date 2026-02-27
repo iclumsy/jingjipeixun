@@ -102,27 +102,33 @@
       </view>
       <view class="attachments-grid">
         <view class="attachment-item" wx:if="{{downloadUrls.photo_path}}" bindtap="previewImage" data-url="{{downloadUrls.photo_path}}">
-          <image class="attachment-image" src="{{downloadUrls.photo_path}}" mode="aspectFill" />
+          <image wx:if="{{previewUrls.photo_path}}" class="attachment-image" src="{{previewUrls.photo_path}}" mode="aspectFill" />
+          <view wx:else class="attachment-empty">点击查看</view>
           <text class="attachment-label">个人照片</text>
         </view>
         <view class="attachment-item" wx:if="{{downloadUrls.diploma_path}}" bindtap="previewImage" data-url="{{downloadUrls.diploma_path}}">
-          <image class="attachment-image" src="{{downloadUrls.diploma_path}}" mode="aspectFill" />
+          <image wx:if="{{previewUrls.diploma_path}}" class="attachment-image" src="{{previewUrls.diploma_path}}" mode="aspectFill" />
+          <view wx:else class="attachment-empty">点击查看</view>
           <text class="attachment-label">学历证书</text>
         </view>
         <view class="attachment-item" wx:if="{{downloadUrls.id_card_front_path}}" bindtap="previewImage" data-url="{{downloadUrls.id_card_front_path}}">
-          <image class="attachment-image" src="{{downloadUrls.id_card_front_path}}" mode="aspectFill" />
+          <image wx:if="{{previewUrls.id_card_front_path}}" class="attachment-image" src="{{previewUrls.id_card_front_path}}" mode="aspectFill" />
+          <view wx:else class="attachment-empty">点击查看</view>
           <text class="attachment-label">身份证正面</text>
         </view>
         <view class="attachment-item" wx:if="{{downloadUrls.id_card_back_path}}" bindtap="previewImage" data-url="{{downloadUrls.id_card_back_path}}">
-          <image class="attachment-image" src="{{downloadUrls.id_card_back_path}}" mode="aspectFill" />
+          <image wx:if="{{previewUrls.id_card_back_path}}" class="attachment-image" src="{{previewUrls.id_card_back_path}}" mode="aspectFill" />
+          <view wx:else class="attachment-empty">点击查看</view>
           <text class="attachment-label">身份证反面</text>
         </view>
         <view class="attachment-item" wx:if="{{downloadUrls.hukou_residence_path}}" bindtap="previewImage" data-url="{{downloadUrls.hukou_residence_path}}">
-          <image class="attachment-image" src="{{downloadUrls.hukou_residence_path}}" mode="aspectFill" />
+          <image wx:if="{{previewUrls.hukou_residence_path}}" class="attachment-image" src="{{previewUrls.hukou_residence_path}}" mode="aspectFill" />
+          <view wx:else class="attachment-empty">点击查看</view>
           <text class="attachment-label">户口本户籍页</text>
         </view>
         <view class="attachment-item" wx:if="{{downloadUrls.hukou_personal_path}}" bindtap="previewImage" data-url="{{downloadUrls.hukou_personal_path}}">
-          <image class="attachment-image" src="{{downloadUrls.hukou_personal_path}}" mode="aspectFill" />
+          <image wx:if="{{previewUrls.hukou_personal_path}}" class="attachment-image" src="{{previewUrls.hukou_personal_path}}" mode="aspectFill" />
+          <view wx:else class="attachment-empty">点击查看</view>
           <text class="attachment-label">户口本个人页</text>
         </view>
       </view>

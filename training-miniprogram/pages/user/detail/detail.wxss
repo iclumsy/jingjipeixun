@@ -184,6 +184,17 @@
   display: block;
 }
 
+.attachment-empty {
+  width: 100%;
+  height: 220rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  color: #6b7c93;
+  background: linear-gradient(180deg, #f9fcff 0%, #f3f8ff 100%);
+}
+
 .attachment-label {
   display: block;
   text-align: center;

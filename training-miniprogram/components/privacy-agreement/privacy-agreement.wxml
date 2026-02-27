@@ -12,8 +12,14 @@
 
       <view class="content-text">
         <text>在使用本小程序前，请您仔细阅读并同意</text>
+        <text class="link" bindtap="openUserAgreement">《用户服务协议》</text>
+        <text>和</text>
         <text class="link" bindtap="openPrivacyPolicy">《隐私政策》</text>
-        <text>。我们将严格按照您同意的各项条款使用您的个人信息，以便为您提供更好的服务。</text>
+        <text>。</text>
+      </view>
+
+      <view class="content-text">
+        <text>我们仅在您授权同意后收集必要信息，且仅用于学员培训报名相关的提交、审核与办理。</text>
       </view>
 
       <view class="section-title">我们会收集以下信息：</view>
@@ -26,9 +32,9 @@
 
       <view class="section-title">信息用途：</view>
       <view class="info-list">
-        <text class="info-item">• 提供培训管理服务</text>
-        <text class="info-item">• 学员信息审核</text>
-        <text class="info-item">• 生成培训相关文档</text>
+        <text class="info-item">• 学员培训报名资料提交与存档</text>
+        <text class="info-item">• 学员信息审核与驳回处理</text>
+        <text class="info-item">• 培训报名办理所需表单与名单生成</text>
       </view>
 
       <view class="section-title">您的权利：</view>
@@ -38,7 +44,7 @@
       </view>
 
       <view class="content-text highlight">
-        <text>点击"同意"即表示您已阅读并同意上述内容。</text>
+        <text>点击"同意"即表示您已阅读并同意以上两份协议。</text>
       </view>
     </scroll-view>
 

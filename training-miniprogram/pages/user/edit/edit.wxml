@@ -156,6 +156,21 @@
       </view>
     </view>
 
+    <view class="section-card fade-enter agreement-card">
+      <checkbox-group bindchange="onAgreementChange">
+        <label class="agreement-checkline">
+          <checkbox value="agree" checked="{{agreementChecked}}" color="#2f6af5" />
+          <text class="agreement-text">我已阅读并同意</text>
+        </label>
+      </checkbox-group>
+      <view class="agreement-links">
+        <text class="agreement-link" bindtap="openUserAgreement">《用户服务协议》</text>
+        <text class="agreement-sep">和</text>
+        <text class="agreement-link" bindtap="openPrivacyPolicy">《隐私政策》</text>
+      </view>
+      <view class="agreement-tip">所收集信息仅用于学员培训报名资料提交、审核与办理。</view>
+    </view>
+
     <!-- 提交按钮 -->
     <view class="submit-bar">
       <button class="submit-btn" bindtap="submitForm">更新信息</button>

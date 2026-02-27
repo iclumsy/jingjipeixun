@@ -249,6 +249,51 @@
   box-sizing: border-box;
 }
 
+.agreement-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+}
+
+.agreement-checkline {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.agreement-checkline checkbox {
+  transform: scale(0.92);
+}
+
+.agreement-text {
+  font-size: 24rpx;
+  color: #334155;
+}
+
+.agreement-links {
+  margin-top: 10rpx;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.agreement-link {
+  font-size: 24rpx;
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.agreement-sep {
+  margin: 0 6rpx;
+  font-size: 24rpx;
+  color: #6b7c93;
+}
+
+.agreement-tip {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  line-height: 1.65;
+  color: #6b7c93;
+}
+
 .submit-bar {
   display: flex;
   justify-content: center;

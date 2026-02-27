@@ -12,6 +12,10 @@ const {
   readJobCategoriesCache,
   writeJobCategoriesCache
 } = require('../../../utils/job-categories-cache')
+const {
+  hasAcceptedLatestAgreement,
+  markAgreementAccepted
+} = require('../../../utils/legal')
 
 function createEmptyStudent() {
   return {
@@ -35,10 +39,27 @@ function createEmptyStudent() {
   }
 }
 
+function pickAttachmentValue(downloadValue, ...fallbacks) {
+  const candidates = [downloadValue, ...fallbacks]
+  for (const item of candidates) {
+    const value = String(item || '').trim()
+    if (!value) continue
+    if (
+      value.startsWith('cloud://') ||
+      value.startsWith('wxfile://') ||
+      /^https:\/\//i.test(value)
+    ) {
+      return value
+    }
+  }
+  return ''
+}
+
 Page({
   data: {
     studentId: '',
     trainingType: 'special_equipment',
+    agreementChecked: false,
     educationOptions: EDUCATION_OPTIONS,
     fieldErrors: {
       id_card: '',
@@ -61,7 +82,8 @@ Page({
     }
 
     this.setData({
-      studentId
+      studentId,
+      agreementChecked: hasAcceptedLatestAgreement()
     })
 
     await this.loadJobCategories()
@@ -167,12 +189,12 @@ Page({
           project_code: student.project_code || '',
           examProjects,
           files: {
-            photo: downloadUrls.photo_path || student.photo_path || student.files?.photo || student.files?.photo_path || '',
-            diploma: downloadUrls.diploma_path || student.diploma_path || student.files?.diploma || student.files?.diploma_path || '',
-            id_card_front: downloadUrls.id_card_front_path || student.id_card_front_path || student.files?.id_card_front || student.files?.id_card_front_path || '',
-            id_card_back: downloadUrls.id_card_back_path || student.id_card_back_path || student.files?.id_card_back || student.files?.id_card_back_path || '',
-            hukou_residence: downloadUrls.hukou_residence_path || student.hukou_residence_path || student.files?.hukou_residence || student.files?.hukou_residence_path || '',
-            hukou_personal: downloadUrls.hukou_personal_path || student.hukou_personal_path || student.files?.hukou_personal || student.files?.hukou_personal_path || ''
+            photo: pickAttachmentValue(downloadUrls.photo_path, student.files?.photo, student.files?.photo_path, student.photo_path),
+            diploma: pickAttachmentValue(downloadUrls.diploma_path, student.files?.diploma, student.files?.diploma_path, student.diploma_path),
+            id_card_front: pickAttachmentValue(downloadUrls.id_card_front_path, student.files?.id_card_front, student.files?.id_card_front_path, student.id_card_front_path),
+            id_card_back: pickAttachmentValue(downloadUrls.id_card_back_path, student.files?.id_card_back, student.files?.id_card_back_path, student.id_card_back_path),
+            hukou_residence: pickAttachmentValue(downloadUrls.hukou_residence_path, student.files?.hukou_residence, student.files?.hukou_residence_path, student.hukou_residence_path),
+            hukou_personal: pickAttachmentValue(downloadUrls.hukou_personal_path, student.files?.hukou_personal, student.files?.hukou_personal_path, student.hukou_personal_path)
           }
         }
       })
@@ -324,7 +346,49 @@ Page({
     })
   },
 
+  onAgreementChange(e) {
+    const values = e.detail.value || []
+    const checked = values.includes('agree')
+    this.setData({
+      agreementChecked: checked
+    })
+    if (checked) {
+      markAgreementAccepted()
+    }
+  },
+
+  openUserAgreement() {
+    wx.navigateTo({
+      url: '/pages/agreement/agreement'
+    })
+  },
+
+  openPrivacyPolicy() {
+    wx.navigateTo({
+      url: '/pages/privacy/privacy'
+    })
+  },
+
+  ensureAgreementAccepted() {
+    const accepted = this.data.agreementChecked || hasAcceptedLatestAgreement()
+    if (!accepted) {
+      wx.showModal({
+        title: '请先阅读并同意协议',
+        content: '更新前请先同意《用户服务协议》和《隐私政策》。',
+        showCancel: false
+      })
+      return false
+    }
+
+    if (!hasAcceptedLatestAgreement()) {
+      markAgreementAccepted()
+    }
+    return true
+  },
+
   async submitForm() {
+    if (!this.ensureAgreementAccepted()) return
+
     const normalizedStudent = {
       ...this.data.student,
       id_card: normalizeIdCard(this.data.student.id_card),

@@ -8,11 +8,39 @@ const STATUS_HINTS = {
   rejected: '资料已被驳回，可修改后重新提交'
 }
 
+const ATTACHMENT_FIELDS = [
+  'photo_path',
+  'diploma_path',
+  'id_card_front_path',
+  'id_card_back_path',
+  'hukou_residence_path',
+  'hukou_personal_path'
+]
+
+function isSafePreviewUrl(value = '') {
+  const raw = String(value || '').trim()
+  if (!raw) return false
+  if (/^http:\/\//i.test(raw)) return false
+  return (
+    /^https:\/\//i.test(raw) ||
+    /^wxfile:\/\//i.test(raw) ||
+    /^data:image\//i.test(raw) ||
+    /^\/(?!\/)/.test(raw)
+  )
+}
+
+async function resolvePreviewPath(url) {
+  const raw = String(url || '').trim()
+  if (!raw) return ''
+  return isSafePreviewUrl(raw) ? raw : ''
+}
+
 Page({
   data: {
     studentId: '',
     student: null,
     downloadUrls: {},
+    previewUrls: {},
     statusText: '',
     statusHint: '',
     trainingTypeText: '',
@@ -34,9 +62,13 @@ Page({
       const result = await api.getStudentDetail(this.data.studentId)
 
       if (result.student) {
+        const downloadUrls = result.downloadUrls || {}
+        const previewUrls = await this.buildPreviewUrls(downloadUrls)
+
         this.setData({
           student: result.student,
-          downloadUrls: result.downloadUrls || {},
+          downloadUrls,
+          previewUrls,
           statusText: STATUS_LABELS[result.student.status] || result.student.status,
           statusHint: STATUS_HINTS[result.student.status] || '',
           trainingTypeText: TRAINING_TYPE_LABELS[result.student.training_type] || result.student.training_type,
@@ -52,6 +84,20 @@ Page({
         icon: 'none'
       })
     }
+  },
+
+  async buildPreviewUrls(downloadUrls) {
+    const previewUrls = {}
+    for (const field of ATTACHMENT_FIELDS) {
+      const url = downloadUrls[field]
+      if (!url) continue
+      try {
+        previewUrls[field] = await resolvePreviewPath(url)
+      } catch (err) {
+        previewUrls[field] = ''
+      }
+    }
+    return previewUrls
   },
 
   formatTime(time) {
@@ -78,11 +124,22 @@ Page({
 
   previewImage(e) {
     const { url } = e.currentTarget.dataset
-    const urls = Object.values(this.data.downloadUrls).filter(u => u)
+    const urls = Object.values(this.data.downloadUrls)
+      .map(item => String(item || '').trim())
+      .filter(isSafePreviewUrl)
+    const current = isSafePreviewUrl(url) ? url : (urls[0] || '')
+
+    if (!current || urls.length === 0) {
+      wx.showToast({
+        title: '附件地址不可用',
+        icon: 'none'
+      })
+      return
+    }
 
     wx.previewImage({
-      urls: urls,
-      current: url
+      urls,
+      current
     })
   },
 

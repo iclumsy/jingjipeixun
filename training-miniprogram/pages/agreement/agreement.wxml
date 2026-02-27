@@ -1,0 +1,65 @@
+<view class="container">
+  <view class="agreement-content">
+    <view class="title">用户服务协议</view>
+
+    <view class="update-time">更新日期：2026年2月27日</view>
+    <view class="effective-time">生效日期：2026年2月27日</view>
+
+    <view class="section">
+      <view class="section-title">一、协议说明</view>
+      <text class="section-text">
+        欢迎使用培训管理系统小程序。您在使用本小程序前，应当认真阅读并同意本协议及《隐私政策》。您点击同意或继续使用，即视为已阅读、理解并接受本协议。
+      </text>
+    </view>
+
+    <view class="section">
+      <view class="section-title">二、服务内容</view>
+      <text class="section-text">
+        本小程序仅提供学员培训报名相关服务，包括信息填写、资料提交、审核状态查询、驳回后修改与重新提交等功能。
+      </text>
+      <view class="list">
+        <text class="list-item">• 学员报名信息采集</text>
+        <text class="list-item">• 附件资料上传与校验</text>
+        <text class="list-item">• 审核结果展示与反馈</text>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">三、用户义务</view>
+      <view class="list">
+        <text class="list-item">• 提供真实、准确、完整的报名信息</text>
+        <text class="list-item">• 仅在合法、正当、必要范围内使用本小程序</text>
+        <text class="list-item">• 不得冒用他人身份提交资料</text>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">四、信息使用范围</view>
+      <text class="section-text">
+        您提交的信息仅用于学员培训报名相关的资料提交、审核与办理，不用于与培训报名无关的用途。具体收集与处理规则详见《隐私政策》。
+      </text>
+    </view>
+
+    <view class="section">
+      <view class="section-title">五、免责与限制</view>
+      <view class="list">
+        <text class="list-item">• 因网络、系统维护等不可抗力导致的服务中断，平台将尽力恢复</text>
+        <text class="list-item">• 因用户自行提供错误信息导致的后果由用户自行承担</text>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">六、协议更新</view>
+      <text class="section-text">
+        本协议更新后将通过小程序内公告或弹窗方式提示。若更新内容涉及您的核心权利义务，平台将再次征求您的同意。
+      </text>
+    </view>
+
+    <view class="section">
+      <view class="section-title">七、联系我们</view>
+      <view class="contact-info">
+        <text class="contact-item">联系电话：13703531055</text>
+      </view>
+    </view>
+  </view>
+</view>

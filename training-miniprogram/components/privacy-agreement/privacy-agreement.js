@@ -1,4 +1,6 @@
 // components/privacy-agreement/privacy-agreement.js
+const { markAgreementAccepted } = require('../../utils/legal')
+
 Component({
   properties: {
     show: {
@@ -19,10 +21,15 @@ Component({
       })
     },
 
+    openUserAgreement() {
+      wx.navigateTo({
+        url: '/pages/agreement/agreement'
+      })
+    },
+
     onAgree() {
-      // 保存用户同意状态
-      wx.setStorageSync('privacy_agreed', true)
-      wx.setStorageSync('privacy_agreed_time', new Date().toISOString())
+      // 保存用户同意状态（隐私政策 + 用户服务协议）
+      markAgreementAccepted()
 
       this.triggerEvent('agree')
     },
@@ -30,7 +37,7 @@ Component({
     onDisagree() {
       wx.showModal({
         title: '提示',
-        content: '您需要同意隐私政策才能使用本小程序',
+        content: '您需要同意《用户服务协议》和《隐私政策》后才能使用本小程序',
         showCancel: false,
         success: () => {
           // 用户不同意，退出小程序

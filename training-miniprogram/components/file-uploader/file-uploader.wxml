@@ -6,8 +6,9 @@
 
   <view class="uploader-content">
     <view class="file-preview" wx:if="{{fileUrl}}">
-      <image class="preview-image" src="{{fileUrl}}" mode="aspectFill" bindtap="previewImage"></image>
-      <view class="preview-mask"></view>
+      <image wx:if="{{previewUrl}}" class="preview-image" src="{{previewUrl}}" mode="aspectFill" bindtap="previewImage"></image>
+      <view wx:else class="preview-empty" bindtap="previewImage">附件不可直显，点击查看</view>
+      <view class="preview-mask" wx:if="{{previewUrl}}"></view>
       <view class="preview-actions">
         <button class="btn-reupload" size="mini" bindtap="chooseFile">替换</button>
         <button class="btn-delete" size="mini" bindtap="deleteFile">移除</button>

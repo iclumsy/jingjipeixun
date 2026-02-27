@@ -61,6 +61,22 @@ function createEmptyEditStudent() {
   }
 }
 
+function pickAttachmentValue(downloadValue, ...fallbacks) {
+  const candidates = [downloadValue, ...fallbacks]
+  for (const item of candidates) {
+    const value = String(item || '').trim()
+    if (!value) continue
+    if (
+      value.startsWith('cloud://') ||
+      value.startsWith('wxfile://') ||
+      /^https:\/\//i.test(value)
+    ) {
+      return value
+    }
+  }
+  return ''
+}
+
 Page({
   data: {
     studentId: '',
@@ -198,12 +214,12 @@ Page({
           examProjects,
           training_type: trainingType,
           files: {
-            photo: downloadUrls.photo_path || student.photo_path || student.files?.photo || '',
-            diploma: downloadUrls.diploma_path || student.diploma_path || student.files?.diploma || '',
-            id_card_front: downloadUrls.id_card_front_path || student.id_card_front_path || student.files?.id_card_front || '',
-            id_card_back: downloadUrls.id_card_back_path || student.id_card_back_path || student.files?.id_card_back || '',
-            hukou_residence: downloadUrls.hukou_residence_path || student.hukou_residence_path || student.files?.hukou_residence || '',
-            hukou_personal: downloadUrls.hukou_personal_path || student.hukou_personal_path || student.files?.hukou_personal || ''
+            photo: pickAttachmentValue(downloadUrls.photo_path, student.files?.photo, student.photo_path),
+            diploma: pickAttachmentValue(downloadUrls.diploma_path, student.files?.diploma, student.diploma_path),
+            id_card_front: pickAttachmentValue(downloadUrls.id_card_front_path, student.files?.id_card_front, student.id_card_front_path),
+            id_card_back: pickAttachmentValue(downloadUrls.id_card_back_path, student.files?.id_card_back, student.id_card_back_path),
+            hukou_residence: pickAttachmentValue(downloadUrls.hukou_residence_path, student.files?.hukou_residence, student.hukou_residence_path),
+            hukou_personal: pickAttachmentValue(downloadUrls.hukou_personal_path, student.files?.hukou_personal, student.hukou_personal_path)
           }
         },
         loading: false

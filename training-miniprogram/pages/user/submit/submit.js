@@ -12,6 +12,10 @@ const {
   readJobCategoriesCache,
   writeJobCategoriesCache
 } = require('../../../utils/job-categories-cache')
+const {
+  hasAcceptedLatestAgreement,
+  markAgreementAccepted
+} = require('../../../utils/legal')
 
 const FORCE_CREATE_SUBMIT_KEY = 'submit_force_create_mode'
 
@@ -40,6 +44,7 @@ function createEmptyStudent() {
 Page({
   data: {
     trainingType: 'special_equipment',
+    agreementChecked: false,
     educationOptions: EDUCATION_OPTIONS,
     fieldErrors: {
       id_card: '',
@@ -51,6 +56,9 @@ Page({
   },
 
   onLoad() {
+    this.setData({
+      agreementChecked: hasAcceptedLatestAgreement()
+    })
     this.loadJobCategories()
   },
 
@@ -255,7 +263,49 @@ Page({
     })
   },
 
+  onAgreementChange(e) {
+    const values = e.detail.value || []
+    const checked = values.includes('agree')
+    this.setData({
+      agreementChecked: checked
+    })
+    if (checked) {
+      markAgreementAccepted()
+    }
+  },
+
+  openUserAgreement() {
+    wx.navigateTo({
+      url: '/pages/agreement/agreement'
+    })
+  },
+
+  openPrivacyPolicy() {
+    wx.navigateTo({
+      url: '/pages/privacy/privacy'
+    })
+  },
+
+  ensureAgreementAccepted() {
+    const accepted = this.data.agreementChecked || hasAcceptedLatestAgreement()
+    if (!accepted) {
+      wx.showModal({
+        title: '请先阅读并同意协议',
+        content: '提交前请先同意《用户服务协议》和《隐私政策》。',
+        showCancel: false
+      })
+      return false
+    }
+
+    if (!hasAcceptedLatestAgreement()) {
+      markAgreementAccepted()
+    }
+    return true
+  },
+
   async submitForm() {
+    if (!this.ensureAgreementAccepted()) return
+
     const normalizedStudent = {
       ...this.data.student,
       id_card: normalizeIdCard(this.data.student.id_card),

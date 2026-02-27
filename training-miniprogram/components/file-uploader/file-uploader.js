@@ -4,6 +4,41 @@ const { MAX_FILE_SIZE } = require('../../utils/constants')
 const TEMP_URL_CACHE_TTL_MS = 45 * 60 * 1000
 const tempUrlCache = new Map()
 
+function isHttpUrl(value = '') {
+  return /^http:\/\//i.test(String(value || '').trim())
+}
+
+function isHttpsUrl(value = '') {
+  return /^https:\/\//i.test(String(value || '').trim())
+}
+
+function isLocalFileUrl(value = '') {
+  return /^wxfile:\/\//i.test(String(value || '').trim())
+}
+
+function isDataImageUrl(value = '') {
+  return /^data:image\//i.test(String(value || '').trim())
+}
+
+function isAppAssetPath(value = '') {
+  return /^\/(?!\/)/.test(String(value || '').trim())
+}
+
+function toSafeImageSrc(value = '') {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  if (isHttpUrl(raw)) return ''
+  if (
+    isHttpsUrl(raw) ||
+    isLocalFileUrl(raw) ||
+    isDataImageUrl(raw) ||
+    isAppAssetPath(raw)
+  ) {
+    return raw
+  }
+  return ''
+}
+
 function normalizeFileUrl(value = '') {
   const raw = String(value || '').trim()
   if (!raw) return ''
@@ -37,6 +72,12 @@ function writeTempUrlCache(fileID, url) {
   })
 }
 
+async function resolveDisplayUrl(url) {
+  const normalized = normalizeFileUrl(url)
+  if (!normalized) return ''
+  return toSafeImageSrc(normalized)
+}
+
 Component({
   properties: {
     fileType: {
@@ -64,10 +105,13 @@ Component({
           if (newVal.startsWith('cloud://')) {
             const cachedUrl = readTempUrlCache(newVal)
             if (cachedUrl) {
+              const normalizedUrl = normalizeFileUrl(cachedUrl)
               this.setData({
-                fileUrl: normalizeFileUrl(cachedUrl),
+                fileUrl: normalizedUrl,
+                previewUrl: toSafeImageSrc(normalizedUrl),
                 cloudPath: newVal
               })
+              this.syncPreviewUrl(normalizedUrl)
               return
             }
 
@@ -77,27 +121,37 @@ Component({
               })
               if (res.fileList && res.fileList.length > 0) {
                 writeTempUrlCache(newVal, res.fileList[0].tempFileURL)
+                const normalizedUrl = normalizeFileUrl(res.fileList[0].tempFileURL)
                 this.setData({
-                  fileUrl: normalizeFileUrl(res.fileList[0].tempFileURL),
+                  fileUrl: normalizedUrl,
+                  previewUrl: toSafeImageSrc(normalizedUrl),
                   cloudPath: newVal
                 })
+                this.syncPreviewUrl(normalizedUrl)
               }
             } catch (err) {
               console.error('获取临时链接失败:', err)
+              const normalizedUrl = normalizeFileUrl(newVal)
               this.setData({
-                fileUrl: normalizeFileUrl(newVal),
+                fileUrl: normalizedUrl,
+                previewUrl: toSafeImageSrc(normalizedUrl),
                 cloudPath: newVal
               })
+              this.syncPreviewUrl(normalizedUrl)
             }
           } else {
+            const normalizedUrl = normalizeFileUrl(newVal)
             this.setData({
-              fileUrl: normalizeFileUrl(newVal),
+              fileUrl: normalizedUrl,
+              previewUrl: toSafeImageSrc(normalizedUrl),
               cloudPath: newVal
             })
+            this.syncPreviewUrl(normalizedUrl)
           }
         } else {
           this.setData({
             fileUrl: '',
+            previewUrl: '',
             cloudPath: ''
           })
         }
@@ -107,6 +161,7 @@ Component({
 
   data: {
     fileUrl: '',
+    previewUrl: '',
     cloudPath: '',
     uploading: false,
     progress: 0,
@@ -114,6 +169,16 @@ Component({
   },
 
   methods: {
+    async syncPreviewUrl(url) {
+      const token = (this._previewToken || 0) + 1
+      this._previewToken = token
+      const localUrl = await resolveDisplayUrl(url)
+      if (token !== this._previewToken) return
+      this.setData({
+        previewUrl: localUrl || toSafeImageSrc(url)
+      })
+    },
+
     async chooseFile() {
       try {
         const res = await wx.chooseImage({
@@ -179,6 +244,7 @@ Component({
           success: res => {
             this.setData({
               fileUrl: filePath,
+              previewUrl: filePath,
               cloudPath: res.fileID,
               uploading: false,
               progress: 100
@@ -216,17 +282,25 @@ Component({
     },
 
     previewImage() {
-      if (this.data.fileUrl) {
-        wx.previewImage({
-          urls: [this.data.fileUrl],
-          current: this.data.fileUrl
+      const current = toSafeImageSrc(this.data.previewUrl) || toSafeImageSrc(this.data.fileUrl)
+      if (!current) {
+        wx.showToast({
+          title: '附件地址不可用，请稍后重试',
+          icon: 'none'
         })
+        return
       }
+
+      wx.previewImage({
+        urls: [current],
+        current
+      })
     },
 
     deleteFile() {
       this.setData({
         fileUrl: '',
+        previewUrl: '',
         cloudPath: '',
         progress: 0,
         error: ''

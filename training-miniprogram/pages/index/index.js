@@ -1,5 +1,6 @@
 // pages/index/index.js
 const app = getApp()
+const { hasAcceptedLatestAgreement } = require('../../utils/legal')
 
 Page({
   data: {
@@ -13,23 +14,18 @@ Page({
   },
 
   checkPrivacyAgreement() {
-    // 检查用户是否已同意隐私政策
-    const privacyAgreed = wx.getStorageSync('privacy_agreed')
-
-    if (!privacyAgreed) {
-      // 未同意，显示隐私协议弹窗
+    // 检查用户是否已同意最新版本的《用户服务协议》《隐私政策》
+    if (!hasAcceptedLatestAgreement()) {
       this.setData({
         showPrivacyAgreement: true,
         loading: false
       })
     } else {
-      // 已同意，继续登录流程
       this.checkUserRole()
     }
   },
 
   onPrivacyAgree() {
-    // 用户同意隐私政策
     this.setData({
       showPrivacyAgreement: false,
       loading: true
