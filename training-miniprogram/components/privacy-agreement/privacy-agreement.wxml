@@ -7,7 +7,7 @@
 
     <scroll-view class="dialog-content" scroll-y>
       <view class="content-text">
-        <text>感谢您使用培训管理系统小程序！</text>
+        <text>感谢您使用阳泉精技培训管理小程序！</text>
       </view>
 
       <view class="content-text">

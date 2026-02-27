@@ -57,7 +57,14 @@ function createEmptyEditStudent() {
     project_code: '',
     examProjects: [],
     training_type: 'special_equipment',
-    files: {}
+    files: {
+      photo: '',
+      diploma: '',
+      id_card_front: '',
+      id_card_back: '',
+      hukou_residence: '',
+      hukou_personal: ''
+    }
   }
 }
 
@@ -358,10 +365,8 @@ Page({
 
   onFileDeleted(e) {
     const { fileType } = e.detail
-    const files = { ...(this.data.editStudent.files || {}) }
-    delete files[fileType]
     this.setData({
-      'editStudent.files': files
+      [`editStudent.files.${fileType}`]: ''
     })
   },
 

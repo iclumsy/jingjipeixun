@@ -127,27 +127,27 @@
       <view class="attachments-tip">可直接替换附件，未替换的附件会保留原记录。</view>
       <view class="attachments-grid">
         <view class="attachment-item" wx:if="{{trainingType === 'special_equipment'}}">
-          <file-uploader compact="{{true}}" fileType="photo" label="个人照片" required="{{true}}" value="{{editStudent.files.photo}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
+          <file-uploader compact="{{true}}" fileType="photo" label="个人照片" required="{{true}}" value="{{(editStudent.files && editStudent.files.photo) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
         </view>
 
         <view class="attachment-item">
-          <file-uploader compact="{{true}}" fileType="diploma" label="学历证书" required="{{true}}" value="{{editStudent.files.diploma}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
+          <file-uploader compact="{{true}}" fileType="diploma" label="学历证书" required="{{true}}" value="{{(editStudent.files && editStudent.files.diploma) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
         </view>
 
         <view class="attachment-item">
-          <file-uploader compact="{{true}}" fileType="id_card_front" label="身份证正面" required="{{true}}" value="{{editStudent.files.id_card_front}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
+          <file-uploader compact="{{true}}" fileType="id_card_front" label="身份证正面" required="{{true}}" value="{{(editStudent.files && editStudent.files.id_card_front) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
         </view>
 
         <view class="attachment-item">
-          <file-uploader compact="{{true}}" fileType="id_card_back" label="身份证反面" required="{{true}}" value="{{editStudent.files.id_card_back}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
+          <file-uploader compact="{{true}}" fileType="id_card_back" label="身份证反面" required="{{true}}" value="{{(editStudent.files && editStudent.files.id_card_back) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
         </view>
 
         <view class="attachment-item" wx:if="{{trainingType === 'special_equipment'}}">
-          <file-uploader compact="{{true}}" fileType="hukou_residence" label="户口本户籍页" required="{{true}}" value="{{editStudent.files.hukou_residence}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
+          <file-uploader compact="{{true}}" fileType="hukou_residence" label="户口本户籍页" required="{{true}}" value="{{(editStudent.files && editStudent.files.hukou_residence) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
         </view>
 
         <view class="attachment-item" wx:if="{{trainingType === 'special_equipment'}}">
-          <file-uploader compact="{{true}}" fileType="hukou_personal" label="户口本个人页" required="{{true}}" value="{{editStudent.files.hukou_personal}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
+          <file-uploader compact="{{true}}" fileType="hukou_personal" label="户口本个人页" required="{{true}}" value="{{(editStudent.files && editStudent.files.hukou_personal) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
         </view>
       </view>
     </view>

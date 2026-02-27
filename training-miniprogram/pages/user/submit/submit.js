@@ -37,7 +37,14 @@ function createEmptyStudent() {
     examProjectIndex: -1,
     project_code: '',
     examProjects: [],
-    files: {}
+    files: {
+      photo: '',
+      diploma: '',
+      id_card_front: '',
+      id_card_back: '',
+      hukou_residence: '',
+      hukou_personal: ''
+    }
   }
 }
 
@@ -256,10 +263,8 @@ Page({
 
   onFileDeleted(e) {
     const { fileType } = e.detail
-    const files = { ...this.data.student.files }
-    delete files[fileType]
     this.setData({
-      'student.files': files
+      [`student.files.${fileType}`]: ''
     })
   },
 
