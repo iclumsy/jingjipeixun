@@ -1,8 +1,6 @@
 // utils/api.js
 // API 封装
 
-const app = getApp()
-
 /**
  * 调用云函数
  * @param {string} name - 云函数名称
@@ -94,50 +92,6 @@ function reviewStudent(studentId, action) {
   return callFunction('reviewStudent', {
     student_id: studentId,
     action
-  })
-}
-
-/**
- * 批量审核
- * @param {array} studentIds - 学员ID数组
- * @param {string} action - 操作（approve/reject）
- * @returns {Promise}
- */
-function batchReview(studentIds, action) {
-  return callFunction('batchReview', {
-    student_ids: studentIds,
-    action
-  })
-}
-
-/**
- * 导出Excel
- * @param {object} params - 筛选参数
- * @returns {Promise}
- */
-function exportExcel(params = {}) {
-  return callFunction('exportExcel', params)
-}
-
-/**
- * 生成体检表
- * @param {string} studentId - 学员ID
- * @returns {Promise}
- */
-function generateHealthCheck(studentId) {
-  return callFunction('generateHealthCheck', {
-    student_id: studentId
-  })
-}
-
-/**
- * 下载附件压缩包
- * @param {string} studentId - 学员ID
- * @returns {Promise}
- */
-function downloadAttachments(studentId) {
-  return callFunction('downloadAttachments', {
-    student_id: studentId
   })
 }
 
@@ -257,10 +211,6 @@ module.exports = {
   getStudents,
   getStudentDetail,
   reviewStudent,
-  batchReview,
-  exportExcel,
-  generateHealthCheck,
-  downloadAttachments,
   updateStudent,
   deleteStudent,
   getCompanies,

@@ -7,8 +7,6 @@
     "pages/user/edit/edit",
     "pages/admin/review/review",
     "pages/admin/detail/detail",
-    "pages/admin/batch/batch",
-    "pages/admin/export/export",
     "pages/agreement/agreement",
     "pages/privacy/privacy"
   ],

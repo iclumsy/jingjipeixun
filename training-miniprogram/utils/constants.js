@@ -72,9 +72,6 @@ const PAGE_SIZE = 20
 // 云存储路径前缀
 const CLOUD_STORAGE_PREFIX = 'cloud://'
 
-// 需要生成体检表的项目代码
-const HEALTH_CHECK_PROJECTS = ['N1', 'G3']
-
 module.exports = {
   TRAINING_TYPES,
   TRAINING_TYPE_LABELS,
@@ -87,6 +84,5 @@ module.exports = {
   MAX_FILE_SIZE,
   ALLOWED_FILE_TYPES,
   PAGE_SIZE,
-  CLOUD_STORAGE_PREFIX,
-  HEALTH_CHECK_PROJECTS
+  CLOUD_STORAGE_PREFIX
 }
