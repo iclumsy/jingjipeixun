@@ -1,5 +1,5 @@
 {
-  "description": "培训管理系统小程序",
+  "description": "阳泉精技培训报名",
   "packOptions": {
     "ignore": [],
     "include": []
@@ -48,7 +48,7 @@
   },
   "compileType": "miniprogram",
   "libVersion": "3.8.8",
-  "appid": "wxea71cec93859e421",
+  "appid": "wx9784b4b2cf716cb6",
   "projectname": "training-miniprogram",
   "condition": {},
   "editorSetting": {

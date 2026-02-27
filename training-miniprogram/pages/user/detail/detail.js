@@ -57,7 +57,16 @@ Page({
   formatTime(time) {
     if (!time) return '-'
 
-    const date = new Date(time)
+    const raw = String(time).trim()
+    const normalized = raw.includes(' ')
+      ? raw.replace(/-/g, '/')
+      : raw
+
+    let date = new Date(normalized)
+    if (Number.isNaN(date.getTime()) && raw.includes(' ')) {
+      date = new Date(raw.replace(' ', 'T'))
+    }
+    if (Number.isNaN(date.getTime())) return '-'
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const day = String(date.getDate()).padStart(2, '0')

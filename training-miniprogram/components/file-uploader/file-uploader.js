@@ -4,6 +4,17 @@ const { MAX_FILE_SIZE } = require('../../utils/constants')
 const TEMP_URL_CACHE_TTL_MS = 45 * 60 * 1000
 const tempUrlCache = new Map()
 
+function normalizeFileUrl(value = '') {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  if (!/^https?:\/\//i.test(raw)) return raw
+  try {
+    return encodeURI(raw)
+  } catch (err) {
+    return raw
+  }
+}
+
 function readTempUrlCache(fileID) {
   const cached = tempUrlCache.get(fileID)
   if (!cached) return ''
@@ -50,7 +61,7 @@ Component({
             const cachedUrl = readTempUrlCache(newVal)
             if (cachedUrl) {
               this.setData({
-                fileUrl: cachedUrl,
+                fileUrl: normalizeFileUrl(cachedUrl),
                 cloudPath: newVal
               })
               return
@@ -63,20 +74,20 @@ Component({
               if (res.fileList && res.fileList.length > 0) {
                 writeTempUrlCache(newVal, res.fileList[0].tempFileURL)
                 this.setData({
-                  fileUrl: res.fileList[0].tempFileURL,
+                  fileUrl: normalizeFileUrl(res.fileList[0].tempFileURL),
                   cloudPath: newVal
                 })
               }
             } catch (err) {
               console.error('获取临时链接失败:', err)
               this.setData({
-                fileUrl: newVal,
+                fileUrl: normalizeFileUrl(newVal),
                 cloudPath: newVal
               })
             }
           } else {
             this.setData({
-              fileUrl: newVal,
+              fileUrl: normalizeFileUrl(newVal),
               cloudPath: newVal
             })
           }

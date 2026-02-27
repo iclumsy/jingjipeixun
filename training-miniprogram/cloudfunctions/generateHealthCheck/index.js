@@ -35,9 +35,14 @@ async function getBaseUrl(event = {}) {
 function toAbsoluteUrl(baseUrl, pathValue) {
   const raw = String(pathValue || '').trim()
   if (!raw) return ''
-  if (/^https?:\/\//i.test(raw)) return raw
-  if (raw.startsWith('/')) return `${baseUrl}${raw}`
-  return `${baseUrl}/${raw}`
+  const absolute = /^https?:\/\//i.test(raw)
+    ? raw
+    : (raw.startsWith('/') ? `${baseUrl}${raw}` : `${baseUrl}/${raw}`)
+  try {
+    return encodeURI(absolute)
+  } catch (err) {
+    return absolute
+  }
 }
 
 exports.main = async (event = {}) => {
