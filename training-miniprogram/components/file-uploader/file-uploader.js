@@ -38,6 +38,13 @@ function normalizeFileUrl(value = '') {
   }
 }
 
+function withCacheBust(url) {
+  const raw = String(url || '').trim()
+  if (!raw) return ''
+  const sep = raw.includes('?') ? '&' : '?'
+  return `${raw}${sep}v=${Date.now()}`
+}
+
 function withMiniToken(url) {
   const token = api.getToken()
   if (!token) return url
@@ -51,7 +58,7 @@ function toAbsoluteServerUrl(relativePath = '') {
   const baseUrl = api.getBaseUrl()
   if (!baseUrl) return ''
   const path = rel.startsWith('/') ? rel : `/${rel}`
-  return withMiniToken(`${baseUrl}${path}`)
+  return withCacheBust(withMiniToken(`${baseUrl}${path}`))
 }
 
 function toSafeImageSrc(value = '') {
@@ -178,7 +185,7 @@ Component({
         })
 
         const storedPath = normalizeFileUrl(result.path || '')
-        const previewUrl = toSafeImageSrc(storedPath) || filePath
+        const previewUrl = filePath || toSafeImageSrc(storedPath)
         this.setData({
           fileUrl: storedPath,
           storedPath,

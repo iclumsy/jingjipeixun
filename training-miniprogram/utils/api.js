@@ -82,6 +82,13 @@ function withMiniToken(url) {
   return `${url}${sep}mini_token=${encodeURIComponent(token)}`
 }
 
+function withCacheBust(url) {
+  const raw = trimText(url)
+  if (!raw) return ''
+  const sep = raw.includes('?') ? '&' : '?'
+  return `${raw}${sep}v=${Date.now()}`
+}
+
 function normalizeErrorMessage(data, statusCode) {
   if (data && typeof data === 'object') {
     if (data.message) return String(data.message)
@@ -371,11 +378,11 @@ function toAbsoluteFileUrl(pathValue) {
   const raw = trimText(pathValue)
   if (!raw) return ''
   if (/^https?:\/\//i.test(raw)) {
-    return withMiniToken(raw)
+    return withCacheBust(withMiniToken(raw))
   }
   const baseUrl = ensureBaseUrl()
   const rel = raw.startsWith('/') ? raw : `/${raw}`
-  return withMiniToken(`${baseUrl}${rel}`)
+  return withCacheBust(withMiniToken(`${baseUrl}${rel}`))
 }
 
 function buildDownloadUrls(student = {}) {

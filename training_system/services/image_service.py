@@ -5,16 +5,27 @@ from PIL import Image, ImageOps
 import numpy as np
 from flask import current_app
 
-try:
-    import cv2
-except ImportError:
-    cv2 = None
+CV2_IMPORT_ERROR = ''
+REMBG_IMPORT_ERROR = ''
+REMBG_SESSION_IMPORT_ERROR = ''
 
 try:
-    from rembg import remove, new_session
-except ImportError:
+    import cv2
+except Exception as err:
+    cv2 = None
+    CV2_IMPORT_ERROR = str(err)
+
+try:
+    from rembg import remove
+except Exception as err:
     remove = None
+    REMBG_IMPORT_ERROR = str(err)
+
+try:
+    from rembg import new_session
+except Exception as err:
     new_session = None
+    REMBG_SESSION_IMPORT_ERROR = str(err)
 
 
 def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
@@ -29,24 +40,36 @@ def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
     Returns:
         str: Path to processed photo (output_path on success, input_path on failure)
     """
-    if remove is None or new_session is None or cv2 is None:
-        current_app.logger.warning('rembg or cv2 not available, skipping background removal')
+    if remove is None or cv2 is None:
+        current_app.logger.warning(
+            'rembg/cv2 unavailable, skipping background removal; cv2_error=%s rembg_error=%s',
+            CV2_IMPORT_ERROR or '-',
+            REMBG_IMPORT_ERROR or '-'
+        )
         return input_path
 
     try:
-        # Configure rembg session with alpha matting for better edge detection
-        session = new_session(
-            model_name="u2net_human_seg",
-            alpha_matting=True,
-            alpha_matting_foreground_threshold=240,
-            alpha_matting_background_threshold=10,
-            alpha_matting_erode_size=10
-        )
-
         # Read and remove background
         with open(input_path, "rb") as f:
             input_img = f.read()
-        output_img = remove(input_img, session=session)
+
+        # Prefer explicit session when available; otherwise fallback to default remove().
+        if new_session is not None:
+            session = new_session(
+                model_name="u2net_human_seg",
+                alpha_matting=True,
+                alpha_matting_foreground_threshold=240,
+                alpha_matting_background_threshold=10,
+                alpha_matting_erode_size=10
+            )
+            output_img = remove(input_img, session=session)
+        else:
+            if REMBG_SESSION_IMPORT_ERROR:
+                current_app.logger.warning(
+                    'rembg.new_session unavailable, using default session; detail=%s',
+                    REMBG_SESSION_IMPORT_ERROR
+                )
+            output_img = remove(input_img)
         img_no_bg = Image.open(io.BytesIO(output_img)).convert("RGBA")
 
         # Fix mask to avoid missing clothing areas
