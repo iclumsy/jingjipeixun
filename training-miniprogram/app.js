@@ -54,6 +54,6 @@ App({
     loginState: 'idle',
     loginError: '',
     // 发布前请替换为你的后端 HTTPS 地址（必须在小程序后台配置 request 合法域名）
-    apiBaseUrl: 'http://127.0.0.1:5001'
+    apiBaseUrl: 'http://jingji.ctirad.fun:7777'
   }
 })

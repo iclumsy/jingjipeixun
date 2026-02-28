@@ -150,13 +150,9 @@ Page({
       }
 
       const student = result.student
+      const trainingType = student.training_type || 'special_equipment'
 
-      this.setData({
-        trainingType: student.training_type
-      })
-      this.updateJobCategoryNames()
-
-      const categories = this.data.jobCategories[student.training_type]
+      const categories = this.data.jobCategories[trainingType]
       let jobCategoryIndex = -1
       let examProjects = []
       let examProjectIndex = -1
@@ -175,6 +171,8 @@ Page({
       const normalizedPhone = normalizePhone(student.phone)
 
       this.setData({
+        trainingType,
+        jobCategoryNames: this.getJobCategoryNames(trainingType),
         fieldErrors: {
           id_card: getIdCardError(normalizedIdCard),
           phone: getPhoneError(normalizedPhone)
@@ -217,22 +215,35 @@ Page({
     }
   },
 
-  updateJobCategoryNames() {
-    const categories = this.data.jobCategories[this.data.trainingType]
-    if (categories && categories.job_categories) {
-      const names = categories.job_categories.map(c => c.name)
-      this.setData({
-        jobCategoryNames: names
-      })
-    }
+  getJobCategoryNames(trainingType = this.data.trainingType) {
+    const categories = this.data.jobCategories[trainingType]
+    const list = categories && Array.isArray(categories.job_categories)
+      ? categories.job_categories
+      : []
+    return list.map(item => item.name)
+  },
+
+  updateJobCategoryNames(trainingType = this.data.trainingType) {
+    this.setData({
+      jobCategoryNames: this.getJobCategoryNames(trainingType)
+    })
   },
 
   selectTrainingType(e) {
     const type = e.currentTarget.dataset.type
+    if (!type || type === this.data.trainingType) return
+
+    const nextJobCategoryNames = this.getJobCategoryNames(type)
     this.setData({
-      trainingType: type
+      trainingType: type,
+      jobCategoryNames: nextJobCategoryNames,
+      'student.job_category': '',
+      'student.jobCategoryIndex': -1,
+      'student.examProjects': [],
+      'student.exam_project': '',
+      'student.examProjectIndex': -1,
+      'student.project_code': ''
     })
-    this.updateJobCategoryNames()
   },
 
   selectGender(e) {

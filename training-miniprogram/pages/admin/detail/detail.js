@@ -160,18 +160,17 @@ Page({
     }
   },
 
-  updateJobCategoryNames() {
-    const categories = this.data.jobCategories[this.data.trainingType]
-    if (categories && categories.job_categories) {
-      const names = categories.job_categories.map(c => c.name)
-      this.setData({
-        jobCategoryNames: names
-      })
-      return
-    }
+  getJobCategoryNames(trainingType = this.data.trainingType) {
+    const categories = this.data.jobCategories[trainingType]
+    const list = categories && Array.isArray(categories.job_categories)
+      ? categories.job_categories
+      : []
+    return list.map(item => item.name)
+  },
 
+  updateJobCategoryNames(trainingType = this.data.trainingType) {
     this.setData({
-      jobCategoryNames: []
+      jobCategoryNames: this.getJobCategoryNames(trainingType)
     })
   },
 
@@ -208,6 +207,7 @@ Page({
         student,
         downloadUrls,
         trainingType,
+        jobCategoryNames: this.getJobCategoryNames(trainingType),
         trainingTypeText: TRAINING_TYPE_LABELS[trainingType] || trainingType,
         statusText: STATUS_TEXT_MAP[student.status] || student.status || '-',
         submitTimeText: formatTime(student.created_at),
@@ -246,8 +246,6 @@ Page({
         },
         loading: false
       })
-
-      this.updateJobCategoryNames()
     } catch (err) {
       console.error('加载审核详情失败:', err)
       this.setData({ loading: false })
@@ -259,8 +257,10 @@ Page({
     const type = e.currentTarget.dataset.type
     if (!type || type === this.data.trainingType) return
 
+    const nextJobCategoryNames = this.getJobCategoryNames(type)
     this.setData({
       trainingType: type,
+      jobCategoryNames: nextJobCategoryNames,
       trainingTypeText: TRAINING_TYPE_LABELS[type] || type,
       'editStudent.training_type': type,
       'editStudent.job_category': '',
@@ -270,7 +270,6 @@ Page({
       'editStudent.project_code': '',
       'editStudent.examProjects': []
     })
-    this.updateJobCategoryNames()
   },
 
   onJobCategoryChange(e) {
