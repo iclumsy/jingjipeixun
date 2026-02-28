@@ -159,12 +159,14 @@ def create_app():
         """Protect admin pages and API routes with session or API key."""
         g.mini_user = None
         path = request.path or '/'
-        protected_api = path.startswith('/api/') or path.startswith('/students/')
+        protected_api = path.startswith('/api/')
 
         if path.startswith('/static/') or path == '/favicon.ico':
             return None
 
         if path.startswith('/auth/'):
+            return None
+        if path.startswith('/students/'):
             return None
         if path == '/api/miniprogram/login':
             return None

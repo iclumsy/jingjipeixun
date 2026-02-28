@@ -200,7 +200,8 @@ def create_student_route():
         student_payload['education'] = normalize_education(student_payload.get('education', ''))
 
         mini_user = get_mini_user()
-        if mini_user and not is_mini_admin():
+        if mini_user:
+            # For mini-program direct callers, always bind record owner to token openid.
             student_payload['submitter_openid'] = get_mini_openid()
         else:
             student_payload['submitter_openid'] = (student_payload.get('submitter_openid', '') or '').strip()
