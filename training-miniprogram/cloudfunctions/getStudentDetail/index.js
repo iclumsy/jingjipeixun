@@ -21,21 +21,59 @@ function trimSlash(value = '') {
   return String(value || '').trim().replace(/\/+$/, '')
 }
 
-async function getBaseUrl(event = {}) {
-  const direct = trimSlash(event.api_base_url || event.base_url || '')
-  if (direct) {
-    return direct
+function trimText(value = '') {
+  return String(value || '').trim()
+}
+
+function getApiKeyFromConfig(config = {}, event = {}) {
+  const direct = trimText(
+    event.api_key
+      || event.apiKey
+      || event.origin_system_api_key
+      || event.originSystemApiKey
+  )
+  if (direct) return direct
+
+  return trimText(
+    config.api_key
+      || config.apiKey
+      || config.origin_system_api_key
+      || config.originSystemApiKey
+  )
+}
+
+function buildApiHeaders(apiKey = '') {
+  if (!apiKey) return {}
+  return {
+    'X-API-Key': apiKey
+  }
+}
+
+async function getRemoteConfig(event = {}) {
+  const directBaseUrl = trimSlash(event.api_base_url || event.base_url || '')
+  const directApiKey = getApiKeyFromConfig({}, event)
+  if (directBaseUrl) {
+    return {
+      baseUrl: directBaseUrl,
+      apiKey: directApiKey
+    }
   }
 
   try {
     const result = await db.collection(CONFIG_COLLECTION).doc(BASE_URL_CONFIG_DOC_ID).get()
     const raw = result && result.data ? result.data : {}
     const config = raw && typeof raw.data === 'object' ? raw.data : raw
-    return trimSlash(
-      (config && (config.base_url || config.baseUrl || config.origin_system_base_url || config.originSystemBaseUrl)) || ''
-    )
+    return {
+      baseUrl: trimSlash(
+        (config && (config.base_url || config.baseUrl || config.origin_system_base_url || config.originSystemBaseUrl)) || ''
+      ),
+      apiKey: getApiKeyFromConfig(config, event)
+    }
   } catch (err) {
-    return ''
+    return {
+      baseUrl: '',
+      apiKey: directApiKey
+    }
   }
 }
 
@@ -148,7 +186,7 @@ async function mapWithConcurrency(items, concurrency, mapper) {
   return results
 }
 
-async function proxyRemoteAttachmentToCloudFileId(sourceUrl, studentId, fieldName) {
+async function proxyRemoteAttachmentToCloudFileId(sourceUrl, studentId, fieldName, apiKey) {
   if (!sourceUrl) return ''
   if (isCloudFileId(sourceUrl)) return sourceUrl
 
@@ -156,6 +194,7 @@ async function proxyRemoteAttachmentToCloudFileId(sourceUrl, studentId, fieldNam
   if (cachedFileID) return cachedFileID
 
   const response = await safeAxiosGet(sourceUrl, {
+    headers: buildApiHeaders(apiKey),
     responseType: 'arraybuffer',
     timeout: DEFAULT_TIMEOUT_MS,
     validateStatus: () => true
@@ -192,16 +231,23 @@ exports.main = async (event = {}) => {
     }
   }
 
-  const baseUrl = await getBaseUrl(event)
+  const { baseUrl, apiKey } = await getRemoteConfig(event)
   if (!baseUrl) {
     return {
       error: '配置错误',
       message: '未在云数据库 config/origin_system_sync 中配置 base_url'
     }
   }
+  if (!apiKey) {
+    return {
+      error: '配置错误',
+      message: '未在云数据库 config/origin_system_sync 中配置 api_key'
+    }
+  }
 
   try {
     const response = await safeAxiosGet(`${baseUrl}/api/students/${encodeURIComponent(studentId)}`, {
+      headers: buildApiHeaders(apiKey),
       timeout: DEFAULT_TIMEOUT_MS,
       validateStatus: () => true
     })
@@ -244,7 +290,7 @@ exports.main = async (event = {}) => {
     const proxyResults = await mapWithConcurrency(tasks, PROXY_CONCURRENCY, async task => {
       const { field, sourceUrl } = task
       try {
-        const fileID = await proxyRemoteAttachmentToCloudFileId(sourceUrl, withClientId._id || studentId, field)
+        const fileID = await proxyRemoteAttachmentToCloudFileId(sourceUrl, withClientId._id || studentId, field, apiKey)
         return { field, fileID }
       } catch (err) {
         console.warn(`附件中转失败 ${field}:`, err.message || err)

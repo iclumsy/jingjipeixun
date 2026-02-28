@@ -30,21 +30,52 @@ function trimSlash(value = '') {
   return String(value || '').trim().replace(/\/+$/, '')
 }
 
-async function getBaseUrl(event = {}) {
-  const direct = trimSlash(event.api_base_url || event.base_url || '')
-  if (direct) {
-    return direct
+function trimText(value = '') {
+  return String(value || '').trim()
+}
+
+function getApiKeyFromConfig(config = {}, event = {}) {
+  const direct = trimText(
+    event.api_key
+      || event.apiKey
+      || event.origin_system_api_key
+      || event.originSystemApiKey
+  )
+  if (direct) return direct
+
+  return trimText(
+    config.api_key
+      || config.apiKey
+      || config.origin_system_api_key
+      || config.originSystemApiKey
+  )
+}
+
+async function getRemoteConfig(event = {}) {
+  const directBaseUrl = trimSlash(event.api_base_url || event.base_url || '')
+  const directApiKey = getApiKeyFromConfig({}, event)
+  if (directBaseUrl) {
+    return {
+      baseUrl: directBaseUrl,
+      apiKey: directApiKey
+    }
   }
 
   try {
     const result = await db.collection(CONFIG_COLLECTION).doc(BASE_URL_CONFIG_DOC_ID).get()
     const raw = result && result.data ? result.data : {}
     const config = raw && typeof raw.data === 'object' ? raw.data : raw
-    return trimSlash(
-      (config && (config.base_url || config.baseUrl || config.origin_system_base_url || config.originSystemBaseUrl)) || ''
-    )
+    return {
+      baseUrl: trimSlash(
+        (config && (config.base_url || config.baseUrl || config.origin_system_base_url || config.originSystemBaseUrl)) || ''
+      ),
+      apiKey: getApiKeyFromConfig(config, event)
+    }
   } catch (err) {
-    return ''
+    return {
+      baseUrl: '',
+      apiKey: directApiKey
+    }
   }
 }
 
@@ -83,7 +114,7 @@ async function appendCloudFileToForm(form, fieldName, fileID, fallbackName) {
   })
 }
 
-async function createOneStudent(baseUrl, student, trainingType, submitterOpenid) {
+async function createOneStudent(baseUrl, apiKey, student, trainingType, submitterOpenid) {
   const form = new FormData()
 
   const textFields = [
@@ -115,7 +146,10 @@ async function createOneStudent(baseUrl, student, trainingType, submitterOpenid)
   }
 
   const response = await axios.post(`${baseUrl}/api/students`, form, {
-    headers: form.getHeaders(),
+    headers: {
+      ...form.getHeaders(),
+      'X-API-Key': apiKey
+    },
     timeout: DEFAULT_TIMEOUT_MS,
     maxBodyLength: Infinity,
     maxContentLength: Infinity,
@@ -161,11 +195,17 @@ exports.main = async (event = {}) => {
     }
   }
 
-  const baseUrl = await getBaseUrl(event)
+  const { baseUrl, apiKey } = await getRemoteConfig(event)
   if (!baseUrl) {
     return {
       error: '配置错误',
       message: '未在云数据库 config/origin_system_sync 中配置 base_url'
+    }
+  }
+  if (!apiKey) {
+    return {
+      error: '配置错误',
+      message: '未在云数据库 config/origin_system_sync 中配置 api_key'
     }
   }
 
@@ -174,7 +214,7 @@ exports.main = async (event = {}) => {
 
     for (const student of students) {
       const effectiveTrainingType = training_type || student.training_type || 'special_operation'
-      const result = await createOneStudent(baseUrl, student, effectiveTrainingType, wxContext.OPENID)
+      const result = await createOneStudent(baseUrl, apiKey, student, effectiveTrainingType, wxContext.OPENID)
       ids.push(String(result.id || ''))
     }
 

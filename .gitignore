@@ -11,6 +11,9 @@ logs/
 *.old
 .migration_complete
 training_system/.DS_Store
+# training_system/.env
+# training_system/.env.*
+# !training_system/.env.example
 # macOS 系统文件（完整规则）
 .DS_Store
 .DS_Store?

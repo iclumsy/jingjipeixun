@@ -1,3 +1,14 @@
+const rawFetch = window.fetch.bind(window);
+window.fetch = async (...args) => {
+    const response = await rawFetch(...args);
+    if (response.status === 401) {
+        const nextPath = `${window.location.pathname}${window.location.search || ''}`;
+        window.location.href = `/auth/login?next=${encodeURIComponent(nextPath)}`;
+        throw new Error('未登录或登录已过期');
+    }
+    return response;
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     let currentStatus = 'unreviewed';
     let currentStudentId = null;
