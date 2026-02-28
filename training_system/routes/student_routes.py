@@ -1,5 +1,5 @@
 """Student-related routes."""
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, g
 from models.student import (
     create_student, get_students, get_student_by_id, update_student,
     delete_student, delete_students_batch,
@@ -12,6 +12,7 @@ from utils.error_handlers import AppError, ValidationError, NotFoundError
 import os
 import io
 import zipfile
+import time
 
 
 student_bp = Blueprint('student', __name__)
@@ -73,55 +74,137 @@ def parse_bool(value):
     return normalized in ('1', 'true', 'yes', 'on')
 
 
+def get_mini_user():
+    """Return mini-program auth payload from request context."""
+    user = getattr(g, 'mini_user', None)
+    return user if isinstance(user, dict) else None
+
+
+def is_mini_admin():
+    """Whether current mini-program caller is admin."""
+    user = get_mini_user()
+    return bool(user and user.get('is_admin'))
+
+
+def get_mini_openid():
+    """Return mini-program caller openid."""
+    user = get_mini_user()
+    if not user:
+        return ''
+    return str(user.get('openid', '') or '').strip()
+
+
+def ensure_mini_admin():
+    """Reject non-admin mini callers for admin operations."""
+    user = get_mini_user()
+    if user and not is_mini_admin():
+        raise AppError('无权限执行该操作', status_code=403)
+
+
+def ensure_mini_owner_or_admin(student):
+    """Reject mini caller if not owner and not admin."""
+    user = get_mini_user()
+    if not user or is_mini_admin():
+        return
+    owner_openid = str(student.get('submitter_openid', '') or '').strip()
+    if owner_openid != get_mini_openid():
+        raise AppError('无权限访问该记录', status_code=403)
+
+
+def ensure_safe_relative_student_path(path_value):
+    """Validate relative file path for students folder."""
+    raw = str(path_value or '').strip()
+    if not raw:
+        return ''
+    normalized = raw.replace('\\', '/')
+    if normalized.startswith('/'):
+        raise ValidationError('附件路径无效')
+    if '..' in normalized.split('/'):
+        raise ValidationError('附件路径无效')
+    if not normalized.startswith('students/'):
+        raise ValidationError('附件路径无效')
+    return normalized
+
+
 @student_bp.route('/api/students', methods=['POST'])
 def create_student_route():
     """Create a new student."""
     try:
-        data = request.form
-        files = request.files
-
-        # Validate data
-        validate_student_data(data)
-
-        training_type = normalize_training_type(data.get('training_type', 'special_operation'))
-        required_attachments = REQUIRED_ATTACHMENTS.get(training_type, REQUIRED_ATTACHMENTS['special_operation'])
-        missing_files = [
-            field for field in required_attachments
-            if not files.get(field) or not files.get(field).filename
-        ]
-        if missing_files:
-            fields = {field: '该培训项目下此附件为必传项' for field in missing_files}
-            raise ValidationError('缺少必传附件', fields=fields)
-
-        # Save files
+        use_multipart = bool(request.form or request.files)
         file_paths = {}
 
-        id_card_val = data.get('id_card', '').strip()
-        company_val = data.get('company', '').strip()
+        if use_multipart:
+            data = request.form
+            files = request.files
 
-        for input_name, db_key in FILE_MAP.items():
-            file = files.get(input_name)
-            if file and file.filename and id_card_val:
-                try:
-                    validate_file_upload(file)
-                    rel = process_and_save_file(
-                        file, id_card_val, data.get('name', ''),
-                        input_name, company_val, training_type
-                    )
-                    file_paths[db_key] = rel
-                except Exception as e:
-                    current_app.logger.error(f'Failed to save file {input_name}: {str(e)}')
+            # Validate data
+            validate_student_data(data)
+
+            training_type = normalize_training_type(data.get('training_type', 'special_operation'))
+            required_attachments = REQUIRED_ATTACHMENTS.get(training_type, REQUIRED_ATTACHMENTS['special_operation'])
+            missing_files = [
+                field for field in required_attachments
+                if not files.get(field) or not files.get(field).filename
+            ]
+            if missing_files:
+                fields = {field: '该培训项目下此附件为必传项' for field in missing_files}
+                raise ValidationError('缺少必传附件', fields=fields)
+
+            id_card_val = data.get('id_card', '').strip()
+            company_val = data.get('company', '').strip()
+
+            for input_name, db_key in FILE_MAP.items():
+                file = files.get(input_name)
+                if file and file.filename and id_card_val:
+                    try:
+                        validate_file_upload(file)
+                        rel = process_and_save_file(
+                            file, id_card_val, data.get('name', ''),
+                            input_name, company_val, training_type
+                        )
+                        file_paths[db_key] = rel
+                    except Exception as err:
+                        current_app.logger.error(f'Failed to save file {input_name}: {str(err)}')
+                        file_paths[db_key] = ""
+                else:
                     file_paths[db_key] = ""
-            else:
-                file_paths[db_key] = ""
+
+            student_payload = data.to_dict(flat=True)
+        else:
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                raise ValidationError('请求参数格式错误')
+
+            validate_student_data(payload)
+            training_type = normalize_training_type(payload.get('training_type', 'special_operation'))
+
+            files_payload = payload.get('files', {}) if isinstance(payload.get('files', {}), dict) else {}
+            for input_name, db_key in FILE_MAP.items():
+                file_paths[db_key] = ensure_safe_relative_student_path(files_payload.get(input_name, ''))
+
+            required_attachments = REQUIRED_ATTACHMENTS.get(training_type, REQUIRED_ATTACHMENTS['special_operation'])
+            missing_files = [
+                field for field in required_attachments
+                if not file_paths.get(FILE_MAP[field], '')
+            ]
+            if missing_files:
+                fields = {field: '该培训项目下此附件为必传项' for field in missing_files}
+                raise ValidationError('缺少必传附件', fields=fields)
+
+            student_payload = dict(payload)
 
         file_paths['training_form_path'] = ""
 
         # Create student
-        student_payload = data.to_dict(flat=True)
         student_payload['training_type'] = training_type
         student_payload['education'] = normalize_education(student_payload.get('education', ''))
-        student_payload['submitter_openid'] = (data.get('submitter_openid', '') or '').strip()
+
+        mini_user = get_mini_user()
+        if mini_user and not is_mini_admin():
+            student_payload['submitter_openid'] = get_mini_openid()
+        else:
+            student_payload['submitter_openid'] = (student_payload.get('submitter_openid', '') or '').strip()
+
         student_id = create_student(student_payload, file_paths)
         current_app.logger.info(f'Student created: ID={student_id}')
 
@@ -145,15 +228,24 @@ def get_students_route():
         search = request.args.get('search', '')
         company = request.args.get('company', '')
         training_type = request.args.get('training_type', '')
-        my_only = parse_bool(request.args.get('my_only', False))
-        submitter_openid = (request.args.get('submitter_openid', '') or '').strip()
-        if my_only and not submitter_openid:
-            # fallback: allow openid query alias
-            submitter_openid = (request.args.get('openid', '') or '').strip()
+        mini_user = get_mini_user()
 
-        students = get_students(status, search, company, training_type, submitter_openid if my_only else '')
+        if mini_user and not is_mini_admin():
+            submitter_openid = get_mini_openid()
+        else:
+            my_only = parse_bool(request.args.get('my_only', False))
+            submitter_openid = (request.args.get('submitter_openid', '') or '').strip()
+            if my_only and not submitter_openid:
+                # fallback: allow openid query alias
+                submitter_openid = (request.args.get('openid', '') or '').strip()
+            if not my_only:
+                submitter_openid = ''
+
+        students = get_students(status, search, company, training_type, submitter_openid)
         return jsonify(students)
 
+    except AppError as e:
+        return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         current_app.logger.error(f'Error getting students: {str(e)}')
         return jsonify({'error': str(e)}), 500
@@ -164,8 +256,11 @@ def get_student_route(id):
     """Get single student detail."""
     try:
         student = get_student_by_id(id)
+        ensure_mini_owner_or_admin(student)
         return jsonify(student)
     except NotFoundError as e:
+        return jsonify(e.to_dict()), e.status_code
+    except AppError as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         current_app.logger.error(f'Error getting student {id}: {str(e)}')
@@ -182,6 +277,10 @@ def update_student_route(id):
         ]
 
         current_student = get_student_by_id(id)
+        ensure_mini_owner_or_admin(current_student)
+        if get_mini_user() and not is_mini_admin() and current_student.get('status') != 'rejected':
+            raise AppError('当前状态不允许修改', status_code=403)
+
         updates = {}
 
         # Handle form data (multipart) or JSON
@@ -236,6 +335,9 @@ def update_student_route(id):
                         updates[db_key] = ''
         else:
             payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                raise ValidationError('请求参数格式错误')
+
             for k in allowed_text:
                 if k in payload:
                     updates[k] = payload[k]
@@ -250,13 +352,44 @@ def update_student_route(id):
             if updates:
                 validate_student_data(updates, required_fields=[])
 
+            files_payload = payload.get('files', {}) if isinstance(payload.get('files', {}), dict) else {}
+            effective_training_type = normalize_training_type(
+                updates.get('training_type', current_student.get('training_type', 'special_operation'))
+            )
+            allowed_attachments = set(REQUIRED_ATTACHMENTS.get(effective_training_type, REQUIRED_ATTACHMENTS['special_operation']))
+
+            for input_name, db_key in FILE_MAP.items():
+                if input_name not in files_payload:
+                    continue
+                rel = ensure_safe_relative_student_path(files_payload.get(input_name, ''))
+                if rel and input_name not in allowed_attachments:
+                    raise ValidationError(f'{effective_training_type} 不允许上传 {input_name}')
+
+                old_rel = current_student.get(db_key, '')
+                if old_rel and rel != old_rel:
+                    delete_student_files({db_key: old_rel}, current_app.config['BASE_DIR'])
+                updates[db_key] = rel
+
+        effective_training_type = normalize_training_type(
+            updates.get('training_type', current_student.get('training_type', 'special_operation'))
+        )
+        required_attachments = REQUIRED_ATTACHMENTS.get(effective_training_type, REQUIRED_ATTACHMENTS['special_operation'])
+        for attachment_field in required_attachments:
+            db_key = FILE_MAP[attachment_field]
+            final_value = updates.get(db_key, current_student.get(db_key, ''))
+            if not final_value:
+                raise ValidationError(
+                    '缺少必传附件',
+                    fields={attachment_field: '该培训项目下此附件为必传项'}
+                )
+
         # Update student
         updated_student = update_student(id, updates)
         current_app.logger.info(f'Student updated: ID={id}')
 
         return jsonify(updated_student)
 
-    except (ValidationError, NotFoundError) as e:
+    except (ValidationError, NotFoundError, AppError) as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         current_app.logger.error(f'Error updating student {id}: {str(e)}')
@@ -268,6 +401,10 @@ def upload_student_attachment_route(id):
     """Upload a single attachment for an existing student."""
     try:
         student = get_student_by_id(id)
+        ensure_mini_owner_or_admin(student)
+        if get_mini_user() and not is_mini_admin() and student.get('status') != 'rejected':
+            raise AppError('当前状态不允许修改', status_code=403)
+
         training_type = normalize_training_type(student.get('training_type', 'special_operation'))
         allowed_attachments = set(REQUIRED_ATTACHMENTS.get(training_type, REQUIRED_ATTACHMENTS['special_operation']))
 
@@ -314,10 +451,61 @@ def upload_student_attachment_route(id):
             'student': updated
         })
 
-    except (ValidationError, NotFoundError) as e:
+    except (ValidationError, NotFoundError, AppError) as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         current_app.logger.error(f'Error uploading attachment for student {id}: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
+
+@student_bp.route('/api/miniprogram/upload', methods=['POST'])
+def miniprogram_upload_attachment_route():
+    """Upload a single attachment before form submit (mini-program direct mode)."""
+    try:
+        upload_file = request.files.get('file')
+        if not upload_file or not upload_file.filename:
+            raise ValidationError('未检测到有效上传文件')
+
+        file_type = str(
+            request.form.get('file_type')
+            or request.form.get('fileType')
+            or ''
+        ).strip()
+        if file_type not in FILE_MAP:
+            raise ValidationError('附件类型无效')
+
+        training_type = normalize_training_type(
+            request.form.get('training_type') or request.form.get('trainingType') or 'special_operation'
+        )
+        allowed_attachments = set(REQUIRED_ATTACHMENTS.get(training_type, REQUIRED_ATTACHMENTS['special_operation']))
+        if file_type not in allowed_attachments:
+            raise ValidationError('当前培训项目不需要该附件')
+
+        validate_file_upload(upload_file)
+
+        id_card_for_name = str(request.form.get('id_card', '') or '').strip() or f"temp{int(time.time())}"
+        name_for_save = str(request.form.get('name', '') or '').strip() or '未命名'
+        company_for_name = str(request.form.get('company', '') or '').strip()
+
+        rel = process_and_save_file(
+            upload_file,
+            id_card_for_name,
+            name_for_save,
+            file_type,
+            company_for_name,
+            training_type
+        )
+
+        return jsonify({
+            'success': True,
+            'path': rel,
+            'file_type': file_type
+        })
+
+    except (ValidationError, AppError) as e:
+        return jsonify(e.to_dict()), e.status_code
+    except Exception as e:
+        current_app.logger.error(f'Error uploading mini attachment: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 
@@ -325,6 +513,7 @@ def upload_student_attachment_route(id):
 def reject_student_route(id):
     """Reject a student: update status by default, delete only when explicitly requested."""
     try:
+        ensure_mini_admin()
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
             data = {}
@@ -351,6 +540,8 @@ def reject_student_route(id):
 
     except NotFoundError as e:
         return jsonify(e.to_dict()), e.status_code
+    except AppError as e:
+        return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         current_app.logger.error(f'Error rejecting student {id}: {str(e)}')
         return jsonify({'error': str(e)}), 500
@@ -360,6 +551,7 @@ def reject_student_route(id):
 def approve_student_route(id):
     """Approve a student."""
     try:
+        ensure_mini_admin()
         current_student = get_student_by_id(id)
         
         health_check_path = generate_health_check_form(
@@ -381,6 +573,8 @@ def approve_student_route(id):
 
     except NotFoundError as e:
         return jsonify(e.to_dict()), e.status_code
+    except AppError as e:
+        return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         current_app.logger.error(f'Error approving student {id}: {str(e)}')
         return jsonify({'error': str(e)}), 500
@@ -399,6 +593,7 @@ def generate_materials_route(id):
 def download_attachments_zip_route(id):
     """Download all attachments for a student as ZIP."""
     try:
+        ensure_mini_admin()
         student = get_student_by_id(id)
 
         if student.get('status') != 'reviewed':
@@ -446,6 +641,8 @@ def download_attachments_zip_route(id):
 
     except NotFoundError as e:
         return jsonify(e.to_dict()), e.status_code
+    except AppError as e:
+        return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         current_app.logger.error(f'Error generating ZIP for student {id}: {str(e)}')
         return jsonify({'error': str(e)}), 500
@@ -455,6 +652,7 @@ def download_attachments_zip_route(id):
 def batch_approve_students_route():
     """Batch approve students."""
     try:
+        ensure_mini_admin()
         data = request.get_json()
         if not data or 'ids' not in data:
             raise ValidationError('Missing student IDs')
@@ -484,7 +682,7 @@ def batch_approve_students_route():
 
         return jsonify({'message': f'Successfully approved {approved_count} of {len(ids)} students'}), 200
 
-    except ValidationError as e:
+    except (ValidationError, AppError) as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         current_app.logger.error(f'Error batch approving students: {str(e)}')
@@ -495,6 +693,7 @@ def batch_approve_students_route():
 def batch_reject_students_route():
     """Batch reject and delete students."""
     try:
+        ensure_mini_admin()
         data = request.get_json()
         if not data or 'ids' not in data:
             raise ValidationError('Missing student IDs')
@@ -512,7 +711,7 @@ def batch_reject_students_route():
         current_app.logger.info(f'Batch rejected {len(ids)} students')
         return jsonify({'message': f'Successfully rejected and deleted {len(ids)} students'}), 200
 
-    except ValidationError as e:
+    except (ValidationError, AppError) as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         current_app.logger.error(f'Error batch rejecting students: {str(e)}')
@@ -523,6 +722,7 @@ def batch_reject_students_route():
 def batch_delete_students_route():
     """Batch delete students."""
     try:
+        ensure_mini_admin()
         data = request.get_json()
         if not data or 'ids' not in data:
             raise ValidationError('Missing student IDs')
@@ -540,7 +740,7 @@ def batch_delete_students_route():
         current_app.logger.info(f'Batch deleted {len(ids)} students')
         return jsonify({'message': f'Successfully deleted {len(ids)} students'}), 200
 
-    except ValidationError as e:
+    except (ValidationError, AppError) as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         current_app.logger.error(f'Error batch deleting students: {str(e)}')
@@ -551,6 +751,7 @@ def batch_delete_students_route():
 def get_companies_route():
     """Get distinct company names."""
     try:
+        ensure_mini_admin()
         status = request.args.get('status', '')
         company_filter = request.args.get('company', '')
         training_type = request.args.get('training_type', '')
@@ -558,6 +759,8 @@ def get_companies_route():
         companies = get_companies(status, company_filter, training_type)
         return jsonify(companies)
 
+    except AppError as e:
+        return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         current_app.logger.error(f'Error getting companies: {str(e)}')
         return jsonify({'error': str(e)}), 500

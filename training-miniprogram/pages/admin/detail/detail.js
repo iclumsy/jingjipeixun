@@ -76,6 +76,7 @@ function pickAttachmentValue(downloadValue, ...fallbacks) {
     if (
       value.startsWith('cloud://') ||
       value.startsWith('wxfile://') ||
+      value.startsWith('students/') ||
       /^https:\/\//i.test(value)
     ) {
       return value
@@ -221,12 +222,12 @@ Page({
           examProjects,
           training_type: trainingType,
           files: {
-            photo: pickAttachmentValue(downloadUrls.photo_path, student.files?.photo, student.photo_path),
-            diploma: pickAttachmentValue(downloadUrls.diploma_path, student.files?.diploma, student.diploma_path),
-            id_card_front: pickAttachmentValue(downloadUrls.id_card_front_path, student.files?.id_card_front, student.id_card_front_path),
-            id_card_back: pickAttachmentValue(downloadUrls.id_card_back_path, student.files?.id_card_back, student.id_card_back_path),
-            hukou_residence: pickAttachmentValue(downloadUrls.hukou_residence_path, student.files?.hukou_residence, student.hukou_residence_path),
-            hukou_personal: pickAttachmentValue(downloadUrls.hukou_personal_path, student.files?.hukou_personal, student.hukou_personal_path)
+            photo: pickAttachmentValue(student.files?.photo, student.photo_path, downloadUrls.photo_path),
+            diploma: pickAttachmentValue(student.files?.diploma, student.diploma_path, downloadUrls.diploma_path),
+            id_card_front: pickAttachmentValue(student.files?.id_card_front, student.id_card_front_path, downloadUrls.id_card_front_path),
+            id_card_back: pickAttachmentValue(student.files?.id_card_back, student.id_card_back_path, downloadUrls.id_card_back_path),
+            hukou_residence: pickAttachmentValue(student.files?.hukou_residence, student.hukou_residence_path, downloadUrls.hukou_residence_path),
+            hukou_personal: pickAttachmentValue(student.files?.hukou_personal, student.hukou_personal_path, downloadUrls.hukou_personal_path)
           }
         },
         loading: false

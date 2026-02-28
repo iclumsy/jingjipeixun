@@ -1,8 +1,7 @@
 // components/file-uploader/file-uploader.js
+const api = require('../../utils/api')
 const { validateFileSize, validateFileType } = require('../../utils/validators')
 const { MAX_FILE_SIZE } = require('../../utils/constants')
-const TEMP_URL_CACHE_TTL_MS = 45 * 60 * 1000
-const tempUrlCache = new Map()
 
 function isHttpUrl(value = '') {
   return /^http:\/\//i.test(String(value || '').trim())
@@ -24,21 +23,6 @@ function isAppAssetPath(value = '') {
   return /^\/(?!\/)/.test(String(value || '').trim())
 }
 
-function toSafeImageSrc(value = '') {
-  const raw = String(value || '').trim()
-  if (!raw) return ''
-  if (isHttpUrl(raw)) return ''
-  if (
-    isHttpsUrl(raw) ||
-    isLocalFileUrl(raw) ||
-    isDataImageUrl(raw) ||
-    isAppAssetPath(raw)
-  ) {
-    return raw
-  }
-  return ''
-}
-
 function normalizeFileUrl(value = '') {
   const raw = String(value || '').trim()
   if (!raw) return ''
@@ -54,28 +38,38 @@ function normalizeFileUrl(value = '') {
   }
 }
 
-function readTempUrlCache(fileID) {
-  const cached = tempUrlCache.get(fileID)
-  if (!cached) return ''
-  if (cached.expireAt <= Date.now()) {
-    tempUrlCache.delete(fileID)
-    return ''
+function withMiniToken(url) {
+  const token = api.getToken()
+  if (!token) return url
+  const sep = url.includes('?') ? '&' : '?'
+  return `${url}${sep}mini_token=${encodeURIComponent(token)}`
+}
+
+function toAbsoluteServerUrl(relativePath = '') {
+  const rel = String(relativePath || '').trim()
+  if (!rel) return ''
+  const baseUrl = api.getBaseUrl()
+  if (!baseUrl) return ''
+  const path = rel.startsWith('/') ? rel : `/${rel}`
+  return withMiniToken(`${baseUrl}${path}`)
+}
+
+function toSafeImageSrc(value = '') {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  if (isHttpUrl(raw)) return ''
+  if (
+    isHttpsUrl(raw) ||
+    isLocalFileUrl(raw) ||
+    isDataImageUrl(raw) ||
+    isAppAssetPath(raw)
+  ) {
+    return raw
   }
-  return cached.url
-}
-
-function writeTempUrlCache(fileID, url) {
-  if (!fileID || !url) return
-  tempUrlCache.set(fileID, {
-    url,
-    expireAt: Date.now() + TEMP_URL_CACHE_TTL_MS
-  })
-}
-
-async function resolveDisplayUrl(url) {
-  const normalized = normalizeFileUrl(url)
-  if (!normalized) return ''
-  return toSafeImageSrc(normalized)
+  if (raw.startsWith('students/')) {
+    return toAbsoluteServerUrl(raw)
+  }
+  return ''
 }
 
 Component({
@@ -99,62 +93,13 @@ Component({
     value: {
       type: String,
       value: '',
-      observer: async function(newVal) {
-        if (newVal) {
-          // 如果是云存储路径，获取临时下载链接
-          if (newVal.startsWith('cloud://')) {
-            const cachedUrl = readTempUrlCache(newVal)
-            if (cachedUrl) {
-              const normalizedUrl = normalizeFileUrl(cachedUrl)
-              this.setData({
-                fileUrl: normalizedUrl,
-                previewUrl: toSafeImageSrc(normalizedUrl),
-                cloudPath: newVal
-              })
-              this.syncPreviewUrl(normalizedUrl)
-              return
-            }
-
-            try {
-              const res = await wx.cloud.getTempFileURL({
-                fileList: [newVal]
-              })
-              if (res.fileList && res.fileList.length > 0) {
-                writeTempUrlCache(newVal, res.fileList[0].tempFileURL)
-                const normalizedUrl = normalizeFileUrl(res.fileList[0].tempFileURL)
-                this.setData({
-                  fileUrl: normalizedUrl,
-                  previewUrl: toSafeImageSrc(normalizedUrl),
-                  cloudPath: newVal
-                })
-                this.syncPreviewUrl(normalizedUrl)
-              }
-            } catch (err) {
-              console.error('获取临时链接失败:', err)
-              const normalizedUrl = normalizeFileUrl(newVal)
-              this.setData({
-                fileUrl: normalizedUrl,
-                previewUrl: toSafeImageSrc(normalizedUrl),
-                cloudPath: newVal
-              })
-              this.syncPreviewUrl(normalizedUrl)
-            }
-          } else {
-            const normalizedUrl = normalizeFileUrl(newVal)
-            this.setData({
-              fileUrl: normalizedUrl,
-              previewUrl: toSafeImageSrc(normalizedUrl),
-              cloudPath: newVal
-            })
-            this.syncPreviewUrl(normalizedUrl)
-          }
-        } else {
-          this.setData({
-            fileUrl: '',
-            previewUrl: '',
-            cloudPath: ''
-          })
-        }
+      observer: function(newVal) {
+        const normalized = normalizeFileUrl(newVal)
+        this.setData({
+          fileUrl: normalized,
+          previewUrl: toSafeImageSrc(normalized),
+          storedPath: normalized
+        })
       }
     }
   },
@@ -162,23 +107,13 @@ Component({
   data: {
     fileUrl: '',
     previewUrl: '',
-    cloudPath: '',
+    storedPath: '',
     uploading: false,
     progress: 0,
     error: ''
   },
 
   methods: {
-    async syncPreviewUrl(url) {
-      const token = (this._previewToken || 0) + 1
-      this._previewToken = token
-      const localUrl = await resolveDisplayUrl(url)
-      if (token !== this._previewToken) return
-      this.setData({
-        previewUrl: localUrl || toSafeImageSrc(url)
-      })
-    },
-
     async chooseFile() {
       try {
         const res = await wx.chooseImage({
@@ -186,22 +121,17 @@ Component({
           sizeType: ['compressed'],
           sourceType: ['album', 'camera']
         })
-
         const tempFilePath = res.tempFilePaths[0]
 
-        // 检查文件大小
         const fileInfo = await wx.getFileInfo({
           filePath: tempFilePath
         })
-
         if (!validateFileSize(fileInfo.size, MAX_FILE_SIZE)) {
           this.setData({
             error: '文件大小不能超过10MB'
           })
           return
         }
-
-        // 检查文件类型
         if (!validateFileType(tempFilePath)) {
           this.setData({
             error: '只支持JPG、PNG格式的图片'
@@ -209,17 +139,8 @@ Component({
           return
         }
 
-        // 清除错误
         this.setData({ error: '' })
-
-        // 如果是照片类型，可能需要裁剪
-        if (this.data.fileType === 'photo') {
-          // TODO: 跳转到裁剪页面
-          // 暂时直接上传
-          this.uploadFile(tempFilePath)
-        } else {
-          this.uploadFile(tempFilePath)
-        }
+        await this.uploadFile(tempFilePath)
       } catch (err) {
         console.error('选择文件失败:', err)
       }
@@ -228,55 +149,56 @@ Component({
     async uploadFile(filePath) {
       this.setData({
         uploading: true,
-        progress: 0
+        progress: 10,
+        error: ''
       })
 
+      const pages = getCurrentPages()
+      const page = pages && pages.length ? pages[pages.length - 1] : null
+      const trainingType = page && page.data
+        ? page.data.trainingType || (page.data.editStudent && page.data.editStudent.training_type) || ''
+        : ''
+      const idCard = page && page.data
+        ? (page.data.student && page.data.student.id_card) || (page.data.editStudent && page.data.editStudent.id_card) || ''
+        : ''
+      const name = page && page.data
+        ? (page.data.student && page.data.student.name) || (page.data.editStudent && page.data.editStudent.name) || ''
+        : ''
+      const company = page && page.data
+        ? (page.data.student && page.data.student.company) || (page.data.editStudent && page.data.editStudent.company) || ''
+        : ''
+
       try {
-        // 生成云存储路径
-        const timestamp = Date.now()
-        const random = Math.random().toString(36).substr(2, 9)
-        const ext = filePath.substring(filePath.lastIndexOf('.'))
-        const cloudPath = `temp/${this.data.fileType}_${timestamp}_${random}${ext}`
-
-        const uploadTask = wx.cloud.uploadFile({
-          cloudPath,
-          filePath,
-          success: res => {
-            this.setData({
-              fileUrl: filePath,
-              previewUrl: filePath,
-              cloudPath: res.fileID,
-              uploading: false,
-              progress: 100
-            })
-
-            // 触发上传完成事件
-            this.triggerEvent('uploaded', {
-              fileType: this.data.fileType,
-              cloudPath: res.fileID,
-              tempPath: filePath
-            })
-          },
-          fail: err => {
-            console.error('上传失败:', err)
-            this.setData({
-              uploading: false,
-              error: '上传失败，请重试'
-            })
-          }
+        const result = await api.uploadAttachment(filePath, {
+          fileType: this.data.fileType,
+          trainingType,
+          idCard,
+          name,
+          company
         })
 
-        // 监听上传进度
-        uploadTask.onProgressUpdate(res => {
-          this.setData({
-            progress: res.progress
-          })
+        const storedPath = normalizeFileUrl(result.path || '')
+        const previewUrl = toSafeImageSrc(storedPath) || filePath
+        this.setData({
+          fileUrl: storedPath,
+          storedPath,
+          previewUrl,
+          uploading: false,
+          progress: 100
+        })
+
+        this.triggerEvent('uploaded', {
+          fileType: this.data.fileType,
+          filePath: storedPath,
+          cloudPath: storedPath,
+          tempPath: filePath
         })
       } catch (err) {
         console.error('上传失败:', err)
         this.setData({
           uploading: false,
-          error: '上传失败，请重试'
+          progress: 0,
+          error: err.message || '上传失败，请重试'
         })
       }
     },
@@ -301,7 +223,7 @@ Component({
       this.setData({
         fileUrl: '',
         previewUrl: '',
-        cloudPath: '',
+        storedPath: '',
         progress: 0,
         error: ''
       })

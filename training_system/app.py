@@ -1,13 +1,15 @@
 """Main application entry point."""
 import os
 from datetime import timedelta
-from flask import Flask, jsonify, redirect, render_template, request, session
+from flask import Flask, g, jsonify, redirect, render_template, request, session
 from models.student import init_db
 from routes.auth_routes import auth_bp
+from routes.miniprogram_routes import miniprogram_bp
 from routes.student_routes import student_bp
 from routes.file_routes import file_bp
 from routes.export_routes import export_bp
 from routes.config_routes import config_bp
+from utils.miniprogram_auth import extract_mini_token, has_mini_auth_config, verify_mini_token
 from utils.auth import (
     build_login_redirect_target,
     has_api_key,
@@ -146,6 +148,7 @@ def create_app():
 
     # Register blueprints
     app.register_blueprint(auth_bp)
+    app.register_blueprint(miniprogram_bp)
     app.register_blueprint(student_bp)
     app.register_blueprint(file_bp)
     app.register_blueprint(export_bp)
@@ -154,6 +157,7 @@ def create_app():
     @app.before_request
     def require_authentication():
         """Protect admin pages and API routes with session or API key."""
+        g.mini_user = None
         path = request.path or '/'
         protected_api = path.startswith('/api/') or path.startswith('/students/')
 
@@ -162,11 +166,19 @@ def create_app():
 
         if path.startswith('/auth/'):
             return None
+        if path == '/api/miniprogram/login':
+            return None
 
         if session.get('auth_verified') is True:
             return None
 
         if protected_api:
+            mini_token = extract_mini_token(request)
+            mini_user = verify_mini_token(app.config['SECRET_KEY'], mini_token)
+            if mini_user:
+                g.mini_user = mini_user
+                return None
+
             candidate_api_key = (
                 request.headers.get('X-API-Key', '')
                 or request.headers.get('x-api-key', '')
@@ -195,6 +207,8 @@ def create_app():
         app.logger.warning('Using default admin password, please set TRAINING_SYSTEM_ADMIN_PASSWORD or TRAINING_SYSTEM_ADMIN_PASSWORD_HASH')
     if not has_api_key():
         app.logger.warning('TRAINING_SYSTEM_API_KEY is not configured, non-session API access will be blocked')
+    if not has_mini_auth_config():
+        app.logger.warning('WECHAT_MINI_APPID/WECHAT_MINI_SECRET not configured, mini-program direct login will fail')
 
     app.logger.info('Application initialized successfully')
 

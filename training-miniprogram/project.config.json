@@ -55,9 +55,7 @@
     "tabIndent": "insertSpaces",
     "tabSize": 2
   },
-  "cloudfunctionRoot": "cloudfunctions/",
   "miniprogramRoot": "./",
   "srcMiniprogramRoot": "./",
-  "simulatorPluginLibVersion": {},
-  "cloudfunctionTemplateRoot": "cloudfunctionTemplate/"
+  "simulatorPluginLibVersion": {}
 }
