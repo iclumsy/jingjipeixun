@@ -8,4 +8,11 @@
     <view class="loading-title">正在进入系统</view>
     <view class="loading-text">请稍候，正在同步账户信息</view>
   </view>
+
+  <!-- 登录失败状态 -->
+  <view class="entry-error" wx:if="{{!loading && !showPrivacyAgreement && loginError}}">
+    <view class="error-title">进入失败</view>
+    <view class="error-text">{{loginError}}</view>
+    <button class="retry-btn" bindtap="retryLogin">重试登录</button>
+  </view>
 </view>

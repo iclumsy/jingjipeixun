@@ -34,6 +34,45 @@
   color: #6b7c93;
 }
 
+.entry-error {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 48rpx;
+}
+
+.error-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.error-text {
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #6b7c93;
+}
+
+.retry-btn {
+  margin-top: 28rpx;
+  width: 320rpx;
+  height: 84rpx;
+  line-height: 84rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #2f6af5 0%, #4b8dff 100%);
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.retry-btn::after {
+  border: none;
+}
+
 @keyframes spin {
   from {
     transform: rotate(0deg);

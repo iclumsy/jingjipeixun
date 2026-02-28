@@ -18,6 +18,19 @@ const STATUS_TEXT_MAP = {
   rejected: '已驳回'
 }
 
+function parseIsAdmin(raw) {
+  if (raw === true || raw === 1) return true
+  const text = String(raw || '').trim().toLowerCase()
+  return text === 'true' || text === '1'
+}
+
+function hasAdminAccess() {
+  const app = getApp()
+  const fromGlobal = !!(app && app.globalData && app.globalData.isAdmin)
+  const fromStorage = parseIsAdmin(wx.getStorageSync('is_admin'))
+  return fromGlobal || fromStorage
+}
+
 function formatTime(value) {
   if (!value) return '-'
   const raw = String(value).trim()
@@ -68,12 +81,14 @@ Page({
   },
 
   async onLoad() {
+    if (!this.ensureAdminAccess()) return
     await this.refreshAll(true)
     this._skipRefreshOnShow = true
     this.setData({ initialized: true })
   },
 
   async onShow() {
+    if (!this.ensureAdminAccess(false)) return
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 2 })
     }
@@ -87,13 +102,34 @@ Page({
   },
 
   onPullDownRefresh() {
+    if (!this.ensureAdminAccess(false)) {
+      wx.stopPullDownRefresh()
+      return
+    }
     this.refreshAll(true)
   },
 
   onReachBottom() {
+    if (!this.ensureAdminAccess(false)) return
     if (!this.data.loading && this.data.hasMore) {
       this.loadRecords(false)
     }
+  },
+
+  ensureAdminAccess(showToast = true) {
+    if (hasAdminAccess()) return true
+
+    if (showToast) {
+      wx.showToast({
+        title: '仅管理员可进入审核管理',
+        icon: 'none'
+      })
+    }
+
+    wx.switchTab({
+      url: '/pages/user/submit/submit'
+    })
+    return false
   },
 
   async refreshAll(forceCompanyReload = false) {

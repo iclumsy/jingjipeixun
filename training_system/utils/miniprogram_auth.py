@@ -124,14 +124,16 @@ def exchange_code_for_openid(code, timeout_seconds=8):
     if not appid or not secret:
         return {
             'success': False,
-            'message': '未配置 WECHAT_MINI_APPID 或 WECHAT_MINI_SECRET'
+            'message': '未配置 WECHAT_MINI_APPID 或 WECHAT_MINI_SECRET',
+            'error_type': 'config'
         }
 
     raw_code = str(code or '').strip()
     if not raw_code:
         return {
             'success': False,
-            'message': 'code 不能为空'
+            'message': 'code 不能为空',
+            'error_type': 'request'
         }
 
     query = parse.urlencode({
@@ -149,7 +151,8 @@ def exchange_code_for_openid(code, timeout_seconds=8):
     except Exception as err:
         return {
             'success': False,
-            'message': f'请求微信接口失败: {str(err)}'
+            'message': f'请求微信接口失败: {str(err)}',
+            'error_type': 'upstream'
         }
 
     openid = str(data.get('openid', '') or '').strip()
@@ -167,7 +170,9 @@ def exchange_code_for_openid(code, timeout_seconds=8):
         message = f'{message} (errcode={err_code})'
     return {
         'success': False,
-        'message': message
+        'message': message,
+        'error_type': 'wechat',
+        'errcode': err_code
     }
 
 

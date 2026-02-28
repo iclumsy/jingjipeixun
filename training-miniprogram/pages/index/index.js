@@ -6,7 +6,8 @@ Page({
   data: {
     isAdmin: false,
     loading: true,
-    showPrivacyAgreement: false
+    showPrivacyAgreement: false,
+    loginError: ''
   },
 
   onLoad() {
@@ -28,26 +29,66 @@ Page({
   onPrivacyAgree() {
     this.setData({
       showPrivacyAgreement: false,
-      loading: true
+      loading: true,
+      loginError: ''
     })
     this.checkUserRole()
   },
 
   async checkUserRole() {
     try {
-      // 等待登录完成
-      if (app.globalData.userInfo) {
-        this.redirectToPage()
-      } else {
-        // 等待登录
-        setTimeout(() => {
-          this.checkUserRole()
-        }, 500)
+      const loginState = app.globalData.loginState
+      const loginError = app.globalData.loginError || ''
+
+      if (loginState === 'failed') {
+        this.setData({
+          loading: false,
+          loginError
+        })
+        return
       }
+
+      if (app.globalData.userInfo && loginState === 'success') {
+        this.redirectToPage()
+        return
+      }
+
+      if (!this.data.loading) {
+        this.setData({
+          loading: true,
+          loginError: ''
+        })
+      }
+
+      clearTimeout(this._checkTimer)
+      this._checkTimer = setTimeout(() => {
+        this.checkUserRole()
+      }, 400)
     } catch (err) {
       console.error('检查用户角色失败:', err)
-      this.setData({ loading: false })
+      this.setData({
+        loading: false,
+        loginError: err.message || '登录状态检查失败'
+      })
     }
+  },
+
+  async retryLogin() {
+    this.setData({
+      loading: true,
+      loginError: ''
+    })
+
+    try {
+      await app.ensureLogin(true)
+    } catch (err) {
+      // 失败由 checkUserRole 统一展示
+    }
+    this.checkUserRole()
+  },
+
+  onUnload() {
+    clearTimeout(this._checkTimer)
   },
 
   redirectToPage() {

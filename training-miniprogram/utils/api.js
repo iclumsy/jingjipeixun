@@ -39,10 +39,22 @@ function getBaseUrl() {
   return trimSlash(DEFAULT_BASE_URL)
 }
 
+function isDevToolsEnv() {
+  try {
+    const info = wx.getSystemInfoSync()
+    return String(info.platform || '').toLowerCase() === 'devtools'
+  } catch (err) {
+    return false
+  }
+}
+
 function ensureBaseUrl() {
   const baseUrl = getBaseUrl()
   if (!baseUrl) {
     throw new Error('未配置服务器地址，请先在 app.js 设置 globalData.apiBaseUrl')
+  }
+  if (/^http:\/\//i.test(baseUrl) && !isDevToolsEnv()) {
+    throw new Error('当前服务器地址是 HTTP，真机与发布版本必须使用 HTTPS 合法域名')
   }
   return baseUrl
 }

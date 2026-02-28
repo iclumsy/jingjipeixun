@@ -32,10 +32,31 @@ def miniprogram_login_route():
 
     wx_result = exchange_code_for_openid(code)
     if not wx_result.get('success'):
+        err_type = str(wx_result.get('error_type', '') or '')
+        err_code = wx_result.get('errcode')
+        err_message = wx_result.get('message', '微信登录失败')
+
+        if err_type == 'upstream':
+            status_code = 502
+        elif err_type == 'config':
+            status_code = 500
+        elif err_type == 'request':
+            status_code = 400
+        else:
+            status_code = 401
+
+        current_app.logger.warning(
+            'Mini-program login rejected: type=%s errcode=%s message=%s',
+            err_type or 'unknown',
+            str(err_code) if err_code is not None else '-',
+            err_message
+        )
+
         return jsonify({
             'error': '登录失败',
-            'message': wx_result.get('message', '微信登录失败')
-        }), 401
+            'message': err_message,
+            'errCode': err_code
+        }), status_code
 
     openid = wx_result.get('openid', '')
     is_admin = is_admin_openid(openid)

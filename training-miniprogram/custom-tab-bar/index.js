@@ -1,5 +1,11 @@
 const FORCE_CREATE_SUBMIT_KEY = 'submit_force_create_mode'
 
+function parseIsAdmin(raw) {
+  if (raw === true || raw === 1) return true
+  const text = String(raw || '').trim().toLowerCase()
+  return text === 'true' || text === '1'
+}
+
 Component({
   data: {
     selected: 0,
@@ -35,9 +41,8 @@ Component({
       const app = getApp()
       const currentRoute = this.getCurrentRoute()
       const isAdminFromGlobal = !!(app && app.globalData && app.globalData.isAdmin)
-      const isAdminFromStorage = wx.getStorageSync('is_admin') === true
-      const isAdminPage = currentRoute.indexOf('/pages/admin/') === 0
-      const isAdmin = isAdminFromGlobal || isAdminFromStorage || isAdminPage
+      const isAdminFromStorage = parseIsAdmin(wx.getStorageSync('is_admin'))
+      const isAdmin = isAdminFromGlobal || isAdminFromStorage
 
       // 根据用户角色动态设置 TabBar
       const allTabs = [

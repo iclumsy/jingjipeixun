@@ -18,6 +18,19 @@ const STATUS_TEXT_MAP = {
   rejected: '已驳回'
 }
 
+function parseIsAdmin(raw) {
+  if (raw === true || raw === 1) return true
+  const text = String(raw || '').trim().toLowerCase()
+  return text === 'true' || text === '1'
+}
+
+function hasAdminAccess() {
+  const app = getApp()
+  const fromGlobal = !!(app && app.globalData && app.globalData.isAdmin)
+  const fromStorage = parseIsAdmin(wx.getStorageSync('is_admin'))
+  return fromGlobal || fromStorage
+}
+
 function formatTime(value) {
   if (!value) return '-'
   const raw = String(value).trim()
@@ -111,6 +124,7 @@ Page({
   },
 
   async onLoad(options) {
+    if (!this.ensureAdminAccess()) return
     if (!options.id) return
     this.setData({ studentId: String(options.id) })
     await this.initPage()
@@ -537,5 +551,25 @@ Page({
         fail: () => resolve(false)
       })
     })
+  },
+
+  ensureAdminAccess() {
+    if (hasAdminAccess()) return true
+
+    wx.showToast({
+      title: '仅管理员可进入审核详情',
+      icon: 'none'
+    })
+
+    const pages = getCurrentPages()
+    if (pages.length > 1) {
+      wx.navigateBack()
+      return false
+    }
+
+    wx.switchTab({
+      url: '/pages/user/submit/submit'
+    })
+    return false
   }
 })
