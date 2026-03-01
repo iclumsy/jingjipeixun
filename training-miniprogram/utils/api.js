@@ -20,12 +20,30 @@ const FILE_FIELD_TO_PATH_KEY = {
   hukou_personal: 'hukou_personal_path'
 }
 
+const ALLOWED_ATTACHMENTS_BY_TYPE = {
+  special_operation: ['diploma', 'id_card_front', 'id_card_back'],
+  special_equipment: ['photo', 'diploma', 'id_card_front', 'id_card_back', 'hukou_residence', 'hukou_personal']
+}
+
 function trimSlash(value = '') {
   return String(value || '').trim().replace(/\/+$/, '')
 }
 
 function trimText(value = '') {
   return String(value || '').trim()
+}
+
+function normalizeTrainingType(trainingType = '') {
+  const value = trimText(trainingType)
+  if (value === 'special_operation' || value === 'special_equipment') {
+    return value
+  }
+  return 'special_operation'
+}
+
+function parseBoolean(value) {
+  if (typeof value === 'boolean') return value
+  return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase())
 }
 
 function getBaseUrl() {
@@ -48,12 +66,25 @@ function isDevToolsEnv() {
   }
 }
 
+function allowInsecureHttp() {
+  const app = getApp ? getApp() : null
+  const globalFlag = app && app.globalData ? app.globalData.allowInsecureHttp : undefined
+  if (globalFlag !== undefined && globalFlag !== null && globalFlag !== '') {
+    return parseBoolean(globalFlag)
+  }
+  const fromStorage = wx.getStorageSync('allow_insecure_http')
+  if (fromStorage !== undefined && fromStorage !== null && fromStorage !== '') {
+    return parseBoolean(fromStorage)
+  }
+  return false
+}
+
 function ensureBaseUrl() {
   const baseUrl = getBaseUrl()
   if (!baseUrl) {
     throw new Error('未配置服务器地址，请先在 app.js 设置 globalData.apiBaseUrl')
   }
-  if (/^http:\/\//i.test(baseUrl) && !isDevToolsEnv()) {
+  if (/^http:\/\//i.test(baseUrl) && !isDevToolsEnv() && !allowInsecureHttp()) {
     throw new Error('当前服务器地址是 HTTP，真机与发布版本必须使用 HTTPS 合法域名')
   }
   return baseUrl
@@ -230,8 +261,10 @@ async function login() {
   }
 }
 
-function normalizeStudentFiles(files = {}) {
+function normalizeStudentFiles(files = {}, trainingType = '') {
   const baseUrl = getBaseUrl()
+  const normalizedType = normalizeTrainingType(trainingType)
+  const allowedSet = new Set(ALLOWED_ATTACHMENTS_BY_TYPE[normalizedType] || [])
 
   const toRelativeStudentPath = value => {
     const raw = trimText(value)
@@ -257,6 +290,9 @@ function normalizeStudentFiles(files = {}) {
 
   const normalized = {}
   Object.keys(FILE_FIELD_TO_PATH_KEY).forEach(key => {
+    if (!allowedSet.has(key)) {
+      return
+    }
     const value = toRelativeStudentPath(files[key] || '')
     if (value) {
       normalized[key] = value
@@ -266,6 +302,7 @@ function normalizeStudentFiles(files = {}) {
 }
 
 function buildStudentPayload(student = {}, trainingType = '') {
+  const normalizedType = normalizeTrainingType(trainingType || student.training_type || 'special_operation')
   return {
     name: trimText(student.name),
     gender: trimText(student.gender),
@@ -279,8 +316,8 @@ function buildStudentPayload(student = {}, trainingType = '') {
     job_category: trimText(student.job_category),
     exam_project: trimText(student.exam_project),
     project_code: trimText(student.project_code),
-    training_type: trimText(trainingType || student.training_type || 'special_operation'),
-    files: normalizeStudentFiles(student.files || {})
+    training_type: normalizedType,
+    files: normalizeStudentFiles(student.files || {}, normalizedType)
   }
 }
 
@@ -312,11 +349,6 @@ function syncStudent() {
     synced: true,
     message: '已使用直连模式，无需同步'
   })
-}
-
-function parseBoolean(value) {
-  if (typeof value === 'boolean') return value
-  return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase())
 }
 
 function parsePositiveInt(value, fallback) {
@@ -448,10 +480,11 @@ async function reviewStudent(studentId, action) {
 async function updateStudent(studentId, updates = {}) {
   const id = encodeURIComponent(String(studentId || '').trim())
   if (!id) throw new Error('学员ID不能为空')
+  const normalizedType = normalizeTrainingType(updates.training_type || '')
 
   const payload = {
     ...updates,
-    files: normalizeStudentFiles(updates.files || {})
+    files: normalizeStudentFiles(updates.files || {}, normalizedType)
   }
   const student = await requestApi(`/api/students/${id}`, {
     method: 'PUT',

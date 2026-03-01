@@ -364,7 +364,9 @@ def update_student_route(id):
                     continue
                 rel = ensure_safe_relative_student_path(files_payload.get(input_name, ''))
                 if rel and input_name not in allowed_attachments:
-                    raise ValidationError(f'{effective_training_type} 不允许上传 {input_name}')
+                    # Ignore attachments not used by target training type in JSON updates.
+                    # This avoids historical/legacy fields causing save failures.
+                    continue
 
                 old_rel = current_student.get(db_key, '')
                 if old_rel and rel != old_rel:
@@ -478,9 +480,8 @@ def miniprogram_upload_attachment_route():
         training_type = normalize_training_type(
             request.form.get('training_type') or request.form.get('trainingType') or 'special_operation'
         )
-        allowed_attachments = set(REQUIRED_ATTACHMENTS.get(training_type, REQUIRED_ATTACHMENTS['special_operation']))
-        if file_type not in allowed_attachments:
-            raise ValidationError('当前培训项目不需要该附件')
+        # Upload stage is permissive: allow replacing any known attachment type.
+        # Required attachment constraints are enforced on final submit/update validation.
 
         validate_file_upload(upload_file)
 

@@ -20,9 +20,8 @@ const ATTACHMENT_FIELDS = [
 function isSafePreviewUrl(value = '') {
   const raw = String(value || '').trim()
   if (!raw) return false
-  if (/^http:\/\//i.test(raw)) return false
   return (
-    /^https:\/\//i.test(raw) ||
+    /^https?:\/\//i.test(raw) ||
     /^wxfile:\/\//i.test(raw) ||
     /^data:image\//i.test(raw) ||
     /^\/(?!\/)/.test(raw)

@@ -64,8 +64,8 @@ function toAbsoluteServerUrl(relativePath = '') {
 function toSafeImageSrc(value = '') {
   const raw = String(value || '').trim()
   if (!raw) return ''
-  if (isHttpUrl(raw)) return ''
   if (
+    isHttpUrl(raw) ||
     isHttpsUrl(raw) ||
     isLocalFileUrl(raw) ||
     isDataImageUrl(raw) ||
