@@ -59,8 +59,22 @@ function getBaseUrl() {
 
 function isDevToolsEnv() {
   try {
-    const info = wx.getSystemInfoSync()
-    return String(info.platform || '').toLowerCase() === 'devtools'
+    if (typeof wx.getDeviceInfo === 'function') {
+      const deviceInfo = wx.getDeviceInfo() || {}
+      if (String(deviceInfo.platform || '').toLowerCase() === 'devtools') {
+        return true
+      }
+    }
+
+    if (typeof wx.getAppBaseInfo === 'function') {
+      const appBaseInfo = wx.getAppBaseInfo() || {}
+      const hostEnv = String((appBaseInfo.host && appBaseInfo.host.env) || '').toLowerCase()
+      if (hostEnv === 'devtools') {
+        return true
+      }
+    }
+
+    return false
   } catch (err) {
     return false
   }
