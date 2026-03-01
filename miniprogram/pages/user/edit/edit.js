@@ -230,7 +230,8 @@ Page({
   },
 
   selectTrainingType(e) {
-    const type = e.currentTarget.dataset.type
+    const detail = e.detail || {}
+    const type = detail.type || (e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.type)
     if (!type || type === this.data.trainingType) return
 
     const nextJobCategoryNames = this.getJobCategoryNames(type)
@@ -247,15 +248,21 @@ Page({
   },
 
   selectGender(e) {
-    const gender = e.currentTarget.dataset.gender
+    const detail = e.detail || {}
+    const gender = detail.gender || (e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.gender)
     this.setData({
       'student.gender': gender
     })
   },
 
   onInputChange(e) {
-    const { field } = e.currentTarget.dataset
-    let value = e.detail.value
+    const detail = e.detail || {}
+    const field = detail.field || (e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.field)
+    let value = detail.value
+    if (value === undefined) {
+      value = e.detail && e.detail.value
+    }
+    if (!field) return
 
     if (field === 'id_card') {
       value = normalizeIdCard(value).slice(0, 18)
@@ -265,21 +272,19 @@ Page({
       value = normalizePhone(value).slice(0, 11)
     }
 
-    this.setData({
+    const updates = {
       [`student.${field}`]: value
-    })
+    }
 
     if (field === 'id_card') {
-      this.setData({
-        'fieldErrors.id_card': getIdCardError(value)
-      })
+      updates['fieldErrors.id_card'] = getIdCardError(value)
     }
 
     if (field === 'phone') {
-      this.setData({
-        'fieldErrors.phone': getPhoneError(value)
-      })
+      updates['fieldErrors.phone'] = getPhoneError(value)
     }
+
+    this.setData(updates)
   },
 
   onIdCardBlur() {
@@ -295,8 +300,9 @@ Page({
   },
 
   onPickerChange(e) {
-    const { field } = e.currentTarget.dataset
-    const pickerIndex = parseInt(e.detail.value)
+    const detail = e.detail || {}
+    const field = detail.field || (e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.field) || 'education'
+    const pickerIndex = Number(detail.index !== undefined ? detail.index : detail.value)
 
     if (field === 'education') {
       this.setData({
@@ -307,7 +313,8 @@ Page({
   },
 
   onJobCategoryChange(e) {
-    const categoryIndex = parseInt(e.detail.value)
+    const detail = e.detail || {}
+    const categoryIndex = Number(detail.index !== undefined ? detail.index : detail.value)
     const categories = this.data.jobCategories[this.data.trainingType]
 
     if (categories && categories.job_categories) {
@@ -337,7 +344,8 @@ Page({
   },
 
   onExamProjectChange(e) {
-    const projectIndex = parseInt(e.detail.value)
+    const detail = e.detail || {}
+    const projectIndex = Number(detail.index !== undefined ? detail.index : detail.value)
     const project = this.data.student.examProjects[projectIndex]
 
     if (project) {
@@ -364,8 +372,9 @@ Page({
   },
 
   onAgreementChange(e) {
-    const values = e.detail.value || []
-    const checked = values.includes('agree')
+    const detail = e.detail || {}
+    const values = detail.values || detail.value || []
+    const checked = typeof detail.checked === 'boolean' ? detail.checked : values.includes('agree')
     this.setData({
       agreementChecked: checked
     })

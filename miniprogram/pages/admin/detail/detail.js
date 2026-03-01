@@ -254,7 +254,8 @@ Page({
   },
 
   selectTrainingType(e) {
-    const type = e.currentTarget.dataset.type
+    const detail = e.detail || {}
+    const type = detail.type || (e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.type)
     if (!type || type === this.data.trainingType) return
 
     const nextJobCategoryNames = this.getJobCategoryNames(type)
@@ -273,7 +274,8 @@ Page({
   },
 
   onJobCategoryChange(e) {
-    const categoryIndex = parseInt(e.detail.value)
+    const detail = e.detail || {}
+    const categoryIndex = Number(detail.index !== undefined ? detail.index : detail.value)
     const categories = this.data.jobCategories[this.data.trainingType]
     if (!(categories && categories.job_categories)) return
 
@@ -303,7 +305,8 @@ Page({
   },
 
   onExamProjectChange(e) {
-    const projectIndex = parseInt(e.detail.value)
+    const detail = e.detail || {}
+    const projectIndex = Number(detail.index !== undefined ? detail.index : detail.value)
     const project = this.data.editStudent.examProjects[projectIndex]
     if (!project) return
 
@@ -315,15 +318,20 @@ Page({
   },
 
   selectGender(e) {
-    const gender = e.currentTarget.dataset.gender
+    const detail = e.detail || {}
+    const gender = detail.gender || (e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.gender)
     this.setData({
       'editStudent.gender': gender
     })
   },
 
   onInputChange(e) {
-    const { field } = e.currentTarget.dataset
-    let value = e.detail.value
+    const detail = e.detail || {}
+    const field = detail.field || (e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.field)
+    let value = detail.value
+    if (value === undefined) {
+      value = e.detail && e.detail.value
+    }
     if (!field) return
 
     if (field === 'id_card') {
@@ -333,21 +341,19 @@ Page({
       value = normalizePhone(value).slice(0, 11)
     }
 
-    this.setData({
+    const updates = {
       [`editStudent.${field}`]: value
-    })
+    }
 
     if (field === 'id_card') {
-      this.setData({
-        'fieldErrors.id_card': getIdCardError(value)
-      })
+      updates['fieldErrors.id_card'] = getIdCardError(value)
     }
 
     if (field === 'phone') {
-      this.setData({
-        'fieldErrors.phone': getPhoneError(value)
-      })
+      updates['fieldErrors.phone'] = getPhoneError(value)
     }
+
+    this.setData(updates)
   },
 
   onIdCardBlur() {
@@ -363,7 +369,8 @@ Page({
   },
 
   onEducationChange(e) {
-    const index = parseInt(e.detail.value)
+    const detail = e.detail || {}
+    const index = Number(detail.index !== undefined ? detail.index : detail.value)
     this.setData({
       'editStudent.education': this.data.educationOptions[index],
       'editStudent.educationIndex': index

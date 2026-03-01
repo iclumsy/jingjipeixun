@@ -14,143 +14,27 @@
       <view class="summary-meta" wx:if="{{student.reviewed_at}}">审核时间：{{reviewTimeText}}</view>
     </view>
 
-    <view class="section-card type-selector fade-enter">
-      <view class="card-header">
-        <view class="card-title">培训信息</view>
-      </view>
-
-      <view class="type-options">
-        <view class="type-option {{trainingType === 'special_equipment' ? 'active' : ''}}" bindtap="selectTrainingType" data-type="special_equipment">
-          <text class="type-name">特种设备</text>
-        </view>
-        <view class="type-option {{trainingType === 'special_operation' ? 'active' : ''}}" bindtap="selectTrainingType" data-type="special_operation">
-          <text class="type-name">特种作业</text>
-        </view>
-      </view>
-
-      <view class="form-item mt-24">
-        <view class="label required">作业类别</view>
-        <picker mode="selector" range="{{jobCategoryNames}}" value="{{editStudent.jobCategoryIndex}}" bindchange="onJobCategoryChange">
-          <view class="picker-input">
-            <text class="{{editStudent.job_category ? '' : 'placeholder'}}">{{editStudent.job_category || '请选择作业类别'}}</text>
-            <text class="arrow">›</text>
-          </view>
-        </picker>
-      </view>
-
-      <view class="form-item" wx:if="{{editStudent.examProjects && editStudent.examProjects.length > 0}}">
-        <view class="label">操作项目</view>
-        <picker mode="selector" range="{{editStudent.examProjects}}" range-key="name" value="{{editStudent.examProjectIndex}}" bindchange="onExamProjectChange">
-          <view class="picker-input">
-            <text class="{{editStudent.exam_project ? '' : 'placeholder'}}">{{editStudent.exam_project || '请选择操作项目'}}</text>
-            <text class="arrow">›</text>
-          </view>
-        </picker>
-      </view>
-    </view>
-
-    <view class="section-card fade-enter">
-      <view class="card-header">
-        <view class="card-title">基本信息</view>
-      </view>
-
-      <view class="form-item form-inline">
-        <view class="label required inline-label">姓名</view>
-        <input class="input inline-control" placeholder="请输入姓名" value="{{editStudent.name}}" bindinput="onInputChange" data-field="name" />
-      </view>
-
-      <view class="form-item form-inline">
-        <view class="label required inline-label">性别</view>
-        <view class="gender-selector inline-control">
-          <view class="gender-option {{editStudent.gender === '男' ? 'active' : ''}}" bindtap="selectGender" data-gender="男">
-            <text>男</text>
-          </view>
-          <view class="gender-option {{editStudent.gender === '女' ? 'active' : ''}}" bindtap="selectGender" data-gender="女">
-            <text>女</text>
-          </view>
-        </view>
-      </view>
-
-      <view class="form-item form-inline">
-        <view class="label required inline-label">文化程度</view>
-        <picker class="inline-control" mode="selector" range="{{educationOptions}}" value="{{editStudent.educationIndex}}" bindchange="onEducationChange">
-          <view class="picker-input">
-            <text class="{{editStudent.education ? '' : 'placeholder'}}">{{editStudent.education || '请选择文化程度'}}</text>
-            <text class="arrow">›</text>
-          </view>
-        </picker>
-      </view>
-
-      <view class="form-item">
-        <view class="label required">身份证号</view>
-        <input class="input" placeholder="请输入18位身份证号" value="{{editStudent.id_card}}" bindinput="onInputChange" bindblur="onIdCardBlur" data-field="id_card" maxlength="18" />
-        <view class="field-error" wx:if="{{fieldErrors.id_card}}">{{fieldErrors.id_card}}</view>
-      </view>
-
-      <view class="form-item">
-        <view class="label required">手机号</view>
-        <input class="input" type="number" placeholder="请输入11位手机号" value="{{editStudent.phone}}" bindinput="onInputChange" bindblur="onPhoneBlur" data-field="phone" maxlength="11" />
-        <view class="field-error" wx:if="{{fieldErrors.phone}}">{{fieldErrors.phone}}</view>
-      </view>
-
-      <view class="form-item">
-        <view class="label">毕业学校</view>
-        <input class="input" placeholder="请输入毕业学校（选填）" value="{{editStudent.school}}" bindinput="onInputChange" data-field="school" />
-      </view>
-
-      <view class="form-item">
-        <view class="label">所学专业</view>
-        <input class="input" placeholder="请输入所学专业（选填）" value="{{editStudent.major}}" bindinput="onInputChange" data-field="major" />
-      </view>
-    </view>
-
-    <view class="section-card fade-enter">
-      <view class="card-header">
-        <view class="card-title">单位信息</view>
-      </view>
-
-      <view class="form-item">
-        <view class="label required">单位名称</view>
-        <input class="input" placeholder="请输入单位名称" value="{{editStudent.company}}" bindinput="onInputChange" data-field="company" />
-      </view>
-
-      <view class="form-item">
-        <view class="label required">单位地址</view>
-        <input class="input" placeholder="请输入单位地址" value="{{editStudent.company_address}}" bindinput="onInputChange" data-field="company_address" />
-      </view>
-    </view>
-
-    <view class="section-card fade-enter">
-      <view class="card-header">
-        <view class="card-title">附件上传</view>
-      </view>
-      <view class="attachments-tip">可直接替换附件，未替换的附件会保留原记录。</view>
-      <view class="attachments-grid">
-        <view class="attachment-item" wx:if="{{trainingType === 'special_equipment'}}">
-          <file-uploader compact="{{true}}" fileType="photo" label="个人照片" required="{{true}}" value="{{(editStudent.files && editStudent.files.photo) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
-        </view>
-
-        <view class="attachment-item">
-          <file-uploader compact="{{true}}" fileType="diploma" label="学历证书" required="{{true}}" value="{{(editStudent.files && editStudent.files.diploma) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
-        </view>
-
-        <view class="attachment-item">
-          <file-uploader compact="{{true}}" fileType="id_card_front" label="身份证正面" required="{{true}}" value="{{(editStudent.files && editStudent.files.id_card_front) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
-        </view>
-
-        <view class="attachment-item">
-          <file-uploader compact="{{true}}" fileType="id_card_back" label="身份证反面" required="{{true}}" value="{{(editStudent.files && editStudent.files.id_card_back) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
-        </view>
-
-        <view class="attachment-item" wx:if="{{trainingType === 'special_equipment'}}">
-          <file-uploader compact="{{true}}" fileType="hukou_residence" label="户口本户籍页" required="{{true}}" value="{{(editStudent.files && editStudent.files.hukou_residence) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
-        </view>
-
-        <view class="attachment-item" wx:if="{{trainingType === 'special_equipment'}}">
-          <file-uploader compact="{{true}}" fileType="hukou_personal" label="户口本个人页" required="{{true}}" value="{{(editStudent.files && editStudent.files.hukou_personal) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
-        </view>
-      </view>
-    </view>
+    <student-form
+      trainingType="{{trainingType}}"
+      formData="{{editStudent}}"
+      educationOptions="{{educationOptions}}"
+      jobCategoryNames="{{jobCategoryNames}}"
+      fieldErrors="{{fieldErrors}}"
+      showAgreement="{{false}}"
+      showSubmit="{{false}}"
+      trainingCardTitle="培训信息"
+      attachmentsTip="可直接替换附件，未替换的附件会保留原记录。"
+      bind:trainingtypechange="selectTrainingType"
+      bind:genderchange="selectGender"
+      bind:inputchange="onInputChange"
+      bind:idcardblur="onIdCardBlur"
+      bind:phoneblur="onPhoneBlur"
+      bind:educationchange="onEducationChange"
+      bind:jobcategorychange="onJobCategoryChange"
+      bind:examprojectchange="onExamProjectChange"
+      bind:fileuploaded="onFileUploaded"
+      bind:filedeleted="onFileDeleted"
+    />
   </view>
 
   <view class="bottom-actions" wx:if="{{student}}">

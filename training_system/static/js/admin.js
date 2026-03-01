@@ -175,13 +175,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 training_type: currentTrainingType
             });
             
-            const res = await fetch(`/api/students?${queryParams.toString()}`);
+            const res = await fetch(`/api/companies?${queryParams.toString()}`);
             if (!res.ok) {
                 throw new Error(`网络错误: ${res.status}`);
             }
-            const filteredStudents = await res.json();
-            
-            const companiesWithData = [...new Set(filteredStudents.map(student => student.company).filter(Boolean))];
+            const companiesWithData = await res.json();
             
             while (companyFilter.options.length > 1) {
                 companyFilter.remove(1);

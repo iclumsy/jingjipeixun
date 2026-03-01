@@ -37,33 +37,19 @@ Page({
 
   async checkUserRole() {
     try {
-      const loginState = app.globalData.loginState
-      const loginError = app.globalData.loginError || ''
+      this.setData({
+        loading: true,
+        loginError: ''
+      })
 
-      if (loginState === 'failed') {
-        this.setData({
-          loading: false,
-          loginError
-        })
-        return
-      }
+      await app.ensureLogin()
 
-      if (app.globalData.userInfo && loginState === 'success') {
+      if (app.globalData.userInfo && app.globalData.loginState === 'success') {
         this.redirectToPage()
         return
       }
 
-      if (!this.data.loading) {
-        this.setData({
-          loading: true,
-          loginError: ''
-        })
-      }
-
-      clearTimeout(this._checkTimer)
-      this._checkTimer = setTimeout(() => {
-        this.checkUserRole()
-      }, 400)
+      throw new Error(app.globalData.loginError || '登录失败，请重试')
     } catch (err) {
       console.error('检查用户角色失败:', err)
       this.setData({
@@ -85,10 +71,6 @@ Page({
       // 失败由 checkUserRole 统一展示
     }
     this.checkUserRole()
-  },
-
-  onUnload() {
-    clearTimeout(this._checkTimer)
   },
 
   redirectToPage() {

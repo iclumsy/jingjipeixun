@@ -74,6 +74,14 @@ def parse_bool(value):
     return normalized in ('1', 'true', 'yes', 'on')
 
 
+def build_internal_error_response(message='服务器内部错误，请稍后重试'):
+    """Build unified 500 response payload for unexpected errors."""
+    return jsonify({
+        'error': 'internal_error',
+        'message': message
+    }), 500
+
+
 def get_mini_user():
     """Return mini-program auth payload from request context."""
     user = getattr(g, 'mini_user', None)
@@ -218,7 +226,7 @@ def create_student_route():
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         current_app.logger.exception('Error creating student')
-        return jsonify({'error': str(e)}), 500
+        return build_internal_error_response('创建学员失败，请稍后重试')
 
 
 @student_bp.route('/api/students', methods=['GET'])
@@ -248,8 +256,8 @@ def get_students_route():
     except AppError as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
-        current_app.logger.error(f'Error getting students: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.exception('Error getting students')
+        return build_internal_error_response('加载学员列表失败，请稍后重试')
 
 
 @student_bp.route('/api/students/<int:id>', methods=['GET'])
@@ -264,8 +272,8 @@ def get_student_route(id):
     except AppError as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
-        current_app.logger.error(f'Error getting student {id}: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.exception('Error getting student %s', id)
+        return build_internal_error_response('加载学员详情失败，请稍后重试')
 
 
 @student_bp.route('/api/students/<int:id>', methods=['PUT', 'PATCH'])
@@ -395,8 +403,8 @@ def update_student_route(id):
     except (ValidationError, NotFoundError, AppError) as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
-        current_app.logger.error(f'Error updating student {id}: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.exception('Error updating student %s', id)
+        return build_internal_error_response('更新学员失败，请稍后重试')
 
 
 @student_bp.route('/api/students/<int:id>/upload', methods=['POST'])
@@ -457,8 +465,8 @@ def upload_student_attachment_route(id):
     except (ValidationError, NotFoundError, AppError) as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
-        current_app.logger.error(f'Error uploading attachment for student {id}: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.exception('Error uploading attachment for student %s', id)
+        return build_internal_error_response('上传附件失败，请稍后重试')
 
 
 @student_bp.route('/api/miniprogram/upload', methods=['POST'])
@@ -507,8 +515,8 @@ def miniprogram_upload_attachment_route():
     except (ValidationError, AppError) as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
-        current_app.logger.error(f'Error uploading mini attachment: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.exception('Error uploading mini attachment')
+        return build_internal_error_response('上传附件失败，请稍后重试')
 
 
 @student_bp.route('/api/students/<int:id>/reject', methods=['POST'])
@@ -545,8 +553,8 @@ def reject_student_route(id):
     except AppError as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
-        current_app.logger.error(f'Error rejecting student {id}: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.exception('Error rejecting student %s', id)
+        return build_internal_error_response('驳回学员失败，请稍后重试')
 
 
 @student_bp.route('/api/students/<int:id>/approve', methods=['POST'])
@@ -578,8 +586,8 @@ def approve_student_route(id):
     except AppError as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
-        current_app.logger.error(f'Error approving student {id}: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.exception('Error approving student %s', id)
+        return build_internal_error_response('审核学员失败，请稍后重试')
 
 
 @student_bp.route('/api/students/<int:id>/generate', methods=['POST'])
@@ -646,8 +654,8 @@ def download_attachments_zip_route(id):
     except AppError as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
-        current_app.logger.error(f'Error generating ZIP for student {id}: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.exception('Error generating ZIP for student %s', id)
+        return build_internal_error_response('打包附件失败，请稍后重试')
 
 
 @student_bp.route('/api/students/batch/approve', methods=['POST'])
@@ -687,8 +695,8 @@ def batch_approve_students_route():
     except (ValidationError, AppError) as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
-        current_app.logger.error(f'Error batch approving students: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.exception('Error batch approving students')
+        return build_internal_error_response('批量审核失败，请稍后重试')
 
 
 @student_bp.route('/api/students/batch/reject', methods=['POST'])
@@ -716,8 +724,8 @@ def batch_reject_students_route():
     except (ValidationError, AppError) as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
-        current_app.logger.error(f'Error batch rejecting students: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.exception('Error batch rejecting students')
+        return build_internal_error_response('批量驳回失败，请稍后重试')
 
 
 @student_bp.route('/api/students/batch/delete', methods=['POST'])
@@ -745,8 +753,8 @@ def batch_delete_students_route():
     except (ValidationError, AppError) as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
-        current_app.logger.error(f'Error batch deleting students: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.exception('Error batch deleting students')
+        return build_internal_error_response('批量删除失败，请稍后重试')
 
 
 @student_bp.route('/api/companies', methods=['GET'])
@@ -764,5 +772,5 @@ def get_companies_route():
     except AppError as e:
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
-        current_app.logger.error(f'Error getting companies: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.exception('Error getting companies')
+        return build_internal_error_response('加载公司列表失败，请稍后重试')

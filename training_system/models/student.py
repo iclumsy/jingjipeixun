@@ -73,6 +73,18 @@ def init_db(database_path):
             )
         ''')
         _ensure_column_exists(conn, 'students', 'submitter_openid', 'submitter_openid TEXT')
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_students_status_training_company "
+            "ON students(status, training_type, company)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_students_submitter_openid "
+            "ON students(submitter_openid)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_students_created_at_desc "
+            "ON students(created_at DESC)"
+        )
         conn.commit()
     except sqlite3.Error as e:
         raise DatabaseError(f'Failed to initialize database: {str(e)}')
