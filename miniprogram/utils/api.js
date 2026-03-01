@@ -576,6 +576,7 @@ module.exports = {
   getCompanies,
   getJobCategories,
   uploadAttachment,
+  toAbsoluteFileUrl,
   getBaseUrl,
   setBaseUrl,
   getToken,

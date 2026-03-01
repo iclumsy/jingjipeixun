@@ -38,29 +38,6 @@ function normalizeFileUrl(value = '') {
   }
 }
 
-function withCacheBust(url) {
-  const raw = String(url || '').trim()
-  if (!raw) return ''
-  const sep = raw.includes('?') ? '&' : '?'
-  return `${raw}${sep}v=${Date.now()}`
-}
-
-function withMiniToken(url) {
-  const token = api.getToken()
-  if (!token) return url
-  const sep = url.includes('?') ? '&' : '?'
-  return `${url}${sep}mini_token=${encodeURIComponent(token)}`
-}
-
-function toAbsoluteServerUrl(relativePath = '') {
-  const rel = String(relativePath || '').trim()
-  if (!rel) return ''
-  const baseUrl = api.getBaseUrl()
-  if (!baseUrl) return ''
-  const path = rel.startsWith('/') ? rel : `/${rel}`
-  return withCacheBust(withMiniToken(`${baseUrl}${path}`))
-}
-
 function toSafeImageSrc(value = '') {
   const raw = String(value || '').trim()
   if (!raw) return ''
@@ -73,8 +50,12 @@ function toSafeImageSrc(value = '') {
   ) {
     return raw
   }
-  if (raw.startsWith('students/')) {
-    return toAbsoluteServerUrl(raw)
+  if (raw.startsWith('students/') || raw.startsWith('/students/')) {
+    try {
+      return api.toAbsoluteFileUrl(raw)
+    } catch (err) {
+      return ''
+    }
   }
   return ''
 }

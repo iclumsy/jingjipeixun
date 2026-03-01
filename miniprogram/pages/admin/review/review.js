@@ -1,5 +1,6 @@
 const api = require('../../../utils/api')
 const { TRAINING_TYPE_LABELS } = require('../../../utils/constants')
+const { hasAdminAccess, formatDateTime } = require('../../../utils/page-helpers')
 
 const STATUS_FILTERS = [
   { label: '待审核', value: 'unreviewed' },
@@ -18,45 +19,12 @@ const STATUS_TEXT_MAP = {
   rejected: '已驳回'
 }
 
-function parseIsAdmin(raw) {
-  if (raw === true || raw === 1) return true
-  const text = String(raw || '').trim().toLowerCase()
-  return text === 'true' || text === '1'
-}
-
-function hasAdminAccess() {
-  const app = getApp()
-  const fromGlobal = !!(app && app.globalData && app.globalData.isAdmin)
-  const fromStorage = parseIsAdmin(wx.getStorageSync('is_admin'))
-  return fromGlobal || fromStorage
-}
-
-function formatTime(value) {
-  if (!value) return '-'
-  const raw = String(value).trim()
-  const normalized = raw.includes(' ')
-    ? raw.replace(/-/g, '/')
-    : raw
-
-  let date = new Date(normalized)
-  if (Number.isNaN(date.getTime()) && raw.includes(' ')) {
-    date = new Date(raw.replace(' ', 'T'))
-  }
-  if (Number.isNaN(date.getTime())) return '-'
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hour = String(date.getHours()).padStart(2, '0')
-  const minute = String(date.getMinutes()).padStart(2, '0')
-  return `${year}-${month}-${day} ${hour}:${minute}`
-}
-
 function mapRecord(item) {
   return {
     ...item,
     statusText: STATUS_TEXT_MAP[item.status] || item.status || '-',
     trainingTypeText: TRAINING_TYPE_LABELS[item.training_type] || item.training_type || '-',
-    submitTimeText: formatTime(item.created_at)
+    submitTimeText: formatDateTime(item.created_at)
   }
 }
 
