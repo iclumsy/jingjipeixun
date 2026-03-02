@@ -991,7 +991,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const actionBar = clone.querySelector('.action-bar');
         if (actionBar) {
-            if (student.status === 'unreviewed') {
+            if (currentStatus === 'unreviewed') {
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'btn';
                 deleteBtn.style.cssText = 'background: #FFF1F2; color: #BE123C;';
@@ -1003,13 +1003,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
                 actionBar.appendChild(deleteBtn);
 
-                const rejectBtn = document.createElement('button');
-                rejectBtn.className = 'btn';
-                rejectBtn.style.cssText = 'background: #FEE2E2; color: #EF4444;';
-                rejectBtn.textContent = '审核不通过';
-                rejectBtn.onclick = () => rejectStudent(false);
-                actionBar.appendChild(rejectBtn);
-                
                 const approveBtn = document.createElement('button');
                 approveBtn.className = 'btn primary';
                 approveBtn.textContent = '审核通过';
@@ -1025,24 +1018,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
                 actionBar.appendChild(downloadZipBtn);
 
-                if (student.status === 'rejected') {
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.className = 'btn';
-                    deleteBtn.style.cssText = 'background: #FFF1F2; color: #BE123C;';
-                    deleteBtn.textContent = '删除学员';
-                    deleteBtn.onclick = () => {
-                        const confirmed = window.confirm('确认删除该学员吗？删除后不可恢复。');
-                        if (!confirmed) return;
-                        rejectStudent(true);
-                    };
-                    actionBar.appendChild(deleteBtn);
-                }
-                
                 const rejectBtn = document.createElement('button');
                 rejectBtn.className = 'btn';
                 rejectBtn.style.cssText = 'background: #FEE2E2; color: #EF4444;';
-                rejectBtn.textContent = '审核不通过';
-                rejectBtn.onclick = () => rejectStudent(false);
+                rejectBtn.textContent = '驳回';
+                rejectBtn.onclick = () => rejectStudent(false, 'rejected');
                 actionBar.appendChild(rejectBtn);
             }
         }
@@ -1099,12 +1079,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    window.rejectStudent = async function(shouldDelete) {
+    window.rejectStudent = async function(shouldDelete, targetStatus = 'rejected') {
         if (!currentStudentId) return;
         try {
             const payload = shouldDelete
                 ? { delete: true }
-                : { delete: false, status: 'rejected' };
+                : { delete: false, status: targetStatus || 'rejected' };
             const res = await fetch(`/api/students/${currentStudentId}/reject`, { 
                 method: 'POST',
                 headers: {
@@ -1113,7 +1093,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(payload)
             });
             if (!res.ok) throw new Error('操作失败');
-            showMessage(shouldDelete ? '已删除学员' : '已驳回学员', 'success');
+            const statusMessage = (payload.status === 'rejected') ? '已驳回学员' : '状态已更新';
+            showMessage(shouldDelete ? '已删除学员' : statusMessage, 'success');
             loadStudents();
             loadCompanies(currentStatus);
             mainContent.innerHTML = '<div class="empty-state">请选择左侧学员查看详情</div>';
