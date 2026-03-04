@@ -194,37 +194,6 @@ def get_student_by_id(student_id):
         return dict(student)
 
 
-def get_student_by_file_path(file_path):
-    """
-    Get student record by attachment relative path.
-
-    Args:
-        file_path: Relative path like students/xxx/yyy.jpg
-
-    Returns:
-        dict | None: Student record when matched, else None
-    """
-    path = str(file_path or '').strip()
-    if not path:
-        return None
-
-    with get_db_connection() as conn:
-        student = conn.execute(
-            '''
-            SELECT * FROM students
-            WHERE photo_path = ?
-               OR diploma_path = ?
-               OR id_card_front_path = ?
-               OR id_card_back_path = ?
-               OR hukou_residence_path = ?
-               OR hukou_personal_path = ?
-               OR training_form_path = ?
-            LIMIT 1
-            ''',
-            (path, path, path, path, path, path, path)
-        ).fetchone()
-        return dict(student) if student else None
-
 
 def update_student(student_id, updates):
     """
@@ -275,27 +244,6 @@ def delete_student(student_id):
         return dict(student)
 
 
-def delete_students_batch(student_ids):
-    """
-    Delete multiple students.
-
-    Args:
-        student_ids: List of student IDs
-
-    Returns:
-        list: List of deleted student records
-    """
-    with get_db_connection() as conn:
-        placeholders = ','.join(['?'] * len(student_ids))
-        students = conn.execute(
-            f"SELECT * FROM students WHERE id IN ({placeholders})",
-            student_ids
-        ).fetchall()
-
-        conn.execute(f"DELETE FROM students WHERE id IN ({placeholders})", student_ids)
-        return [dict(s) for s in students]
-
-
 def approve_student(student_id):
     """
     Approve a student (change status to 'reviewed').
@@ -307,21 +255,6 @@ def approve_student(student_id):
         dict: Updated student record
     """
     return update_student(student_id, {'status': 'reviewed'})
-
-
-def approve_students_batch(student_ids):
-    """
-    Approve multiple students.
-
-    Args:
-        student_ids: List of student IDs
-    """
-    with get_db_connection() as conn:
-        placeholders = ','.join(['?'] * len(student_ids))
-        conn.execute(
-            f"UPDATE students SET status = 'reviewed' WHERE id IN ({placeholders})",
-            student_ids
-        )
 
 
 def get_companies(status='', company_filter='', training_type=''):

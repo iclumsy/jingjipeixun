@@ -2,8 +2,7 @@
 from flask import Blueprint, request, jsonify, current_app, g
 from models.student import (
     create_student, get_students, get_student_by_id, update_student,
-    delete_student, delete_students_batch,
-    get_companies
+    delete_student, get_companies
 )
 from services.image_service import process_and_save_file, delete_student_files
 from services.document_service import generate_health_check_form
@@ -31,24 +30,6 @@ REQUIRED_ATTACHMENTS = {
     'special_equipment': ['photo', 'diploma', 'id_card_front', 'id_card_back', 'hukou_residence', 'hukou_personal']
 }
 
-EDUCATION_NORMALIZATION_MAP = {
-    '初中': '初中',
-    '初中或同等学历': '初中',
-    '高中': '高中或同等学历',
-    '高中或同等学历': '高中或同等学历',
-    '中专': '中专或同等学历',
-    '中专或同等学历': '中专或同等学历',
-    '专科': '专科或同等学历',
-    '大专': '专科或同等学历',
-    '专科或同等学历': '专科或同等学历',
-    '大专或同等学历': '专科或同等学历',
-    '本科': '本科或同等学历',
-    '本科或同等学历': '本科或同等学历',
-    '研究生': '研究生及以上',
-    '研究生及以上': '研究生及以上',
-    '研究生或同等学历': '研究生及以上'
-}
-
 
 def normalize_training_type(training_type):
     """Normalize and validate training type."""
@@ -56,14 +37,6 @@ def normalize_training_type(training_type):
     if value in REQUIRED_ATTACHMENTS:
         return value
     return 'special_operation'
-
-
-def normalize_education(education):
-    """Normalize education text from different clients to canonical values."""
-    value = (education or '').strip()
-    if not value:
-        return value
-    return EDUCATION_NORMALIZATION_MAP.get(value, value)
 
 
 def parse_bool(value):
@@ -205,7 +178,7 @@ def create_student_route():
 
         # Create student
         student_payload['training_type'] = training_type
-        student_payload['education'] = normalize_education(student_payload.get('education', ''))
+
 
         mini_user = get_mini_user()
         if mini_user:
@@ -302,8 +275,6 @@ def update_student_route(id):
                 updates['project_code'] = data.get('exam_code', '')
             if 'training_type' in updates:
                 updates['training_type'] = normalize_training_type(updates['training_type'])
-            if 'education' in updates:
-                updates['education'] = normalize_education(updates['education'])
 
             # Validate partial update
             if updates:
@@ -354,8 +325,6 @@ def update_student_route(id):
                 updates['project_code'] = payload.get('exam_code', '')
             if 'training_type' in updates:
                 updates['training_type'] = normalize_training_type(updates['training_type'])
-            if 'education' in updates:
-                updates['education'] = normalize_education(updates['education'])
 
             # Validate partial update
             if updates:
@@ -657,104 +626,6 @@ def download_attachments_zip_route(id):
         current_app.logger.exception('Error generating ZIP for student %s', id)
         return build_internal_error_response('打包附件失败，请稍后重试')
 
-
-@student_bp.route('/api/students/batch/approve', methods=['POST'])
-def batch_approve_students_route():
-    """Batch approve students."""
-    try:
-        ensure_mini_admin()
-        data = request.get_json()
-        if not data or 'ids' not in data:
-            raise ValidationError('Missing student IDs')
-
-        ids = data['ids']
-        if not isinstance(ids, list):
-            raise ValidationError('IDs must be a list')
-
-        approved_count = 0
-        for student_id in ids:
-            try:
-                student = get_student_by_id(student_id)
-                health_check_path = generate_health_check_form(
-                    student,
-                    current_app.config['BASE_DIR'],
-                    current_app.config['STUDENTS_FOLDER']
-                )
-                updates = {'status': 'reviewed'}
-                if health_check_path:
-                    updates['training_form_path'] = health_check_path
-                update_student(student_id, updates)
-                approved_count += 1
-            except Exception as e:
-                current_app.logger.error(f'Failed to generate health check for student {student_id}: {str(e)}')
-        
-        current_app.logger.info(f'Batch approved {approved_count}/{len(ids)} students')
-
-        return jsonify({'message': f'Successfully approved {approved_count} of {len(ids)} students'}), 200
-
-    except (ValidationError, AppError) as e:
-        return jsonify(e.to_dict()), e.status_code
-    except Exception as e:
-        current_app.logger.exception('Error batch approving students')
-        return build_internal_error_response('批量审核失败，请稍后重试')
-
-
-@student_bp.route('/api/students/batch/reject', methods=['POST'])
-def batch_reject_students_route():
-    """Batch reject and delete students."""
-    try:
-        ensure_mini_admin()
-        data = request.get_json()
-        if not data or 'ids' not in data:
-            raise ValidationError('Missing student IDs')
-
-        ids = data['ids']
-        if not isinstance(ids, list):
-            raise ValidationError('IDs must be a list')
-
-        students = delete_students_batch(ids)
-
-        # Delete files for each student
-        for student in students:
-            delete_student_files(student, current_app.config['BASE_DIR'])
-
-        current_app.logger.info(f'Batch rejected {len(ids)} students')
-        return jsonify({'message': f'Successfully rejected and deleted {len(ids)} students'}), 200
-
-    except (ValidationError, AppError) as e:
-        return jsonify(e.to_dict()), e.status_code
-    except Exception as e:
-        current_app.logger.exception('Error batch rejecting students')
-        return build_internal_error_response('批量驳回失败，请稍后重试')
-
-
-@student_bp.route('/api/students/batch/delete', methods=['POST'])
-def batch_delete_students_route():
-    """Batch delete students."""
-    try:
-        ensure_mini_admin()
-        data = request.get_json()
-        if not data or 'ids' not in data:
-            raise ValidationError('Missing student IDs')
-
-        ids = data['ids']
-        if not isinstance(ids, list):
-            raise ValidationError('IDs must be a list')
-
-        students = delete_students_batch(ids)
-
-        # Delete files for each student
-        for student in students:
-            delete_student_files(student, current_app.config['BASE_DIR'])
-
-        current_app.logger.info(f'Batch deleted {len(ids)} students')
-        return jsonify({'message': f'Successfully deleted {len(ids)} students'}), 200
-
-    except (ValidationError, AppError) as e:
-        return jsonify(e.to_dict()), e.status_code
-    except Exception as e:
-        current_app.logger.exception('Error batch deleting students')
-        return build_internal_error_response('批量删除失败，请稍后重试')
 
 
 @student_bp.route('/api/companies', methods=['GET'])
