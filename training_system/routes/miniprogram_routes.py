@@ -1,4 +1,4 @@
-"""Mini-program auth routes."""
+"""小程序认证路由。"""
 from flask import Blueprint, current_app, jsonify, request
 from utils.miniprogram_auth import (
     exchange_code_for_openid,
@@ -9,12 +9,12 @@ from utils.miniprogram_auth import (
 )
 
 
-miniprogram_bp = Blueprint('miniprogram', __name__)
+miniprogram_bp = Blueprint('miniprogram', __name__)  # 小程序蓝图
 
 
 @miniprogram_bp.route('/api/miniprogram/login', methods=['POST'])
 def miniprogram_login_route():
-    """Login mini-program user via wx.login code."""
+    """通过 wx.login 的 code 登录小程序用户。"""
     payload = request.get_json(silent=True) or {}
     code = (payload.get('code', '') or '').strip()
     if not code:

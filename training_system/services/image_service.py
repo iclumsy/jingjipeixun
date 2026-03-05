@@ -1,4 +1,4 @@
-"""Image processing service."""
+"""图片处理服务。"""
 import os
 import io
 from PIL import Image, ImageOps
@@ -30,15 +30,15 @@ except Exception as err:
 
 def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
     """
-    Replace ID photo background with specified color (default white).
+    将证件照背景替换为指定颜色（默认白色）。
 
-    Args:
-        input_path: Input photo path
-        output_path: Output photo path
-        bg_color: Background color tuple (R, G, B)
+    参数:
+        input_path: 输入照片路径
+        output_path: 输出照片路径
+        bg_color: 背景颜色元组 (R, G, B)
 
-    Returns:
-        str: Path to processed photo (output_path on success, input_path on failure)
+    返回:
+        str: 处理后的照片路径（成功返回 output_path，失败返回 input_path）
     """
     if remove is None or cv2 is None:
         current_app.logger.warning(
@@ -49,11 +49,11 @@ def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
         return input_path
 
     try:
-        # Read and remove background
+        # 读取并移除背景
         with open(input_path, "rb") as f:
             input_img = f.read()
 
-        # Prefer explicit session when available; otherwise fallback to default remove().
+        # 优先使用显式会话；否则回退到默认 remove()
         if new_session is not None:
             session = new_session(
                 model_name="u2net_human_seg",
@@ -72,7 +72,7 @@ def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
             output_img = remove(input_img)
         img_no_bg = Image.open(io.BytesIO(output_img)).convert("RGBA")
 
-        # Fix mask to avoid missing clothing areas
+        # 修复掩码，避免服装区域缺失
         img_np = np.array(img_no_bg)
         alpha_channel = img_np[:, :, 3]
         kernel = np.ones((3, 3), np.uint8)
@@ -80,12 +80,12 @@ def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
         img_np[:, :, 3] = alpha_channel
         img_no_bg_fixed = Image.fromarray(img_np, mode="RGBA")
 
-        # Create white background and composite
+        # 创建白色背景并合成
         bg_img = Image.new("RGBA", img_no_bg_fixed.size, bg_color + (255,))
         result = Image.alpha_composite(bg_img, img_no_bg_fixed)
         result = result.convert("RGB")
 
-        # Save processed image
+        # 保存处理后的图片
         result.save(output_path, quality=95)
         current_app.logger.info(f'Background replaced successfully: {output_path}')
         return output_path
@@ -96,23 +96,23 @@ def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
 
 def process_and_save_file(file_storage, id_card, name, label_key, company='', training_type='special_operation'):
     """
-    Save uploaded file with naming pattern '<company>-<name>/<id_card><name>-<label>.<ext>'.
+    保存上传文件，命名格式为 '<公司>-<姓名>/<身份证号><姓名>-<标签>.<扩展名>'。
 
-    Args:
-        file_storage: FileStorage object from request.files
-        id_card: Student ID card number
-        name: Student name
-        label_key: File label key (e.g., 'photo', 'diploma')
-        company: Company name
-        training_type: Training type (special_operation or special_equipment)
+    参数:
+        file_storage: 来自 request.files 的 FileStorage 对象
+        id_card: 学员身份证号
+        name: 学员姓名
+        label_key: 文件标签键（如 'photo', 'diploma'）
+        company: 公司名称
+        training_type: 培训类型（special_operation 或 special_equipment）
 
-    Returns:
-        str: Relative path like 'students/<training_type>-<company>-<name>/...'
+    返回:
+        str: 相对路径，如 'students/<培训类型>-<公司>-<姓名>/...'
     """
     if not file_storage or not file_storage.filename:
         return ''
 
-    # Label name mapping
+    # 标签名称映射
     label_name_map = {
         'photo': '个人照片',
         'diploma': '学历证书',
@@ -126,14 +126,14 @@ def process_and_save_file(file_storage, id_card, name, label_key, company='', tr
     _, ext = os.path.splitext(file_storage.filename)
     orig_ext = ext.lower() if ext else '.jpg'
 
-    # Map training type to Chinese name
+    # 培训类型映射为中文名称
     training_type_map = {
         'special_operation': '特种作业',
         'special_equipment': '特种设备'
     }
     training_type_name = training_type_map.get(training_type, '特种作业')
 
-    # Create student folder
+    # 创建学员文件夹
     student_folder_name = f"{training_type_name}-{company}-{name}"
     student_folder_path = os.path.join(
         current_app.config['STUDENTS_FOLDER'],
@@ -141,11 +141,11 @@ def process_and_save_file(file_storage, id_card, name, label_key, company='', tr
     )
     os.makedirs(student_folder_path, exist_ok=True)
 
-    # Generate filename
+    # 生成文件名
     safe_name = f"{id_card}-{name}-{label_name}{orig_ext}"
     abs_path = os.path.join(student_folder_path, safe_name)
 
-    # Save file
+    # 保存文件
     try:
         file_storage.save(abs_path)
         current_app.logger.info(f'File saved: {abs_path}')
@@ -158,14 +158,14 @@ def process_and_save_file(file_storage, id_card, name, label_key, company='', tr
 
 def delete_file_if_exists(file_path, base_dir):
     """
-    Delete a file if it exists.
+    如果文件存在则删除。
 
-    Args:
-        file_path: Relative file path
-        base_dir: Base directory
+    参数:
+        file_path: 相对文件路径
+        base_dir: 基础目录
 
-    Returns:
-        bool: True if file was deleted, False otherwise
+    返回:
+        bool: 删除成功返回 True，否则返回 False
     """
     if not file_path:
         return False
@@ -177,7 +177,7 @@ def delete_file_if_exists(file_path, base_dir):
             os.remove(abs_path)
             current_app.logger.info(f'File deleted: {abs_path}')
 
-            # Try to remove empty student folder
+            # 尝试删除空的学员文件夹
             if file_path.startswith('students/'):
                 folder_path = os.path.dirname(abs_path)
                 if os.path.isdir(folder_path) and not os.listdir(folder_path):
@@ -193,11 +193,11 @@ def delete_file_if_exists(file_path, base_dir):
 
 def delete_student_files(student_record, base_dir):
     """
-    Delete all files associated with a student.
+    删除学员关联的所有文件。
 
-    Args:
-        student_record: Student record dictionary
-        base_dir: Base directory
+    参数:
+        student_record: 学员记录字典
+        base_dir: 基础目录
     """
     file_keys = [
         'photo_path', 'diploma_path',

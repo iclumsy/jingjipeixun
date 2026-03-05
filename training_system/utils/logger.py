@@ -1,4 +1,4 @@
-"""Logging configuration for the application."""
+"""应用日志配置。"""
 import logging
 import os
 from logging.handlers import RotatingFileHandler
@@ -6,19 +6,19 @@ from logging.handlers import RotatingFileHandler
 
 def setup_logger(app):
     """
-    Configure application logging with both file and console handlers.
+    配置应用日志，包含文件和控制台处理器。
 
-    Args:
-        app: Flask application instance
+    参数:
+        app: Flask 应用实例
     """
-    # Create logs directory if it doesn't exist
+    # 创建日志目录（如不存在）
     log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
     os.makedirs(log_dir, exist_ok=True)
 
-    # Set logging level based on debug mode
+    # 根据调试模式设置日志级别
     log_level = logging.DEBUG if app.debug else logging.INFO
 
-    # Create formatters
+    # 创建格式化器
     detailed_formatter = logging.Formatter(
         '[%(asctime)s] %(levelname)s in %(module)s (%(filename)s:%(lineno)d): %(message)s'
     )
@@ -26,7 +26,7 @@ def setup_logger(app):
         '%(levelname)s: %(message)s'
     )
 
-    # File handler for all logs
+    # 文件处理器（记录所有日志）
     file_handler = RotatingFileHandler(
         os.path.join(log_dir, 'app.log'),
         maxBytes=10 * 1024 * 1024,  # 10MB
@@ -35,7 +35,7 @@ def setup_logger(app):
     file_handler.setLevel(log_level)
     file_handler.setFormatter(detailed_formatter)
 
-    # File handler for errors only
+    # 文件处理器（仅记录错误）
     error_handler = RotatingFileHandler(
         os.path.join(log_dir, 'error.log'),
         maxBytes=10 * 1024 * 1024,  # 10MB
@@ -44,21 +44,21 @@ def setup_logger(app):
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(detailed_formatter)
 
-    # Console handler
+    # 控制台处理器
     console_handler = logging.StreamHandler()
     console_handler.setLevel(log_level)
     console_handler.setFormatter(simple_formatter)
 
-    # Remove existing handlers to avoid duplicates
+    # 移除已有处理器以避免重复
     app.logger.handlers.clear()
 
-    # Add handlers to app logger
+    # 添加处理器到应用日志
     app.logger.addHandler(file_handler)
     app.logger.addHandler(error_handler)
     app.logger.addHandler(console_handler)
     app.logger.setLevel(log_level)
 
-    # Log startup message
+    # 记录启动信息
     app.logger.info('Application logging initialized')
 
     return app.logger

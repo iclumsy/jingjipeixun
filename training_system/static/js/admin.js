@@ -20,11 +20,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainContent = document.getElementById('mainContent');
     const searchInput = document.getElementById('searchInput');
     const detailTemplate = document.getElementById('detail-template');
-    
+
     let currentFilters = {
         company: ''
     };
-    
+
     if (window.trainingType) {
         currentTrainingType = window.trainingType;
     } else {
@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     syncGlobalAdminState();
-    
+
     async function loadJobCategories() {
         try {
             const response = await fetch('/api/config/job_categories');
@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return '';
     }
-    
+
     function updateTrainingTypeButtons() {
         const btnSpecialOperation = document.getElementById('btnSpecialOperation');
         const btnSpecialEquipment = document.getElementById('btnSpecialEquipment');
@@ -164,27 +164,27 @@ document.addEventListener('DOMContentLoaded', () => {
         loadStudents();
         loadCompanies();
     });
-    
+
     async function loadCompanies(status = currentStatus) {
         const companyFilter = document.getElementById('companyFilter');
         if (!companyFilter) return;
-        
+
         try {
             const queryParams = new URLSearchParams({
                 status: buildStatusQueryParam(status),
                 training_type: currentTrainingType
             });
-            
+
             const res = await fetch(`/api/companies?${queryParams.toString()}`);
             if (!res.ok) {
                 throw new Error(`网络错误: ${res.status}`);
             }
             const companiesWithData = await res.json();
-            
+
             while (companyFilter.options.length > 1) {
                 companyFilter.remove(1);
             }
-            
+
             companiesWithData.forEach(company => {
                 const option = document.createElement('option');
                 option.value = company;
@@ -198,25 +198,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const mobileMenuToggle = document.getElementById('mobileMenuToggle');
     const sidebar = document.getElementById('sidebar');
-    
+
     if (mobileMenuToggle && sidebar) {
         mobileMenuToggle.addEventListener('click', () => {
             sidebar.classList.toggle('mobile-open');
         });
-        
+
         document.addEventListener('click', (e) => {
-            if (window.innerWidth <= 768 && 
-                !sidebar.contains(e.target) && 
-                !mobileMenuToggle.contains(e.target) && 
+            if (window.innerWidth <= 768 &&
+                !sidebar.contains(e.target) &&
+                !mobileMenuToggle.contains(e.target) &&
                 sidebar.classList.contains('mobile-open')) {
                 sidebar.classList.remove('mobile-open');
             }
         });
     }
-    
+
     const btnSpecialOperation = document.getElementById('btnSpecialOperation');
     const btnSpecialEquipment = document.getElementById('btnSpecialEquipment');
-    
+
     if (btnSpecialOperation) {
         btnSpecialOperation.addEventListener('click', () => {
             currentTrainingType = 'special_operation';
@@ -232,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentStudentId = null;
         });
     }
-    
+
     if (btnSpecialEquipment) {
         btnSpecialEquipment.addEventListener('click', () => {
             currentTrainingType = 'special_equipment';
@@ -248,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentStudentId = null;
         });
     }
-    
+
     function updateStatusButtons() {
         const btnUnreviewed = document.getElementById('btnUnreviewed');
         const btnReviewed = document.getElementById('btnReviewed');
@@ -271,10 +271,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     updateStatusButtons();
-    
+
     const btnUnreviewed = document.getElementById('btnUnreviewed');
     const btnReviewed = document.getElementById('btnReviewed');
-    
+
     if (btnUnreviewed) {
         btnUnreviewed.addEventListener('click', () => {
             currentStatus = 'unreviewed';
@@ -290,7 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentStudentId = null;
         });
     }
-    
+
     if (btnReviewed) {
         btnReviewed.addEventListener('click', () => {
             currentStatus = 'reviewed';
@@ -310,25 +310,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
-            const filtered = students.filter(s => 
-                s.name.toLowerCase().includes(term) || 
-                s.id_card.includes(term) || 
+            const filtered = students.filter(s =>
+                s.name.toLowerCase().includes(term) ||
+                s.id_card.includes(term) ||
                 s.phone.includes(term)
             );
             renderList(filtered);
         });
     }
-    
+
     const companyFilter = document.getElementById('companyFilter');
     const resetFilters = document.getElementById('resetFilters');
-    
+
     if (companyFilter) {
         companyFilter.addEventListener('change', (e) => {
             currentFilters.company = e.target.value;
             loadStudents();
         });
     }
-    
+
     if (resetFilters) {
         resetFilters.addEventListener('click', () => {
             if (companyFilter) companyFilter.value = '';
@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 company: currentFilters.company,
                 training_type: currentTrainingType
             });
-            
+
             const res = await fetch(`/api/students?${queryParams.toString()}`);
             if (!res.ok) {
                 throw new Error(`网络错误: ${res.status}`);
@@ -408,15 +408,15 @@ document.addEventListener('DOMContentLoaded', () => {
             timeout = setTimeout(later, wait);
         };
     }
-    
+
     const autoSave = debounce(async (studentId) => {
         if (!studentId) return;
-        
+
         showSaveStatus('保存中...', 'info');
-        
+
         try {
             const formData = new FormData();
-            
+
             const allInputs = mainContent.querySelectorAll('input[data-key], select[data-key]');
             allInputs.forEach(input => {
                 const key = input.getAttribute('data-key');
@@ -430,17 +430,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (inferredTrainingType) {
                 formData.set('training_type', inferredTrainingType);
             }
-            
+
             const res = await fetch(`/api/students/${studentId}`, { method: 'PUT', body: formData });
-            
+
             if (!res.ok) {
                 throw new Error('保存失败');
             }
-            
+
             const updated = await res.json();
-            
+
             showSaveStatus('保存成功', 'success');
-            
+
             const idx = students.findIndex(s => s.id === studentId);
             if (idx >= 0) {
                 const previousTrainingType = students[idx].training_type;
@@ -449,13 +449,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     showDetail(updated);
                 }
             }
-            
+
         } catch (e) {
             console.error('Auto-save error:', e);
             showSaveStatus('保存失败', 'error');
         }
     }, 1000);
-    
+
     function showSaveStatus(message, type = 'info') {
         const existingStatus = mainContent.querySelector('.save-status');
         if (existingStatus) {
@@ -556,7 +556,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderList(students);
 
         const clone = detailTemplate.content.cloneNode(true);
-        
+
         clone.querySelector('.student-name').textContent = student.name;
         clone.querySelector('.student-id').textContent = student.id_card;
         const submitterOpenidNode = clone.querySelector('.submitter-openid');
@@ -568,24 +568,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const statusMeta = getStatusMeta(student.status);
             statusBadge.innerHTML = `<span class="badge ${statusMeta.className}">${statusMeta.label}</span>`;
         }
-        
+
         const grid = clone.querySelector('.detail-grid');
-        
+
         const editable = [
             { key: 'name', label: '姓名', required: true },
             { key: 'gender', label: '性别', required: true, pattern: '男|女', title: '请输入"男"或"女"' },
-            { key: 'education', label: '文化程度', required: true, type: 'select', options: [
-                { value: '', text: '请选择' },
-                { value: '研究生及以上', text: '研究生及以上' },
-                { value: '研究生或同等学历', text: '研究生或同等学历' },
-                { value: '本科或同等学历', text: '本科或同等学历' },
-                { value: '专科或同等学历', text: '专科或同等学历' },
-                { value: '大专或同等学历', text: '大专或同等学历' },
-                { value: '中专或同等学历', text: '中专或同等学历' },
-                { value: '高中或同等学历', text: '高中或同等学历' },
-                { value: '初中', text: '初中' },
-                { value: '初中或同等学历', text: '初中或同等学历' }
-            ]},
+            {
+                key: 'education', label: '文化程度', required: true, type: 'select', options: [
+                    { value: '', text: '请选择' },
+                    { value: '初中', text: '初中' },
+                    { value: '高中或同等学历', text: '高中或同等学历' },
+                    { value: '中专或同等学历', text: '中专或同等学历' },
+                    { value: '专科或同等学历', text: '专科或同等学历' },
+                    { value: '本科或同等学历', text: '本科或同等学历' },
+                    { value: '研究生及以上', text: '研究生及以上' }
+                ]
+            },
             { key: 'id_card', label: '身份证号', required: true, pattern: '\\d{17}[\\dXx]', title: '请输入正确的18位身份证号' },
             { key: 'phone', label: '手机号', required: true, pattern: '\\d{11}', title: '请输入11位手机号' },
             { key: 'school', label: '毕业院校' },
@@ -596,19 +595,19 @@ document.addEventListener('DOMContentLoaded', () => {
             { key: 'exam_project', label: '操作项目', required: true, type: 'select', options: [] },
             { key: 'project_code', label: '项目代号', readonly: true }
         ];
-        
-        const originalData = {...student};
-        
+
+        const originalData = { ...student };
+
         editable.forEach(f => {
             const item = document.createElement('div');
             item.className = 'detail-item';
             const val = student[f.key] || '';
-            
+
             let input;
             if (f.type === 'select') {
                 input = document.createElement('select');
                 input.setAttribute('data-key', f.key);
-                
+
                 if (f.key === 'job_category') {
                     input.innerHTML = '<option value="">请选择</option>';
                     if (jobCategoriesConfig) {
@@ -616,7 +615,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const typeConfig = jobCategoriesConfig[trainingType];
                             const optgroup = document.createElement('optgroup');
                             optgroup.label = typeConfig.name;
-                            
+
                             typeConfig.job_categories.forEach(category => {
                                 const option = document.createElement('option');
                                 option.value = category.name;
@@ -627,15 +626,15 @@ document.addEventListener('DOMContentLoaded', () => {
                                 }
                                 optgroup.appendChild(option);
                             });
-                            
+
                             input.appendChild(optgroup);
                         });
                     }
-                    
-                    input.addEventListener('change', function() {
+
+                    input.addEventListener('change', function () {
                         updateExamProjectOptions(this, '');
                     });
-                    
+
                     setTimeout(() => {
                         updateExamProjectOptions(input, originalData.exam_project);
                     }, 0);
@@ -664,17 +663,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (f.pattern) input.pattern = f.pattern;
                 if (f.title) input.title = f.title;
             }
-            
+
             input.style.width = '100%';
             input.style.padding = '8px';
             input.style.border = '1px solid #ddd';
             input.style.borderRadius = '4px';
-            
+
             item.innerHTML = `<label>${f.label}</label>`;
             item.style.position = 'relative';
             item.appendChild(input);
             grid.appendChild(item);
-            
+
             const showError = () => {
                 input.classList.remove('error');
                 const parent = item;
@@ -717,16 +716,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const projectSelect = Array.from(grid.querySelectorAll('select')).find(select => select.getAttribute('data-key') === 'exam_project');
             const projectCodeInput = Array.from(grid.querySelectorAll('input')).find(input => input.getAttribute('data-key') === 'project_code');
             if (!projectSelect) return;
-            
+
             const selectedCategory = categorySelect.value;
             const selectedOption = categorySelect.options[categorySelect.selectedIndex];
-            
+
             projectSelect.innerHTML = '<option value="">请选择操作项目</option>';
             if (projectCodeInput) projectCodeInput.value = '';
-            
+
             if (selectedCategory && jobCategoriesConfig) {
                 let foundProjects = null;
-                
+
                 Object.keys(jobCategoriesConfig).forEach(trainingType => {
                     const typeConfig = jobCategoriesConfig[trainingType];
                     const category = typeConfig.job_categories.find(c => c.name === selectedCategory);
@@ -734,7 +733,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         foundProjects = category.exam_projects;
                     }
                 });
-                
+
                 if (foundProjects) {
                     foundProjects.forEach(project => {
                         const option = document.createElement('option');
@@ -749,8 +748,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
             }
-            
-            projectSelect.onchange = function() {
+
+            projectSelect.onchange = function () {
                 const selectedProjectOption = this.options[this.selectedIndex];
                 if (projectCodeInput && selectedProjectOption && selectedProjectOption.dataset.code) {
                     projectCodeInput.value = selectedProjectOption.dataset.code;
@@ -793,23 +792,23 @@ document.addEventListener('DOMContentLoaded', () => {
             uploadBox.style.transition = 'all 0.3s ease';
             uploadBox.style.position = 'relative';
             uploadBox.style.overflow = 'hidden';
-            
+
             uploadBox.onclick = (e) => {
                 if (!e.target.closest('button')) {
                     uploadBox.querySelector('input').click();
                 }
             };
-            
+
             uploadBox.onmouseover = () => {
                 uploadBox.style.borderColor = '#4f46e5';
                 uploadBox.style.backgroundColor = 'rgba(79, 70, 229, 0.05)';
             };
-            
+
             uploadBox.onmouseout = () => {
                 uploadBox.style.borderColor = '#ddd';
                 uploadBox.style.backgroundColor = 'transparent';
             };
-            
+
             const placeholder = document.createElement('div');
             placeholder.className = 'upload-placeholder';
             placeholder.style.display = existingPath ? 'none' : 'flex';
@@ -817,13 +816,13 @@ document.addEventListener('DOMContentLoaded', () => {
             placeholder.style.alignItems = 'center';
             placeholder.style.justifyContent = 'center';
             placeholder.style.gap = '8px';
-            
+
             const icon = document.createElement('span');
             icon.className = 'icon';
             icon.textContent = '+';
             icon.style.fontSize = '20px';
             icon.style.color = '#999';
-            
+
             const text = document.createElement('span');
             text.className = 'text';
             text.textContent = attachment.label;
@@ -832,7 +831,7 @@ document.addEventListener('DOMContentLoaded', () => {
             text.style.textAlign = 'center';
             text.style.maxWidth = '80px';
             text.style.wordBreak = 'break-all';
-            
+
             placeholder.appendChild(icon);
             placeholder.appendChild(text);
 
@@ -845,14 +844,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (existingPath) {
                 img.src = '/' + existingPath;
             }
-            
+
             const input = document.createElement('input');
             input.type = 'file';
             input.name = attachment.fieldName;
             input.accept = '.jpg,.jpeg,.png,image/jpeg,image/png';
             input.style.display = 'none';
             input.title = `${attachment.label}（JPG/PNG，≤10MB）`;
-            
+
             input.addEventListener('change', () => {
                 if (input.files && input.files[0]) {
                     const file = input.files[0];
@@ -864,11 +863,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     const reader = new FileReader();
-                    reader.onload = function(ev) {
+                    reader.onload = function (ev) {
                         img.src = ev.target.result;
                         img.style.display = 'block';
                         placeholder.style.display = 'none';
-                        
+
                         uploadFile(student.id, attachment.fieldName, file, attachment.dbKey);
                     };
                     reader.readAsDataURL(file);
@@ -912,7 +911,7 @@ document.addEventListener('DOMContentLoaded', () => {
             wrapper.appendChild(viewBtn);
             filesContainer.appendChild(wrapper);
         });
-        
+
         if (student.status === 'reviewed' && student.training_form_path) {
             const healthCheckWrapper = document.createElement('div');
             healthCheckWrapper.className = 'file-item-wrapper';
@@ -921,7 +920,7 @@ document.addEventListener('DOMContentLoaded', () => {
             healthCheckWrapper.style.alignItems = 'center';
             healthCheckWrapper.style.gap = '5px';
             healthCheckWrapper.style.minWidth = '100px';
-            
+
             const healthCheckBox = document.createElement('div');
             healthCheckBox.className = 'upload-box health-check-doc';
             healthCheckBox.style.width = '100px';
@@ -935,35 +934,35 @@ document.addEventListener('DOMContentLoaded', () => {
             healthCheckBox.style.cursor = 'pointer';
             healthCheckBox.style.background = 'linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%)';
             healthCheckBox.style.transition = 'all 0.3s ease';
-            
+
             healthCheckBox.onmouseover = () => {
                 healthCheckBox.style.transform = 'scale(1.05)';
                 healthCheckBox.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
             };
-            
+
             healthCheckBox.onmouseout = () => {
                 healthCheckBox.style.transform = 'scale(1)';
                 healthCheckBox.style.boxShadow = 'none';
             };
-            
+
             const docIcon = document.createElement('span');
             docIcon.textContent = '📄';
             docIcon.style.fontSize = '32px';
-            
+
             const docLabel = document.createElement('span');
             docLabel.textContent = '体检表';
             docLabel.style.fontSize = '12px';
             docLabel.style.color = '#065F46';
             docLabel.style.fontWeight = '600';
             docLabel.style.marginTop = '5px';
-            
+
             healthCheckBox.appendChild(docIcon);
             healthCheckBox.appendChild(docLabel);
-            
+
             healthCheckBox.onclick = () => {
                 window.open('/' + student.training_form_path, '_blank');
             };
-            
+
             const downloadBtn = document.createElement('button');
             downloadBtn.textContent = '下载';
             downloadBtn.style.marginTop = '5px';
@@ -975,7 +974,7 @@ document.addEventListener('DOMContentLoaded', () => {
             downloadBtn.style.color = '#065F46';
             downloadBtn.style.cursor = 'pointer';
             downloadBtn.style.fontWeight = '500';
-            
+
             downloadBtn.onclick = (e) => {
                 e.stopPropagation();
                 const link = document.createElement('a');
@@ -983,12 +982,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 link.download = `${student.id_card}-${student.name}-体检表.docx`;
                 link.click();
             };
-            
+
             healthCheckWrapper.appendChild(healthCheckBox);
             healthCheckWrapper.appendChild(downloadBtn);
             filesContainer.appendChild(healthCheckWrapper);
         }
-        
+
         const actionBar = clone.querySelector('.action-bar');
         if (actionBar) {
             if (currentStatus === 'unreviewed') {
@@ -1034,20 +1033,20 @@ document.addEventListener('DOMContentLoaded', () => {
     async function uploadFile(studentId, fieldName, file, dbKey) {
         const formData = new FormData();
         formData.append(fieldName, file);
-        
+
         try {
             const res = await fetch(`/api/students/${studentId}/upload`, {
                 method: 'POST',
                 body: formData
             });
-            
+
             if (!res.ok) {
                 throw new Error('上传失败');
             }
-            
+
             const result = await res.json();
             showSaveStatus('文件上传成功', 'success');
-            
+
             const idx = students.findIndex(s => s.id === studentId);
             if (idx >= 0) {
                 students[idx][dbKey || result.field] = result.path;
@@ -1064,7 +1063,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    window.approveStudent = async function() {
+    window.approveStudent = async function () {
         if (!currentStudentId) return;
         try {
             const res = await fetch(`/api/students/${currentStudentId}/approve`, { method: 'POST' });
@@ -1079,13 +1078,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    window.rejectStudent = async function(shouldDelete, targetStatus = 'rejected') {
+    window.rejectStudent = async function (shouldDelete, targetStatus = 'rejected') {
         if (!currentStudentId) return;
         try {
             const payload = shouldDelete
                 ? { delete: true }
                 : { delete: false, status: targetStatus || 'rejected' };
-            const res = await fetch(`/api/students/${currentStudentId}/reject`, { 
+            const res = await fetch(`/api/students/${currentStudentId}/reject`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

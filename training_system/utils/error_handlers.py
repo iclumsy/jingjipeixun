@@ -1,11 +1,11 @@
-"""Unified error handling for the application."""
+"""应用统一错误处理。"""
 from flask import jsonify
 from werkzeug.exceptions import HTTPException
 import traceback
 
 
 class AppError(Exception):
-    """Base application error class."""
+    """应用基础错误类。"""
 
     def __init__(self, message, status_code=500, payload=None):
         super().__init__(message)
@@ -14,21 +14,21 @@ class AppError(Exception):
         self.payload = payload
 
     def to_dict(self):
-        """Convert error to dictionary for JSON response."""
+        """将错误转换为 JSON 响应用字典。"""
         rv = dict(self.payload or ())
         rv['error'] = self.message
         return rv
 
 
 class ValidationError(AppError):
-    """Validation error for input data."""
+    """输入数据校验错误。"""
 
     def __init__(self, message, fields=None):
         super().__init__(message, status_code=400)
         self.fields = fields or {}
 
     def to_dict(self):
-        """Convert validation error to dictionary."""
+        """将校验错误转换为字典。"""
         rv = super().to_dict()
         if self.fields:
             rv['fields'] = self.fields
@@ -36,30 +36,30 @@ class ValidationError(AppError):
 
 
 class NotFoundError(AppError):
-    """Resource not found error."""
+    """资源未找到错误。"""
 
-    def __init__(self, message="Resource not found"):
+    def __init__(self, message="资源未找到"):
         super().__init__(message, status_code=404)
 
 
 class DatabaseError(AppError):
-    """Database operation error."""
+    """数据库操作错误。"""
 
-    def __init__(self, message="Database operation failed"):
+    def __init__(self, message="数据库操作失败"):
         super().__init__(message, status_code=500)
 
 
 def register_error_handlers(app):
     """
-    Register error handlers for the Flask application.
+    为 Flask 应用注册错误处理器。
 
-    Args:
-        app: Flask application instance
+    参数:
+        app: Flask 应用实例
     """
 
     @app.errorhandler(AppError)
     def handle_app_error(error):
-        """Handle custom application errors."""
+        """处理自定义应用错误。"""
         app.logger.error(f'{error.__class__.__name__}: {error.message}')
         response = jsonify(error.to_dict())
         response.status_code = error.status_code
@@ -67,7 +67,7 @@ def register_error_handlers(app):
 
     @app.errorhandler(HTTPException)
     def handle_http_exception(error):
-        """Handle HTTP exceptions."""
+        """处理 HTTP 异常。"""
         app.logger.warning(f'HTTP {error.code}: {error.description}')
         description = error.description
         if error.code == 413:
@@ -80,11 +80,11 @@ def register_error_handlers(app):
 
     @app.errorhandler(Exception)
     def handle_unexpected_error(error):
-        """Handle unexpected errors."""
+        """处理未预期的错误。"""
         app.logger.error(f'Unexpected error: {str(error)}')
         app.logger.error(traceback.format_exc())
         response = jsonify({
-            'error': 'An unexpected error occurred. Please try again later.'
+            'error': '服务器发生意外错误，请稍后重试'
         })
         response.status_code = 500
         return response

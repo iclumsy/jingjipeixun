@@ -1,4 +1,4 @@
-"""Student model and database operations."""
+"""学员模型与数据库操作。"""
 import sqlite3
 from contextlib import contextmanager
 from flask import current_app
@@ -8,8 +8,8 @@ from utils.error_handlers import DatabaseError, NotFoundError
 @contextmanager
 def get_db_connection():
     """
-    Context manager for database connections.
-    Ensures connections are properly closed.
+    数据库连接上下文管理器。
+    确保连接被正确关闭。
     """
     conn = None
     try:
@@ -28,7 +28,7 @@ def get_db_connection():
 
 
 def _ensure_column_exists(conn, table_name, column_name, column_definition):
-    """Add column when missing for lightweight schema migration."""
+    """在列缺失时自动添加，用于轻量级模式迁移。"""
     columns = conn.execute(f'PRAGMA table_info({table_name})').fetchall()
     existed = any(str(col[1]) == column_name for col in columns)
     if not existed:
@@ -37,10 +37,10 @@ def _ensure_column_exists(conn, table_name, column_name, column_definition):
 
 def init_db(database_path):
     """
-    Initialize the database with required tables.
+    初始化数据库，创建必要的表。
 
-    Args:
-        database_path: Path to the database file
+    参数:
+        database_path: 数据库文件路径
     """
     conn = sqlite3.connect(database_path)
     try:
@@ -94,14 +94,14 @@ def init_db(database_path):
 
 def create_student(data, file_paths):
     """
-    Create a new student record.
+    创建新的学员记录。
 
-    Args:
-        data: Dictionary containing student data
-        file_paths: Dictionary containing file paths
+    参数:
+        data: 包含学员数据的字典
+        file_paths: 包含文件路径的字典
 
-    Returns:
-        int: ID of the created student
+    返回:
+        int: 创建的学员 ID
     """
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -129,16 +129,16 @@ def create_student(data, file_paths):
 
 def get_students(status='unreviewed', search='', company='', training_type='', submitter_openid=''):
     """
-    Get students with optional filters.
+    获取学员列表，支持可选筛选条件。
 
-    Args:
-        status: Student status filter
-        search: Search term for name, ID card, or phone
-        company: Company name filter
-        training_type: Training type filter
+    参数:
+        status: 学员状态筛选
+        search: 按姓名、身份证号、手机号搜索
+        company: 公司名称筛选
+        training_type: 培训类型筛选
 
-    Returns:
-        list: List of student records as dictionaries
+    返回:
+        list: 学员记录字典列表
     """
     with get_db_connection() as conn:
         query = "SELECT * FROM students WHERE 1=1"
@@ -176,69 +176,69 @@ def get_students(status='unreviewed', search='', company='', training_type='', s
 
 def get_student_by_id(student_id):
     """
-    Get a student by ID.
+    根据 ID 获取学员。
 
-    Args:
-        student_id: Student ID
+    参数:
+        student_id: 学员 ID
 
-    Returns:
-        dict: Student record
+    返回:
+        dict: 学员记录
 
-    Raises:
-        NotFoundError: If student not found
+    异常:
+        NotFoundError: 学员不存在时抛出
     """
     with get_db_connection() as conn:
         student = conn.execute('SELECT * FROM students WHERE id = ?', (student_id,)).fetchone()
         if not student:
-            raise NotFoundError('Student not found')
+            raise NotFoundError('学员不存在')
         return dict(student)
 
 
 
 def update_student(student_id, updates):
     """
-    Update a student record.
+    更新学员记录。
 
-    Args:
-        student_id: Student ID
-        updates: Dictionary of fields to update
+    参数:
+        student_id: 学员 ID
+        updates: 要更新的字段字典
 
-    Returns:
-        dict: Updated student record
+    返回:
+        dict: 更新后的学员记录
     """
     if not updates:
-        raise DatabaseError('No fields to update')
+        raise DatabaseError('没有要更新的字段')
 
     with get_db_connection() as conn:
-        # Check if student exists
+        # 检查学员是否存在
         student = conn.execute('SELECT * FROM students WHERE id = ?', (student_id,)).fetchone()
         if not student:
-            raise NotFoundError('Student not found')
+            raise NotFoundError('学员不存在')
 
-        # Build update query
+        # 构建更新 SQL
         set_clause = ', '.join([f"{k} = ?" for k in updates.keys()])
         values = list(updates.values()) + [student_id]
         conn.execute(f"UPDATE students SET {set_clause} WHERE id = ?", values)
 
-        # Return updated student
+        # 返回更新后的学员记录
         updated = conn.execute('SELECT * FROM students WHERE id = ?', (student_id,)).fetchone()
         return dict(updated)
 
 
 def delete_student(student_id):
     """
-    Delete a student record.
+    删除学员记录。
 
-    Args:
-        student_id: Student ID
+    参数:
+        student_id: 学员 ID
 
-    Returns:
-        dict: Deleted student record (for cleanup purposes)
+    返回:
+        dict: 被删除的学员记录（用于清理文件）
     """
     with get_db_connection() as conn:
         student = conn.execute('SELECT * FROM students WHERE id = ?', (student_id,)).fetchone()
         if not student:
-            raise NotFoundError('Student not found')
+            raise NotFoundError('学员不存在')
 
         conn.execute('DELETE FROM students WHERE id = ?', (student_id,))
         return dict(student)
@@ -246,35 +246,35 @@ def delete_student(student_id):
 
 def approve_student(student_id):
     """
-    Approve a student (change status to 'reviewed').
+    审核通过学员（将状态改为 'reviewed'）。
 
-    Args:
-        student_id: Student ID
+    参数:
+        student_id: 学员 ID
 
-    Returns:
-        dict: Updated student record
+    返回:
+        dict: 更新后的学员记录
     """
     return update_student(student_id, {'status': 'reviewed'})
 
 
 def get_companies(status='', company_filter='', training_type=''):
     """
-    Get distinct company names with optional filters.
+    获取去重后的公司名称列表，支持可选筛选条件。
 
-    Args:
-        status: Student status filter
-        company_filter: Company name filter
-        training_type: Training type filter
+    参数:
+        status: 学员状态筛选
+        company_filter: 公司名称筛选
+        training_type: 培训类型筛选
 
-    Returns:
-        list: List of company names
+    返回:
+        list: 公司名称列表
     """
     with get_db_connection() as conn:
         query = """SELECT DISTINCT company FROM students
                   WHERE company IS NOT NULL AND company != ''"""
         params = []
 
-        # Handle status filter
+        # 处理状态筛选
         if status:
             if status == 'pending':
                 query += " AND status IN (?, ?)"

@@ -1,4 +1,4 @@
-"""Main application entry point."""
+"""应用主入口。"""
 import os
 from datetime import timedelta
 from flask import Flask, g, jsonify, redirect, render_template, request, session
@@ -21,7 +21,7 @@ from utils.error_handlers import register_error_handlers
 
 
 def _strip_wrapping_quotes(value):
-    """Strip a matching pair of wrapping single/double quotes."""
+    """去除值两端匹配的单引号或双引号。"""
     text = str(value or '').strip()
     if len(text) >= 2 and text[0] == text[-1] and text[0] in {"'", '"'}:
         return text[1:-1]
@@ -29,7 +29,7 @@ def _strip_wrapping_quotes(value):
 
 
 def _resolve_env_file_path(base_dir):
-    """Resolve env file path from TRAINING_SYSTEM_ENV_FILE or default .env."""
+    """从环境变量 TRAINING_SYSTEM_ENV_FILE 解析配置文件路径，默认为 .env。"""
     configured = (os.getenv('TRAINING_SYSTEM_ENV_FILE', '') or '').strip()
     if not configured:
         return os.path.join(base_dir, '.env')
@@ -40,8 +40,8 @@ def _resolve_env_file_path(base_dir):
 
 def load_env_file(base_dir):
     """
-    Load env vars from config file.
-    Existing process env has priority and will not be overridden.
+    从配置文件加载环境变量。
+    已存在的进程环境变量优先，不会被覆盖。
     """
     env_file = _resolve_env_file_path(base_dir)
     result = {
@@ -79,8 +79,8 @@ def load_env_file(base_dir):
 
 def get_max_content_length():
     """
-    Build MAX_CONTENT_LENGTH from env var MAX_CONTENT_LENGTH_MB.
-    Default 64MB to support multi-attachment sync uploads.
+    根据环境变量 MAX_CONTENT_LENGTH_MB 构建请求体大小限制。
+    默认 64MB，以支持多附件同步上传。
     """
     raw_mb = os.getenv('MAX_CONTENT_LENGTH_MB', '64')
     try:
@@ -95,10 +95,10 @@ def get_max_content_length():
 
 
 def create_app():
-    """Create and configure the Flask application."""
+    """创建并配置 Flask 应用。"""
     app = Flask(__name__)
 
-    # Configuration
+    # 应用配置
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     env_load = load_env_file(BASE_DIR)
     app.config['BASE_DIR'] = BASE_DIR
@@ -116,14 +116,14 @@ def create_app():
         session_hours = 12
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=session_hours)
 
-    # Ensure directories exist
+    # 确保必要目录存在
     os.makedirs(app.config['STUDENTS_FOLDER'], exist_ok=True)
     os.makedirs(os.path.join(BASE_DIR, 'database'), exist_ok=True)
 
-    # Initialize database
+    # 初始化数据库
     init_db(app.config['DATABASE'])
 
-    # Setup logging
+    # 初始化日志
     setup_logger(app)
     if env_load.get('error'):
         app.logger.warning(
@@ -143,10 +143,10 @@ def create_app():
             env_load.get('path', '')
         )
 
-    # Register error handlers
+    # 注册错误处理器
     register_error_handlers(app)
 
-    # Register blueprints
+    # 注册蓝图
     app.register_blueprint(auth_bp)
     app.register_blueprint(miniprogram_bp)
     app.register_blueprint(student_bp)
@@ -156,7 +156,7 @@ def create_app():
 
     @app.before_request
     def require_authentication():
-        """Protect admin pages and API routes with session or API key."""
+        """通过会话或 API Key 保护管理页面和 API 路由。"""
         g.mini_user = None
         path = request.path or '/'
         protected_api = path.startswith('/api/')
@@ -164,11 +164,15 @@ def create_app():
         if path.startswith('/static/') or path == '/favicon.ico':
             return None
 
+        if path == '/':
+            return None
         if path.startswith('/auth/'):
             return None
         if path.startswith('/students/'):
             return None
         if path == '/api/miniprogram/login':
+            return None
+        if path == '/api/config/job_categories':
             return None
 
         if session.get('auth_verified') is True:
@@ -196,10 +200,10 @@ def create_app():
         query_string = request.query_string.decode('utf-8', errors='ignore')
         return redirect(build_login_redirect_target(path, query_string))
 
-    # # Main routes
-    # @app.route('/')
-    # def index():
-    #     return render_template('index.html')
+    # 页面路由
+    @app.route('/')
+    def index():
+        return render_template('index.html')
 
     @app.route('/admin')
     def admin():
@@ -216,11 +220,11 @@ def create_app():
 
     return app
 
-# Create application instance
+# 创建应用实例
 app = create_app()
 
 
 if __name__ == '__main__':
-    # Use environment variable for debug mode
+    # 从环境变量读取调试模式
     debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     app.run(debug=debug_mode, host='0.0.0.0', port=5001) 

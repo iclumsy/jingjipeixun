@@ -1,21 +1,21 @@
-"""Data validation utilities."""
+"""数据校验工具。"""
 import re
 from utils.error_handlers import ValidationError
 
 
 def validate_student_data(data, required_fields=None):
     """
-    Validate student data.
+    校验学员数据。
 
-    Args:
-        data: Dictionary containing student data
-        required_fields: List of required field names (optional)
+    参数:
+        data: 包含学员数据的字典
+        required_fields: 必填字段名称列表（可选）
 
-    Returns:
-        dict: Validated data
+    返回:
+        dict: 校验后的数据
 
-    Raises:
-        ValidationError: If validation fails
+    异常:
+        ValidationError: 校验失败时抛出
     """
     if required_fields is None:
         required_fields = ['name', 'gender', 'education', 'id_card', 'phone',
@@ -23,22 +23,22 @@ def validate_student_data(data, required_fields=None):
 
     errors = {}
 
-    # Check required fields
+    # 检查必填字段
     for field in required_fields:
         if not data.get(field):
             errors[field] = '必填项'
 
-    # Validate gender
+    # 校验性别
     if 'gender' in data and data.get('gender') not in ['男', '女']:
         errors['gender'] = '性别须为"男"或"女"'
 
-    # Validate ID card
+    # 校验身份证号
     if 'id_card' in data:
         id_card = data.get('id_card', '')
         if id_card and not re.fullmatch(r'\d{17}[\dXx]', id_card):
             errors['id_card'] = '身份证号格式不正确'
 
-    # Validate phone
+    # 校验手机号
     if 'phone' in data:
         phone = data.get('phone', '')
         if phone and not re.fullmatch(r'\d{11}', phone):
@@ -52,17 +52,17 @@ def validate_student_data(data, required_fields=None):
 
 def validate_file_upload(file, allowed_extensions=None):
     """
-    Validate uploaded file.
+    校验上传文件。
 
-    Args:
-        file: FileStorage object from request.files
-        allowed_extensions: Set of allowed file extensions
+    参数:
+        file: 来自 request.files 的 FileStorage 对象
+        allowed_extensions: 允许的文件扩展名集合
 
-    Returns:
-        bool: True if valid
+    返回:
+        bool: 有效返回 True
 
-    Raises:
-        ValidationError: If validation fails
+    异常:
+        ValidationError: 校验失败时抛出
     """
     if allowed_extensions is None:
         allowed_extensions = {'jpg', 'jpeg', 'png'}
@@ -73,7 +73,7 @@ def validate_file_upload(file, allowed_extensions=None):
     if not file or not file.filename:
         raise ValidationError('未选择文件')
 
-    # Check file extension
+    # 检查文件扩展名
     if '.' not in file.filename:
         raise ValidationError('文件名无效')
 

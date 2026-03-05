@@ -1,4 +1,4 @@
-"""Student-related routes."""
+"""学员相关路由。"""
 from flask import Blueprint, request, jsonify, current_app, g
 from models.student import (
     create_student, get_students, get_student_by_id, update_student,
@@ -14,8 +14,9 @@ import zipfile
 import time
 
 
-student_bp = Blueprint('student', __name__)
+student_bp = Blueprint('student', __name__)  # 学员蓝图
 
+# 前端字段名 -> 数据库字段名 映射
 FILE_MAP = {
     'photo': 'photo_path',
     'diploma': 'diploma_path',
@@ -25,6 +26,7 @@ FILE_MAP = {
     'hukou_personal': 'hukou_personal_path'
 }
 
+# 各培训类型的必传附件
 REQUIRED_ATTACHMENTS = {
     'special_operation': ['diploma', 'id_card_front', 'id_card_back'],
     'special_equipment': ['photo', 'diploma', 'id_card_front', 'id_card_back', 'hukou_residence', 'hukou_personal']
@@ -32,7 +34,7 @@ REQUIRED_ATTACHMENTS = {
 
 
 def normalize_training_type(training_type):
-    """Normalize and validate training type."""
+    """标准化并校验培训类型。"""
     value = (training_type or '').strip()
     if value in REQUIRED_ATTACHMENTS:
         return value
@@ -40,7 +42,7 @@ def normalize_training_type(training_type):
 
 
 def parse_bool(value):
-    """Parse truthy query value."""
+    """解析布尔型查询参数。"""
     if isinstance(value, bool):
         return value
     normalized = str(value or '').strip().lower()
@@ -48,7 +50,7 @@ def parse_bool(value):
 
 
 def build_internal_error_response(message='服务器内部错误，请稍后重试'):
-    """Build unified 500 response payload for unexpected errors."""
+    """构建统一的 500 错误响应。"""
     return jsonify({
         'error': 'internal_error',
         'message': message
@@ -56,19 +58,19 @@ def build_internal_error_response(message='服务器内部错误，请稍后重�
 
 
 def get_mini_user():
-    """Return mini-program auth payload from request context."""
+    """从请求上下文获取小程序认证信息。"""
     user = getattr(g, 'mini_user', None)
     return user if isinstance(user, dict) else None
 
 
 def is_mini_admin():
-    """Whether current mini-program caller is admin."""
+    """判断当前小程序调用者是否为管理员。"""
     user = get_mini_user()
     return bool(user and user.get('is_admin'))
 
 
 def get_mini_openid():
-    """Return mini-program caller openid."""
+    """获取小程序调用者的 openid。"""
     user = get_mini_user()
     if not user:
         return ''
@@ -76,14 +78,14 @@ def get_mini_openid():
 
 
 def ensure_mini_admin():
-    """Reject non-admin mini callers for admin operations."""
+    """拒绝非管理员小程序用户的管理操作。"""
     user = get_mini_user()
     if user and not is_mini_admin():
         raise AppError('无权限执行该操作', status_code=403)
 
 
 def ensure_mini_owner_or_admin(student):
-    """Reject mini caller if not owner and not admin."""
+    """拒绝非本人且非管理员的小程序用户访问。"""
     user = get_mini_user()
     if not user or is_mini_admin():
         return
@@ -93,7 +95,7 @@ def ensure_mini_owner_or_admin(student):
 
 
 def ensure_safe_relative_student_path(path_value):
-    """Validate relative file path for students folder."""
+    """校验学员附件的相对路径安全性。"""
     raw = str(path_value or '').strip()
     if not raw:
         return ''
@@ -109,7 +111,7 @@ def ensure_safe_relative_student_path(path_value):
 
 @student_bp.route('/api/students', methods=['POST'])
 def create_student_route():
-    """Create a new student."""
+    """创建新学员。"""
     try:
         use_multipart = bool(request.form or request.files)
         file_paths = {}
@@ -118,7 +120,7 @@ def create_student_route():
             data = request.form
             files = request.files
 
-            # Validate data
+            # 校验数据
             validate_student_data(data)
 
             training_type = normalize_training_type(data.get('training_type', 'special_operation'))
@@ -176,13 +178,13 @@ def create_student_route():
 
         file_paths['training_form_path'] = ""
 
-        # Create student
+        # 创建学员记录
         student_payload['training_type'] = training_type
 
 
         mini_user = get_mini_user()
         if mini_user:
-            # For mini-program direct callers, always bind record owner to token openid.
+            # 小程序直接提交时，始终将记录归属绑定到令牌中的 openid
             student_payload['submitter_openid'] = get_mini_openid()
         else:
             student_payload['submitter_openid'] = (student_payload.get('submitter_openid', '') or '').strip()
@@ -204,7 +206,7 @@ def create_student_route():
 
 @student_bp.route('/api/students', methods=['GET'])
 def get_students_route():
-    """Get students with optional filters."""
+    """获取学员列表，支持筛选条件。"""
     try:
         status = request.args.get('status', 'unreviewed')
         search = request.args.get('search', '')
@@ -218,7 +220,7 @@ def get_students_route():
             my_only = parse_bool(request.args.get('my_only', False))
             submitter_openid = (request.args.get('submitter_openid', '') or '').strip()
             if my_only and not submitter_openid:
-                # fallback: allow openid query alias
+                # 兼容：允许使用 openid 作为查询别名
                 submitter_openid = (request.args.get('openid', '') or '').strip()
             if not my_only:
                 submitter_openid = ''
@@ -235,7 +237,7 @@ def get_students_route():
 
 @student_bp.route('/api/students/<int:id>', methods=['GET'])
 def get_student_route(id):
-    """Get single student detail."""
+    """获取单个学员详情。"""
     try:
         student = get_student_by_id(id)
         ensure_mini_owner_or_admin(student)
@@ -251,7 +253,7 @@ def get_student_route(id):
 
 @student_bp.route('/api/students/<int:id>', methods=['PUT', 'PATCH'])
 def update_student_route(id):
-    """Update a student."""
+    """更新学员信息。"""
     try:
         allowed_text = [
             'name', 'gender', 'education', 'school', 'major', 'id_card', 'phone',
@@ -265,7 +267,7 @@ def update_student_route(id):
 
         updates = {}
 
-        # Handle form data (multipart) or JSON
+        # 处理表单数据（multipart）或 JSON
         if request.form:
             data = request.form
             for k in allowed_text:
@@ -276,11 +278,11 @@ def update_student_route(id):
             if 'training_type' in updates:
                 updates['training_type'] = normalize_training_type(updates['training_type'])
 
-            # Validate partial update
+            # 校验部分更新字段
             if updates:
                 validate_student_data(updates, required_fields=[])
 
-            # Handle file uploads
+            # 处理文件上传
             effective_training_type = normalize_training_type(
                 data.get('training_type', updates.get('training_type', current_student.get('training_type', 'special_operation')))
             )
@@ -297,7 +299,7 @@ def update_student_route(id):
                     name_for_save = data.get('name', current_student['name'])
                     company_for_name = data.get('company', current_student.get('company', ''))
 
-                    # Delete old file
+                    # 删除旧文件
                     old_rel = current_student.get(db_key)
                     if old_rel:
                         delete_student_files({db_key: old_rel}, current_app.config['BASE_DIR'])
@@ -326,7 +328,7 @@ def update_student_route(id):
             if 'training_type' in updates:
                 updates['training_type'] = normalize_training_type(updates['training_type'])
 
-            # Validate partial update
+            # 校验部分更新字段
             if updates:
                 validate_student_data(updates, required_fields=[])
 
@@ -341,8 +343,7 @@ def update_student_route(id):
                     continue
                 rel = ensure_safe_relative_student_path(files_payload.get(input_name, ''))
                 if rel and input_name not in allowed_attachments:
-                    # Ignore attachments not used by target training type in JSON updates.
-                    # This avoids historical/legacy fields causing save failures.
+                    # 忽略目标培训类型不需要的附件，避免历史遗留字段导致保存失败
                     continue
 
                 old_rel = current_student.get(db_key, '')
@@ -363,7 +364,7 @@ def update_student_route(id):
                     fields={attachment_field: '该培训项目下此附件为必传项'}
                 )
 
-        # Update student
+        # 更新学员记录
         updated_student = update_student(id, updates)
         current_app.logger.info(f'Student updated: ID={id}')
 
@@ -378,7 +379,7 @@ def update_student_route(id):
 
 @student_bp.route('/api/students/<int:id>/upload', methods=['POST'])
 def upload_student_attachment_route(id):
-    """Upload a single attachment for an existing student."""
+    """为已有学员上传单个附件。"""
     try:
         student = get_student_by_id(id)
         ensure_mini_owner_or_admin(student)
@@ -440,7 +441,7 @@ def upload_student_attachment_route(id):
 
 @student_bp.route('/api/miniprogram/upload', methods=['POST'])
 def miniprogram_upload_attachment_route():
-    """Upload a single attachment before form submit (mini-program direct mode)."""
+    """小程序表单提交前上传单个附件（直传模式）。"""
     try:
         upload_file = request.files.get('file')
         if not upload_file or not upload_file.filename:
@@ -457,8 +458,8 @@ def miniprogram_upload_attachment_route():
         training_type = normalize_training_type(
             request.form.get('training_type') or request.form.get('trainingType') or 'special_operation'
         )
-        # Upload stage is permissive: allow replacing any known attachment type.
-        # Required attachment constraints are enforced on final submit/update validation.
+        # 上传阶段宽松处理：允许替换任何已知附件类型
+        # 必传附件约束在最终提交/更新校验时强制执行
 
         validate_file_upload(upload_file)
 
@@ -490,7 +491,7 @@ def miniprogram_upload_attachment_route():
 
 @student_bp.route('/api/students/<int:id>/reject', methods=['POST'])
 def reject_student_route(id):
-    """Reject a student: update status by default, delete only when explicitly requested."""
+    """驳回学员：默认更新状态，仅在明确请求时删除记录。"""
     try:
         ensure_mini_admin()
         data = request.get_json(silent=True)
@@ -528,7 +529,7 @@ def reject_student_route(id):
 
 @student_bp.route('/api/students/<int:id>/approve', methods=['POST'])
 def approve_student_route(id):
-    """Approve a student."""
+    """审核通过学员。"""
     try:
         ensure_mini_admin()
         current_student = get_student_by_id(id)
@@ -559,18 +560,10 @@ def approve_student_route(id):
         return build_internal_error_response('审核学员失败，请稍后重试')
 
 
-@student_bp.route('/api/students/<int:id>/generate', methods=['POST'])
-def generate_materials_route(id):
-    """Deprecated endpoint kept for backward compatibility."""
-    current_app.logger.warning('Deprecated generate endpoint called for student ID=%s', id)
-    return jsonify({
-        'error': '该接口已下线，请使用审核通过自动生成体检表流程'
-    }), 410
-
 
 @student_bp.route('/api/students/<int:id>/attachments.zip', methods=['GET'])
 def download_attachments_zip_route(id):
-    """Download all attachments for a student as ZIP."""
+    """将学员所有附件打包为 ZIP 下载。"""
     try:
         ensure_mini_admin()
         student = get_student_by_id(id)
@@ -630,7 +623,7 @@ def download_attachments_zip_route(id):
 
 @student_bp.route('/api/companies', methods=['GET'])
 def get_companies_route():
-    """Get distinct company names."""
+    """获取去重后的公司名称列表。"""
     try:
         ensure_mini_admin()
         status = request.args.get('status', '')

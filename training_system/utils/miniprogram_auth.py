@@ -1,4 +1,4 @@
-"""Mini-program authentication helpers."""
+"""小程序认证工具。"""
 import hmac
 import json
 import os
@@ -6,6 +6,7 @@ from urllib import parse, request
 from itsdangerous import BadSignature, BadTimeSignature, URLSafeTimedSerializer
 
 
+# 环境变量名常量
 MINI_APPID_ENV = 'WECHAT_MINI_APPID'
 MINI_SECRET_ENV = 'WECHAT_MINI_SECRET'
 MINI_TOKEN_HOURS_ENV = 'TRAINING_SYSTEM_MINI_TOKEN_HOURS'
@@ -14,22 +15,22 @@ MINI_TOKEN_SALT = 'training-system-mini-token'
 
 
 def get_mini_appid():
-    """Return configured mini-program appid."""
+    """获取配置的小程序 appid。"""
     return (os.getenv(MINI_APPID_ENV, '') or '').strip()
 
 
 def get_mini_secret():
-    """Return configured mini-program secret."""
+    """获取配置的小程序 secret。"""
     return (os.getenv(MINI_SECRET_ENV, '') or '').strip()
 
 
 def has_mini_auth_config():
-    """Whether mini-program appid/secret are configured."""
+    """是否已配置小程序 appid/secret。"""
     return bool(get_mini_appid() and get_mini_secret())
 
 
 def parse_admin_openids():
-    """Return configured admin openids from env."""
+    """从环境变量获取配置的管理员 openid 列表。"""
     raw = (os.getenv(MINI_ADMIN_OPENIDS_ENV, '') or '').strip()
     if not raw:
         return set()
@@ -37,7 +38,7 @@ def parse_admin_openids():
 
 
 def is_admin_openid(openid):
-    """Check whether openid is in admin openid list."""
+    """检查 openid 是否在管理员列表中。"""
     candidate = (openid or '').strip()
     if not candidate:
         return False
@@ -45,7 +46,7 @@ def is_admin_openid(openid):
 
 
 def get_mini_token_hours():
-    """Return mini token lifetime hours."""
+    """获取小程序令牌有效时长（小时）。"""
     raw = os.getenv(MINI_TOKEN_HOURS_ENV, '72')
     try:
         return max(1, int(raw))
@@ -54,7 +55,7 @@ def get_mini_token_hours():
 
 
 def get_mini_token_max_age_seconds():
-    """Return mini token max age in seconds."""
+    """获取小程序令牌最大有效期（秒）。"""
     return get_mini_token_hours() * 3600
 
 
@@ -63,7 +64,7 @@ def _build_serializer(secret_key):
 
 
 def sign_mini_token(secret_key, openid, is_admin=False):
-    """Create signed token payload."""
+    """创建签名令牌。"""
     serializer = _build_serializer(secret_key)
     payload = {
         'openid': str(openid or '').strip(),
@@ -73,7 +74,7 @@ def sign_mini_token(secret_key, openid, is_admin=False):
 
 
 def verify_mini_token(secret_key, token, max_age_seconds=None):
-    """Verify mini token and return payload dict."""
+    """验证小程序令牌并返回载荷字典。"""
     raw_token = str(token or '').strip()
     if not raw_token:
         return None
@@ -99,7 +100,7 @@ def verify_mini_token(secret_key, token, max_age_seconds=None):
 
 
 def extract_mini_token(req):
-    """Extract token from Authorization/X-Mini-Token/query."""
+    """从 Authorization/X-Mini-Token 头或查询参数提取令牌。"""
     auth_header = (req.headers.get('Authorization', '') or '').strip()
     if auth_header.lower().startswith('bearer '):
         bearer = auth_header[7:].strip()
@@ -118,7 +119,7 @@ def extract_mini_token(req):
 
 
 def exchange_code_for_openid(code, timeout_seconds=8):
-    """Exchange wx.login code for openid."""
+    """用 wx.login 的 code 换取 openid。"""
     appid = get_mini_appid()
     secret = get_mini_secret()
     if not appid or not secret:
@@ -177,5 +178,5 @@ def exchange_code_for_openid(code, timeout_seconds=8):
 
 
 def safe_compare_openid(left, right):
-    """Constant-time compare for openid text."""
+    """常量时间比较 openid 文本。"""
     return hmac.compare_digest(str(left or ''), str(right or ''))

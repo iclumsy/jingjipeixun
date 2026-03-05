@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script to generate random student data for testing purposes.
+生成随机学员数据的测试脚本。
 """
 import os
 import random
@@ -10,15 +10,17 @@ import requests
 import json
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'database', 'students.db')
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config', 'job_categories.json')
+DB_PATH = os.path.join(os.path.dirname(__file__), 'database', 'students.db')  # 数据库路径
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config', 'job_categories.json')  # 作业类别配置路径
 
+# 姓氏库
 FIRST_NAMES = [
     '张', '王', '李', '赵', '刘', '陈', '杨', '黄', '周', '吴',
     '徐', '孙', '马', '朱', '胡', '郭', '何', '高', '林', '罗',
     '郑', '梁', '谢', '宋', '唐', '许', '韩', '冯', '邓', '曹'
 ]
 
+# 名字库
 LAST_NAMES = [
     '伟', '芳', '娜', '敏', '静', '丽', '强', '磊', '军', '洋',
     '勇', '艳', '杰', '娟', '涛', '明', '超', '秀英', '霞', '平',
@@ -28,10 +30,11 @@ LAST_NAMES = [
 GENDERS = ['男', '女']
 
 EDUCATION_LEVELS = [
-    '研究生及以上', '本科或同等学历', '专科或同等学历',
-    '中专或同等学历', '高中或同等学历', '初中'
+    '初中', '高中或同等学历', '中专或同等学历',
+    '专科或同等学历', '本科或同等学历', '研究生及以上'
 ]
 
+# 公司名称库
 COMPANIES = [
     '阳泉市第一建筑工程有限公司', '阳泉市第二建筑工程有限公司',
     '阳泉市第三建筑工程有限公司', '阳泉市第四建筑工程有限公司',
@@ -45,16 +48,19 @@ COMPANIES = [
     '阳泉市安防工程有限公司', '阳泉市智能化工程有限公司'
 ]
 
+# 地址前缀库
 ADDRESS_PREFIXES = [
     '山西省阳泉市城区', '山西省阳泉市矿区', '山西省阳泉市郊区',
     '山西省阳泉市平定县', '山西省阳泉市盂县'
 ]
 
 def load_job_categories():
+    """加载作业类别配置文件。"""
     with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 def generate_id_card():
+    """生成随机身份证号。"""
     area_code = ''.join(random.choices(string.digits, k=6))
     year = random.randint(1970, 2005)
     month = random.randint(1, 12)
@@ -65,6 +71,7 @@ def generate_id_card():
     return f'{area_code}{birth_date}{sequence}{check_digit}'
 
 def generate_phone():
+    """生成随机手机号。"""
     prefix = random.choice(['130', '131', '132', '133', '134', '135', '136', '137', '138', '139',
                            '150', '151', '152', '153', '155', '156', '157', '158', '159',
                            '170', '171', '172', '173', '175', '176', '177', '178',
@@ -73,6 +80,7 @@ def generate_phone():
     return f'{prefix}{suffix}'
 
 def generate_address():
+    """生成随机地址。"""
     prefix = random.choice(ADDRESS_PREFIXES)
     street = random.choice(['胜利街', '解放路', '建设路', '青年路', '光明街', '前进街', '和平街', '友谊街'])
     number = random.randint(1, 100)
@@ -86,6 +94,7 @@ def generate_address():
     return address
 
 def generate_file_path(training_type, company, name, id_card, file_type):
+    """生成学员附件文件路径。"""
     training_type_map = {
         'special_operation': '特种作业',
         'special_equipment': '特种设备'
@@ -103,6 +112,7 @@ def generate_file_path(training_type, company, name, id_card, file_type):
     return f"students/{folder_name}/{file_name}"
 
 def download_image(url, save_path):
+    """下载图片到指定路径。"""
     try:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         response = requests.get(url, timeout=15)
@@ -116,6 +126,7 @@ def download_image(url, save_path):
         return False
 
 def get_real_person_photo(gender='male'):
+    """从在线 API 获取真实人像照片 URL。"""
     try:
         api_url = f"https://randomuser.me/api/?inc=picture&gender={gender}"
         response = requests.get(api_url, timeout=10)
@@ -129,6 +140,7 @@ def get_real_person_photo(gender='male'):
     return None
 
 def generate_student(training_type, config, gender_cn=None):
+    """生成单个随机学员数据。"""
     try:
         if gender_cn is None:
             gender_cn = random.choice(GENDERS)
@@ -215,6 +227,7 @@ def generate_student(training_type, config, gender_cn=None):
         raise
 
 def insert_student(conn, student_data):
+    """将学员数据插入数据库。"""
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO students (
@@ -237,6 +250,7 @@ def insert_student(conn, student_data):
     return cursor.lastrowid
 
 def main():
+    """主函数：生成测试学员数据并插入数据库。"""
     config = load_job_categories()
     conn = sqlite3.connect(DB_PATH)
     

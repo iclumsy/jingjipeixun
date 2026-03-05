@@ -1,14 +1,14 @@
-"""File serving routes."""
+"""文件服务路由。"""
 from flask import Blueprint, current_app, send_from_directory
 import os
 
 
-file_bp = Blueprint('file', __name__)
+file_bp = Blueprint('file', __name__)  # 文件蓝图
 
 
 @file_bp.route('/students/<path:filename>')
 def serve_students(filename):
-    """Serve files from students folder."""
+    """提供学员文件夹中的文件访问。"""
     try:
         parts = filename.split('/', 1)
         if len(parts) == 2:
@@ -22,4 +22,4 @@ def serve_students(filename):
 
     except Exception as e:
         current_app.logger.error(f'Error serving student file {filename}: {str(e)}')
-        return "File not found", 404
+        return "文件未找到", 404

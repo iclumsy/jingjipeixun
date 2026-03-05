@@ -1,14 +1,14 @@
-"""Authentication routes for admin web."""
+"""管理后台认证路由。"""
 from flask import Blueprint, jsonify, redirect, render_template, request, session
 from utils.auth import sanitize_next_path, verify_admin_credentials
 
 
-auth_bp = Blueprint('auth', __name__)
+auth_bp = Blueprint('auth', __name__)  # 认证蓝图
 
 
 @auth_bp.route('/auth/login', methods=['GET', 'POST'])
 def login():
-    """Render login page and handle credential verification."""
+    """渲染登录页面并处理账号密码验证。"""
     next_path = sanitize_next_path(request.args.get('next', '/admin'))
 
     if request.method == 'GET':
@@ -42,7 +42,7 @@ def login():
 
 @auth_bp.route('/auth/logout', methods=['GET', 'POST'])
 def logout():
-    """Clear session and return to login page."""
+    """清除会话并返回登录页。"""
     session.clear()
     if request.is_json:
         return jsonify({'success': True})

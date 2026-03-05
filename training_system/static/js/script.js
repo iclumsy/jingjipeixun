@@ -172,20 +172,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         return { valid: true };
     }
 
-    // Add initial student
+    // 添加初始学员表单
     addStudent();
 
     addBtn.addEventListener('click', addStudent);
 
     submitBtn.addEventListener('click', async (e) => {
         e.preventDefault();
-        
+
         const entries = document.querySelectorAll('.student-entry');
         let allValid = true;
         let oldStatus = document.getElementById('submit-status');
         if (oldStatus) oldStatus.remove();
-        
-        // Validate all first
+
+        // 先校验所有表单
         entries.forEach(entry => {
             const res = validateEntry(entry);
             if (!res.valid) {
@@ -202,7 +202,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // Submit one by one
+        // 验证码校验
+        if (typeof window.verifyCaptcha === 'function' && !window.verifyCaptcha()) {
+            return;
+        }
+
+        // 逐个提交
         let successCount = 0;
         let failCount = 0;
         submitBtn.disabled = true;
@@ -212,7 +217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             try {
                 const formData = new FormData();
                 const inputs = entry.querySelectorAll('input, select');
-                
+
                 inputs.forEach(input => {
                     if (input.type === 'file') {
                         if (input.files[0]) {
@@ -233,12 +238,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (response.ok) {
                     successCount++;
-                    entry.remove(); // Remove successful entries
+                    entry.remove(); // 移除提交成功的条目
                 } else {
                     failCount++;
                     const data = await response.json();
                     console.error('Submission failed:', data);
-                    // Highlight entry or show error
+                    // 高亮条目或显示错误
                     entry.style.border = '2px solid red';
                 }
             } catch (err) {
@@ -250,9 +255,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         submitBtn.disabled = false;
         submitBtn.textContent = '提交所有信息';
 
+        // 提交后重新生成验证码
+        if (typeof window.refreshCaptcha === 'function') window.refreshCaptcha();
+
         if (container.children.length === 0) {
             showModal(`成功提交 ${successCount} 位学员信息！`, 'success');
-            addStudent(); // Reset with one empty form
+            addStudent(); // 重置为一个空表单
         } else {
             showModal(`提交完成。成功: ${successCount}, 失败: ${failCount}。请检查失败条目。`, failCount > 0 ? 'error' : 'success');
         }
@@ -274,7 +282,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    window.removeStudent = function(btn) {
+    window.removeStudent = function (btn) {
         if (container.children.length > 1) {
             btn.closest('.student-entry').remove();
         } else {
@@ -282,11 +290,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    window.previewFile = function(input) {
+    window.previewFile = function (input) {
         const box = input.closest('.upload-box');
         const img = box.querySelector('.preview-img');
         const placeholder = box.querySelector('.upload-placeholder');
-        
+
         if (input.files && input.files[0]) {
             const file = input.files[0];
             const validation = validateAttachmentFile(input, file);
@@ -297,14 +305,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
-            // If this is the personal photo field, crop to one-inch ratio client-side
+            // 如果是个人照片字段，在客户端裁剪为一寸比例
             if (input.name === 'photo') {
                 const imgEl = new Image();
                 const reader = new FileReader();
-                reader.onload = function(ev) {
-                    imgEl.onload = function() {
+                reader.onload = function (ev) {
+                    imgEl.onload = function () {
                         try {
-                            // Target physical size: 2.5cm x 3.5cm -> inches
+                            // 目标物理尺寸: 2.5cm x 3.5cm -> 英寸
                             const tgtWIn = 2.5 / 2.54;
                             const tgtHIn = 3.5 / 2.54;
                             const dpi = 300;
@@ -319,7 +327,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             const ctx = canvas.getContext('2d');
                             ctx.fillStyle = '#FFFFFF';
                             ctx.fillRect(0, 0, pxW, pxH);
-                            // Scale to fit (contain) and center, avoid cropping face
+                            // 缩放适应（包含）并居中，避免裁剪人脸
                             const scale = Math.min(pxW / srcW, pxH / srcH);
                             const newW = Math.max(1, Math.round(srcW * scale));
                             const newH = Math.max(1, Math.round(srcH * scale));
@@ -327,7 +335,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             const dy = Math.round((pxH - newH) / 2);
                             ctx.drawImage(imgEl, 0, 0, srcW, srcH, dx, dy, newW, newH);
 
-                            canvas.toBlob(function(blob) {
+                            canvas.toBlob(function (blob) {
                                 if (!blob) {
                                     img.src = ev.target.result;
                                     img.style.display = 'block';
@@ -346,7 +354,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     img.src = URL.createObjectURL(newFile);
                                 } catch (e) {
                                     const r2 = new FileReader();
-                                    r2.onload = function(ev2) { img.src = ev2.target.result; };
+                                    r2.onload = function (ev2) { img.src = ev2.target.result; };
                                     r2.readAsDataURL(newFile);
                                 }
                                 img.style.display = 'block';
@@ -364,7 +372,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 reader.readAsDataURL(file);
             } else {
                 const reader = new FileReader();
-                reader.onload = function(e) {
+                reader.onload = function (e) {
                     img.src = e.target.result;
                     img.style.display = 'block';
                     placeholder.style.display = 'none';
@@ -380,7 +388,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let isValid = true;
         const errors = [];
         const inputs = entry.querySelectorAll('input, select');
-        
+
         const errorMessages = {
             'name': '请输入姓名',
             'gender': '请选择性别',
@@ -404,11 +412,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             'hukou_residence': '请上传户口本户籍页照片',
             'hukou_personal': '请上传户口本个人页照片'
         };
-        
+
         function getErrorMessage(input) {
             const name = input.name;
             const customMsg = errorMessages[name];
-            
+
             if (typeof customMsg === 'object') {
                 if (input.validity.valueMissing) {
                     return customMsg.valueMissing || '请填写此字段';
@@ -417,47 +425,47 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return customMsg.patternMismatch || '格式不正确';
                 }
             }
-            
+
             if (typeof customMsg === 'string') {
                 return customMsg;
             }
-            
+
             return input.title || input.validationMessage || '请填写此字段';
         }
-        
+
         inputs.forEach(input => {
             clearFieldError(input);
-            
+
             if (!input.checkValidity()) {
                 showFieldError(input, getErrorMessage(input));
                 isValid = false;
-                
+
                 const parent = input.closest('.form-group') || input.parentElement;
                 const labelEl = parent.querySelector('label');
                 const labelText = labelEl ? labelEl.textContent.trim() : input.name;
-                errors.push({ 
-                    input, 
-                    label: labelText, 
-                    message: getErrorMessage(input) 
+                errors.push({
+                    input,
+                    label: labelText,
+                    message: getErrorMessage(input)
                 });
             }
         });
-        
+
         return { valid: isValid, errors };
     }
-    
+
     function showFieldError(input, message) {
         input.classList.add('error');
         const parent = input.closest('.form-group') || input.parentElement;
         parent.classList.add('has-error');
-        
+
         if (input.type === 'file') {
             const box = input.closest('.upload-box');
             if (box) {
                 box.classList.add('has-error');
             }
         }
-        
+
         let pop = parent.querySelector('.error-pop');
         if (!pop) {
             pop = document.createElement('span');
@@ -466,7 +474,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         pop.textContent = message;
         pop.classList.remove('hiding');
-        
+
         if (pop._autoHideTimer) {
             clearTimeout(pop._autoHideTimer);
         }
@@ -481,19 +489,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }, 2000);
     }
-    
+
     function clearFieldError(input) {
         input.classList.remove('error');
         const parent = input.closest('.form-group') || input.parentElement;
         parent.classList.remove('has-error');
-        
+
         if (input.type === 'file') {
             const box = input.closest('.upload-box');
             if (box) {
                 box.classList.remove('has-error');
             }
         }
-        
+
         const pop = parent.querySelector('.error-pop');
         if (pop) {
             pop.classList.add('hiding');
@@ -507,7 +515,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function attachEntryValidation(entry) {
         const inputs = entry.querySelectorAll('input, select');
-        
+
         const errorMessages = {
             'name': '请输入姓名',
             'gender': '请选择性别',
@@ -531,11 +539,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             'hukou_residence': '请上传户口本户籍页照片',
             'hukou_personal': '请上传户口本个人页照片'
         };
-        
+
         function getErrorMessage(input) {
             const name = input.name;
             const customMsg = errorMessages[name];
-            
+
             if (typeof customMsg === 'object') {
                 if (input.validity.valueMissing) {
                     return customMsg.valueMissing || '请填写此字段';
@@ -544,17 +552,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return customMsg.patternMismatch || '格式不正确';
                 }
             }
-            
+
             if (typeof customMsg === 'string') {
                 return customMsg;
             }
-            
+
             return input.title || input.validationMessage || '请填写此字段';
         }
-        
+
         inputs.forEach(input => {
             let debounceTimer;
-            
+
             const validateField = () => {
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => {
@@ -565,21 +573,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 }, 150);
             };
-            
+
             input.addEventListener('input', validateField);
             input.addEventListener('blur', validateField);
             input.addEventListener('change', validateField);
         });
     }
 
-    // Submit form with specific training type
-    window.submitFormWithTrainingType = async function(trainingType) {
+    // 指定培训类型提交表单
+    window.submitFormWithTrainingType = async function (trainingType) {
         const entries = document.querySelectorAll('.student-entry');
         let allValid = true;
         let oldStatus = document.getElementById('submit-status');
         if (oldStatus) oldStatus.remove();
-        
-        // Validate all first
+
+        // 先校验所有表单
         entries.forEach(entry => {
             const res = validateEntry(entry);
             if (!res.valid) {
@@ -596,7 +604,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // Submit one by one
+        // 验证码校验
+        if (typeof window.verifyCaptcha === 'function' && !window.verifyCaptcha()) {
+            return;
+        }
+
+        // 逐个提交
         let successCount = 0;
         let failCount = 0;
         submitBtn.disabled = true;
@@ -606,7 +619,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             try {
                 const formData = new FormData();
                 const inputs = entry.querySelectorAll('input, select');
-                
+
                 inputs.forEach(input => {
                     if (input.type === 'file') {
                         if (input.files[0]) {
@@ -628,12 +641,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (response.ok) {
                     successCount++;
-                    entry.remove(); // Remove successful entries
+                    entry.remove(); // 移除提交成功的条目
                 } else {
                     failCount++;
                     const data = await response.json();
                     console.error('Submission failed:', data);
-                    // Highlight entry or show error
+                    // 高亮条目或显示错误
                     entry.style.border = '2px solid red';
                 }
             } catch (err) {
@@ -645,9 +658,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         submitBtn.disabled = false;
         submitBtn.textContent = '提交所有信息';
 
+        // 提交后重新生成验证码
+        if (typeof window.refreshCaptcha === 'function') window.refreshCaptcha();
+
         if (container.children.length === 0) {
             showModal(`成功提交 ${successCount} 位学员信息！`, 'success');
-            addStudent(); // Reset with one empty form
+            addStudent(); // 重置为一个空表单
         } else {
             showModal(`提交完成。成功: ${successCount}, 失败: ${failCount}。请检查失败条目。`, failCount > 0 ? 'error' : 'success');
         }

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
+
 <body class="collection-page">
     <div class="container">
         <header>
@@ -18,7 +20,8 @@
                     </div>
                     <div class="header-subline">
                         <p class="header-company">阳泉精技特种作业人员培训有限公司</p>
-                        <div class="header-contact">联系人：霍老师 <a class="header-contact-phone" href="tel:13703531055">13703531055</a></div>
+                        <div class="header-contact">联系人：霍老师 <a class="header-contact-phone"
+                                href="tel:13703531055">13703531055</a></div>
                     </div>
                 </div>
             </div>
@@ -26,6 +29,19 @@
 
         <form id="collectionForm">
             <div id="students-container">
+            </div>
+
+            <div class="captcha-section"
+                style="margin-top: 20px; padding: 16px 20px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <span style="font-size: 0.95rem; color: #374151; font-weight: 500;">验证：</span>
+                <span id="captchaQuestion"
+                    style="font-size: 1.1rem; font-weight: 600; color: #1f2937; letter-spacing: 1px;"></span>
+                <span style="font-size: 1rem; color: #6b7280;">＝</span>
+                <input type="text" id="captchaInput" autocomplete="off" inputmode="numeric" placeholder="请输入答案"
+                    style="width: 100px; padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 1rem; text-align: center;">
+                <button type="button" id="refreshCaptcha" title="换一题"
+                    style="background: none; border: none; cursor: pointer; font-size: 1.2rem; color: #6b7280; padding: 4px;">🔄</button>
+                <span id="captchaError" style="color: #dc2626; font-size: 0.85rem; display: none;">验证答案错误，请重试</span>
             </div>
 
             <div class="actions">
@@ -83,15 +99,12 @@
                         <span class="hint-slot"></span>
                         <select name="education" required>
                             <option value="">请选择</option>
-                            <option value="研究生及以上">研究生及以上</option>
-                            <option value="研究生或同等学历">研究生或同等学历</option>
-                            <option value="本科或同等学历">本科或同等学历</option>
-                            <option value="专科或同等学历">专科或同等学历</option>
-                            <option value="大专或同等学历">大专或同等学历</option>
-                            <option value="中专或同等学历">中专或同等学历</option>
-                            <option value="高中或同等学历">高中或同等学历</option>
                             <option value="初中">初中</option>
-                            <option value="初中或同等学历">初中或同等学历</option>
+                            <option value="高中或同等学历">高中或同等学历</option>
+                            <option value="中专或同等学历">中专或同等学历</option>
+                            <option value="专科或同等学历">专科或同等学历</option>
+                            <option value="本科或同等学历">本科或同等学历</option>
+                            <option value="研究生及以上">研究生及以上</option>
                         </select>
                     </div>
                     <div class="form-group w-lg">
@@ -128,7 +141,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="form-section">
                 <div class="section-title">证件上传</div>
                 <div style="margin-bottom: 10px; font-size: 0.85rem; color: #6b7280;">支持 JPG/PNG 格式，单个文件不超过 10MB</div>
@@ -140,7 +153,8 @@
                                 <span class="text">个人照片</span>
                             </div>
                             <img class="preview-img" style="display: none;">
-                            <input type="file" name="photo" accept=".jpg,.jpeg,.png,image/jpeg,image/png" data-max-size-mb="10" title="请上传个人照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
+                            <input type="file" name="photo" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                                data-max-size-mb="10" title="请上传个人照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
                         </div>
                     </div>
                     <div class="form-group w-upload" data-attachment="diploma">
@@ -150,7 +164,8 @@
                                 <span class="text">学历证书</span>
                             </div>
                             <img class="preview-img" style="display: none;">
-                            <input type="file" name="diploma" accept=".jpg,.jpeg,.png,image/jpeg,image/png" data-max-size-mb="10" title="请上传学历证书照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
+                            <input type="file" name="diploma" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                                data-max-size-mb="10" title="请上传学历证书照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
                         </div>
                     </div>
                     <div class="form-group w-upload" data-attachment="id_card_front">
@@ -160,7 +175,8 @@
                                 <span class="text">身份证正面</span>
                             </div>
                             <img class="preview-img" style="display: none;">
-                            <input type="file" name="id_card_front" accept=".jpg,.jpeg,.png,image/jpeg,image/png" data-max-size-mb="10" title="请上传身份证正面照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
+                            <input type="file" name="id_card_front" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                                data-max-size-mb="10" title="请上传身份证正面照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
                         </div>
                     </div>
                     <div class="form-group w-upload" data-attachment="id_card_back">
@@ -170,7 +186,8 @@
                                 <span class="text">身份证反面</span>
                             </div>
                             <img class="preview-img" style="display: none;">
-                            <input type="file" name="id_card_back" accept=".jpg,.jpeg,.png,image/jpeg,image/png" data-max-size-mb="10" title="请上传身份证反面照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
+                            <input type="file" name="id_card_back" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                                data-max-size-mb="10" title="请上传身份证反面照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
                         </div>
                     </div>
                     <div class="form-group w-upload" data-attachment="hukou_residence" style="display: none;">
@@ -180,7 +197,8 @@
                                 <span class="text">户口本户籍页</span>
                             </div>
                             <img class="preview-img" style="display: none;">
-                            <input type="file" name="hukou_residence" accept=".jpg,.jpeg,.png,image/jpeg,image/png" data-max-size-mb="10" title="请上传户口本户籍页照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
+                            <input type="file" name="hukou_residence" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                                data-max-size-mb="10" title="请上传户口本户籍页照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
                         </div>
                     </div>
                     <div class="form-group w-upload" data-attachment="hukou_personal" style="display: none;">
@@ -190,7 +208,8 @@
                                 <span class="text">户口本个人页</span>
                             </div>
                             <img class="preview-img" style="display: none;">
-                            <input type="file" name="hukou_personal" accept=".jpg,.jpeg,.png,image/jpeg,image/png" data-max-size-mb="10" title="请上传户口本个人页照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
+                            <input type="file" name="hukou_personal" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                                data-max-size-mb="10" title="请上传户口本个人页照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
                         </div>
                     </div>
                 </div>
@@ -201,7 +220,7 @@
     <script src="/static/js/script.js"></script>
     <script>
         let jobCategoriesConfig = null;
-        
+
         async function loadJobCategories() {
             try {
                 const response = await fetch('/api/config/job_categories');
@@ -215,7 +234,7 @@
                 console.error('Error loading job categories:', error);
             }
         }
-        
+
         function findTrainingTypeByCategory(categoryName) {
             if (!categoryName || !jobCategoriesConfig) return '';
             let found = '';
@@ -256,7 +275,7 @@
                 categorySelect.value = keepCategory;
             }
         }
-        
+
         function updateExamProjectOptions(categorySelect, keepProject = '') {
             const entry = categorySelect.closest('.student-entry');
             const projectSelect = entry.querySelector('select[name="exam_project"]');
@@ -264,20 +283,20 @@
             const selectedCategory = categorySelect.value;
             const selectedOption = categorySelect.options[categorySelect.selectedIndex];
             let selectedTrainingType = '';
-            
+
             projectSelect.innerHTML = '<option value="">请选择操作项目</option>';
             projectCodeInput.value = '';
-            
+
             if (selectedOption && selectedOption.dataset.trainingType) {
                 selectedTrainingType = selectedOption.dataset.trainingType;
             } else {
                 selectedTrainingType = findTrainingTypeByCategory(selectedCategory);
             }
             updateAttachmentVisibility(entry, selectedTrainingType);
-            
+
             if (selectedCategory && jobCategoriesConfig) {
                 let foundProjects = null;
-                
+
                 const targetTypes = selectedTrainingType ? [selectedTrainingType] : Object.keys(jobCategoriesConfig);
                 targetTypes.forEach(trainingType => {
                     const typeConfig = jobCategoriesConfig[trainingType];
@@ -286,7 +305,7 @@
                         foundProjects = category.exam_projects;
                     }
                 });
-                
+
                 if (foundProjects) {
                     foundProjects.forEach(project => {
                         const option = document.createElement('option');
@@ -302,28 +321,28 @@
                 }
             }
         }
-        
+
         function updateProjectCode(projectSelect) {
             const entry = projectSelect.closest('.student-entry');
             const projectCodeInput = entry.querySelector('input[name="project_code"]');
             const selectedOption = projectSelect.options[projectSelect.selectedIndex];
-            
+
             if (selectedOption && selectedOption.dataset.code) {
                 projectCodeInput.value = selectedOption.dataset.code;
             } else {
                 projectCodeInput.value = '';
             }
         }
-        
+
         function updateAttachmentVisibility(entry, trainingType) {
             const uploadGrid = entry.querySelector('.upload-grid');
             const attachmentGroups = uploadGrid.querySelectorAll('[data-attachment]');
-            
+
             let requiredAttachments = [];
             if (jobCategoriesConfig && jobCategoriesConfig[trainingType]) {
                 requiredAttachments = jobCategoriesConfig[trainingType].attachments || [];
             }
-            
+
             attachmentGroups.forEach(group => {
                 const attachmentName = group.dataset.attachment;
                 if (requiredAttachments.includes(attachmentName)) {
@@ -360,11 +379,56 @@
                 updateAttachmentVisibility(entry, '');
             }
         }
-        
-        document.addEventListener('DOMContentLoaded', function() {
+
+        // ─── Arithmetic CAPTCHA ───
+        let captchaAnswer = null;
+
+        function generateCaptcha() {
+            const ops = ['+', '-', '×'];
+            const op = ops[Math.floor(Math.random() * ops.length)];
+            let a, b, answer;
+            if (op === '+') {
+                a = Math.floor(Math.random() * 50) + 1;
+                b = Math.floor(Math.random() * 50) + 1;
+                answer = a + b;
+            } else if (op === '-') {
+                a = Math.floor(Math.random() * 50) + 10;
+                b = Math.floor(Math.random() * a);
+                answer = a - b;
+            } else {
+                a = Math.floor(Math.random() * 12) + 1;
+                b = Math.floor(Math.random() * 12) + 1;
+                answer = a * b;
+            }
+            captchaAnswer = answer;
+            document.getElementById('captchaQuestion').textContent = `${a} ${op} ${b}`;
+            document.getElementById('captchaInput').value = '';
+            document.getElementById('captchaError').style.display = 'none';
+        }
+
+        function verifyCaptcha() {
+            const input = document.getElementById('captchaInput').value.trim();
+            if (input === '' || parseInt(input, 10) !== captchaAnswer) {
+                document.getElementById('captchaError').style.display = 'inline';
+                document.getElementById('captchaInput').focus();
+                generateCaptcha();
+                return false;
+            }
+            document.getElementById('captchaError').style.display = 'none';
+            return true;
+        }
+
+        // Expose verifyCaptcha globally so script.js can call it before submit
+        window.verifyCaptcha = verifyCaptcha;
+        window.refreshCaptcha = generateCaptcha;
+
+        document.addEventListener('DOMContentLoaded', function () {
             window.initializeStudentEntry = initializeStudentEntry;
             loadJobCategories();
+            generateCaptcha();
+            document.getElementById('refreshCaptcha').addEventListener('click', generateCaptcha);
         });
     </script>
 </body>
+
 </html>
