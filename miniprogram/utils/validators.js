@@ -1,5 +1,25 @@
-// utils/validators.js
-// 表单验证工具函数
+/**
+ * 小程序表单验证工具函数。
+ *
+ * 本模块提供学员数据的客户端校验功能，与服务端 validators.py 校验规则保持一致：
+ *
+ * 基础校验:
+ *   - 必填字段检查
+ *   - 性别仅允许 "男" 或 "女"
+ *   - 身份证号格式（18位，末位数字或X）
+ *   - 手机号格式（11位，以1开头）
+ *
+ * 附件校验:
+ *   - 根据培训类型确定必填附件列表
+ *   - 文件大小限制（默认 10MB）
+ *   - 文件类型限制（仅 JPG/PNG）
+ *
+ * 工具函数:
+ *   - normalizeIdCard: 去空格并转大写
+ *   - normalizePhone: 去空格并移除非数字字符
+ *   - getRequiredFiles: 获取各培训类型的必填附件列表
+ *   - getFileLabel: 获取文件类型的中文标签
+ */
 
 function normalizeText(value) {
   return String(value || '').replace(/\s+/g, '').trim()

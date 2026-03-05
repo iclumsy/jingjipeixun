@@ -1,3 +1,40 @@
+/**
+ * 管理后台前端脚本。
+ *
+ * 本文件处理管理后台的所有前端逻辑，包括：
+ *
+ * 1. 学员列表管理
+ *    - 按状态（未审核/已审核）和培训类型（特种作业/特种设备）筛选
+ *    - 按公司筛选、按姓名/身份证/手机号搜索
+ *    - 动态渲染学员卡片列表
+ *
+ * 2. 学员详情查看/编辑
+ *    - 动态渲染详情页面（基于 HTML template）
+ *    - 行内编辑并自动保存（防抖动 1 秒）
+ *    - 附件图片查看和替换上传
+ *
+ * 3. 审核流程
+ *    - 审核通过：更新状态为 reviewed，自动生成体检表
+ *    - 驳回：更新状态为 rejected，学员可修改后重新提交
+ *    - 删除：彻底删除记录和关联文件
+ *
+ * 4. 数据导出
+ *    - 导出当前筛选条件下的学员数据为 Excel
+ *    - 单个学员附件打包下载为 ZIP
+ *
+ * 5. 响应式布局
+ *    - 移动端侧边栏切换
+ *    - 适配不同屏幕尺寸
+ *
+ * 全局状态:
+ *    currentStatus       - 当前筛选的审核状态 ('unreviewed'/'reviewed')
+ *    currentTrainingType - 当前筛选的培训类型 ('special_operation'/'special_equipment')
+ *    currentStudentId    - 当前查看的学员 ID
+ *    students            - 当前列表中的学员数据数组
+ */
+
+// ======================== 全局 fetch 拦截器 ========================
+// 拦截所有 fetch 请求，当服务器返回 401（未认证）时自动跳转到登录页
 const rawFetch = window.fetch.bind(window);
 window.fetch = async (...args) => {
     const response = await rawFetch(...args);
@@ -10,21 +47,25 @@ window.fetch = async (...args) => {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    let currentStatus = 'unreviewed';
-    let currentStudentId = null;
-    let currentTrainingType = 'special_equipment';
-    let students = [];
-    let jobCategoriesConfig = null;
+    // ======================== 全局状态 ========================
+    let currentStatus = 'unreviewed';                  // 当前筛选的审核状态
+    let currentStudentId = null;                        // 当前查看的学员 ID
+    let currentTrainingType = 'special_equipment';      // 当前筛选的培训类型
+    let students = [];                                  // 学员数据数组
+    let jobCategoriesConfig = null;                     // 作业类别配置数据
 
-    const listContainer = document.getElementById('studentList');
-    const mainContent = document.getElementById('mainContent');
-    const searchInput = document.getElementById('searchInput');
-    const detailTemplate = document.getElementById('detail-template');
+    // ======================== DOM 元素引用 ========================
+    const listContainer = document.getElementById('studentList');       // 学员列表容器
+    const mainContent = document.getElementById('mainContent');         // 右侧详情内容区域
+    const searchInput = document.getElementById('searchInput');         // 搜索输入框
+    const detailTemplate = document.getElementById('detail-template');  // 学员详情 HTML 模板
 
+    // 当前活动的筛选条件
     let currentFilters = {
-        company: ''
+        company: ''  // 公司名称筛选
     };
 
+    // 从 URL 参数或全局变量初始化培训类型
     if (window.trainingType) {
         currentTrainingType = window.trainingType;
     } else {
@@ -35,6 +76,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * 同步全局管理状态到 window 和 DOM 属性。
+     * 便于 CSS 和其他脚本根据当前状态调整显示。
+     */
     function syncGlobalAdminState() {
         window.trainingType = currentTrainingType;
         window.currentStatus = currentStatus;
@@ -44,10 +89,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /** 构建状态查询参数（'unreviewed' 映射为 'pending'）。 */
     function buildStatusQueryParam(status) {
         return status === 'unreviewed' ? 'pending' : status;
     }
 
+    /** 获取状态的中文标签和 CSS 类名。 */
     function getStatusMeta(status) {
         if (status === 'reviewed') {
             return { label: '已审核', className: 'reviewed' };
@@ -60,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     syncGlobalAdminState();
 
+    /** 从服务器加载作业类别配置数据（用于编辑时的下拉选项）。 */
     async function loadJobCategories() {
         try {
             const response = await fetch('/api/config/job_categories');
@@ -72,12 +120,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // ======================== 附件配置 ========================
+    // 客户端文件校验规则
     const ATTACHMENT_RULES = {
         maxSizeMb: 10,
         allowedExtensions: ['jpg', 'jpeg', 'png'],
         allowedMimeTypes: ['image/jpeg', 'image/png']
     };
 
+    // 各培训类型的附件字段配置（与服务端 student_routes.py 中的 REQUIRED_ATTACHMENTS 对应）
     const ATTACHMENT_CONFIG = {
         special_operation: [
             { dbKey: 'diploma_path', fieldName: 'diploma', label: '学历证书' },
@@ -94,10 +145,18 @@ document.addEventListener('DOMContentLoaded', () => {
         ]
     };
 
+    /** 获取指定培训类型的附件字段配置列表。 */
     function getAttachmentConfig(trainingType) {
         return ATTACHMENT_CONFIG[trainingType] || ATTACHMENT_CONFIG.special_operation;
     }
 
+    /**
+     * 根据作业类别下拉框的选中值推断培训类型。
+     * 遍历配置数据，查找该作业类别属于哪个培训类型。
+     *
+     * @param {HTMLSelectElement} categorySelect - 作业类别下拉框
+     * @returns {string} 培训类型
+     */
     function inferTrainingTypeFromCategorySelect(categorySelect) {
         if (!categorySelect) {
             return '';
@@ -123,6 +182,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return inferred;
     }
 
+    /**
+     * 校验上传的附件文件（扩展名、MIME 类型、大小）。
+     *
+     * @param {File} file - 文件对象
+     * @param {string} label - 文件标签（用于错误提示）
+     * @returns {{valid: boolean, error?: string}} 校验结果
+     */
     function validateAttachmentFile(file, label) {
         const ext = (file.name.split('.').pop() || '').toLowerCase();
         if (!ATTACHMENT_RULES.allowedExtensions.includes(ext)) {
@@ -137,6 +203,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return '';
     }
 
+    /**
+     * 更新培训类型切换按钮的激活状态。
+     * 当前选中的培训类型按钮添加 active 类。
+     */
     function updateTrainingTypeButtons() {
         const btnSpecialOperation = document.getElementById('btnSpecialOperation');
         const btnSpecialEquipment = document.getElementById('btnSpecialEquipment');
@@ -165,6 +235,11 @@ document.addEventListener('DOMContentLoaded', () => {
         loadCompanies();
     });
 
+    /**
+     * 从服务器加载公司名称列表（用于公司筛选下拉框）。
+     *
+     * @param {string} status - 按学员状态筛选
+     */
     async function loadCompanies(status = currentStatus) {
         const companyFilter = document.getElementById('companyFilter');
         if (!companyFilter) return;
@@ -340,6 +415,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    /**
+     * 从服务器加载学员列表。
+     * 根据当前筛选条件（状态、培训类型、公司）查询。
+     */
     async function loadStudents() {
         listContainer.innerHTML = '<div style="padding:20px;text-align:center;">加载中...</div>';
         try {
@@ -361,6 +440,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * 渲染学员列表卡片。
+     * 点击卡片时加载该学员的详情。
+     *
+     * @param {Array} list - 学员数据数组
+     */
     function renderList(list) {
         listContainer.innerHTML = '';
         if (!list || list.length === 0) {
@@ -397,6 +482,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    /**
+     * 防抖动函数（延迟执行，用于输入框输入时避免频繁请求）。
+     *
+     * @param {Function} func - 要延迟执行的函数
+     * @param {number} wait - 延迟毫秒数
+     * @returns {Function} 防抖动后的函数
+     */
     function debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
@@ -456,6 +548,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 1000);
 
+    /**
+     * 显示保存状态提示（在详情页面右上角显示保存成功/失败的提示）。
+     *
+     * @param {string} message - 提示消息
+     * @param {string} type - 类型 ('info'/'success'/'error')
+     */
     function showSaveStatus(message, type = 'info') {
         const existingStatus = mainContent.querySelector('.save-status');
         if (existingStatus) {
@@ -502,6 +600,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3000);
     }
 
+    /**
+     * 显示全屏模态提示框（审核/驳回/删除操作的确认和结果提示）。
+     *
+     * @param {string} message - 显示的消息
+     * @param {string} type - 类型 ('info'/'success'/'error')
+     */
     function showMessage(message, type = 'info') {
         const existingMessage = document.querySelector('.custom-message');
         if (existingMessage) {
@@ -550,6 +654,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 4000);
     }
 
+    /**
+     * 渲染学员详情页面。
+     *
+     * 这是管理后台最复杂的函数，包含：
+     * - 基本信息字段的显示和行内编辑
+     * - 作业类别/操作项目的联动下拉选择
+     * - 附件图片的显示和替换上传
+     * - 审核通过、驳回、删除按钮的事件处理
+     * - 自动保存（防抖动 1 秒）
+     * - 附件打包 ZIP 下载
+     *
+     * @param {Object} student - 学员数据对象
+     */
     function showDetail(student) {
         currentStudentId = student.id;
         document.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));

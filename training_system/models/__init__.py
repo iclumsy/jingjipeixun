@@ -1,1 +1,8 @@
-"""Models package for database operations."""
+"""
+模型包（Models Package）。
+
+本包定义数据库表结构和数据访问层（DAL），负责所有与 SQLite 数据库的交互。
+
+模块列表:
+    - student.py : 学员数据模型，包含学员表的建表、增删改查、审核等操作
+"""

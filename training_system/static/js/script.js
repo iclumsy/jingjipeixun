@@ -1,11 +1,44 @@
+/**
+ * 学员信息采集表单前端脚本。
+ *
+ * 本文件处理学员数据采集表单的所有前端逻辑，包括：
+ *
+ * 1. 表单管理
+ *    - 动态添加/删除学员条目（基于 HTML template 克隆）
+ *    - 表单提交时逐个发送学员数据
+ *
+ * 2. 客户端校验
+ *    - 必填字段检查（姓名、性别、身份证号、手机号等）
+ *    - 格式检查（身份证号 18 位、手机号 11 位）
+ *    - 附件文件格式和大小校验
+ *    - 实时字段校验（失焦和输入时触发）
+ *
+ * 3. 文件上传
+ *    - 图片预览（上传后展示缩略图）
+ *    - 个人照片自动裁剪为一寸证件照比例（2.5cm×3.5cm）
+ *
+ * 4. 提交流程
+ *    - 校验所有表单 -> 验证码校验 -> 逐个提交 -> 显示结果模态框
+ *    - 提交成功的条目自动移除，失败的高亮显示
+ *
+ * 5. 培训类型推断
+ *    - 根据作业类别自动推断培训类型（特种作业/特种设备）
+ */
 document.addEventListener('DOMContentLoaded', async () => {
-    const container = document.getElementById('students-container');
-    const template = document.getElementById('student-template');
-    const addBtn = document.getElementById('addStudentBtn');
-    const submitBtn = document.getElementById('submitBtn');
-    const form = document.getElementById('collectionForm');
-    const actions = document.querySelector('.actions');
+    // ======================== DOM 元素引用 ========================
+    const container = document.getElementById('students-container');  // 学员条目容器
+    const template = document.getElementById('student-template');      // 学员条目 HTML 模板
+    const addBtn = document.getElementById('addStudentBtn');           // 添加学员按钮
+    const submitBtn = document.getElementById('submitBtn');            // 提交所有按钮
+    const form = document.getElementById('collectionForm');            // 表单元素
+    const actions = document.querySelector('.actions');                // 操作按钮区域
 
+    /**
+     * 显示结果模态框（提交成功/失败后的提示）。
+     *
+     * @param {string} message - 显示的消息内容
+     * @param {string} type - 模态框类型：'success' 或 'error'
+     */
     function showModal(message, type = 'success') {
         const existingModal = document.querySelector('.result-modal');
         if (existingModal) {
@@ -92,12 +125,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     }
 
+    // ======================== 附件上传配置 ========================
+    // 客户端文件校验规则（与服务端 validators.py 保持一致）
     const ATTACHMENT_RULES = {
-        maxSizeMb: 10,
-        allowedExtensions: ['jpg', 'jpeg', 'png'],
-        allowedMimeTypes: ['image/jpeg', 'image/png']
+        maxSizeMb: 10,                                    // 单文件最大 10MB
+        allowedExtensions: ['jpg', 'jpeg', 'png'],        // 允许的文件扩展名
+        allowedMimeTypes: ['image/jpeg', 'image/png']     // 允许的 MIME 类型
     };
 
+    /**
+     * 根据作业类别名称查找对应的培训类型。
+     *
+     * 遍历配置数据中的所有培训类型，查找包含该作业类别的培训类型。
+     * 配置数据来自 /api/config/job_categories 接口。
+     *
+     * @param {string} categoryName - 作业类别名称
+     * @returns {string} 培训类型（'special_operation' 或 'special_equipment'）
+     */
     function findTrainingTypeByCategory(categoryName) {
         if (!categoryName || !window.jobCategoriesConfigRaw) {
             return '';
@@ -112,6 +156,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         return found;
     }
 
+    /**
+     * 解析当前学员条目的培训类型。
+     *
+     * 优先级：
+     * 1. 作业类别下拉框的 data-training-type 属性
+     * 2. 根据作业类别名称从配置数据推断
+     * 3. 默认回退到 'special_operation'
+     *
+     * @param {HTMLElement} entry - 学员条目 DOM 元素
+     * @returns {string} 培训类型
+     */
     function resolveTrainingType(entry) {
         const jobCategorySelect = entry.querySelector('select[name="job_category"]');
         if (jobCategorySelect) {
@@ -128,6 +183,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         return 'special_operation';
     }
 
+    /**
+     * 重置上传框的预览状态（隐藏缩略图，显示占位符）。
+     *
+     * @param {HTMLElement} box - 上传框 DOM 元素
+     */
     function resetUploadPreview(box) {
         const img = box.querySelector('.preview-img');
         const placeholder = box.querySelector('.upload-placeholder');
@@ -140,6 +200,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * 校验上传的附件文件（扩展名、MIME类型、文件大小）。
+     *
+     * @param {HTMLInputElement} input - 文件输入框
+     * @param {File} file - 用户选择的文件对象
+     * @returns {{valid: boolean, error?: string}} 校验结果
+     */
     function validateAttachmentFile(input, file) {
         const ext = (file.name.split('.').pop() || '').toLowerCase();
         const maxSizeMb = Number(input.dataset.maxSizeMb || ATTACHMENT_RULES.maxSizeMb);
@@ -172,11 +239,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         return { valid: true };
     }
 
-    // 添加初始学员表单
+    // ======================== 初始化 ========================
+    // 页面加载时自动添加一个空白的学员表单
     addStudent();
 
-    addBtn.addEventListener('click', addStudent);
+    addBtn.addEventListener('click', addStudent);  // “添加学员”按钮点击事件
 
+    // ======================== 提交逻辑 ========================
+    /**
+     * 点击“提交所有信息”按钮的处理流程：
+     * 1. 校验所有学员表单
+     * 2. 校验验证码（如已启用）
+     * 3. 逐个提交学员数据（Multipart 表单）
+     * 4. 显示提交结果模态框
+     */
     submitBtn.addEventListener('click', async (e) => {
         e.preventDefault();
 
@@ -271,6 +347,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         submitBtn.click();
     });
 
+    /**
+     * 添加一个新的学员表单条目。
+     * 通过克隆 HTML template 元素创建，并绑定字段校验事件。
+     */
     function addStudent() {
         const clone = template.content.cloneNode(true);
         container.appendChild(clone);
@@ -282,6 +362,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * 删除一个学员条目（至少保留一个）。
+     * 暴露为全局函数供 HTML onclick 调用。
+     *
+     * @param {HTMLElement} btn - 触发删除的按钮元素
+     */
     window.removeStudent = function (btn) {
         if (container.children.length > 1) {
             btn.closest('.student-entry').remove();
@@ -290,6 +376,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
+    /**
+     * 附件文件选择后的预览处理。
+     * 暴露为全局函数供 HTML onchange 调用。
+     *
+     * 处理流程：
+     * 1. 校验文件格式和大小
+     * 2. 如果是个人照片，自动裁剪为一寸证件照比例 (2.5cm×3.5cm)
+     * 3. 显示预览缩略图
+     *
+     * @param {HTMLInputElement} input - 文件输入框
+     */
     window.previewFile = function (input) {
         const box = input.closest('.upload-box');
         const img = box.querySelector('.preview-img');
@@ -305,7 +402,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
-            // 如果是个人照片字段，在客户端裁剪为一寸比例
+            // 如果是个人照片字段，在客户端裁剪为一寸证件照比例
+            // 目标尺寸：2.5cm × 3.5cm，300 DPI
             if (input.name === 'photo') {
                 const imgEl = new Image();
                 const reader = new FileReader();
@@ -327,7 +425,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             const ctx = canvas.getContext('2d');
                             ctx.fillStyle = '#FFFFFF';
                             ctx.fillRect(0, 0, pxW, pxH);
-                            // 缩放适应（包含）并居中，避免裁剪人脸
+                            // 等比缩放并居中（“包含”模式），避免裁剪人脸
                             const scale = Math.min(pxW / srcW, pxH / srcH);
                             const newW = Math.max(1, Math.round(srcW * scale));
                             const newH = Math.max(1, Math.round(srcH * scale));
@@ -335,6 +433,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             const dy = Math.round((pxH - newH) / 2);
                             ctx.drawImage(imgEl, 0, 0, srcW, srcH, dx, dy, newW, newH);
 
+                            // 将 Canvas 转换为 Blob，替换原始文件
                             canvas.toBlob(function (blob) {
                                 if (!blob) {
                                     img.src = ev.target.result;
@@ -384,11 +483,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
+    /**
+     * 校验单个学员条目的所有字段。
+     *
+     * 使用 HTML5 原生的 checkValidity() API 进行校验，
+     * 并根据字段名称显示自定义的中文错误提示。
+     *
+     * @param {HTMLElement} entry - 学员条目 DOM 元素
+     * @returns {{valid: boolean, errors: Array}} 校验结果
+     */
     function validateEntry(entry) {
         let isValid = true;
         const errors = [];
         const inputs = entry.querySelectorAll('input, select');
 
+        // 字段名 -> 自定义错误消息映射
+        // 支持字符串（统一提示）和对象（按错误类型区分提示）两种格式
         const errorMessages = {
             'name': '请输入姓名',
             'gender': '请选择性别',
@@ -454,6 +564,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         return { valid: isValid, errors };
     }
 
+    /**
+     * 显示字段级别的错误提示气泡。
+     *
+     * 在字段下方显示红色错误消息，2 秒后自动淡出。
+     * 同时为字段和上传框添加错误样式类。
+     *
+     * @param {HTMLInputElement} input - 错误字段
+     * @param {string} message - 错误消息
+     */
     function showFieldError(input, message) {
         input.classList.add('error');
         const parent = input.closest('.form-group') || input.parentElement;
@@ -490,6 +609,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 2000);
     }
 
+    /**
+     * 清除字段的错误状态和提示气泡。
+     *
+     * @param {HTMLInputElement} input - 目标字段
+     */
     function clearFieldError(input) {
         input.classList.remove('error');
         const parent = input.closest('.form-group') || input.parentElement;
@@ -513,6 +637,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * 为学员条目的所有字段绑定实时校验事件。
+     *
+     * 监听 input/blur/change 事件，使用 150ms 防抖动避免频繁触发。
+     *
+     * @param {HTMLElement} entry - 学员条目 DOM 元素
+     */
     function attachEntryValidation(entry) {
         const inputs = entry.querySelectorAll('input, select');
 
@@ -580,7 +711,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // 指定培训类型提交表单
+    /**
+     * 指定培训类型提交所有学员表单（可覆盖自动推断的类型）。
+     * 暴露为全局函数，供外部按钮调用。
+     *
+     * @param {string} trainingType - 培训类型（'special_operation' 或 'special_equipment'）
+     */
     window.submitFormWithTrainingType = async function (trainingType) {
         const entries = document.querySelectorAll('.student-entry');
         let allValid = true;
