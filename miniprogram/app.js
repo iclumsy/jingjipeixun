@@ -94,7 +94,7 @@ App({
     // 临时允许 HTTP 接口地址（上线前请改为 false 并切换到 HTTPS）
     allowInsecureHttp: true,
     // 后端 API 基础地址（发布前替换为 HTTPS 地址，并在小程序后台配置 request 合法域名）
-    apiBaseUrl: 'http://49.232.213.198:5001/'
+    apiBaseUrl: 'https://jingji.ctirad.fun/'
     // apiBaseUrl: 'http://jingji.ctirad.fun:7777'
   }
 })

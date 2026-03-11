@@ -287,7 +287,6 @@ def create_app():
         # 静态资源和 favicon 无需认证
         if path.startswith('/static/') or path == '/favicon.ico':
             return None
-
         # 首页（学员信息采集页）公开访问
         if path == '/':
             return None
