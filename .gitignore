@@ -19,3 +19,6 @@ training_system/.env.example
 ._*
 .Spotlight-V100
 .Trashes
+
+# Database files
+training_system/database/students.db
