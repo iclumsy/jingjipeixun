@@ -423,5 +423,18 @@ Page({
         showCancel: false
       })
     }
+  },
+
+  onShareAppMessage() {
+    return {
+      title: '信息采集表',
+      path: '/pages/user/submit/submit'
+    }
+  },
+
+  onShareTimeline() {
+    return {
+      title: '信息采集表'
+    }
   }
 })
