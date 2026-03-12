@@ -21,6 +21,7 @@
 import os
 from datetime import timedelta
 from flask import Flask, g, jsonify, redirect, render_template, request, session
+from werkzeug.middleware.proxy_fix import ProxyFix
 from models.student import init_db
 from routes.auth_routes import auth_bp
 from routes.miniprogram_routes import miniprogram_bp
@@ -203,6 +204,13 @@ def create_app():
     app.config['BASE_DIR'] = BASE_DIR                                       # 项目根目录
     app.config['STUDENTS_FOLDER'] = os.path.join(BASE_DIR, 'students')      # 学员附件存储目录
     app.config['DATABASE'] = os.path.join(BASE_DIR, 'database/students.db') # SQLite 数据库文件
+
+    # 启用反向代理信任（用于 Nginx 等代理环境获取真实 IP）
+    # x_for=1 信任 X-Forwarded-For 的最右一层，获取真实 Client IP
+    # x_proto=1 信任 X-Forwarded-Proto 设置正确的协议 (http/https)
+    # x_host=1 信任 X-Forwarded-Host 设置正确的主机名
+    # x_prefix=1 信任 X-Forwarded-Prefix 正确处理反代路径前缀
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
     # 请求体大小限制（防止恶意大文件上传）
     app.config['MAX_CONTENT_LENGTH'] = get_max_content_length()
