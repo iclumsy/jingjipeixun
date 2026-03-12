@@ -57,3 +57,25 @@ def get_job_categories():
     except Exception as e:
         current_app.logger.error(f'Error loading job categories config: {str(e)}')
         return jsonify({'error': str(e)}), 500
+
+@config_bp.route('/api/config/wechat', methods=['GET'])
+def get_wechat_config():
+    """
+    获取微信相关配置。
+
+    目前主要返回用于审核结果通知的订阅消息模板 ID。
+    前端小程序在提交成功后调用此接口获取需要订阅的模板配置。
+
+    返回:
+        200: 微信配置 JSON 对象
+    """
+    try:
+        from services.wechat_service import get_wechat_template_id
+        template_id = get_wechat_template_id()
+        return jsonify({
+            'success': True,
+            'template_id': template_id
+        })
+    except Exception as e:
+        current_app.logger.error(f'Error getting wechat config: {str(e)}')
+        return jsonify({'error': str(e)}), 500

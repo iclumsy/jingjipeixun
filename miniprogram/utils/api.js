@@ -719,6 +719,17 @@ async function getJobCategories() {
 }
 
 /**
+ * 获取微信相关配置（如订阅消息模板ID）。
+ * @returns {Promise<Object>} 微信配置对象
+ */
+async function getWechatConfig() {
+  const data = await requestApi('/api/config/wechat', {
+    method: 'GET'
+  })
+  return data
+}
+
+/**
  * 上传学员附件图片。
  *
  * @param {string} filePath - 微信临时文件路径
@@ -755,6 +766,7 @@ module.exports = {
   deleteStudent,        // 删除学员
   getCompanies,         // 获取公司列表
   getJobCategories,     // 获取作业类别配置
+  getWechatConfig,      // 获取微信配置
   uploadAttachment,     // 上传附件
   toAbsoluteFileUrl,    // 文件路径转 URL
   getBaseUrl,           // 获取 API 地址

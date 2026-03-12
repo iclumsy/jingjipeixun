@@ -33,6 +33,7 @@ from models.student import (
     create_student, get_students, get_student_by_id, update_student,
     delete_student, get_companies
 )
+from services.wechat_service import send_review_result_message
 from services.image_service import process_and_save_file, delete_student_files
 from services.document_service import generate_health_check_form
 from utils.validators import validate_student_data, validate_file_upload
@@ -819,6 +820,14 @@ def reject_student_route(id):
         else:
             # 仅更新状态
             student = update_student(id, {'status': target_status})
+            
+            # 发送微信推送消息
+            submitter_openid = student.get('submitter_openid')
+            student_name = student.get('name')
+            if submitter_openid and target_status == 'rejected':
+                # 后台非阻塞发送防止拖慢响应，这里简单同步调用（已在服务内吃掉异常）
+                send_review_result_message(submitter_openid, student_name, '已驳回')
+                
             current_app.logger.info(f'Student moved to {target_status}: ID={id}')
             return jsonify({'message': f'Student moved to {target_status}', 'student': student})
 
@@ -864,6 +873,12 @@ def approve_student_route(id):
         if health_check_path:
             updates['training_form_path'] = health_check_path
         student = update_student(id, updates)
+
+        # 发送微信推送消息
+        submitter_openid = student.get('submitter_openid')
+        student_name = student.get('name')
+        if submitter_openid:
+            send_review_result_message(submitter_openid, student_name, '已通过')
 
         if health_check_path:
             current_app.logger.info(f'Health check form generated for student ID={id}')

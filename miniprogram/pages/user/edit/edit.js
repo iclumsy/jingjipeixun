@@ -455,6 +455,22 @@ Page({
         throw new Error(result.message || '更新失败')
       }
 
+      // 尝试请求订阅消息权限
+      try {
+        const configRes = await api.getWechatConfig()
+        if (configRes && configRes.success && configRes.template_id) {
+          await new Promise((resolve, reject) => {
+            wx.requestSubscribeMessage({
+              tmplIds: [configRes.template_id],
+              success: resolve,
+              fail: reject
+            })
+          })
+        }
+      } catch (subErr) {
+        console.warn('请求订阅消息失败或用户取消:', subErr)
+      }
+
       wx.showModal({
         title: '更新成功',
         content: '学员信息已更新，等待重新审核',
