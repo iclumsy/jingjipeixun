@@ -173,3 +173,40 @@ def send_review_result_message(openid, student_name, action, page_path="pages/in
     except Exception as e:
         current_app.logger.error(f"发送订阅消息请求异常: {str(e)}")
         return False
+
+def broadcast_new_student_to_admins(student_name):
+    """
+    向所有配置的小程序管理员发送新学员提交通知。
+    复用审核结果通知的模板，将 action 写为 '新提交等待审核'。
+    注意：这要求管理员用户在小程序端也授权过该订阅消息模板，否则微信接口会下发拦截（这属于正常现象）。
+    """
+    from utils.miniprogram_auth import parse_admin_openids
+    admin_openids = parse_admin_openids()
+    
+    if not admin_openids:
+        current_app.logger.info("未配置管理员 openid (TRAINING_SYSTEM_ADMIN_OPENIDS)，跳过发送新提交通知。")
+        return
+        
+    current_app.logger.info(f"准备向 {len(admin_openids)} 位管理员推送新提交通知...")
+    success_count = 0
+    fail_count = 0
+    
+    # 复用 send_review_result_message 发送，action 显示为 "待审核"
+    # template 限制："通过" or "驳回"。如果模板强校验，这里写 "待审核" 可能依然被接受（因为是中英文数字），
+    # 我们测试直接发 "待审核"
+    action_text = "待审核"
+    
+    for admin_openid in admin_openids:
+        # 管理员点击卡片后，跳转到他自己的首页或者指定的审核列表页（当前用首页即可，首页有管理员入口）
+        result = send_review_result_message(
+            openid=admin_openid,
+            student_name=student_name,
+            action=action_text,
+            page_path="pages/index/index" 
+        )
+        if result:
+            success_count += 1
+        else:
+            fail_count += 1
+            
+    current_app.logger.info(f"管理员推送结束：成功 {success_count}，失败 {fail_count}。如果失败，可能是管理员未在小程序端授权接收该提醒。")

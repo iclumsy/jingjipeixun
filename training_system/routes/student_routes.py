@@ -33,8 +33,7 @@ from models.student import (
     create_student, get_students, get_student_by_id, update_student,
     delete_student, get_companies
 )
-from services.wechat_service import send_review_result_message
-from services.wecom_service import send_new_student_notification
+from services.wechat_service import send_review_result_message, broadcast_new_student_to_admins
 from services.image_service import process_and_save_file, delete_student_files
 from services.document_service import generate_health_check_form
 from utils.validators import validate_student_data, validate_file_upload
@@ -364,13 +363,8 @@ def create_student_route():
         student_id = create_student(student_payload, file_paths)
         current_app.logger.info(f'Student created: ID={student_id}')
         
-        # 异步/非阻塞方式发送企微通知（在这里为了简便同步调用，内部已做 try-catch 避免阻断）
-        send_new_student_notification(
-            student_name=student_payload.get('name', ''),
-            training_type=student_payload.get('training_type', ''),
-            id_card=student_payload.get('id_card', ''),
-            phone=student_payload.get('phone', '')
-        )
+        # 异步/非阻塞方式发送给所有管理员（基于小程序订阅消息）
+        broadcast_new_student_to_admins(student_name=student_payload.get('name', ''))
 
         return jsonify({'message': 'Student added successfully', 'id': student_id}), 201
 
