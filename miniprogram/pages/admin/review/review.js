@@ -53,6 +53,49 @@ Page({
     await this.refreshAll(true)
     this._skipRefreshOnShow = true
     this.setData({ initialized: true })
+
+    // 延迟一点弹出提示，确保页面已经渲染且不打断操作
+    setTimeout(() => {
+      this.checkAdminSubscription()
+    }, 1000)
+  },
+
+  async checkAdminSubscription() {
+    // 检查是否已经提示过
+    if (wx.getStorageSync('admin_nots_prompted')) return
+    
+    try {
+      const configRes = await api.getWechatConfig()
+      if (configRes && configRes.success && configRes.template_id) {
+        wx.showModal({
+          title: '接收新提醒',
+          content: '为了能及时收到新学员报名的通知，请点击授权订阅消息',
+          confirmText: '去授权',
+          cancelText: '暂不需要',
+          success: (res) => {
+            // 只要弹过一次就不再强制弹
+            wx.setStorageSync('admin_nots_prompted', true)
+            if (res.confirm) {
+              wx.requestSubscribeMessage({
+                tmplIds: [configRes.template_id],
+                success: (subRes) => {
+                  if (subRes[configRes.template_id] === 'accept') {
+                    wx.showToast({ title: '授权成功', icon: 'success' })
+                  } else {
+                    wx.showToast({ title: '已取消授权', icon: 'none' })
+                  }
+                },
+                fail: (err) => {
+                  console.warn('请求订阅消息失败:', err)
+                }
+              })
+            }
+          }
+        })
+      }
+    } catch (err) {
+      console.warn('获取配置或请求订阅失败:', err)
+    }
   },
 
   async onShow() {
