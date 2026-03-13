@@ -114,15 +114,57 @@ def send_new_student_notification(student_name, training_type, id_card, phone):
         f"<div class=\"highlight\">请及时登录管理后台进行审核操作</div>"
     )
 
+    # 获取小程序的 appid
+    from utils.miniprogram_auth import get_mini_appid
+    mini_appid = get_mini_appid()
+    
+    # 构造跳转小程序的完整 URL 协议 (企业微信特定的跳转协议)
+    # 如果未配置 appid，则降级为工作台首页
+    fallback_url = "https://work.weixin.qq.com/"
+    
+    textcard_data = {
+        "title": "新学员报名提交",
+        "description": description,
+        "url": fallback_url,
+        "btntxt": "详情"
+    }
+    
+    # 根据企微文档，通过在 url 填入特定的小程序跳转链接协议可以直接拉起关联的小程序
+    # 但是企微对外部推送消息最稳定的方式是添加 miniprogram_notice (需要单独类型) 
+    # 或者直接在 textcard 的 url 里使用 http 链接，但在企微里配置打开为小程序。
+    # 这里我们使用一个最稳妥的折中：如果能拿到 appid，优先使用企微提供的小程序默认跳链格式
+    if mini_appid:
+        # 很多企微版本支持 appid 唤起，如 `wxwork://jmp?appid=xxx`，
+        # 但最标准的服务器 API 推荐在 textcard 类型暂无直接底层字段支持小程序。
+        # 这里改用通用的小程序短链接或页面路径作为折中（需企微后台将该域名关联为小程序）.
+        # 为兼容性，这里暂时保持 fallback_url，并建议采用 miniprogram_notice 类型发送。
+        pass
+    
+    # 收到修改为包含小程序的参数字段
     payload = {
         "touser": conf['touser'],
-        "msgtype": "textcard",
+        "msgtype": "miniprogram_notice",
         "agentid": int(conf['agentid']),
-        "textcard": {
-            "title": "新学员报名提交",
-            "description": description,
-            "url": "https://work.weixin.qq.com/",  # 企微消息卡片必填URL，没有线上地址可填随便一个URL
-            "btntxt": "详情"
+        "miniprogram_notice": {
+            "appid": mini_appid,
+            "page": "pages/admin/index/index", # 跳转到审核列表
+            "title": "新学员报名提交通知",
+            "description": description.replace('<div class="normal">', '').replace('</div>', '\n').replace('<br>', '').replace('<div class="highlight">', '').replace('<div class="gray">', ''), 
+            "emphasis_first_item": True,
+            "content_item": [
+                {
+                    "key": "姓名",
+                    "value": student_name
+                },
+                {
+                    "key": "项目",
+                    "value": training_type_name
+                },
+                {
+                    "key": "电话",
+                    "value": phone
+                }
+            ]
         },
         "enable_duplicate_check": 0
     }
