@@ -117,7 +117,14 @@ def send_review_result_message(openid, student_name, action, page_path="pages/in
     
     # 截断数据以防不合规 (name 最大一般较短，10个字符安全)
     safe_name = str(student_name)[:10] if student_name else '未知学员'
-    safe_action = "通过" if "通过" in action else "驳回" 
+    
+    if "通过" in action:
+        safe_action = "通过"
+    elif "驳回" in action:
+        safe_action = "驳回"
+    else:
+        # 允许"待审核"等自定义短状态
+        safe_action = str(action)[:10]
     
     import datetime
     now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
