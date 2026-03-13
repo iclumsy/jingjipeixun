@@ -839,7 +839,7 @@ def reject_student_route(id):
             student_name = student.get('name')
             if submitter_openid and target_status == 'rejected':
                 # 后台非阻塞发送防止拖慢响应，这里简单同步调用（已在服务内吃掉异常）
-                send_review_result_message(submitter_openid, student_name, '已驳回')
+                send_review_result_message(submitter_openid, student_name, '已驳回', remark="请点击前往小程序进行修改")
                 
             current_app.logger.info(f'Student moved to {target_status}: ID={id}')
             return jsonify({'message': f'Student moved to {target_status}', 'student': student})
@@ -891,7 +891,7 @@ def approve_student_route(id):
         submitter_openid = student.get('submitter_openid')
         student_name = student.get('name')
         if submitter_openid:
-            send_review_result_message(submitter_openid, student_name, '已通过')
+            send_review_result_message(submitter_openid, student_name, '已通过', remark="请点击前往小程序查看详情")
 
         if health_check_path:
             current_app.logger.info(f'Health check form generated for student ID={id}')

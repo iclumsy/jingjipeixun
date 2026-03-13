@@ -80,7 +80,7 @@ def get_access_token(force_refresh=False):
     
     return _access_token_cache['token']
 
-def send_review_result_message(openid, student_name, action, page_path="pages/index/index"):
+def send_review_result_message(openid, student_name, action, page_path="pages/index/index", remark="点击前往小程序查看详情"):
     """
     发送模板消息（审核结果通知）。
     不会抛出异常以防止阻断审核流程，如果失败仅打印日志。
@@ -97,6 +97,7 @@ def send_review_result_message(openid, student_name, action, page_path="pages/in
         student_name (str): 学员姓名
         action (str): 操作结果，如 '已通过', '已驳回'
         page_path (str): 点击消息后跳转的小程序页面路径
+        remark (str): 自定义备注信息
     """
     template_id = get_wechat_template_id()
     if not template_id:
@@ -149,7 +150,7 @@ def send_review_result_message(openid, student_name, action, page_path="pages/in
                 "value": now_str
             },
             "thing11": {
-                "value": "点击前往小程序查看详情"
+                "value": remark
             }
         }
     }
@@ -202,6 +203,7 @@ def broadcast_new_student_to_admins(student_name):
     # template 限制："通过" or "驳回"。如果模板强校验，这里写 "待审核" 可能依然被接受（因为是中英文数字），
     # 我们测试直接发 "待审核"
     action_text = "待审核"
+    admin_remark = "请点击前往小程序进行审核"
     
     for admin_openid in admin_openids:
         # 管理员点击卡片后，跳转到他自己的首页或者指定的审核列表页（当前用首页即可，首页有管理员入口）
@@ -209,7 +211,8 @@ def broadcast_new_student_to_admins(student_name):
             openid=admin_openid,
             student_name=student_name,
             action=action_text,
-            page_path="pages/index/index" 
+            page_path="pages/index/index",
+            remark=admin_remark
         )
         if result:
             success_count += 1
