@@ -614,6 +614,16 @@ def update_student_route(id):
         updated_student = update_student(id, updates)
         current_app.logger.info(f'Student updated: ID={id}')
 
+        # 检查是否是从被驳回修改为重新提交（待审核）状态
+        is_resubmitted = (
+            current_student.get('status') == 'rejected' and
+            updates.get('status') == 'unreviewed'
+        )
+        if is_resubmitted:
+            # 获取更新后的全名或备用名称发送提醒
+            student_name_for_notice = updates.get('name', current_student.get('name', ''))
+            broadcast_new_student_to_admins(student_name_for_notice)
+
         return jsonify(updated_student)
 
     except (ValidationError, NotFoundError, AppError) as e:
