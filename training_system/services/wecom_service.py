@@ -105,22 +105,24 @@ def send_new_student_notification(student_name, training_type, id_card, phone):
     if training_type not in ["special_operation", "special_equipment"]:
         training_type_name = training_type
 
-    text_content = (
-        f"【收到新学员报名提交】\n"
-        f"姓名: {student_name}\n"
-        f"项目: {training_type_name}\n"
-        f"身份证: {id_card}\n"
-        f"电话: {phone}\n"
-        f"时间: {now_str}\n\n"
-        f"请及时登录管理后台审核"
+    description = (
+        f"<div class=\"gray\">{now_str}</div>"
+        f"<div class=\"normal\">姓名: {student_name}</div>"
+        f"<div class=\"normal\">项目: {training_type_name}</div>"
+        f"<div class=\"normal\">身份证: {id_card}</div>"
+        f"<div class=\"normal\">电话: {phone}</div><br>"
+        f"<div class=\"highlight\">请及时登录管理后台进行审核操作</div>"
     )
 
     payload = {
         "touser": conf['touser'],
-        "msgtype": "text",
+        "msgtype": "textcard",
         "agentid": int(conf['agentid']),
-        "text": {
-            "content": text_content
+        "textcard": {
+            "title": "新学员报名提交",
+            "description": description,
+            "url": "https://work.weixin.qq.com/",  # 企微消息卡片必填URL，没有线上地址可填随便一个URL
+            "btntxt": "详情"
         },
         "enable_duplicate_check": 0
     }
