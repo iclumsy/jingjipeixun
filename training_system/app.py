@@ -295,8 +295,8 @@ def create_app():
         # 静态资源和 favicon 无需认证
         if path.startswith('/static/') or path == '/favicon.ico':
             return None
-        # 首页（学员信息采集页）公开访问
-        if path == '/':
+        # 官网首页和报名页公开访问
+        if path in {'/', '/apply'}:
             return None
         # 登录/登出路由无需认证
         if path.startswith('/auth/'):
@@ -349,8 +349,13 @@ def create_app():
     # ======================== 页面路由 ========================
     @app.route('/')
     def index():
-        """渲染学员信息采集首页（公开访问，无需登录）。"""
+        """渲染官网首页（公开访问，无需登录）。"""
         return render_template('index.html')
+
+    @app.route('/apply')
+    def apply():
+        """渲染学员信息采集页（公开访问，无需登录）。"""
+        return render_template('apply.html')
 
     @app.route('/admin')
     def admin():

@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在线报名 - 阳泉精技特种作业人员培训有限公司</title>
+    <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body class="collection-page">
+    <div class="container">
+        <header>
+            <div class="header-brand" style="display: flex; align-items: center; gap: 20px;">
+                <img class="header-logo" src="/static/images/logo.png" alt="Logo" style="height: 84px; width: auto;">
+                <div class="header-main">
+                    <div class="header-title-row">
+                        <h1>学员信息采集</h1>
+                    </div>
+                    <div class="header-subline">
+                        <p class="header-company">阳泉精技特种作业人员培训有限公司</p>
+                        <div class="header-contact">联系人：霍老师 <a class="header-contact-phone"
+                                href="tel:13703531055">13703531055</a></div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <form id="collectionForm">
+            <div id="students-container">
+            </div>
+
+            <div class="captcha-section"
+                style="margin-top: 20px; padding: 16px 20px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <span style="font-size: 0.95rem; color: #374151; font-weight: 500;">验证：</span>
+                <span id="captchaQuestion"
+                    style="font-size: 1.1rem; font-weight: 600; color: #1f2937; letter-spacing: 1px;"></span>
+                <span style="font-size: 1rem; color: #6b7280;">＝</span>
+                <input type="text" id="captchaInput" autocomplete="off" inputmode="numeric" placeholder="请输入答案"
+                    style="width: 100px; padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 1rem; text-align: center;">
+                <button type="button" id="refreshCaptcha" title="换一题"
+                    style="background: none; border: none; cursor: pointer; font-size: 1.2rem; color: #6b7280; padding: 4px;">🔄</button>
+                <span id="captchaError" style="color: #dc2626; font-size: 0.85rem; display: none;">验证答案错误，请重试</span>
+            </div>
+
+            <div class="actions">
+                <button type="button" id="addStudentBtn" class="btn secondary">+ 添加学员</button>
+                <button type="submit" id="submitBtn" class="btn primary">提交所有信息</button>
+            </div>
+        </form>
+    </div>
+
+    <template id="student-template">
+        <div class="student-entry">
+            <div class="entry-header">
+                <h3>学员信息</h3>
+                <button type="button" class="btn-delete" onclick="removeStudent(this)">×</button>
+            </div>
+            <div class="form-section">
+                <div class="section-title">培训信息</div>
+                <div class="form-grid">
+                    <div class="form-group w-xl">
+                        <label>培训项目/作业类别</label>
+                        <span class="hint-slot"></span>
+                        <select name="job_category" required onchange="updateExamProjectOptions(this)">
+                            <option value="">请选择</option>
+                        </select>
+                    </div>
+                    <div class="form-group w-lg">
+                        <label>操作项目</label>
+                        <span class="hint-slot"></span>
+                        <select name="exam_project" required onchange="updateProjectCode(this)">
+                            <option value="">请先选择作业类别</option>
+                        </select>
+                        <input type="hidden" name="project_code">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="section-title">个人信息</div>
+                <div class="form-grid">
+                    <div class="form-group w-sm">
+                        <label>姓名</label>
+                        <span class="hint-slot"></span>
+                        <input type="text" name="name" required>
+                    </div>
+                    <div class="form-group w-xs">
+                        <label>性别</label>
+                        <span class="hint-slot"></span>
+                        <select name="gender" required>
+                            <option value="男">男</option>
+                            <option value="女">女</option>
+                        </select>
+                    </div>
+                    <div class="form-group w-md">
+                        <label>文化程度</label>
+                        <span class="hint-slot"></span>
+                        <select name="education" required>
+                            <option value="">请选择</option>
+                            <option value="初中">初中</option>
+                            <option value="高中或同等学历">高中或同等学历</option>
+                            <option value="中专或同等学历">中专或同等学历</option>
+                            <option value="专科或同等学历">专科或同等学历</option>
+                            <option value="本科或同等学历">本科或同等学历</option>
+                            <option value="研究生及以上">研究生及以上</option>
+                        </select>
+                    </div>
+                    <div class="form-group w-lg">
+                        <label>身份证号</label>
+                        <span class="hint-slot"></span>
+                        <input type="text" name="id_card" required pattern="\d{17}[\dXx]" title="请输入正确的18位身份证号">
+                    </div>
+                    <div class="form-group w-md">
+                        <label>手机号</label>
+                        <span class="hint-slot"></span>
+                        <input type="tel" name="phone" required pattern="\d{11}" title="请输入11位手机号">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group w-1-5">
+                            <label>毕业院校</label>
+                            <span class="hint-slot"></span>
+                            <input type="text" name="school">
+                        </div>
+                        <div class="form-group w-1-5">
+                            <label>所学专业</label>
+                            <span class="hint-slot"></span>
+                            <input type="text" name="major">
+                        </div>
+                        <div class="form-group w-1-5">
+                            <label>单位名称</label>
+                            <span class="hint-slot"></span>
+                            <input type="text" name="company" required title="请输入单位名称">
+                        </div>
+                        <div class="form-group w-2-5">
+                            <label>单位地址</label>
+                            <span class="hint-slot"></span>
+                            <input type="text" name="company_address" required title="请输入单位地址">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="section-title">证件上传</div>
+                <div style="margin-bottom: 10px; font-size: 0.85rem; color: #6b7280;">支持 JPG/PNG 格式，单个文件不超过 10MB</div>
+                <div class="upload-grid" id="upload-grid">
+                    <div class="form-group w-upload" data-attachment="photo" style="display: none;">
+                        <div class="upload-box" onclick="this.querySelector('input').click()">
+                            <div class="upload-placeholder">
+                                <span class="icon">+</span>
+                                <span class="text">个人照片</span>
+                            </div>
+                            <img class="preview-img" style="display: none;">
+                            <input type="file" name="photo" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                                data-max-size-mb="10" title="请上传个人照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
+                        </div>
+                    </div>
+                    <div class="form-group w-upload" data-attachment="diploma">
+                        <div class="upload-box" onclick="this.querySelector('input').click()">
+                            <div class="upload-placeholder">
+                                <span class="icon">+</span>
+                                <span class="text">学历证书</span>
+                            </div>
+                            <img class="preview-img" style="display: none;">
+                            <input type="file" name="diploma" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                                data-max-size-mb="10" title="请上传学历证书照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
+                        </div>
+                    </div>
+                    <div class="form-group w-upload" data-attachment="id_card_front">
+                        <div class="upload-box" onclick="this.querySelector('input').click()">
+                            <div class="upload-placeholder">
+                                <span class="icon">+</span>
+                                <span class="text">身份证正面</span>
+                            </div>
+                            <img class="preview-img" style="display: none;">
+                            <input type="file" name="id_card_front" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                                data-max-size-mb="10" title="请上传身份证正面照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
+                        </div>
+                    </div>
+                    <div class="form-group w-upload" data-attachment="id_card_back">
+                        <div class="upload-box" onclick="this.querySelector('input').click()">
+                            <div class="upload-placeholder">
+                                <span class="icon">+</span>
+                                <span class="text">身份证反面</span>
+                            </div>
+                            <img class="preview-img" style="display: none;">
+                            <input type="file" name="id_card_back" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                                data-max-size-mb="10" title="请上传身份证反面照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
+                        </div>
+                    </div>
+                    <div class="form-group w-upload" data-attachment="hukou_residence" style="display: none;">
+                        <div class="upload-box" onclick="this.querySelector('input').click()">
+                            <div class="upload-placeholder">
+                                <span class="icon">+</span>
+                                <span class="text">户口本户籍页</span>
+                            </div>
+                            <img class="preview-img" style="display: none;">
+                            <input type="file" name="hukou_residence" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                                data-max-size-mb="10" title="请上传户口本户籍页照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
+                        </div>
+                    </div>
+                    <div class="form-group w-upload" data-attachment="hukou_personal" style="display: none;">
+                        <div class="upload-box" onclick="this.querySelector('input').click()">
+                            <div class="upload-placeholder">
+                                <span class="icon">+</span>
+                                <span class="text">户口本个人页</span>
+                            </div>
+                            <img class="preview-img" style="display: none;">
+                            <input type="file" name="hukou_personal" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                                data-max-size-mb="10" title="请上传户口本个人页照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="/static/js/script.js"></script>
+    <script>
+        let jobCategoriesConfig = null;
+
+        async function loadJobCategories() {
+            try {
+                const response = await fetch('/api/config/job_categories');
+                if (!response.ok) {
+                    throw new Error('Failed to load job categories');
+                }
+                jobCategoriesConfig = await response.json();
+                window.jobCategoriesConfigRaw = jobCategoriesConfig;
+                document.querySelectorAll('.student-entry').forEach(entry => initializeStudentEntry(entry, true));
+            } catch (error) {
+                console.error('Error loading job categories:', error);
+            }
+        }
+
+        function findTrainingTypeByCategory(categoryName) {
+            if (!categoryName || !jobCategoriesConfig) return '';
+            let found = '';
+            Object.keys(jobCategoriesConfig).forEach(trainingType => {
+                const categories = jobCategoriesConfig[trainingType]?.job_categories || [];
+                if (categories.some(category => category.name === categoryName)) {
+                    found = trainingType;
+                }
+            });
+            return found;
+        }
+
+        function populateCombinedCategories(entry, keepCategory = '') {
+            const categorySelect = entry.querySelector('select[name="job_category"]');
+            if (!categorySelect) return;
+
+            categorySelect.innerHTML = '<option value="">请选择</option>';
+
+            if (jobCategoriesConfig) {
+                Object.keys(jobCategoriesConfig).forEach(trainingType => {
+                    const typeConfig = jobCategoriesConfig[trainingType];
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = typeConfig?.name || trainingType;
+
+                    (typeConfig?.job_categories || []).forEach(category => {
+                        const option = document.createElement('option');
+                        option.value = category.name;
+                        option.textContent = category.name;
+                        option.dataset.trainingType = trainingType;
+                        optgroup.appendChild(option);
+                    });
+
+                    categorySelect.appendChild(optgroup);
+                });
+            }
+
+            if (keepCategory) {
+                categorySelect.value = keepCategory;
+            }
+        }
+
+        function updateExamProjectOptions(categorySelect, keepProject = '') {
+            const entry = categorySelect.closest('.student-entry');
+            const projectSelect = entry.querySelector('select[name="exam_project"]');
+            const projectCodeInput = entry.querySelector('input[name="project_code"]');
+            const selectedCategory = categorySelect.value;
+            const selectedOption = categorySelect.options[categorySelect.selectedIndex];
+            let selectedTrainingType = '';
+
+            projectSelect.innerHTML = '<option value="">请选择操作项目</option>';
+            projectCodeInput.value = '';
+
+            if (selectedOption && selectedOption.dataset.trainingType) {
+                selectedTrainingType = selectedOption.dataset.trainingType;
+            } else {
+                selectedTrainingType = findTrainingTypeByCategory(selectedCategory);
+            }
+            updateAttachmentVisibility(entry, selectedTrainingType);
+
+            if (selectedCategory && jobCategoriesConfig) {
+                let foundProjects = null;
+
+                const targetTypes = selectedTrainingType ? [selectedTrainingType] : Object.keys(jobCategoriesConfig);
+                targetTypes.forEach(trainingType => {
+                    const typeConfig = jobCategoriesConfig[trainingType];
+                    const category = typeConfig?.job_categories?.find(c => c.name === selectedCategory);
+                    if (category) {
+                        foundProjects = category.exam_projects;
+                    }
+                });
+
+                if (foundProjects) {
+                    foundProjects.forEach(project => {
+                        const option = document.createElement('option');
+                        option.value = project.name;
+                        option.textContent = project.code ? `${project.name} (${project.code})` : project.name;
+                        option.dataset.code = project.code || '';
+                        if (keepProject && keepProject === project.name) {
+                            option.selected = true;
+                            projectCodeInput.value = project.code || '';
+                        }
+                        projectSelect.appendChild(option);
+                    });
+                }
+            }
+        }
+
+        function updateProjectCode(projectSelect) {
+            const entry = projectSelect.closest('.student-entry');
+            const projectCodeInput = entry.querySelector('input[name="project_code"]');
+            const selectedOption = projectSelect.options[projectSelect.selectedIndex];
+
+            if (selectedOption && selectedOption.dataset.code) {
+                projectCodeInput.value = selectedOption.dataset.code;
+            } else {
+                projectCodeInput.value = '';
+            }
+        }
+
+        function updateAttachmentVisibility(entry, trainingType) {
+            const uploadGrid = entry.querySelector('.upload-grid');
+            const attachmentGroups = uploadGrid.querySelectorAll('[data-attachment]');
+
+            let requiredAttachments = [];
+            if (jobCategoriesConfig && jobCategoriesConfig[trainingType]) {
+                requiredAttachments = jobCategoriesConfig[trainingType].attachments || [];
+            }
+
+            attachmentGroups.forEach(group => {
+                const attachmentName = group.dataset.attachment;
+                if (requiredAttachments.includes(attachmentName)) {
+                    group.style.display = '';
+                    const input = group.querySelector('input[type="file"]');
+                    if (input) {
+                        input.required = true;
+                    }
+                } else {
+                    group.style.display = 'none';
+                    const input = group.querySelector('input[type="file"]');
+                    if (input) {
+                        input.required = false;
+                        input.value = '';
+                        const img = group.querySelector('.preview-img');
+                        const placeholder = group.querySelector('.upload-placeholder');
+                        if (img) { img.style.display = 'none'; img.src = ''; }
+                        if (placeholder) { placeholder.style.display = 'block'; }
+                    }
+                }
+            });
+        }
+
+        function initializeStudentEntry(entry, keepValues = false) {
+            const categorySelect = entry.querySelector('select[name="job_category"]');
+            const currentCategory = keepValues ? (categorySelect?.value || '') : '';
+            const currentProject = keepValues ? (entry.querySelector('select[name="exam_project"]')?.value || '') : '';
+
+            populateCombinedCategories(entry, currentCategory);
+
+            if (currentCategory) {
+                updateExamProjectOptions(categorySelect, currentProject);
+            } else {
+                updateAttachmentVisibility(entry, '');
+            }
+        }
+
+        // ─── Arithmetic CAPTCHA ───
+        let captchaAnswer = null;
+
+        function generateCaptcha() {
+            const ops = ['+', '-', '×'];
+            const op = ops[Math.floor(Math.random() * ops.length)];
+            let a, b, answer;
+            if (op === '+') {
+                a = Math.floor(Math.random() * 50) + 1;
+                b = Math.floor(Math.random() * 50) + 1;
+                answer = a + b;
+            } else if (op === '-') {
+                a = Math.floor(Math.random() * 50) + 10;
+                b = Math.floor(Math.random() * a);
+                answer = a - b;
+            } else {
+                a = Math.floor(Math.random() * 12) + 1;
+                b = Math.floor(Math.random() * 12) + 1;
+                answer = a * b;
+            }
+            captchaAnswer = answer;
+            document.getElementById('captchaQuestion').textContent = `${a} ${op} ${b}`;
+            document.getElementById('captchaInput').value = '';
+            document.getElementById('captchaError').style.display = 'none';
+        }
+
+        function verifyCaptcha() {
+            const input = document.getElementById('captchaInput').value.trim();
+            if (input === '' || parseInt(input, 10) !== captchaAnswer) {
+                document.getElementById('captchaError').style.display = 'inline';
+                document.getElementById('captchaInput').focus();
+                generateCaptcha();
+                return false;
+            }
+            document.getElementById('captchaError').style.display = 'none';
+            return true;
+        }
+
+        // Expose verifyCaptcha globally so script.js can call it before submit
+        window.verifyCaptcha = verifyCaptcha;
+        window.refreshCaptcha = generateCaptcha;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            window.initializeStudentEntry = initializeStudentEntry;
+            loadJobCategories();
+            generateCaptcha();
+            document.getElementById('refreshCaptcha').addEventListener('click', generateCaptcha);
+        });
+    </script>
+</body>
+
+</html>

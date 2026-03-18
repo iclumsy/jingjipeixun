@@ -4,431 +4,312 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>学员信息采集系统</title>
+    <title>阳泉精技特种作业人员培训有限公司</title>
+    <meta name="description" content="阳泉精技特种作业人员培训有限公司，提供特种作业培训、正规考证、证书复审及企业安全培训服务。">
     <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/home.css">
 </head>
 
-<body class="collection-page">
-    <div class="container">
-        <header>
-            <div class="header-brand" style="display: flex; align-items: center; gap: 20px;">
-                <img class="header-logo" src="/static/images/logo.png" alt="Logo" style="height: 84px; width: auto;">
-                <div class="header-main">
-                    <div class="header-title-row">
-                        <h1>学员信息采集</h1>
+<body class="site-homepage">
+    <header class="site-header" id="home">
+        <div class="topbar">
+            <div class="site-shell topbar-inner">
+                <a class="brand" href="#home" aria-label="返回首页">
+                    <img class="brand-logo" src="/static/images/logo.png" alt="阳泉精技特种作业人员培训有限公司">
+                    <div class="brand-copy">
+                        <strong>阳泉精技特种作业人员培训有限公司</strong>
+                        <span>阳泉本地专业、合规、权威的特种作业培训机构</span>
                     </div>
-                    <div class="header-subline">
-                        <p class="header-company">阳泉精技特种作业人员培训有限公司</p>
-                        <div class="header-contact">联系人：霍老师 <a class="header-contact-phone"
-                                href="tel:13703531055">13703531055</a></div>
-                    </div>
-                </div>
-            </div>
-        </header>
+                </a>
 
-        <form id="collectionForm">
-            <div id="students-container">
-            </div>
+                <nav class="site-nav" aria-label="主导航">
+                    <a href="#home">首页</a>
+                    <a href="#about">关于我们</a>
+                    <a href="#programs">培训项目</a>
+                    <a href="#guide">报考指南</a>
+                    <a href="#strength">教学实力</a>
+                    <a href="#news">新闻动态</a>
+                    <a href="#contact">联系我们</a>
+                </nav>
 
-            <div class="captcha-section"
-                style="margin-top: 20px; padding: 16px 20px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                <span style="font-size: 0.95rem; color: #374151; font-weight: 500;">验证：</span>
-                <span id="captchaQuestion"
-                    style="font-size: 1.1rem; font-weight: 600; color: #1f2937; letter-spacing: 1px;"></span>
-                <span style="font-size: 1rem; color: #6b7280;">＝</span>
-                <input type="text" id="captchaInput" autocomplete="off" inputmode="numeric" placeholder="请输入答案"
-                    style="width: 100px; padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 1rem; text-align: center;">
-                <button type="button" id="refreshCaptcha" title="换一题"
-                    style="background: none; border: none; cursor: pointer; font-size: 1.2rem; color: #6b7280; padding: 4px;">🔄</button>
-                <span id="captchaError" style="color: #dc2626; font-size: 0.85rem; display: none;">验证答案错误，请重试</span>
-            </div>
-
-            <div class="actions">
-                <button type="button" id="addStudentBtn" class="btn secondary">+ 添加学员</button>
-                <button type="submit" id="submitBtn" class="btn primary">提交所有信息</button>
-            </div>
-        </form>
-    </div>
-
-    <template id="student-template">
-        <div class="student-entry">
-            <div class="entry-header">
-                <h3>学员信息</h3>
-                <button type="button" class="btn-delete" onclick="removeStudent(this)">×</button>
-            </div>
-            <div class="form-section">
-                <div class="section-title">培训信息</div>
-                <div class="form-grid">
-                    <div class="form-group w-xl">
-                        <label>培训项目/作业类别</label>
-                        <span class="hint-slot"></span>
-                        <select name="job_category" required onchange="updateExamProjectOptions(this)">
-                            <option value="">请选择</option>
-                        </select>
-                    </div>
-                    <div class="form-group w-lg">
-                        <label>操作项目</label>
-                        <span class="hint-slot"></span>
-                        <select name="exam_project" required onchange="updateProjectCode(this)">
-                            <option value="">请先选择作业类别</option>
-                        </select>
-                        <input type="hidden" name="project_code">
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-section">
-                <div class="section-title">个人信息</div>
-                <div class="form-grid">
-                    <div class="form-group w-sm">
-                        <label>姓名</label>
-                        <span class="hint-slot"></span>
-                        <input type="text" name="name" required>
-                    </div>
-                    <div class="form-group w-xs">
-                        <label>性别</label>
-                        <span class="hint-slot"></span>
-                        <select name="gender" required>
-                            <option value="男">男</option>
-                            <option value="女">女</option>
-                        </select>
-                    </div>
-                    <div class="form-group w-md">
-                        <label>文化程度</label>
-                        <span class="hint-slot"></span>
-                        <select name="education" required>
-                            <option value="">请选择</option>
-                            <option value="初中">初中</option>
-                            <option value="高中或同等学历">高中或同等学历</option>
-                            <option value="中专或同等学历">中专或同等学历</option>
-                            <option value="专科或同等学历">专科或同等学历</option>
-                            <option value="本科或同等学历">本科或同等学历</option>
-                            <option value="研究生及以上">研究生及以上</option>
-                        </select>
-                    </div>
-                    <div class="form-group w-lg">
-                        <label>身份证号</label>
-                        <span class="hint-slot"></span>
-                        <input type="text" name="id_card" required pattern="\d{17}[\dXx]" title="请输入正确的18位身份证号">
-                    </div>
-                    <div class="form-group w-md">
-                        <label>手机号</label>
-                        <span class="hint-slot"></span>
-                        <input type="tel" name="phone" required pattern="\d{11}" title="请输入11位手机号">
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group w-1-5">
-                            <label>毕业院校</label>
-                            <span class="hint-slot"></span>
-                            <input type="text" name="school">
-                        </div>
-                        <div class="form-group w-1-5">
-                            <label>所学专业</label>
-                            <span class="hint-slot"></span>
-                            <input type="text" name="major">
-                        </div>
-                        <div class="form-group w-1-5">
-                            <label>单位名称</label>
-                            <span class="hint-slot"></span>
-                            <input type="text" name="company" required title="请输入单位名称">
-                        </div>
-                        <div class="form-group w-2-5">
-                            <label>单位地址</label>
-                            <span class="hint-slot"></span>
-                            <input type="text" name="company_address" required title="请输入单位地址">
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-section">
-                <div class="section-title">证件上传</div>
-                <div style="margin-bottom: 10px; font-size: 0.85rem; color: #6b7280;">支持 JPG/PNG 格式，单个文件不超过 10MB</div>
-                <div class="upload-grid" id="upload-grid">
-                    <div class="form-group w-upload" data-attachment="photo" style="display: none;">
-                        <div class="upload-box" onclick="this.querySelector('input').click()">
-                            <div class="upload-placeholder">
-                                <span class="icon">+</span>
-                                <span class="text">个人照片</span>
-                            </div>
-                            <img class="preview-img" style="display: none;">
-                            <input type="file" name="photo" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-                                data-max-size-mb="10" title="请上传个人照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
-                        </div>
-                    </div>
-                    <div class="form-group w-upload" data-attachment="diploma">
-                        <div class="upload-box" onclick="this.querySelector('input').click()">
-                            <div class="upload-placeholder">
-                                <span class="icon">+</span>
-                                <span class="text">学历证书</span>
-                            </div>
-                            <img class="preview-img" style="display: none;">
-                            <input type="file" name="diploma" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-                                data-max-size-mb="10" title="请上传学历证书照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
-                        </div>
-                    </div>
-                    <div class="form-group w-upload" data-attachment="id_card_front">
-                        <div class="upload-box" onclick="this.querySelector('input').click()">
-                            <div class="upload-placeholder">
-                                <span class="icon">+</span>
-                                <span class="text">身份证正面</span>
-                            </div>
-                            <img class="preview-img" style="display: none;">
-                            <input type="file" name="id_card_front" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-                                data-max-size-mb="10" title="请上传身份证正面照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
-                        </div>
-                    </div>
-                    <div class="form-group w-upload" data-attachment="id_card_back">
-                        <div class="upload-box" onclick="this.querySelector('input').click()">
-                            <div class="upload-placeholder">
-                                <span class="icon">+</span>
-                                <span class="text">身份证反面</span>
-                            </div>
-                            <img class="preview-img" style="display: none;">
-                            <input type="file" name="id_card_back" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-                                data-max-size-mb="10" title="请上传身份证反面照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
-                        </div>
-                    </div>
-                    <div class="form-group w-upload" data-attachment="hukou_residence" style="display: none;">
-                        <div class="upload-box" onclick="this.querySelector('input').click()">
-                            <div class="upload-placeholder">
-                                <span class="icon">+</span>
-                                <span class="text">户口本户籍页</span>
-                            </div>
-                            <img class="preview-img" style="display: none;">
-                            <input type="file" name="hukou_residence" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-                                data-max-size-mb="10" title="请上传户口本户籍页照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
-                        </div>
-                    </div>
-                    <div class="form-group w-upload" data-attachment="hukou_personal" style="display: none;">
-                        <div class="upload-box" onclick="this.querySelector('input').click()">
-                            <div class="upload-placeholder">
-                                <span class="icon">+</span>
-                                <span class="text">户口本个人页</span>
-                            </div>
-                            <img class="preview-img" style="display: none;">
-                            <input type="file" name="hukou_personal" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-                                data-max-size-mb="10" title="请上传户口本个人页照片（JPG/PNG，≤10MB）" onchange="previewFile(this)">
-                        </div>
-                    </div>
-                </div>
+                <a class="nav-cta" href="/apply">在线报名</a>
             </div>
         </div>
-    </template>
 
-    <script src="/static/js/script.js"></script>
-    <script>
-        let jobCategoriesConfig = null;
+        <section class="hero">
+            <div class="site-shell hero-grid">
+                <div class="hero-copy">
+                    <p class="hero-kicker">阳泉本地专业特种作业培训机构</p>
+                    <h1>特种作业培训・正规考证・全国通用证书</h1>
+                    <p class="hero-lead">
+                        立足山西省阳泉市，面向个人及企业提供正规特种作业人员安全技术培训、考试辅导、证书复审及企业安全培训服务，帮助学员合规取证、安全上岗。
+                    </p>
 
-        async function loadJobCategories() {
-            try {
-                const response = await fetch('/api/config/job_categories');
-                if (!response.ok) {
-                    throw new Error('Failed to load job categories');
-                }
-                jobCategoriesConfig = await response.json();
-                window.jobCategoriesConfigRaw = jobCategoriesConfig;
-                document.querySelectorAll('.student-entry').forEach(entry => initializeStudentEntry(entry, true));
-            } catch (error) {
-                console.error('Error loading job categories:', error);
-            }
-        }
+                    <div class="hero-actions">
+                        <a class="btn-primary" href="/apply">立即报名</a>
+                        <a class="btn-secondary" href="tel:13703531055">电话咨询</a>
+                    </div>
 
-        function findTrainingTypeByCategory(categoryName) {
-            if (!categoryName || !jobCategoriesConfig) return '';
-            let found = '';
-            Object.keys(jobCategoriesConfig).forEach(trainingType => {
-                const categories = jobCategoriesConfig[trainingType]?.job_categories || [];
-                if (categories.some(category => category.name === categoryName)) {
-                    found = trainingType;
-                }
-            });
-            return found;
-        }
+                    <ul class="hero-highlights">
+                        <li>正规资质</li>
+                        <li>规范教学</li>
+                        <li>实操训练</li>
+                        <li>一站式服务</li>
+                    </ul>
+                </div>
 
-        function populateCombinedCategories(entry, keepCategory = '') {
-            const categorySelect = entry.querySelector('select[name="job_category"]');
-            if (!categorySelect) return;
+                <aside class="hero-panel" aria-label="服务概览">
+                    <p class="panel-label">核心服务</p>
+                    <h2>围绕培训、考证、复审与企业安全培训，建立规范服务流程。</h2>
+                    <ul class="panel-list">
+                        <li>特种作业人员安全技术培训</li>
+                        <li>考试辅导与报考流程支持</li>
+                        <li>证书复审与资料提交指导</li>
+                        <li>企业安全培训与岗位能力提升</li>
+                    </ul>
+                    <div class="panel-note">
+                        强调合规培训、安全上岗，坚持严谨、规范、可信的培训服务标准。
+                    </div>
+                </aside>
+            </div>
+        </section>
+    </header>
 
-            categorySelect.innerHTML = '<option value="">请选择</option>';
+    <main>
+        <section class="section" id="about">
+            <div class="site-shell">
+                <div class="section-heading">
+                    <p class="section-kicker">关于我们</p>
+                    <h2>立足阳泉，面向本地个人和企业提供规范可靠的培训支持。</h2>
+                </div>
 
-            if (jobCategoriesConfig) {
-                Object.keys(jobCategoriesConfig).forEach(trainingType => {
-                    const typeConfig = jobCategoriesConfig[trainingType];
-                    const optgroup = document.createElement('optgroup');
-                    optgroup.label = typeConfig?.name || trainingType;
+                <div class="about-grid">
+                    <div class="about-copy-card">
+                        <p>
+                            阳泉精技特种作业人员培训有限公司专注特种作业人员安全技术培训服务，围绕培训、考证、复审及企业安全培训等业务，持续为阳泉本地学员和企业提供规范、专业、可靠的培训支持。
+                        </p>
+                        <p>
+                            公司坚持资质正规、师资专业、教学规范的办学要求，注重理论与实操并重，培训流程清晰、服务衔接顺畅，学员考试通过率保持较高水平。
+                        </p>
+                        <div class="about-emphasis">
+                            核心定位：阳泉本地专业、合规、权威的特种作业培训机构。
+                        </div>
+                    </div>
 
-                    (typeConfig?.job_categories || []).forEach(category => {
-                        const option = document.createElement('option');
-                        option.value = category.name;
-                        option.textContent = category.name;
-                        option.dataset.trainingType = trainingType;
-                        optgroup.appendChild(option);
-                    });
+                    <div class="trust-grid">
+                        <article class="trust-card">
+                            <h3>资质正规</h3>
+                            <p>坚持按照相关要求开展特种作业培训服务，强调合规组织与规范管理。</p>
+                        </article>
+                        <article class="trust-card">
+                            <h3>师资专业</h3>
+                            <p>围绕岗位能力提升与考试要求组织教学，突出重点、难点和实操要点。</p>
+                        </article>
+                        <article class="trust-card">
+                            <h3>教学规范</h3>
+                            <p>坚持理论教学、实操训练、考试辅导相结合，确保培训流程清晰有序。</p>
+                        </article>
+                        <article class="trust-card">
+                            <h3>服务完善</h3>
+                            <p>从咨询报名到考证复审提供衔接服务，减少学员办理过程中的重复沟通成本。</p>
+                        </article>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-                    categorySelect.appendChild(optgroup);
-                });
-            }
+        <section class="section section-muted" id="programs">
+            <div class="site-shell">
+                <div class="section-heading">
+                    <p class="section-kicker">培训项目</p>
+                    <h2>围绕重点岗位开展专项培训，突出规范操作与安全意识。</h2>
+                </div>
 
-            if (keepCategory) {
-                categorySelect.value = keepCategory;
-            }
-        }
+                <div class="program-grid">
+                    <article class="program-card">
+                        <h3>高压电工 / 低压电工</h3>
+                        <p>系统讲授电工作业安全技术知识与规范操作要求，强化上岗必备能力。</p>
+                    </article>
+                    <article class="program-card">
+                        <h3>焊接与热切割作业</h3>
+                        <p>围绕焊接、切割等作业场景开展理论与实操培训，突出安全防护与标准流程。</p>
+                    </article>
+                    <article class="program-card">
+                        <h3>高处作业</h3>
+                        <p>针对登高架设、安装维护等场景开展专项培训，强化风险辨识与安全作业能力。</p>
+                    </article>
+                    <article class="program-card">
+                        <h3>制冷与空调作业</h3>
+                        <p>覆盖制冷与空调设备运行、维护及安全操作要点，满足岗位持证要求。</p>
+                    </article>
+                    <article class="program-card">
+                        <h3>其他特种作业</h3>
+                        <p>可根据政策要求及企业岗位需求，提供相关项目咨询、报名与培训服务。</p>
+                    </article>
+                </div>
+            </div>
+        </section>
 
-        function updateExamProjectOptions(categorySelect, keepProject = '') {
-            const entry = categorySelect.closest('.student-entry');
-            const projectSelect = entry.querySelector('select[name="exam_project"]');
-            const projectCodeInput = entry.querySelector('input[name="project_code"]');
-            const selectedCategory = categorySelect.value;
-            const selectedOption = categorySelect.options[categorySelect.selectedIndex];
-            let selectedTrainingType = '';
+        <section class="section" id="guide">
+            <div class="site-shell">
+                <div class="section-heading">
+                    <p class="section-kicker">报考须知</p>
+                    <h2>报名材料、培训流程和取证节奏公开清晰，便于学员提前准备。</h2>
+                </div>
 
-            projectSelect.innerHTML = '<option value="">请选择操作项目</option>';
-            projectCodeInput.value = '';
+                <div class="guide-grid">
+                    <article class="guide-card">
+                        <h3>报考条件</h3>
+                        <p>年满 18 周岁，身体健康，具备相应文化程度，并符合国家规定的特种作业报考条件。</p>
+                    </article>
+                    <article class="guide-card">
+                        <h3>报名材料</h3>
+                        <p>身份证明、学历证明、个人照片、联系方式等；复审业务按要求提交原证及相关资料。</p>
+                    </article>
+                    <article class="guide-card">
+                        <h3>培训流程</h3>
+                        <p>咨询报名 → 资料审核 → 理论培训 → 实操训练 → 考试辅导 → 参加考试/复审。</p>
+                    </article>
+                    <article class="guide-card">
+                        <h3>拿证周期</h3>
+                        <p>以主管部门考试安排、审核进度及当期通知为准，报名后由老师统一告知节点时间。</p>
+                    </article>
+                </div>
+            </div>
+        </section>
 
-            if (selectedOption && selectedOption.dataset.trainingType) {
-                selectedTrainingType = selectedOption.dataset.trainingType;
-            } else {
-                selectedTrainingType = findTrainingTypeByCategory(selectedCategory);
-            }
-            updateAttachmentVisibility(entry, selectedTrainingType);
+        <section class="section section-dark" id="strength">
+            <div class="site-shell">
+                <div class="section-heading section-heading-light">
+                    <p class="section-kicker">教学实力</p>
+                    <h2>坚持标准化组织、实操化训练和全过程服务，帮助学员稳步完成培训与报考。</h2>
+                </div>
 
-            if (selectedCategory && jobCategoriesConfig) {
-                let foundProjects = null;
+                <div class="advantage-grid">
+                    <article class="advantage-card">
+                        <h3>正规资质</h3>
+                        <p>严格按照相关要求开展培训服务。</p>
+                    </article>
+                    <article class="advantage-card">
+                        <h3>实操教学</h3>
+                        <p>理论学习与现场训练同步推进。</p>
+                    </article>
+                    <article class="advantage-card">
+                        <h3>考场标准</h3>
+                        <p>训练流程贴近考试要求与作业规范。</p>
+                    </article>
+                    <article class="advantage-card">
+                        <h3>通过率高</h3>
+                        <p>教学组织规范，辅导更有针对性。</p>
+                    </article>
+                    <article class="advantage-card">
+                        <h3>一站式服务</h3>
+                        <p>报名、培训、辅导、复审咨询全流程衔接。</p>
+                    </article>
+                </div>
 
-                const targetTypes = selectedTrainingType ? [selectedTrainingType] : Object.keys(jobCategoriesConfig);
-                targetTypes.forEach(trainingType => {
-                    const typeConfig = jobCategoriesConfig[trainingType];
-                    const category = typeConfig?.job_categories?.find(c => c.name === selectedCategory);
-                    if (category) {
-                        foundProjects = category.exam_projects;
-                    }
-                });
+                <div class="environment-block">
+                    <div class="environment-copy">
+                        <p class="section-kicker">教学环境</p>
+                        <h3>配备规范化教学与实训条件，注重设备操作演示、安全规范讲解与现场训练。</h3>
+                    </div>
 
-                if (foundProjects) {
-                    foundProjects.forEach(project => {
-                        const option = document.createElement('option');
-                        option.value = project.name;
-                        option.textContent = project.code ? `${project.name} (${project.code})` : project.name;
-                        option.dataset.code = project.code || '';
-                        if (keepProject && keepProject === project.name) {
-                            option.selected = true;
-                            projectCodeInput.value = project.code || '';
-                        }
-                        projectSelect.appendChild(option);
-                    });
-                }
-            }
-        }
+                    <div class="environment-grid">
+                        <article class="environment-card environment-card-ground">
+                            <div class="environment-overlay">
+                                <strong>实训场地展示</strong>
+                                <span>规范化训练空间，突出现场教学组织。</span>
+                            </div>
+                        </article>
+                        <article class="environment-card environment-card-equipment">
+                            <div class="environment-overlay">
+                                <strong>教学设备展示</strong>
+                                <span>贴近岗位场景，强化设备认知与操作训练。</span>
+                            </div>
+                        </article>
+                        <article class="environment-card environment-card-safety">
+                            <div class="environment-overlay">
+                                <strong>安全规范展示</strong>
+                                <span>围绕标准流程和风险防控开展规范讲解。</span>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-        function updateProjectCode(projectSelect) {
-            const entry = projectSelect.closest('.student-entry');
-            const projectCodeInput = entry.querySelector('input[name="project_code"]');
-            const selectedOption = projectSelect.options[projectSelect.selectedIndex];
+        <section class="section" id="news">
+            <div class="site-shell">
+                <div class="section-heading">
+                    <p class="section-kicker">新闻动态</p>
+                    <h2>围绕政策解读、培训安排和企业服务信息，保持持续更新。</h2>
+                </div>
 
-            if (selectedOption && selectedOption.dataset.code) {
-                projectCodeInput.value = selectedOption.dataset.code;
-            } else {
-                projectCodeInput.value = '';
-            }
-        }
+                <div class="news-grid">
+                    <article class="news-card">
+                        <span class="news-tag">政策解读</span>
+                        <h3>特种作业持证上岗与合规培训政策解读</h3>
+                        <p>聚焦持证要求、培训规范与安全责任，帮助学员和企业明确上岗合规要求。</p>
+                    </article>
+                    <article class="news-card">
+                        <span class="news-tag">培训通知</span>
+                        <h3>培训开班通知、考试安排将持续更新</h3>
+                        <p>开班、辅导、考试及复审相关通知将根据实际安排及时发布，方便学员掌握时间节点。</p>
+                    </article>
+                    <article class="news-card">
+                        <span class="news-tag">企业服务</span>
+                        <h3>企业团体报名、证书复审与安全培训可电话咨询</h3>
+                        <p>面向企业提供团体报名沟通、资料整理指导及安全培训支持，提升组织办理效率。</p>
+                    </article>
+                </div>
+            </div>
+        </section>
 
-        function updateAttachmentVisibility(entry, trainingType) {
-            const uploadGrid = entry.querySelector('.upload-grid');
-            const attachmentGroups = uploadGrid.querySelectorAll('[data-attachment]');
+        <section class="section section-contact" id="contact">
+            <div class="site-shell contact-grid">
+                <div class="contact-copy">
+                    <p class="section-kicker">联系我们</p>
+                    <h2>阳泉精技特种作业人员培训有限公司</h2>
+                    <ul class="contact-list">
+                        <li><span>所在地</span><strong>山西省阳泉市</strong></li>
+                        <li><span>联系人</span><strong>霍老师 13703531055</strong></li>
+                        <li><span>服务范围</span><strong>特种作业培训、正规考证、证书复审、企业安全培训</strong></li>
+                    </ul>
+                </div>
 
-            let requiredAttachments = [];
-            if (jobCategoriesConfig && jobCategoriesConfig[trainingType]) {
-                requiredAttachments = jobCategoriesConfig[trainingType].attachments || [];
-            }
+                <div class="contact-card">
+                    <h3>报名与咨询通道</h3>
+                    <p>欢迎个人学员及企业客户来电咨询培训项目、报考条件、复审流程及开班安排。</p>
+                    <div class="contact-actions">
+                        <a class="btn-primary" href="tel:13703531055">拨打电话</a>
+                        <a class="btn-secondary btn-secondary-dark" href="/apply">在线报名</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
 
-            attachmentGroups.forEach(group => {
-                const attachmentName = group.dataset.attachment;
-                if (requiredAttachments.includes(attachmentName)) {
-                    group.style.display = '';
-                    const input = group.querySelector('input[type="file"]');
-                    if (input) {
-                        input.required = true;
-                    }
-                } else {
-                    group.style.display = 'none';
-                    const input = group.querySelector('input[type="file"]');
-                    if (input) {
-                        input.required = false;
-                        input.value = '';
-                        const img = group.querySelector('.preview-img');
-                        const placeholder = group.querySelector('.upload-placeholder');
-                        if (img) { img.style.display = 'none'; img.src = ''; }
-                        if (placeholder) { placeholder.style.display = 'block'; }
-                    }
-                }
-            });
-        }
+    <footer class="site-footer">
+        <div class="site-shell footer-inner">
+            <p>阳泉精技特种作业人员培训有限公司 版权所有</p>
+        </div>
+    </footer>
 
-        function initializeStudentEntry(entry, keepValues = false) {
-            const categorySelect = entry.querySelector('select[name="job_category"]');
-            const currentCategory = keepValues ? (categorySelect?.value || '') : '';
-            const currentProject = keepValues ? (entry.querySelector('select[name="exam_project"]')?.value || '') : '';
+    <div class="floating-actions" aria-label="快捷操作">
+        <a class="floating-action floating-action-primary" href="/apply">
+            <span>在线报名</span>
+            <small>进入信息采集</small>
+        </a>
+        <a class="floating-action floating-action-secondary" href="tel:13703531055">
+            <span>电话咨询</span>
+            <small>霍老师 13703531055</small>
+        </a>
+    </div>
 
-            populateCombinedCategories(entry, currentCategory);
-
-            if (currentCategory) {
-                updateExamProjectOptions(categorySelect, currentProject);
-            } else {
-                updateAttachmentVisibility(entry, '');
-            }
-        }
-
-        // ─── Arithmetic CAPTCHA ───
-        let captchaAnswer = null;
-
-        function generateCaptcha() {
-            const ops = ['+', '-', '×'];
-            const op = ops[Math.floor(Math.random() * ops.length)];
-            let a, b, answer;
-            if (op === '+') {
-                a = Math.floor(Math.random() * 50) + 1;
-                b = Math.floor(Math.random() * 50) + 1;
-                answer = a + b;
-            } else if (op === '-') {
-                a = Math.floor(Math.random() * 50) + 10;
-                b = Math.floor(Math.random() * a);
-                answer = a - b;
-            } else {
-                a = Math.floor(Math.random() * 12) + 1;
-                b = Math.floor(Math.random() * 12) + 1;
-                answer = a * b;
-            }
-            captchaAnswer = answer;
-            document.getElementById('captchaQuestion').textContent = `${a} ${op} ${b}`;
-            document.getElementById('captchaInput').value = '';
-            document.getElementById('captchaError').style.display = 'none';
-        }
-
-        function verifyCaptcha() {
-            const input = document.getElementById('captchaInput').value.trim();
-            if (input === '' || parseInt(input, 10) !== captchaAnswer) {
-                document.getElementById('captchaError').style.display = 'inline';
-                document.getElementById('captchaInput').focus();
-                generateCaptcha();
-                return false;
-            }
-            document.getElementById('captchaError').style.display = 'none';
-            return true;
-        }
-
-        // Expose verifyCaptcha globally so script.js can call it before submit
-        window.verifyCaptcha = verifyCaptcha;
-        window.refreshCaptcha = generateCaptcha;
-
-        document.addEventListener('DOMContentLoaded', function () {
-            window.initializeStudentEntry = initializeStudentEntry;
-            loadJobCategories();
-            generateCaptcha();
-            document.getElementById('refreshCaptcha').addEventListener('click', generateCaptcha);
-        });
-    </script>
+    <div class="mobile-actions" aria-label="移动快捷操作">
+        <a class="mobile-action mobile-action-primary" href="/apply">在线报名</a>
+        <a class="mobile-action mobile-action-secondary" href="tel:13703531055">电话咨询</a>
+    </div>
 </body>
 
 </html>
