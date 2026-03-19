@@ -1124,15 +1124,15 @@ section[id] {
     }
 
     .mobile-action-primary {
-        background: linear-gradient(135deg, #c7a86a 0%, #dac497 100%);
-        color: #18212a;
-        box-shadow: 0 10px 24px rgba(199, 168, 106, 0.18);
+        background: linear-gradient(150deg, rgba(11, 30, 49, 0.96), rgba(23, 59, 91, 0.96));
+        color: #f7fbff;
+        box-shadow: 0 12px 24px rgba(8, 26, 43, 0.18);
     }
 
     .mobile-action-secondary {
-        background: rgba(255, 255, 255, 0.08);
-        color: #f7fbff;
-        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(251, 248, 242, 0.96);
+        color: var(--home-primary);
+        border: 1px solid rgba(199, 168, 106, 0.18);
     }
 
     .site-footer {
