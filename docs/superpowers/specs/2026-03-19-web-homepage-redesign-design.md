@@ -1,229 +1,229 @@
-# Web Homepage Redesign Design
+# 官网首页改版设计说明
 
-Date: 2026-03-19
-Status: Approved in brainstorming
-Scope: `/Users/Ditto/Documents/jingjipeixun/training_system/templates/index.html`, `/Users/Ditto/Documents/jingjipeixun/training_system/static/css/home.css`
+日期：2026-03-19
+状态：已在设计确认阶段通过
+范围：`/Users/Ditto/Documents/jingjipeixun/training_system/templates/index.html`、`/Users/Ditto/Documents/jingjipeixun/training_system/static/css/home.css`
 
-## 1. Summary
+## 1. 背景与结论
 
-Redesign the public web homepage for 阳泉精技特种作业人员培训有限公司 using the approved direction:
+本次任务是对阳泉精技特种作业人员培训有限公司官网首页进行改版，采用已经确认的方向：
 
-- Visual direction: 权威稳重
-- Execution level: 结构升级
+- 视觉方向：权威稳重
+- 改版强度：结构升级
 
-The redesign should keep the existing content model and main section set, but significantly improve first-screen clarity, trust signaling, visual hierarchy, and call-to-action strength. The page should feel like a credible local training institution website rather than a generic marketing template.
+改版不推翻现有站点结构，不新增后端能力，也不扩展到其他页面。重点是在保留现有内容框架的前提下，明显提升首页首屏说服力、可信度、信息层级和行动引导，让页面更像正规本地培训机构官网，而不是常见模板式宣传页。
 
-## 2. Goals
+## 2. 目标
 
-1. Build trust quickly in the first screen through a more official, grounded presentation.
-2. Make the primary actions obvious: online application and phone consultation.
-3. Reorder and restyle content so users can understand the institution, services, process, and contact path without scanning dense copy.
-4. Preserve the current site architecture and routes while improving the homepage presentation.
-5. Keep the page responsive and readable on mobile, including preserving the mobile bottom CTA bar.
+1. 在首屏更快建立信任感，突出正规、合规、本地、可靠的机构形象。
+2. 让“在线报名”和“电话咨询”成为用户无需思考就能看到的主动作。
+3. 让用户更容易理解机构能提供什么服务、适合谁、报名大致怎么走。
+4. 保持现有站点路由、主要板块和内容语义不变，仅优化呈现方式。
+5. 保证桌面端和移动端都能稳定使用，继续保留移动端底部 CTA。
 
-## 3. Non-Goals
+## 3. 非目标
 
-1. No backend changes.
-2. No routing changes.
-3. No CMS or dynamic news system.
-4. No fabricated metrics or unverifiable business claims.
-5. No redesign of `/apply`, `/login`, `/admin`, or the mini-program pages in this task.
+1. 不修改后端逻辑。
+2. 不调整现有页面路由。
+3. 不引入新闻后台、CMS 或动态内容系统。
+4. 不添加无法核实的数据、数字指标或夸张宣传语。
+5. 不在本次任务中改动 `/apply`、`/login`、`/admin` 和小程序页面。
 
-## 4. Current Problems
+## 4. 当前首页存在的问题
 
-The current homepage is structurally complete but visually too even. The main issues are:
+当前首页已经具备完整板块，但存在以下问题：
 
-1. The hero area introduces the business but does not establish trust and action priority strongly enough.
-2. Section cards use a mostly uniform pattern, so the page lacks pacing and memorable hierarchy.
-3. Important trust cues such as local service scope, compliance, training flow, and contact convenience are present but not emphasized enough.
-4. The design language is respectable but still reads as a polished template rather than a distinct institutional homepage.
+1. 首屏虽然有完整介绍，但“可信机构”和“下一步该做什么”传达得还不够强。
+2. 页面中的卡片样式过于平均，导致整页节奏偏平，记忆点不足。
+3. 本地服务、合规培训、报名流程、企业服务这些关键信任信息都在页面中，但缺少优先展示。
+4. 现有视觉语言相对稳妥，但更像“做得还不错的通用模板”，机构辨识度不够强。
 
-## 5. Chosen Design Direction
+## 5. 确认后的设计方向
 
-The page will remain in a deep blue and muted gold palette, but the redesign will make the system more controlled and institutional:
+页面主视觉继续沿用深蓝和金色体系，但会做得更克制、更正式：
 
-1. Deep blue remains the dominant trust color.
-2. Gold becomes a restrained accent for premium and official cues.
-3. Warm off-white and pale sand surfaces will be introduced to reduce the cold, generic look of blue-on-gray.
-4. Typography and spacing will shift toward calmer authority instead of high-energy marketing.
+1. 深蓝继续作为信任和权威主色。
+2. 金色只作为强调色使用，不做大面积装饰。
+3. 增加米白、浅砂色等暖色表面，减轻原页面偏冷、偏模板化的观感。
+4. 字体、留白和卡片节奏都更偏“机构官网”而不是“营销页冲击感”。
 
-This is not a full reinvention. It is a structured upgrade of the current homepage with a stronger narrative and clearer conversion path.
+这不是一次全面重建，而是在现有首页结构上做一次重点明确、层级更强的升级。
 
-## 6. Information Architecture
+## 6. 信息架构
 
-The homepage will keep the current overall section set, with stronger prioritization:
+首页保留现有主要板块，但重新强化优先级：
 
-1. Header / navigation
-2. Hero
-3. Trust highlights strip
-4. About
-5. Programs
-6. Application guide
-7. Teaching strength
-8. News
-9. Contact / closing CTA
-10. Footer
+1. 顶部导航
+2. 首屏 Hero
+3. 首屏下方信任亮点条
+4. 关于我们
+5. 培训项目
+6. 报考指南
+7. 教学实力
+8. 新闻动态
+9. 联系我们与收口 CTA
+10. 页脚
 
-Compared with the current page, the main change is that the top of the page will work harder:
+与当前页面相比，最大的变化是首页顶部的叙事会更强：
 
-1. The hero will directly state the institution type, value, and two primary actions.
-2. A compact trust/highlight strip will sit immediately below the hero to reinforce credibility.
-3. Mid-page sections will use more varied layouts so the page does not feel repetitive.
+1. 首屏直接说明机构定位、服务范围和主动作。
+2. 首屏下方增加或强化一组短句式信任亮点。
+3. 中后段板块继续保留，但版式不再过于平均，避免全页看起来像重复卡片堆叠。
 
-## 7. Section Design
+## 7. 分区设计
 
-### 7.1 Header
+### 7.1 顶部导航
 
-Keep the sticky header and main navigation, but refine presentation:
+保留当前吸顶头部、品牌信息、导航锚点和 `/apply` 按钮，但优化质感：
 
-1. Tighten spacing and alignment to make the header feel more premium.
-2. Preserve the current logo, company name, nav links, and `/apply` CTA.
-3. Keep the semi-transparent dark backdrop, but make it slightly cleaner and less heavy.
+1. 收紧头部间距，让排版更利落。
+2. 保留现有 logo、公司名称、导航项和报名按钮。
+3. 继续使用半透明深色底，但降低厚重感，让导航更干净。
 
-### 7.2 Hero
+### 7.2 首屏 Hero
 
-The hero is the primary upgrade area.
+首屏是本次改版的重点区域。
 
-Changes:
+改动方向：
 
-1. Reframe the hero copy so the first lines communicate trust and service scope more directly.
-2. Keep two main CTAs: `立即报名` and `电话咨询`.
-3. Replace the current side panel feel with a more integrated right-side information block composed of compact cards.
-4. Use the right-side block to summarize:
-   - institution trust/service highlights
-   - simplified application flow
-   - a contact shortcut
-5. Preserve the current dark institutional mood, but create more contrast between the left content area and right support cards.
+1. 重写首屏信息顺序，让用户第一眼先看到“正规培训机构 + 提供哪些服务 + 怎么联系”。
+2. 保留两个核心按钮：`立即报名` 和 `电话咨询`。
+3. 右侧不再只是单一说明面板，而是改成更整合的信息卡区域。
+4. 右侧卡片重点承载三类内容：
+   - 机构可信与服务亮点
+   - 简化后的报名流程提示
+   - 联系方式或快捷入口
+5. 首屏整体仍然保持深色、稳重、正式的氛围，但左右信息对比要更清晰。
 
-The hero should answer three questions at a glance:
+改版后的首屏需要在短时间回答三个问题：
 
-1. What kind of institution is this?
-2. What services can I get here?
-3. What should I click next?
+1. 这是什么机构？
+2. 这里能办理什么？
+3. 我现在应该点哪里？
 
-### 7.3 Trust Highlights Strip
+### 7.3 信任亮点条
 
-Add or strengthen a slim highlight band immediately under the hero. This band should present short-value statements such as:
+在首屏下方增加或强化一条简短的信任亮点区域，内容采用短语式表达，例如：
 
 1. 阳泉本地服务
 2. 培训 + 考证 + 复审
 3. 企业安全培训
 4. 规范教学流程
 
-This strip exists to create fast scanning value on desktop and to reduce the perceived gap between hero and content sections.
+它的作用不是增加信息量，而是帮助用户快速扫读，并把首屏和下方正文更自然地连接起来。
 
-### 7.4 About
+### 7.4 关于我们
 
-Keep the current two-column structure concept, but reduce text wall effect:
+保留当前“双列 + 说明卡”的结构思路，但弱化文字墙效果：
 
-1. Tighten paragraphs.
-2. Turn the existing supporting trust cards into a more deliberate credibility grid.
-3. Preserve the company positioning statement, but present it as a stronger emphasis block.
+1. 精简段落节奏，让阅读压力更低。
+2. 现有的信任卡片改成更明确的机构能力说明网格。
+3. 公司定位语继续保留，但以更明显的强调块呈现。
 
-### 7.5 Programs
+### 7.5 培训项目
 
-Retain the existing training program section, but improve card hierarchy:
+保留当前培训项目区块，但让它更像服务目录而不是普通卡片列表：
 
-1. Keep program cards as a grid.
-2. Strengthen titles and spacing so the section reads more like a service catalog.
-3. Ensure the cards do not visually blend into the surrounding sections.
+1. 继续使用网格布局。
+2. 强化项目标题和卡片层级。
+3. 通过留白、背景和边框处理，避免和周围板块混在一起。
 
-### 7.6 Application Guide
+### 7.6 报考指南
 
-This section should become clearer and more process-oriented.
+这一块要更清楚地承担“降低疑虑”的作用。
 
-Changes:
+改动方向：
 
-1. Keep the current four topics: conditions, materials, flow, cycle.
-2. Style them more like a step-aware process block rather than generic cards.
-3. Make `培训流程` especially easy to scan.
+1. 保留当前四个主题：报考条件、报名材料、培训流程、拿证周期。
+2. 视觉上更接近流程式信息，而不是四张普通介绍卡。
+3. `培训流程` 需要做成更容易一扫而过的结构。
 
-This is one of the highest-conversion sections because it reduces uncertainty before users contact the business.
+这是首页转化价值较高的一块，因为它直接减少用户在报名前的不确定感。
 
-### 7.7 Teaching Strength
+### 7.7 教学实力
 
-Keep this section as the main proof block:
+这一块继续作为“证明区”存在：
 
-1. Preserve the darker background for contrast and pacing.
-2. Keep the advantage cards, but make them feel more intentional and less repetitive.
-3. Preserve the training environment subsection and its visual cards.
-4. Increase the sense that this section demonstrates training seriousness, not just decoration.
+1. 保留深色背景，拉开与其他板块的节奏差异。
+2. 保留优势卡片，但让每张卡更有主次，不只是重复模块。
+3. 保留训练环境子区块和当前环境展示卡片的思路。
+4. 让这一部分传达“培训组织严谨、实操训练规范”的感受，而不是单纯做视觉装饰。
 
-### 7.8 News
+### 7.8 新闻动态
 
-Keep this section lightweight:
+新闻区保持轻量即可：
 
-1. Preserve the current three-card structure.
-2. Ensure it does not compete visually with the trust and guide sections.
-3. It should support freshness and legitimacy, not dominate the page.
+1. 保留当前三张卡片结构。
+2. 不让它在视觉上抢过报考指南和信任信息。
+3. 它的作用是补充“持续更新”和“机构正常运作”的感觉，而不是成为首页主角。
 
-### 7.9 Contact / Closing CTA
+### 7.9 联系我们与收口 CTA
 
-This section should close the page more decisively.
+页面底部需要更明确地收口：
 
-1. Preserve the company name, location, contact person, and service range.
-2. Strengthen the closing CTA card so the page ends with a clear next step.
-3. Ensure both phone and online application actions remain immediately visible.
+1. 保留公司名称、所在地区、联系人和服务范围。
+2. 强化联系卡片，让页面收尾时仍然给出明确下一步。
+3. 电话咨询和在线报名必须持续清晰可见。
 
-## 8. Responsive Behavior
+## 8. 响应式要求
 
-The redesign must maintain full mobile usability.
+改版必须完整覆盖移动端体验。
 
-Desktop:
+桌面端：
 
-1. Use a visually richer hero with a left-right composition.
-2. Preserve enough whitespace to feel authoritative rather than crowded.
+1. 首屏采用更强的左右布局，提升信息层级。
+2. 留白要足够，不能为了塞信息破坏稳重感。
 
-Tablet:
+平板端：
 
-1. Collapse multi-column sections cleanly.
-2. Keep CTAs visible without forcing excessive scrolling.
+1. 多列内容要自然折叠。
+2. CTA 仍然要明显，不要因为压缩布局而弱化。
 
-Mobile:
+移动端：
 
-1. Re-stack the hero so the main copy appears before support cards.
-2. Keep the bottom fixed CTA bar.
-3. Reduce text density and card padding where needed.
-4. Ensure important trust highlights remain visible early in the page.
+1. 首屏先展示主文案，再展示辅助信息卡。
+2. 继续保留底部固定操作条。
+3. 根据屏宽收紧文字密度和卡片内边距。
+4. 确保信任亮点仍然在前几屏内能看到。
 
-## 9. Technical Implementation Notes
+## 9. 技术实现说明
 
-This redesign should primarily be implemented by editing the existing homepage template and stylesheet.
+本次改版应尽量通过修改现有首页模板和样式表完成。
 
-Expected file responsibility:
+预期文件职责：
 
 1. `/Users/Ditto/Documents/jingjipeixun/training_system/templates/index.html`
-   - Adjust section markup where needed for improved structure and hierarchy.
-   - Introduce any new hero support card markup and trust highlight strip markup.
+   - 视需要调整局部结构，使信息层级更清楚。
+   - 增加新的首屏辅助卡片结构和信任亮点条结构。
 2. `/Users/Ditto/Documents/jingjipeixun/training_system/static/css/home.css`
-   - Redefine visual system variables if needed.
-   - Update hero, cards, section spacing, and responsive rules.
-   - Preserve current working behavior for floating and mobile actions.
+   - 重新整理首页视觉变量。
+   - 更新首屏、卡片、分区间距和响应式样式。
+   - 保留现有桌面悬浮操作和移动端固定操作条的有效行为。
 
-JavaScript changes are not expected for this task unless minor presentational behavior is required.
+本任务原则上不需要修改 JavaScript，除非出现轻量级展示行为需求。
 
-## 10. Risks and Constraints
+## 10. 风险与约束
 
-1. Overwriting too much structure would push this into a full redesign, which is out of scope.
-2. Overusing gold accents would make the page feel decorative rather than authoritative.
-3. Introducing fake metrics or unsupported proof points would reduce credibility.
-4. Mobile hero density must be watched closely; the redesign should not create a crowded first screen on small devices.
+1. 如果大幅改写过多结构，会把任务推成“全站重做”，这超出本次范围。
+2. 金色如果使用过重，会从“正式”变成“装饰感过强”。
+3. 如果加入没有依据的数字或背书信息，会直接削弱可信度。
+4. 移动端首屏必须控制信息密度，避免出现拥挤和首屏过高的问题。
 
-## 11. Testing and Verification
+## 11. 验证方式
 
-Implementation should be verified with:
+实现完成后至少需要检查：
 
-1. Visual review of desktop layout, especially hero hierarchy and CTA emphasis.
-2. Visual review at tablet and mobile widths.
-3. Anchor navigation sanity check.
-4. CTA path sanity check for `/apply` and `tel:13703531055`.
-5. Check that floating desktop actions and mobile fixed actions remain readable and do not overlap content incorrectly.
+1. 桌面端视觉层级，尤其是首屏标题、说明和 CTA 的主次关系。
+2. 平板和移动端布局是否自然折叠。
+3. 锚点导航是否正常工作。
+4. `/apply` 与 `tel:13703531055` 两条 CTA 路径是否正常。
+5. 桌面端悬浮操作和移动端底部操作条是否遮挡内容或出现样式冲突。
 
-## 12. Definition of Done
+## 12. 完成标准
 
-The task is complete when:
+满足以下条件即可视为本次任务完成：
 
-1. The homepage clearly reflects the approved direction: 权威稳重 + 结构升级.
-2. The hero communicates trust, service scope, and action path more clearly than the current version.
-3. The page feels more distinctive and more official without adding unsupported claims.
-4. Desktop and mobile layouts both remain polished and usable.
+1. 首页能够明确体现“权威稳重 + 结构升级”的已确认方向。
+2. 首屏比当前版本更清楚地表达机构可信度、服务范围和用户下一步动作。
+3. 页面整体更像正式机构官网，同时不引入无法证明的宣传信息。
+4. 桌面端和移动端都保持良好可用性和完整视觉质量。
