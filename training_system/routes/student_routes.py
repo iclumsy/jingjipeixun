@@ -612,6 +612,20 @@ def update_student_route(id):
                     fields={attachment_field: '该培训项目下此附件为必传项'}
                 )
 
+        # ======= 【新增防线：处理学员修改的越权与并发冲突】 =======
+        if get_mini_user() and not is_mini_admin():
+            # 1. 防止越权：无情剔除前端自己伪造的 status 字段，杜绝自己给自己“盖章通过审核”
+            if 'status' in updates:
+                del updates['status']
+                
+            # 2. 防止 ABA 并发流转：如果此时数据库已经是通过状态（管理员刚批完），报错拦截他提交，保留你的审核成果
+            if current_student.get('status') == 'reviewed':
+                raise AppError('管理员刚刚已审核通过，无法再提交修改', status_code=403)
+                
+            # 3. 强制降维：既然他确实重新编辑并提交了图片或文字，强制恢复为待审核状态
+            updates['status'] = 'unreviewed'
+        # =========================================================
+
         # 执行数据库更新
         updated_student = update_student(id, updates)
         current_app.logger.info(f'Student updated: ID={id}')
