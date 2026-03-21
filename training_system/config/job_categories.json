@@ -1,75 +1,170 @@
 {
-    "special_operation": {
-        "name": "特种作业",
-        "attachments": ["diploma", "id_card_front", "id_card_back"],
-        "job_categories": [
-            {
-                "name": "电工作业",
-                "exam_projects": [
-                    {"name": "低压电工作业", "code": ""},
-                    {"name": "高压电工作业", "code": ""},
-                    {"name": "电力电缆作业", "code": ""},
-                    {"name": "电气试验作业", "code": ""},
-                    {"name": "继电保护作业", "code": ""},
-                    {"name": "防爆电气作业", "code": ""}
-                ]
-            },
-            {
-                "name": "焊接与热切割作业",
-                "exam_projects": [
-                    {"name": "熔化焊接与热切割作业", "code": ""}
-                ]
-            },
-            {
-                "name": "高处作业",
-                "exam_projects": [
-                    {"name": "登高架设作业", "code": ""},
-                    {"name": "高处安装、维护、拆除作业", "code": ""}
-                ]
-            }
+  "special_operation": {
+    "name": "特种作业",
+    "attachments": [
+      "diploma",
+      "id_card_front",
+      "id_card_back"
+    ],
+    "job_categories": [
+      {
+        "name": "电工作业",
+        "exam_projects": [
+          {
+            "name": "低压电工作业",
+            "code": "",
+            "is_active": 1
+          },
+          {
+            "name": "高压电工作业",
+            "code": "",
+            "is_active": 1
+          },
+          {
+            "name": "电力电缆作业",
+            "code": "",
+            "is_active": 1
+          },
+          {
+            "name": "电气试验作业",
+            "code": "",
+            "is_active": 1
+          },
+          {
+            "name": "继电保护作业",
+            "code": "",
+            "is_active": 1
+          },
+          {
+            "name": "防爆电气作业",
+            "code": "",
+            "is_active": 1
+          }
         ]
-    },
-    "special_equipment": {
-        "name": "特种设备",
-        "attachments": ["photo", "diploma", "id_card_front", "id_card_back", "hukou_residence", "hukou_personal"],
-        "job_categories": [
-            {
-                "name": "特种设备安全管理",
-                "exam_projects": [
-                    {"name": "电梯安全管理", "code": "A"},
-                    {"name": "起重机械安全管理", "code": "A"},
-                    {"name": "锅炉压力容器压力管道安全管理", "code": "A"},
-                    {"name": "场内机动车安全管理", "code": "A"}
-                ]
-            },
-            {
-                "name": "锅炉作业",
-                "exam_projects": [
-                    {"name": "工业锅炉司炉", "code": "G1"},
-                    {"name": "锅炉水处理", "code": "G3"}
-                ]
-            },
-            {
-                "name": "压力容器作业",
-                "exam_projects": [
-                    {"name": "快开门式压力容器操作", "code": "R1"}
-                ]
-            },
-            {
-                "name": "起重机作业",
-                "exam_projects": [
-                    {"name": "起重机指挥", "code": "Q1"},
-                    {"name": "桥式起重机司机", "code": "Q2"},
-                    {"name": "门式起重机司机", "code": "Q2"}
-                ]
-            },
-            {
-                "name": "场(厂)内专用机动车辆作业",
-                "exam_projects": [
-                    {"name": "叉车司机", "code": "N1"},
-                    {"name": "观光车和观光列车司机", "code": "N2"}
-                ]
-            }
+      },
+      {
+        "name": "焊接与热切割作业",
+        "exam_projects": [
+          {
+            "name": "熔化焊接与热切割作业",
+            "code": "",
+            "is_active": 1
+          }
         ]
-    }
+      },
+      {
+        "name": "高处作业",
+        "exam_projects": [
+          {
+            "name": "登高架设作业",
+            "code": "",
+            "is_active": 1
+          },
+          {
+            "name": "高处安装、维护、拆除作业",
+            "code": "",
+            "is_active": 1
+          }
+        ]
+      }
+    ]
+  },
+  "special_equipment": {
+    "name": "特种设备",
+    "attachments": [
+      "photo",
+      "diploma",
+      "id_card_front",
+      "id_card_back",
+      "hukou_residence",
+      "hukou_personal"
+    ],
+    "job_categories": [
+      {
+        "name": "特种设备安全管理",
+        "exam_projects": [
+          {
+            "name": "电梯安全管理",
+            "code": "A",
+            "is_active": 1
+          },
+          {
+            "name": "起重机械安全管理",
+            "code": "A",
+            "is_active": 1
+          },
+          {
+            "name": "锅炉压力容器压力管道安全管理",
+            "code": "A",
+            "is_active": 1
+          },
+          {
+            "name": "场内机动车安全管理",
+            "code": "A",
+            "is_active": 1
+          }
+        ]
+      },
+      {
+        "name": "锅炉作业",
+        "exam_projects": [
+          {
+            "name": "工业锅炉司炉",
+            "code": "G1",
+            "is_active": 1
+          },
+          {
+            "name": "锅炉水处理",
+            "code": "G3",
+            "is_active": 1
+          }
+        ]
+      },
+      {
+        "name": "压力容器作业",
+        "exam_projects": [
+          {
+            "name": "快开门式压力容器操作",
+            "code": "R1",
+            "is_active": 1
+          }
+        ]
+      },
+      {
+        "name": "起重机作业",
+        "exam_projects": [
+          {
+            "name": "起重机指挥",
+            "code": "Q1",
+            "is_active": 1
+          },
+          {
+            "name": "桥式起重机司机",
+            "code": "Q2",
+            "is_active": 1
+          },
+          {
+            "name": "门式起重机司机",
+            "code": "Q2",
+            "is_active": 1
+          }
+        ]
+      },
+      {
+        "name": "场(厂)内专用机动车辆作业",
+        "exam_projects": [
+          {
+            "name": "叉车司机",
+            "code": "N1",
+            "is_active": 1
+          },
+          {
+            "name": "观光车和观光列车司机",
+            "code": "N2",
+            "is_active": 1
+          }
+        ]
+      }
+    ]
+  }
 }

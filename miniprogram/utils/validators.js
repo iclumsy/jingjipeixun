@@ -143,8 +143,8 @@ function validateStudent(student, trainingType) {
     errors.company_address = '请输入单位地址'
   }
 
-  if (!validateRequired(student.job_category)) {
-    errors.job_category = '请选择作业类别'
+  if (!validateRequired(student.training_project_id)) {
+    errors.training_project_id = '请选择报考项目'
   }
 
   // 附件验证

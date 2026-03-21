@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统配置管理</title>
+    <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .table-wrap { background: #fff; padding: 20px; border-radius: 8px; margin-top: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
+        th { background: #f9fafb; font-weight: 600; color: #333; }
+        .btn-toggle { padding: 6px 12px; border-radius: 4px; border: none; cursor: pointer; color: white; transition: all 0.2s ease;}
+        .btn-active { background: #10b981; }
+        .btn-active:hover { background: #059669; }
+        .btn-inactive { background: #ef4444; }
+        .btn-inactive:hover { background: #dc2626; }
+        .btn-add { background: #4f46e5; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: opacity 0.2s ease;}
+        .btn-add:hover { opacity: 0.9; }
+        .form-row { margin-bottom: 15px; }
+        .form-row label { display: block; margin-bottom: 5px; font-size: 0.9em; color: #555; }
+        .form-row input, .form-row select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; outline: none; transition: border-color 0.2s ease;}
+        .form-row input:focus, .form-row select:focus { border-color: #4f46e5; }
+    </style>
+</head>
+<body class="admin-page" style="background: #f3f4f6; overflow-y: auto;">
+    <a href="/auth/logout" class="admin-logout-btn">退出</a>
+    <div style="max-width: 1200px; margin: 0 auto; padding: 40px 20px;">
+        <div style="display: flex; gap: 10px; margin-bottom: 30px;">
+            <a href="/admin" style="padding: 10px 20px; background: #fff; color: #333; text-decoration: none; border-radius: 6px; border: 1px solid #ddd; font-weight: bold; transition: all 0.2s ease;">← 返回学员管理</a>
+            <div style="padding: 10px 20px; background: #4f46e5; color: white; border-radius: 6px; font-weight: bold; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.2);">⚙️ 系统配置管理</div>
+        </div>
+
+        <div style="background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+            <h3 style="margin-top: 0; color: #111; margin-bottom: 20px;">✚ 新增培训项目 <span style="font-size:0.8em; color:#888; font-weight:normal;">(新增项目将立即在小程序端生效)</span></h3>
+            <form id="addForm" style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                <div class="form-row" style="flex: 1; min-width: 180px;">
+                    <label>所属主分类 (training_type)</label>
+                    <select id="training_type" required>
+                        <option value="special_equipment">特种设备</option>
+                        <option value="special_operation">特种作业</option>
+                    </select>
+                </div>
+                <div class="form-row" style="flex: 1; min-width: 180px;">
+                    <label>作业类别 (job_category)</label>
+                    <input type="text" id="job_category" placeholder="如：起重机作业" required>
+                </div>
+                <div class="form-row" style="flex: 1; min-width: 180px;">
+                    <label>操作项目 (exam_project)</label>
+                    <input type="text" id="exam_project" placeholder="如：起重机指挥" required>
+                </div>
+                <div class="form-row" style="flex: 1; min-width: 180px;">
+                    <label>项目代号 (project_code) - 选填</label>
+                    <input type="text" id="project_code" placeholder="如：Q1">
+                </div>
+                <div class="form-row">
+                    <button type="submit" class="btn-add">保存添加</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="table-wrap">
+            <h3 style="margin-top: 0; color: #111;">项目字典列表 <span style="font-size:0.8em; color:#888; font-weight:normal;">(为防止历史数据断链，此列表只提供软下架切换，不提供物理删除)</span></h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th width="80">ID</th>
+                        <th width="150">主分类</th>
+                        <th>作业类别</th>
+                        <th>操作项目</th>
+                        <th width="120">项目代号</th>
+                        <th width="150">状态 (点击切换)</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        async function loadProjects() {
+            try {
+                const res = await fetch('/api/config/projects/admin');
+                const data = await res.json();
+                const tbody = document.getElementById('tableBody');
+                tbody.innerHTML = '';
+                
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">数据库暂无配置数据，请先初始化或添加</td></tr>';
+                    return;
+                }
+                
+                data.forEach(p => {
+                    const tr = document.createElement('tr');
+                    const isActive = p.is_active === 1;
+                    const typeName = p.training_type === 'special_equipment' ? '特种设备' : '特种作业';
+                    
+                    // Style row if disabled
+                    if (!isActive) {
+                        tr.style.opacity = '0.5';
+                        tr.style.background = '#fafafa';
+                    }
+
+                    tr.innerHTML = `
+                        <td style="font-weight:bold; color:#555;">${p.id}</td>
+                        <td><span style="display:inline-block; padding:4px 8px; border-radius:4px; font-size:0.85em; background:${p.training_type === 'special_equipment' ? '#e0e7ff' : '#fce7f3'}; color:${p.training_type === 'special_equipment' ? '#3730a3' : '#9d174d'}">${typeName}</span></td>
+                        <td>${p.job_category}</td>
+                        <td><strong style="color:#111;">${p.exam_project}</strong></td>
+                        <td><span style="font-family:monospace; background:#eee; padding:2px 6px; border-radius:4px;">${p.project_code || '-'}</span></td>
+                        <td>
+                            <button class="btn-toggle ${isActive ? 'btn-active' : 'btn-inactive'}" 
+                                onclick="toggleStatus(${p.id}, ${isActive ? 0 : 1})">
+                                ${isActive ? '● 已上架中' : '○ 已隐藏下架'}
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error(err);
+                alert('网络请求失败，请检查登录状态');
+            }
+        }
+
+        async function toggleStatus(id, newStatus) {
+            if (!confirm(`确定要${newStatus === 1 ? '重新上架' : '下架/隐藏'}此项目吗？`)) return;
+            try {
+                const res = await fetch(`/api/config/projects/${id}/toggle`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_active: newStatus })
+                });
+                if (res.ok) {
+                    loadProjects();
+                } else {
+                    const err = await res.json();
+                    alert('操作失败: ' + err.message);
+                }
+            } catch (err) {
+                console.error(err);
+                alert('网络异常');
+            }
+        }
+
+        document.getElementById('addForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.textContent = '保存中...';
+
+            const payload = {
+                training_type: document.getElementById('training_type').value,
+                job_category: document.getElementById('job_category').value,
+                exam_project: document.getElementById('exam_project').value,
+                project_code: document.getElementById('project_code').value
+            };
+            try {
+                const res = await fetch('/api/config/projects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    e.target.reset();
+                    loadProjects();
+                } else {
+                    const err = await res.json();
+                    alert('添加失败: ' + err.message);
+                }
+            } catch (err) {
+                console.error(err);
+                alert('网络异常');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '保存添加';
+            }
+        });
+
+        // Initialize table
+        loadProjects();
+    </script>
+</body>
+</html>

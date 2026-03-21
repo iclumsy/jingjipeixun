@@ -16,9 +16,13 @@
     <a href="/auth/logout" class="admin-logout-btn">退出</a>
     <div class="admin-layout">
         <div class="sidebar" id="sidebar">
-            <div class="sidebar-header">
+            <div class="sidebar-header" style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; gap: 10px;">
+                    <a href="/admin" style="flex: 1; text-align: center; padding: 8px; background: #4f46e5; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">学员管理</a>
+                    <a href="/admin/config" style="flex: 1; text-align: center; padding: 8px; background: #f3f4f6; color: #333; text-decoration: none; border-radius: 6px; border: 1px solid #ddd;">系统配置</a>
+                </div>
                 <div class="sidebar-title-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 10px;">
-                    <h3 style="margin: 0;">学员管理</h3>
+                    <h3 style="margin: 0;">列表检索</h3>
                     <input type="text" id="searchInput" class="search-box" placeholder="搜索姓名、身份证..." style="width: 150px;">
                 </div>
             </div>

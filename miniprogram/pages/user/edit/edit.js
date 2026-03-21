@@ -34,6 +34,7 @@ function createEmptyStudent() {
     exam_project: '',
     examProjectIndex: -1,
     project_code: '',
+    training_project_id: '',
     examProjects: [],
     files: {
       photo: '',
@@ -193,6 +194,7 @@ Page({
           exam_project: student.exam_project || '',
           examProjectIndex,
           project_code: student.project_code || '',
+          training_project_id: student.training_project_id || '',
           examProjects,
           files: {
             photo: pickAttachmentValue(student.files?.photo, student.files?.photo_path, student.photo_path, downloadUrls.photo_path),
@@ -243,7 +245,8 @@ Page({
       'student.examProjects': [],
       'student.exam_project': '',
       'student.examProjectIndex': -1,
-      'student.project_code': ''
+      'student.project_code': '',
+      'student.training_project_id': ''
     })
   },
 
@@ -328,7 +331,8 @@ Page({
           'student.examProjects': examProjects,
           'student.exam_project': examProjects[0].name,
           'student.examProjectIndex': 0,
-          'student.project_code': examProjects[0].code
+          'student.project_code': examProjects[0].code,
+          'student.training_project_id': examProjects[0].id
         })
       } else {
         this.setData({
@@ -337,7 +341,8 @@ Page({
           'student.examProjects': examProjects,
           'student.exam_project': '',
           'student.examProjectIndex': -1,
-          'student.project_code': ''
+          'student.project_code': '',
+          'student.training_project_id': ''
         })
       }
     }
@@ -352,7 +357,8 @@ Page({
       this.setData({
         'student.exam_project': project.name,
         'student.examProjectIndex': projectIndex,
-        'student.project_code': project.code
+        'student.project_code': project.code,
+        'student.training_project_id': project.id
       })
     }
   },

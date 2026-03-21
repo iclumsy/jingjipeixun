@@ -35,6 +35,8 @@
     - idx_students_submitter_openid        : 按提交人 openid 的索引（小程序"我的提交"加速）
     - idx_students_created_at_desc         : 按创建时间倒序索引（最新记录优先）
 """
+import os
+import json
 import sqlite3
 from contextlib import contextmanager
 from flask import current_app
@@ -148,14 +150,69 @@ def init_db(database_path):
                 diploma_path TEXT,
                 id_card_front_path TEXT,
                 id_card_back_path TEXT,
-                hukou_residence_path TEXT,
                 hukou_personal_path TEXT,
                 training_form_path TEXT,
-                submitter_openid TEXT
+                submitter_openid TEXT,
+                training_project_id INTEGER
             )
         ''')
-        # 向前兼容：确保 submitter_openid 列存在（旧版数据库可能缺少此列）
+        # 向前兼容
         _ensure_column_exists(conn, 'students', 'submitter_openid', 'submitter_openid TEXT')
+        _ensure_column_exists(conn, 'students', 'training_project_id', 'training_project_id INTEGER')
+
+        # 创建高级字典表
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS training_projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                training_type TEXT NOT NULL,
+                job_category TEXT NOT NULL,
+                exam_project TEXT NOT NULL,
+                project_code TEXT NOT NULL,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # 同步字典表：以本地 JSON 为准，增量同步配置数据
+        # 这样即使您未来直接修改 JSON 文件，重启服务后数据库能自动同步出最新选项，
+        # 且改名或删除的老配置条目只会在前台隐藏，不会导致历史学员数据外键断裂。
+        json_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'job_categories.json')
+        if os.path.exists(json_path):
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # 首先把所有处于“管理员通过后台手动添加的内容”以及“历史内容”软下架掉
+            conn.execute("UPDATE training_projects SET is_active = 0")
+            
+            for training_type, type_info in data.items():
+                for category in type_info.get('job_categories', []):
+                    job_category = category.get('name')
+                    for project in category.get('exam_projects', []):
+                        exam_project = project.get('name')
+                        project_code = project.get('code', '')
+                        
+                        # 允许在 JSON 里明确指定状态，如果未指定则默认认为是上架(1)
+                        is_active = 1
+                        if 'is_active' in project:
+                            is_active = int(project['is_active'])
+                        elif 'status' in project:
+                            is_active = int(project['status'])
+                        
+                        # 查找这个具体的项目是否在数据库里已经存在过
+                        row = conn.execute('''
+                            SELECT id FROM training_projects 
+                            WHERE training_type = ? AND job_category = ? AND exam_project = ? AND project_code = ?
+                        ''', (training_type, job_category, exam_project, project_code)).fetchone()
+                        
+                        if row:
+                            # 存在过，就将其更新为 JSON 里指定的上架/下架状态
+                            conn.execute("UPDATE training_projects SET is_active = ? WHERE id = ?", (is_active, row['id']))
+                        else:
+                            # 从来没见过，作为新项目插入
+                            conn.execute('''
+                                INSERT INTO training_projects (training_type, job_category, exam_project, project_code, is_active)
+                                VALUES (?, ?, ?, ?, ?)
+                            ''', (training_type, job_category, exam_project, project_code, is_active))
 
         # 创建复合索引：加速按"状态+培训类型+公司"筛选学员列表的查询
         conn.execute(
@@ -206,8 +263,9 @@ def create_student(data, file_paths):
                 company, company_address, job_category, exam_project, project_code,
                 training_type, photo_path, diploma_path,
                 id_card_front_path, id_card_back_path,
-                hukou_residence_path, hukou_personal_path, training_form_path, submitter_openid
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                hukou_residence_path, hukou_personal_path, training_form_path, submitter_openid,
+                training_project_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data['name'], data['gender'], data['education'], data.get('school', ''),
             data.get('major', ''), data['id_card'], data['phone'], data.get('company', ''),
@@ -217,7 +275,8 @@ def create_student(data, file_paths):
             file_paths.get('photo_path', ''), file_paths.get('diploma_path', ''),
             file_paths.get('id_card_front_path', ''), file_paths.get('id_card_back_path', ''),
             file_paths.get('hukou_residence_path', ''), file_paths.get('hukou_personal_path', ''),
-            file_paths.get('training_form_path', ''), data.get('submitter_openid', '')
+            file_paths.get('training_form_path', ''), data.get('submitter_openid', ''),
+            data.get('training_project_id')
         ))
         # 返回新插入记录的自增 ID
         return cursor.lastrowid
@@ -244,8 +303,16 @@ def get_students(status='unreviewed', search='', company='', training_type='', s
         list[dict]: 学员记录字典列表，按 ID 倒序排列（最新记录在前）
     """
     with get_db_connection() as conn:
-        # 使用 "WHERE 1=1" 作为基础条件，方便后续动态拼接 AND 子句
-        query = "SELECT * FROM students WHERE 1=1"
+        query = """
+            SELECT s.*, 
+                   tp.job_category as _tp_job_category, 
+                   tp.exam_project as _tp_exam_project, 
+                   tp.project_code as _tp_project_code,
+                   tp.training_type as _tp_training_type
+            FROM students s
+            LEFT JOIN training_projects tp ON s.training_project_id = tp.id
+            WHERE 1=1
+        """
         params = []
 
         # 状态筛选
@@ -282,8 +349,18 @@ def get_students(status='unreviewed', search='', company='', training_type='', s
         query += " ORDER BY id DESC"
 
         students = conn.execute(query, params).fetchall()
-        # 将 sqlite3.Row 对象转换为普通字典，方便 JSON 序列化
-        return [dict(s) for s in students]
+        result = []
+        for row in students:
+            d = dict(row)
+            if d.get('_tp_job_category'):
+                d['job_category'] = d['_tp_job_category']
+                d['exam_project'] = d['_tp_exam_project']
+                d['project_code'] = d['_tp_project_code']
+                d['training_type'] = d['_tp_training_type']
+            for k in ['_tp_job_category', '_tp_exam_project', '_tp_project_code', '_tp_training_type']:
+                d.pop(k, None)
+            result.append(d)
+        return result
 
 
 def get_student_by_id(student_id):
@@ -300,10 +377,28 @@ def get_student_by_id(student_id):
         NotFoundError: 当指定 ID 的学员不存在时抛出（HTTP 404）
     """
     with get_db_connection() as conn:
-        student = conn.execute('SELECT * FROM students WHERE id = ?', (student_id,)).fetchone()
+        query = """
+            SELECT s.*, 
+                   tp.job_category as _tp_job_category, 
+                   tp.exam_project as _tp_exam_project, 
+                   tp.project_code as _tp_project_code,
+                   tp.training_type as _tp_training_type
+            FROM students s
+            LEFT JOIN training_projects tp ON s.training_project_id = tp.id
+            WHERE s.id = ?
+        """
+        student = conn.execute(query, (student_id,)).fetchone()
         if not student:
             raise NotFoundError('学员不存在')
-        return dict(student)
+        d = dict(student)
+        if d.get('_tp_job_category'):
+            d['job_category'] = d['_tp_job_category']
+            d['exam_project'] = d['_tp_exam_project']
+            d['project_code'] = d['_tp_project_code']
+            d['training_type'] = d['_tp_training_type']
+        for k in ['_tp_job_category', '_tp_exam_project', '_tp_project_code', '_tp_training_type']:
+            d.pop(k, None)
+        return d
 
 
 

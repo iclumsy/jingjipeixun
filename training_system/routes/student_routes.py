@@ -277,11 +277,24 @@ def create_student_route():
             data = request.form
             files = request.files
 
-            # 校验学员基本信息字段
-            validate_student_data(data)
+            data_dict = data.to_dict(flat=True)
+            # 校验学员基本信息（替换掉 job_category，改为校验 training_project_id）
+            req_fields = ['name', 'gender', 'education', 'id_card', 'phone', 'company', 'company_address', 'training_project_id']
+            validate_student_data(data_dict, required_fields=req_fields)
 
-            # 确定培训类型，据此判断必传附件
-            training_type = normalize_training_type(data.get('training_type', 'special_operation'))
+            project_id = data_dict.get('training_project_id')
+            from models.student import get_db_connection
+            with get_db_connection() as conn:
+                proj = conn.execute("SELECT * FROM training_projects WHERE id = ? AND is_active = 1", (project_id,)).fetchone()
+                if not proj:
+                    raise ValidationError('所选培训项目不存在或已停用')
+            
+            data_dict['job_category'] = proj['job_category']
+            data_dict['exam_project'] = proj['exam_project']
+            data_dict['project_code'] = proj['project_code']
+            data_dict['training_type'] = proj['training_type']
+            training_type = proj['training_type']
+            
             required_attachments = REQUIRED_ATTACHMENTS.get(training_type, REQUIRED_ATTACHMENTS['special_operation'])
 
             # 检查必传附件是否齐全
@@ -316,7 +329,7 @@ def create_student_route():
                 else:
                     file_paths[db_key] = ""
 
-            student_payload = data.to_dict(flat=True)
+            student_payload = data_dict
         else:
             # ---- JSON 路径引用模式 ----
             payload = request.get_json(silent=True) or {}
@@ -324,8 +337,21 @@ def create_student_route():
                 raise ValidationError('请求参数格式错误')
 
             # 校验学员基本信息
-            validate_student_data(payload)
-            training_type = normalize_training_type(payload.get('training_type', 'special_operation'))
+            req_fields = ['name', 'gender', 'education', 'id_card', 'phone', 'company', 'company_address', 'training_project_id']
+            validate_student_data(payload, required_fields=req_fields)
+
+            project_id = payload.get('training_project_id')
+            from models.student import get_db_connection
+            with get_db_connection() as conn:
+                proj = conn.execute("SELECT * FROM training_projects WHERE id = ? AND is_active = 1", (project_id,)).fetchone()
+                if not proj:
+                    raise ValidationError('所选培训项目不存在或已停用')
+            
+            payload['job_category'] = proj['job_category']
+            payload['exam_project'] = proj['exam_project']
+            payload['project_code'] = proj['project_code']
+            payload['training_type'] = proj['training_type']
+            training_type = proj['training_type']
 
             # 从 JSON 的 files 字段中提取并校验文件路径
             files_payload = payload.get('files', {}) if isinstance(payload.get('files', {}), dict) else {}
@@ -354,8 +380,8 @@ def create_student_route():
         from models.student import get_db_connection
         with get_db_connection() as conn:
             existing = conn.execute(
-                "SELECT id FROM students WHERE id_card = ? AND training_type = ? AND status IN ('unreviewed', 'reviewed')",
-                (student_payload.get('id_card', ''), training_type)
+                "SELECT id FROM students WHERE id_card = ? AND training_project_id = ? AND status IN ('unreviewed', 'reviewed')",
+                (student_payload.get('id_card', ''), student_payload.get('training_project_id'))
             ).fetchone()
             if existing:
                 raise AppError('该项目您已有正在处理的报名，请勿重复提交', status_code=400)
@@ -499,7 +525,7 @@ def update_student_route(id):
         # 可更新的文本字段白名单（防止恶意修改其他字段）
         allowed_text = [
             'name', 'gender', 'education', 'school', 'major', 'id_card', 'phone',
-            'company', 'company_address', 'job_category', 'exam_project', 'project_code', 'training_type', 'status'
+            'company', 'company_address', 'training_project_id', 'status'
         ]
 
         # 获取当前学员记录并检查权限
@@ -518,16 +544,21 @@ def update_student_route(id):
             for k in allowed_text:
                 if k in data:
                     updates[k] = data[k]
-            # 兼容旧字段名 exam_code -> project_code
-            if 'project_code' not in updates and 'exam_code' in data:
-                updates['project_code'] = data.get('exam_code', '')
-            # 标准化培训类型
-            if 'training_type' in updates:
-                updates['training_type'] = normalize_training_type(updates['training_type'])
 
             # 校验部分更新字段（不要求必填字段齐全）
             if updates:
                 validate_student_data(updates, required_fields=[])
+                
+            # 如果更新了项目
+            if 'training_project_id' in updates:
+                from models.student import get_db_connection
+                with get_db_connection() as conn:
+                    proj = conn.execute("SELECT * FROM training_projects WHERE id = ?", (updates['training_project_id'],)).fetchone()
+                    if proj:
+                        updates['job_category'] = proj['job_category']
+                        updates['exam_project'] = proj['exam_project']
+                        updates['project_code'] = proj['project_code']
+                        updates['training_type'] = proj['training_type']
 
             # 处理附件上传
             effective_training_type = normalize_training_type(
@@ -570,14 +601,21 @@ def update_student_route(id):
             for k in allowed_text:
                 if k in payload:
                     updates[k] = payload[k]
-            if 'project_code' not in updates and 'exam_code' in payload:
-                updates['project_code'] = payload.get('exam_code', '')
-            if 'training_type' in updates:
-                updates['training_type'] = normalize_training_type(updates['training_type'])
 
             # 校验部分更新字段
             if updates:
                 validate_student_data(updates, required_fields=[])
+                
+            # 如果更新了项目
+            if 'training_project_id' in updates:
+                from models.student import get_db_connection
+                with get_db_connection() as conn:
+                    proj = conn.execute("SELECT * FROM training_projects WHERE id = ?", (updates['training_project_id'],)).fetchone()
+                    if proj:
+                        updates['job_category'] = proj['job_category']
+                        updates['exam_project'] = proj['exam_project']
+                        updates['project_code'] = proj['project_code']
+                        updates['training_type'] = proj['training_type']
 
             # 处理 JSON 中的文件路径更新
             files_payload = payload.get('files', {}) if isinstance(payload.get('files', {}), dict) else {}
