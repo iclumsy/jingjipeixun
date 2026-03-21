@@ -110,6 +110,52 @@ def _ensure_column_exists(conn, table_name, column_name, column_definition):
         conn.execute(f'ALTER TABLE {table_name} ADD COLUMN {column_definition}')
 
 
+def sync_config_to_json():
+    """将数据库里的 training_projects 状态全量写回 job_categories.json 保持双端一致"""
+    try:
+        import os
+        import json
+        with get_db_connection() as conn:
+            projects = conn.execute("SELECT * FROM training_projects ORDER BY id").fetchall()
+        
+        data = {
+            "special_equipment": {
+                "name": "特种设备", 
+                "attachments": ["photo","diploma","id_card_front","id_card_back","hukou_residence","hukou_personal"],
+                "job_categories": []
+            },
+            "special_operation": {
+                "name": "特种作业", 
+                "attachments": ["diploma","id_card_front","id_card_back"],
+                "job_categories": []
+            }
+        }
+        category_map = {'special_equipment': {}, 'special_operation': {}}
+        
+        for p in projects:
+            ttype = p['training_type']
+            if ttype not in data:
+                continue
+                
+            cat_name = p['job_category']
+            if cat_name not in category_map[ttype]:
+                category_obj = {"name": cat_name, "exam_projects": []}
+                category_map[ttype][cat_name] = category_obj
+                data[ttype]["job_categories"].append(category_obj)
+                
+            category_map[ttype][cat_name]["exam_projects"].append({
+                "name": p['exam_project'],
+                "code": p['project_code'],
+                "is_active": p['is_active']
+            })
+            
+        json_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'job_categories.json')
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+
 def init_db(database_path):
     """
     初始化数据库，创建必要的表和索引。
@@ -169,9 +215,11 @@ def init_db(database_path):
                 exam_project TEXT NOT NULL,
                 project_code TEXT NOT NULL,
                 is_active INTEGER DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                attachments TEXT DEFAULT '["photo","diploma","id_card_front","id_card_back","hukou_residence","hukou_personal"]'
             )
         ''')
+        _ensure_column_exists(conn, 'training_projects', 'attachments', 'attachments TEXT DEFAULT \'["photo","diploma","id_card_front","id_card_back","hukou_residence","hukou_personal"]\'')
 
         # 同步字典表：以本地 JSON 为准，增量同步配置数据
         # 这样即使您未来直接修改 JSON 文件，重启服务后数据库能自动同步出最新选项，
@@ -206,7 +254,7 @@ def init_db(database_path):
                         
                         if row:
                             # 存在过，就将其更新为 JSON 里指定的上架/下架状态
-                            conn.execute("UPDATE training_projects SET is_active = ? WHERE id = ?", (is_active, row['id']))
+                            conn.execute("UPDATE training_projects SET is_active = ? WHERE id = ?", (is_active, row[0]))
                         else:
                             # 从来没见过，作为新项目插入
                             conn.execute('''
@@ -319,34 +367,34 @@ def get_students(status='unreviewed', search='', company='', training_type='', s
         if status:
             if status == 'pending':
                 # "待处理"视图：包含未审核和已驳回的记录
-                query += " AND status IN (?, ?)"
+                query += " AND s.status IN (?, ?)"
                 params.extend(['unreviewed', 'rejected'])
             else:
-                query += " AND status = ?"
+                query += " AND s.status = ?"
                 params.append(status)
 
         # 培训类型筛选
         if training_type:
-            query += " AND training_type = ?"
+            query += " AND s.training_type = ?"
             params.append(training_type)
 
         # 关键词模糊搜索（同时匹配姓名、身份证号、手机号）
         if search:
-            query += " AND (name LIKE ? OR id_card LIKE ? OR phone LIKE ?)"
+            query += " AND (s.name LIKE ? OR s.id_card LIKE ? OR s.phone LIKE ?)"
             params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
 
         # 公司名称模糊筛选
         if company:
-            query += " AND company LIKE ?"
+            query += " AND s.company LIKE ?"
             params.append(f"%{company}%")
 
         # 提交人 openid 精确筛选
         if submitter_openid:
-            query += " AND submitter_openid = ?"
+            query += " AND s.submitter_openid = ?"
             params.append(submitter_openid)
 
         # 按 ID 倒序排列，确保最新添加的记录排在前面
-        query += " ORDER BY id DESC"
+        query += " ORDER BY s.id DESC"
 
         students = conn.execute(query, params).fetchall()
         result = []

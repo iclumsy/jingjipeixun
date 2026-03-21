@@ -32,32 +32,101 @@
             <div style="padding: 10px 20px; background: #4f46e5; color: white; border-radius: 6px; font-weight: bold; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.2);">⚙️ 系统配置管理</div>
         </div>
 
-        <div style="background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-            <h3 style="margin-top: 0; color: #111; margin-bottom: 20px;">✚ 新增培训项目 <span style="font-size:0.8em; color:#888; font-weight:normal;">(新增项目将立即在小程序端生效)</span></h3>
-            <form id="addForm" style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
-                <div class="form-row" style="flex: 1; min-width: 180px;">
-                    <label>所属主分类 (training_type)</label>
-                    <select id="training_type" required>
-                        <option value="special_equipment">特种设备</option>
-                        <option value="special_operation">特种作业</option>
-                    </select>
-                </div>
-                <div class="form-row" style="flex: 1; min-width: 180px;">
-                    <label>作业类别 (job_category)</label>
-                    <input type="text" id="job_category" placeholder="如：起重机作业" required>
-                </div>
-                <div class="form-row" style="flex: 1; min-width: 180px;">
-                    <label>操作项目 (exam_project)</label>
-                    <input type="text" id="exam_project" placeholder="如：起重机指挥" required>
-                </div>
-                <div class="form-row" style="flex: 1; min-width: 180px;">
-                    <label>项目代号 (project_code) - 选填</label>
-                    <input type="text" id="project_code" placeholder="如：Q1">
-                </div>
-                <div class="form-row">
-                    <button type="submit" class="btn-add">保存添加</button>
-                </div>
-            </form>
+        <style>
+            .custom-form-group {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                flex: 1;
+                min-width: 200px;
+            }
+            .custom-form-group label {
+                font-weight: bold;
+                color: #4b5563;
+                font-size: 0.9em;
+            }
+            .tag-radio-group {
+                display: flex;
+                gap: 10px;
+            }
+            .tag-radio-label {
+                cursor: pointer;
+                position: relative;
+            }
+            .tag-radio-label input[type="radio"] {
+                position: absolute;
+                opacity: 0;
+            }
+            .tag-radio-label span {
+                display: inline-block;
+                padding: 8px 16px;
+                background: #f3f4f6;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                color: #4b5563;
+                transition: all 0.2s;
+                font-weight: 500;
+            }
+            .tag-radio-label input[type="radio"]:checked + span {
+                background: #eff6ff;
+                border-color: #3b82f6;
+                color: #1d4ed8;
+                font-weight: bold;
+            }
+        </style>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div class="tag-radio-group">
+                <label class="tag-radio-label">
+                    <input type="radio" name="filter_training_type" value="special_equipment" checked onchange="renderProjects()">
+                    <span>📦 特种设备</span>
+                </label>
+                <label class="tag-radio-label">
+                    <input type="radio" name="filter_training_type" value="special_operation" onchange="renderProjects()">
+                    <span>⚡️ 特种作业</span>
+                </label>
+            </div>
+            
+            <button class="btn-add" onclick="openAddModal()" style="padding: 10px 24px; height: 44px; font-weight: bold; font-size: 15px; border-radius: 8px;">✚ 新增当前业务线项目</button>
+        </div>
+
+        <!-- 新增/修改共用的项目弹窗 -->
+        <div id="projectModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+            <div style="background:#fff; padding:25px; border-radius:8px; width:90%; max-width:400px; box-shadow: 0 4px 25px rgba(0,0,0,0.2);">
+                <h3 id="modalTitle" style="margin-top:0; color:#111; margin-bottom:20px;">✏️ 修改培训项目</h3>
+                <form id="projectModalForm" style="display: flex; flex-direction: column; gap: 15px;">
+                    <input type="hidden" id="modal_editing_id">
+                    <div class="custom-form-group">
+                        <label>所属主分类</label>
+                        <div class="tag-radio-group">
+                            <label class="tag-radio-label">
+                                <input type="radio" name="modal_training_type" value="special_equipment">
+                                <span>特种设备</span>
+                            </label>
+                            <label class="tag-radio-label">
+                                <input type="radio" name="modal_training_type" value="special_operation">
+                                <span>特种作业</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="custom-form-group">
+                        <label>作业类别</label>
+                        <input type="text" id="modal_job_category" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; outline: none;" placeholder="如：起重机械作业" required>
+                    </div>
+                    <div class="custom-form-group">
+                        <label>操作项目</label>
+                        <input type="text" id="modal_exam_project" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; outline: none;" placeholder="如：起重机指挥" required>
+                    </div>
+                    <div class="custom-form-group">
+                        <label>项目代号 (选填)</label>
+                        <input type="text" id="modal_project_code" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; outline: none;" placeholder="如：Q1">
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                        <button type="button" class="btn-toggle btn-inactive" style="padding: 8px 16px;" onclick="closeModal()">取消</button>
+                        <button type="submit" id="modalSubmitBtn" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">保存</button>
+                    </div>
+                </form>
+            </div>
         </div>
 
         <div class="table-wrap">
@@ -69,11 +138,11 @@
                         <th width="150">主分类</th>
                         <th>作业类别</th>
                         <th>操作项目</th>
-                        <th width="120">项目代号</th>
-                        <th width="150">状态 (点击切换)</th>
+                        <th width="100">项目代号</th>
+                        <th width="180">操作</th>
                     </tr>
                 </thead>
-                <tbody id="tableBody">
+                <tbody id="projectList">
                     <tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">加载中...</td></tr>
                 </tbody>
             </table>
@@ -81,52 +150,67 @@
     </div>
 
     <script>
+        // ======= API 及交互逻辑 =======
+        
+        let allProjects = [];
+
         async function loadProjects() {
             try {
                 const res = await fetch('/api/config/projects/admin');
-                const data = await res.json();
-                const tbody = document.getElementById('tableBody');
-                tbody.innerHTML = '';
-                
-                if (data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">数据库暂无配置数据，请先初始化或添加</td></tr>';
-                    return;
-                }
-                
-                data.forEach(p => {
-                    const tr = document.createElement('tr');
-                    const isActive = p.is_active === 1;
-                    const typeName = p.training_type === 'special_equipment' ? '特种设备' : '特种作业';
-                    
-                    // Style row if disabled
-                    if (!isActive) {
-                        tr.style.opacity = '0.5';
-                        tr.style.background = '#fafafa';
-                    }
-
-                    tr.innerHTML = `
-                        <td style="font-weight:bold; color:#555;">${p.id}</td>
-                        <td><span style="display:inline-block; padding:4px 8px; border-radius:4px; font-size:0.85em; background:${p.training_type === 'special_equipment' ? '#e0e7ff' : '#fce7f3'}; color:${p.training_type === 'special_equipment' ? '#3730a3' : '#9d174d'}">${typeName}</span></td>
-                        <td>${p.job_category}</td>
-                        <td><strong style="color:#111;">${p.exam_project}</strong></td>
-                        <td><span style="font-family:monospace; background:#eee; padding:2px 6px; border-radius:4px;">${p.project_code || '-'}</span></td>
-                        <td>
-                            <button class="btn-toggle ${isActive ? 'btn-active' : 'btn-inactive'}" 
-                                onclick="toggleStatus(${p.id}, ${isActive ? 0 : 1})">
-                                ${isActive ? '● 已上架中' : '○ 已隐藏下架'}
-                            </button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+                allProjects = await res.json();
+                renderProjects();
             } catch (err) {
-                console.error(err);
-                alert('网络请求失败，请检查登录状态');
+                console.error('Failed to load projects:', err);
+                document.getElementById('projectList').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:red;">加载失败，请重试</td></tr>';
             }
         }
 
+        function renderProjects() {
+            const tbody = document.getElementById('projectList');
+            tbody.innerHTML = '';
+            
+            let selectedType = 'special_equipment';
+            document.getElementsByName('filter_training_type').forEach(r => {
+                if (r.checked) selectedType = r.value;
+            });
+
+            const filteredProjects = allProjects.filter(p => p.training_type === selectedType);
+            
+            if (filteredProjects.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 30px; color: #666;">📝 此分类下暂无项目配置数据，您可以通过添加来初始化</td></tr>`;
+                return;
+            }
+
+            filteredProjects.forEach(p => {
+                const isActive = p.is_active === 1;
+                const tr = document.createElement('tr');
+                if (!isActive) {
+                    tr.className = 'inactive-row';
+                }
+                tr.innerHTML = `
+                    <td>${p.id}</td>
+                    <td><span style="background:${p.training_type === 'special_operation' ? '#fce7f3' : '#e0e7ff'}; color:${p.training_type === 'special_operation' ? '#be185d' : '#4338ca'}; padding:3px 8px; border-radius:4px; font-size:0.85em; font-weight:bold;">${p.training_type === 'special_operation' ? '特种作业' : '特种设备'}</span></td>
+                    <td>${p.job_category}</td>
+                    <td><strong style="color:#111;">${p.exam_project}</strong></td>
+                    <td><span style="font-family:monospace; background:#eee; padding:2px 6px; border-radius:4px;">${p.project_code || '-'}</span></td>
+                    <td style="white-space: nowrap;">
+                        <div style="display: flex; gap: 8px; flex-wrap: nowrap;">
+                            <button class="btn-toggle ${isActive ? 'btn-active' : 'btn-inactive'}" 
+                                onclick="toggleStatus(${p.id}, ${isActive ? 0 : 1})">
+                                ${isActive ? '● 已上架' : '○ 已隐藏'}
+                            </button>
+                            <button class="btn-toggle" style="background:#3b82f6; color:white;"
+                                onclick="editProject(${p.id}, '${p.training_type}', '${p.job_category}', '${p.exam_project}', '${p.project_code || ''}')">
+                                ✏️ 编辑
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
         async function toggleStatus(id, newStatus) {
-            if (!confirm(`确定要${newStatus === 1 ? '重新上架' : '下架/隐藏'}此项目吗？`)) return;
             try {
                 const res = await fetch(`/api/config/projects/${id}/toggle`, {
                     method: 'POST',
@@ -145,37 +229,90 @@
             }
         }
 
-        document.getElementById('addForm').addEventListener('submit', async (e) => {
+        function openAddModal() {
+            document.getElementById('modal_editing_id').value = '';
+            document.getElementById('projectModalForm').reset();
+            
+            let selectedType = 'special_equipment';
+            document.getElementsByName('filter_training_type').forEach(r => {
+                if (r.checked) selectedType = r.value;
+            });
+            document.getElementsByName('modal_training_type').forEach(r => {
+                r.checked = (r.value === selectedType);
+            });
+            
+            document.getElementById('modalTitle').innerHTML = '✚ 新增培训项目 <span style="font-size:0.8em; color:#888; font-weight:normal;">(实时生效)</span>';
+            document.getElementById('modalSubmitBtn').textContent = '保存添加';
+            document.getElementById('modalSubmitBtn').style.background = '#4f46e5';
+            
+            document.getElementById('projectModal').style.display = 'flex';
+        }
+
+        function editProject(id, training_type, job_category, exam_project, project_code) {
+            document.getElementById('modal_editing_id').value = id;
+            
+            document.getElementsByName('modal_training_type').forEach(r => {
+                r.checked = (r.value === training_type);
+            });
+            
+            document.getElementById('modal_job_category').value = job_category;
+            document.getElementById('modal_exam_project').value = exam_project;
+            document.getElementById('modal_project_code').value = project_code;
+            
+            document.getElementById('modalTitle').innerHTML = '✏️ 修改培训项目 <span style="font-size:0.5em; color:#ef4444; font-weight:normal; display:block;">修改后将热更新并同步历史数据，同时写入JSON文件</span>';
+            document.getElementById('modalSubmitBtn').textContent = '保存修改';
+            document.getElementById('modalSubmitBtn').style.background = '#f59e0b';
+            
+            document.getElementById('projectModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('projectModal').style.display = 'none';
+        }
+
+        // 新增与修改共用的提交逻辑
+        document.getElementById('projectModalForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const btn = e.target.querySelector('button[type="submit"]');
+            const btn = document.getElementById('modalSubmitBtn');
+            const originalText = btn.textContent;
             btn.disabled = true;
-            btn.textContent = '保存中...';
+            btn.textContent = '请求中...';
+
+            const editingId = document.getElementById('modal_editing_id').value;
+            
+            let selectedType = 'special_equipment';
+            document.getElementsByName('modal_training_type').forEach(r => {
+                if (r.checked) selectedType = r.value;
+            });
 
             const payload = {
-                training_type: document.getElementById('training_type').value,
-                job_category: document.getElementById('job_category').value,
-                exam_project: document.getElementById('exam_project').value,
-                project_code: document.getElementById('project_code').value
+                training_type: selectedType,
+                job_category: document.getElementById('modal_job_category').value,
+                exam_project: document.getElementById('modal_exam_project').value,
+                project_code: document.getElementById('modal_project_code').value
             };
+            
             try {
-                const res = await fetch('/api/config/projects', {
-                    method: 'POST',
+                const url = editingId ? `/api/config/projects/${editingId}` : '/api/config/projects';
+                const method = editingId ? 'PUT' : 'POST';
+                const res = await fetch(url, {
+                    method: method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
                 if (res.ok) {
-                    e.target.reset();
-                    loadProjects();
+                    closeModal();
+                    loadProjects(); // 自动加载最新列表并保持过滤
                 } else {
                     const err = await res.json();
-                    alert('添加失败: ' + err.message);
+                    alert('操作失败: ' + err.message);
                 }
             } catch (err) {
                 console.error(err);
                 alert('网络异常');
             } finally {
                 btn.disabled = false;
-                btn.textContent = '保存添加';
+                btn.textContent = originalText;
             }
         });
 

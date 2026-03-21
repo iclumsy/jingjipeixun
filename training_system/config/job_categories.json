@@ -1,74 +1,4 @@
 {
-  "special_operation": {
-    "name": "特种作业",
-    "attachments": [
-      "diploma",
-      "id_card_front",
-      "id_card_back"
-    ],
-    "job_categories": [
-      {
-        "name": "电工作业",
-        "exam_projects": [
-          {
-            "name": "低压电工作业",
-            "code": "",
-            "is_active": 1
-          },
-          {
-            "name": "高压电工作业",
-            "code": "",
-            "is_active": 1
-          },
-          {
-            "name": "电力电缆作业",
-            "code": "",
-            "is_active": 1
-          },
-          {
-            "name": "电气试验作业",
-            "code": "",
-            "is_active": 1
-          },
-          {
-            "name": "继电保护作业",
-            "code": "",
-            "is_active": 1
-          },
-          {
-            "name": "防爆电气作业",
-            "code": "",
-            "is_active": 1
-          }
-        ]
-      },
-      {
-        "name": "焊接与热切割作业",
-        "exam_projects": [
-          {
-            "name": "熔化焊接与热切割作业",
-            "code": "",
-            "is_active": 1
-          }
-        ]
-      },
-      {
-        "name": "高处作业",
-        "exam_projects": [
-          {
-            "name": "登高架设作业",
-            "code": "",
-            "is_active": 1
-          },
-          {
-            "name": "高处安装、维护、拆除作业",
-            "code": "",
-            "is_active": 1
-          }
-        ]
-      }
-    ]
-  },
   "special_equipment": {
     "name": "特种设备",
     "attachments": [
@@ -161,6 +91,76 @@
           {
             "name": "观光车和观光列车司机",
             "code": "N2",
+            "is_active": 1
+          }
+        ]
+      }
+    ]
+  },
+  "special_operation": {
+    "name": "特种作业",
+    "attachments": [
+      "diploma",
+      "id_card_front",
+      "id_card_back"
+    ],
+    "job_categories": [
+      {
+        "name": "电工作业",
+        "exam_projects": [
+          {
+            "name": "低压电工作业",
+            "code": "",
+            "is_active": 1
+          },
+          {
+            "name": "高压电工作业",
+            "code": "",
+            "is_active": 1
+          },
+          {
+            "name": "电力电缆作业",
+            "code": "",
+            "is_active": 1
+          },
+          {
+            "name": "电气试验作业",
+            "code": "",
+            "is_active": 1
+          },
+          {
+            "name": "继电保护作业",
+            "code": "",
+            "is_active": 1
+          },
+          {
+            "name": "防爆电气作业",
+            "code": "",
+            "is_active": 1
+          }
+        ]
+      },
+      {
+        "name": "焊接与热切割作业",
+        "exam_projects": [
+          {
+            "name": "熔化焊接与热切割作业",
+            "code": "",
+            "is_active": 1
+          }
+        ]
+      },
+      {
+        "name": "高处作业",
+        "exam_projects": [
+          {
+            "name": "登高架设作业",
+            "code": "",
+            "is_active": 1
+          },
+          {
+            "name": "高处安装、维护、拆除作业",
+            "code": "",
             "is_active": 1
           }
         ]

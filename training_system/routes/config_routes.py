@@ -137,7 +137,7 @@ def get_admin_projects():
 @config_bp.route('/api/config/projects', methods=['POST'])
 def add_project():
     try:
-        from models.student import get_db_connection
+        from models.student import get_db_connection, sync_config_to_json
         data = request.json
         with get_db_connection() as conn:
             conn.execute('''
@@ -145,6 +145,31 @@ def add_project():
                 VALUES (?, ?, ?, ?, 1)
             ''', (data['training_type'], data['job_category'], data['exam_project'], data.get('project_code', '')))
             conn.commit()
+        sync_config_to_json()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@config_bp.route('/api/config/projects/<int:id>', methods=['PUT'])
+def edit_project(id):
+    try:
+        from models.student import get_db_connection, sync_config_to_json
+        data = request.json
+        with get_db_connection() as conn:
+            conn.execute('''
+                UPDATE training_projects 
+                SET training_type=?, job_category=?, exam_project=?, project_code=?
+                WHERE id=?
+            ''', (data['training_type'], data['job_category'], data['exam_project'], data.get('project_code', ''), id))
+            
+            # 同步更新现有学员记录中的冗余文本名称字段
+            conn.execute('''
+                UPDATE students 
+                SET training_type=?, job_category=?, exam_project=?, project_code=?
+                WHERE training_project_id=?
+            ''', (data['training_type'], data['job_category'], data['exam_project'], data.get('project_code', ''), id))
+            conn.commit()
+        sync_config_to_json()
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -152,11 +177,13 @@ def add_project():
 @config_bp.route('/api/config/projects/<int:id>/toggle', methods=['POST'])
 def toggle_project(id):
     try:
-        from models.student import get_db_connection
+        from models.student import get_db_connection, sync_config_to_json
         data = request.json
+        new_status = data.get('is_active', 0)
         with get_db_connection() as conn:
-            conn.execute('UPDATE training_projects SET is_active = ? WHERE id = ?', (data['is_active'], id))
+            conn.execute('UPDATE training_projects SET is_active = ? WHERE id = ?', (new_status, id))
             conn.commit()
+        sync_config_to_json()
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
