@@ -129,7 +129,7 @@ def get_admin_projects():
     try:
         from models.student import get_db_connection
         with get_db_connection() as conn:
-            projects = conn.execute("SELECT * FROM training_projects ORDER BY training_type DESC, id DESC").fetchall()
+            projects = conn.execute("SELECT * FROM training_projects ORDER BY id ASC").fetchall()
             return jsonify([dict(p) for p in projects])
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
