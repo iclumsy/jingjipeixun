@@ -22,5 +22,7 @@ training_system/.env.example
 
 # Database files
 training_system/database/students.db
+training_system/uploads/students/
+students/
 .superpowers/
 .worktrees/
