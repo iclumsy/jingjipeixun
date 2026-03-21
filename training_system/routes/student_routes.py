@@ -350,6 +350,16 @@ def create_student_route():
         # 设置培训类型
         student_payload['training_type'] = training_type
 
+        # 防重拦截：检查是否有正在处理的同项目报名
+        from models.student import get_db_connection
+        with get_db_connection() as conn:
+            existing = conn.execute(
+                "SELECT id FROM students WHERE id_card = ? AND training_type = ? AND status IN ('unreviewed', 'reviewed')",
+                (student_payload.get('id_card', ''), training_type)
+            ).fetchone()
+            if existing:
+                raise AppError('该项目您已有正在处理的报名，请勿重复提交', status_code=400)
+
         # 绑定提交人 openid
         mini_user = get_mini_user()
         if mini_user:
@@ -495,8 +505,8 @@ def update_student_route(id):
         # 获取当前学员记录并检查权限
         current_student = get_student_by_id(id)
         ensure_mini_owner_or_admin(current_student)
-        # 小程序普通用户仅在被驳回状态才能修改自己的记录
-        if get_mini_user() and not is_mini_admin() and current_student.get('status') != 'rejected':
+        # 小程序普通用户在未审核和被驳回状态均可修改自己的记录
+        if get_mini_user() and not is_mini_admin() and current_student.get('status') not in ('unreviewed', 'rejected'):
             raise AppError('当前状态不允许修改', status_code=403)
 
         updates = {}
@@ -538,12 +548,7 @@ def update_student_route(id):
                     name_for_save = data.get('name', current_student['name'])
                     company_for_name = data.get('company', current_student.get('company', ''))
 
-                    # 删除旧文件（避免孤立文件占用磁盘空间）
-                    old_rel = current_student.get(db_key)
-                    if old_rel:
-                        delete_student_files({db_key: old_rel}, current_app.config['BASE_DIR'])
-
-                    # 保存新文件
+                    # 保存新文件（底层会自动安全原子覆盖同名文件）
                     try:
                         training_type = normalize_training_type(
                             data.get('training_type', current_student.get('training_type', 'special_operation'))
@@ -589,10 +594,7 @@ def update_student_route(id):
                     # 忽略目标培训类型不需要的附件，避免历史遗留字段导致保存失败
                     continue
 
-                # 路径变更时删除旧文件
-                old_rel = current_student.get(db_key, '')
-                if old_rel and rel != old_rel:
-                    delete_student_files({db_key: old_rel}, current_app.config['BASE_DIR'])
+                # 添加更新路径，文件替换处理在最后统一处理清理
                 updates[db_key] = rel
 
         # 最终校验：确保更新后所有必传附件仍然齐全
@@ -613,6 +615,13 @@ def update_student_route(id):
         # 执行数据库更新
         updated_student = update_student(id, updates)
         current_app.logger.info(f'Student updated: ID={id}')
+
+        # 成功更新数据库后，清理因改名导致路径变更产生的孤儿旧文件
+        for db_key in FILE_MAP.values():
+            old_rel = current_student.get(db_key, '')
+            new_rel = updated_student.get(db_key, '')
+            if old_rel and old_rel != new_rel:
+                delete_student_files({db_key: old_rel}, current_app.config['BASE_DIR'])
 
         # 检查是否是从被驳回修改为重新提交（待审核）状态
         is_resubmitted = (
@@ -653,8 +662,8 @@ def upload_student_attachment_route(id):
     try:
         student = get_student_by_id(id)
         ensure_mini_owner_or_admin(student)
-        # 小程序普通用户仅在被驳回状态可上传附件
-        if get_mini_user() and not is_mini_admin() and student.get('status') != 'rejected':
+        # 小程序普通用户在未审核和被驳回状态均可上传附件
+        if get_mini_user() and not is_mini_admin() and student.get('status') not in ('unreviewed', 'rejected'):
             raise AppError('当前状态不允许修改', status_code=403)
 
         training_type = normalize_training_type(student.get('training_type', 'special_operation'))
@@ -684,13 +693,10 @@ def upload_student_attachment_route(id):
         name_for_save = student.get('name', '')
         company_for_name = student.get('company', '')
 
-        # 删除旧文件
         db_key = FILE_MAP[upload_field]
         old_rel = student.get(db_key)
-        if old_rel:
-            delete_student_files({db_key: old_rel}, current_app.config['BASE_DIR'])
 
-        # 保存新文件并更新数据库
+        # 保存新文件（底层会自动安全原子覆盖同名文件）并更新数据库
         rel = process_and_save_file(
             upload_file,
             id_card_for_name,
@@ -700,6 +706,10 @@ def upload_student_attachment_route(id):
             training_type
         )
         updated = update_student(id, {db_key: rel})
+
+        # 成功更新数据库后，清理因改名导致路径变更产生的孤儿旧文件
+        if old_rel and old_rel != rel:
+            delete_student_files({db_key: old_rel}, current_app.config['BASE_DIR'])
 
         return jsonify({
             'message': '上传成功',

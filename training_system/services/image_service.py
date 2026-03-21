@@ -170,12 +170,18 @@ def process_and_save_file(file_storage, id_card, name, label_key, company='', tr
     # 生成文件名，格式：<身份证号>-<姓名>-<附件类型>.<扩展名>
     safe_name = f"{id_card}-{name}-{label_name}{orig_ext}"
     abs_path = os.path.join(student_folder_path, safe_name)
+    
+    import time
+    temp_path = abs_path + f".tmp_{int(time.time())}"
 
-    # 保存文件到磁盘
+    # 保存文件到磁盘临时路径，然后原子替换，确保同名覆盖的安全
     try:
-        file_storage.save(abs_path)
-        current_app.logger.info(f'File saved: {abs_path}')
+        file_storage.save(temp_path)
+        os.replace(temp_path, abs_path)
+        current_app.logger.info(f'File saved atomically: {abs_path}')
     except Exception as e:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
         current_app.logger.error(f'Failed to save file: {str(e)}')
         raise
 

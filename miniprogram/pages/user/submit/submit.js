@@ -332,7 +332,13 @@ Page({
   },
 
   async submitForm() {
-    if (!this.ensureAgreementAccepted()) return
+    if (this._isSubmitting) return
+    this._isSubmitting = true
+
+    if (!this.ensureAgreementAccepted()) {
+      this._isSubmitting = false
+      return
+    }
 
     const normalizedStudent = {
       ...this.data.student,
@@ -356,6 +362,7 @@ Page({
         content: errorMsg,
         showCancel: false
       })
+      this._isSubmitting = false
       return
     }
 
@@ -422,6 +429,8 @@ Page({
         content: err.message || '请检查网络连接后重试',
         showCancel: false
       })
+    } finally {
+      this._isSubmitting = false
     }
   },
 
