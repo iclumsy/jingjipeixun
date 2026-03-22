@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,29 +8,111 @@
     <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
-        .table-wrap { background: #fff; padding: 20px; border-radius: 8px; margin-top: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
-        th { background: #f9fafb; font-weight: 600; color: #333; }
-        .btn-toggle { padding: 6px 12px; border-radius: 4px; border: none; cursor: pointer; color: white; transition: all 0.2s ease;}
-        .btn-active { background: #10b981; }
-        .btn-active:hover { background: #059669; }
-        .btn-inactive { background: #ef4444; }
-        .btn-inactive:hover { background: #dc2626; }
-        .btn-add { background: #4f46e5; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: opacity 0.2s ease;}
-        .btn-add:hover { opacity: 0.9; }
-        .form-row { margin-bottom: 15px; }
-        .form-row label { display: block; margin-bottom: 5px; font-size: 0.9em; color: #555; }
-        .form-row input, .form-row select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; outline: none; transition: border-color 0.2s ease;}
-        .form-row input:focus, .form-row select:focus { border-color: #4f46e5; }
+        .table-wrap {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            text-align: left;
+        }
+
+        th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .btn-toggle {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            color: white;
+            transition: all 0.2s ease;
+        }
+
+        .btn-active {
+            background: #10b981;
+        }
+
+        .btn-active:hover {
+            background: #059669;
+        }
+
+        .btn-inactive {
+            background: #ef4444;
+        }
+
+        .btn-inactive:hover {
+            background: #dc2626;
+        }
+
+        .btn-add {
+            background: #4f46e5;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: opacity 0.2s ease;
+        }
+
+        .btn-add:hover {
+            opacity: 0.9;
+        }
+
+        .form-row {
+            margin-bottom: 15px;
+        }
+
+        .form-row label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            color: #555;
+        }
+
+        .form-row input,
+        .form-row select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-row input:focus,
+        .form-row select:focus {
+            border-color: #4f46e5;
+        }
     </style>
 </head>
+
 <body class="admin-page" style="background: #f3f4f6; overflow-y: auto;">
     <a href="/auth/logout" class="admin-logout-btn">退出</a>
     <div style="max-width: 1200px; margin: 0 auto; padding: 40px 20px;">
         <div style="display: flex; gap: 10px; margin-bottom: 30px;">
-            <a href="/admin" style="padding: 10px 20px; background: #fff; color: #333; text-decoration: none; border-radius: 6px; border: 1px solid #ddd; font-weight: bold; transition: all 0.2s ease;">← 返回学员管理</a>
-            <div style="padding: 10px 20px; background: #4f46e5; color: white; border-radius: 6px; font-weight: bold; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.2);">⚙️ 系统配置管理</div>
+            <a href="/admin"
+                style="padding: 10px 20px; background: #fff; color: #333; text-decoration: none; border-radius: 6px; border: 1px solid #ddd; font-weight: bold; transition: all 0.2s ease;">←
+                返回学员管理</a>
+            <div
+                style="padding: 10px 20px; background: #4f46e5; color: white; border-radius: 6px; font-weight: bold; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.2);">
+                ⚙️ 系统配置管理</div>
         </div>
 
         <style>
@@ -40,23 +123,28 @@
                 flex: 1;
                 min-width: 200px;
             }
+
             .custom-form-group label {
                 font-weight: bold;
                 color: #4b5563;
                 font-size: 0.9em;
             }
+
             .tag-radio-group {
                 display: flex;
                 gap: 10px;
             }
+
             .tag-radio-label {
                 cursor: pointer;
                 position: relative;
             }
+
             .tag-radio-label input[type="radio"] {
                 position: absolute;
                 opacity: 0;
             }
+
             .tag-radio-label span {
                 display: inline-block;
                 padding: 8px 16px;
@@ -67,7 +155,8 @@
                 transition: all 0.2s;
                 font-weight: 500;
             }
-            .tag-radio-label input[type="radio"]:checked + span {
+
+            .tag-radio-label input[type="radio"]:checked+span {
                 background: #eff6ff;
                 border-color: #3b82f6;
                 color: #1d4ed8;
@@ -78,21 +167,27 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <div class="tag-radio-group">
                 <label class="tag-radio-label">
-                    <input type="radio" name="filter_training_type" value="special_equipment" checked onchange="renderProjects()">
+                    <input type="radio" name="filter_training_type" value="special_equipment" checked
+                        onchange="renderProjects()">
                     <span>📦 特种设备</span>
                 </label>
                 <label class="tag-radio-label">
-                    <input type="radio" name="filter_training_type" value="special_operation" onchange="renderProjects()">
+                    <input type="radio" name="filter_training_type" value="special_operation"
+                        onchange="renderProjects()">
                     <span>⚡️ 特种作业</span>
                 </label>
             </div>
-            
-            <button class="btn-add" onclick="openAddModal()" style="padding: 10px 24px; height: 44px; font-weight: bold; font-size: 15px; border-radius: 8px;">✚ 新增当前业务线项目</button>
+
+            <button class="btn-add" onclick="openAddModal()"
+                style="padding: 10px 24px; height: 44px; font-weight: bold; font-size: 15px; border-radius: 8px;">✚
+                新增当前业务线项目</button>
         </div>
 
         <!-- 新增/修改共用的项目弹窗 -->
-        <div id="projectModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
-            <div style="background:#fff; padding:25px; border-radius:8px; width:90%; max-width:400px; box-shadow: 0 4px 25px rgba(0,0,0,0.2);">
+        <div id="projectModal"
+            style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+            <div
+                style="background:#fff; padding:25px; border-radius:8px; width:90%; max-width:400px; box-shadow: 0 4px 25px rgba(0,0,0,0.2);">
                 <h3 id="modalTitle" style="margin-top:0; color:#111; margin-bottom:20px;">✏️ 修改培训项目</h3>
                 <form id="projectModalForm" style="display: flex; flex-direction: column; gap: 15px;">
                     <input type="hidden" id="modal_editing_id">
@@ -111,26 +206,35 @@
                     </div>
                     <div class="custom-form-group">
                         <label>作业类别</label>
-                        <input type="text" id="modal_job_category" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; outline: none;" placeholder="如：起重机械作业" required>
+                        <input type="text" id="modal_job_category"
+                            style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; outline: none;"
+                            placeholder="如：起重机械作业" required>
                     </div>
                     <div class="custom-form-group">
                         <label>操作项目</label>
-                        <input type="text" id="modal_exam_project" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; outline: none;" placeholder="如：起重机指挥" required>
+                        <input type="text" id="modal_exam_project"
+                            style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; outline: none;"
+                            placeholder="如：起重机指挥" required>
                     </div>
                     <div class="custom-form-group">
                         <label>项目代号 (选填)</label>
-                        <input type="text" id="modal_project_code" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; outline: none;" placeholder="如：Q1">
+                        <input type="text" id="modal_project_code"
+                            style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; outline: none;"
+                            placeholder="如：Q1">
                     </div>
                     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
-                        <button type="button" class="btn-toggle btn-inactive" style="padding: 8px 16px;" onclick="closeModal()">取消</button>
-                        <button type="submit" id="modalSubmitBtn" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">保存</button>
+                        <button type="button" class="btn-toggle btn-inactive" style="padding: 8px 16px;"
+                            onclick="closeModal()">取消</button>
+                        <button type="submit" id="modalSubmitBtn"
+                            style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">保存</button>
                     </div>
                 </form>
             </div>
         </div>
 
         <div class="table-wrap">
-            <h3 style="margin-top: 0; color: #111;">项目字典列表 <span style="font-size:0.8em; color:#888; font-weight:normal;">(为防止历史数据断链，此列表只提供软下架切换，不提供物理删除)</span></h3>
+            <h3 style="margin-top: 0; color: #111;">培训项目列表 <span
+                    style="font-size:0.8em; color:#888; font-weight:normal;">(为防止历史数据断链，此列表只提供软下架切换，不提供物理删除)</span></h3>
             <table>
                 <thead>
                     <tr>
@@ -143,7 +247,9 @@
                     </tr>
                 </thead>
                 <tbody id="projectList">
-                    <tr><td colspan="6" style="text-align:center; padding:30px; color:#666;">加载中...</td></tr>
+                    <tr>
+                        <td colspan="6" style="text-align:center; padding:30px; color:#666;">加载中...</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -151,7 +257,7 @@
 
     <script>
         // ======= API 及交互逻辑 =======
-        
+
         let allProjects = [];
 
         async function loadProjects() {
@@ -168,14 +274,14 @@
         function renderProjects() {
             const tbody = document.getElementById('projectList');
             tbody.innerHTML = '';
-            
+
             let selectedType = 'special_equipment';
             document.getElementsByName('filter_training_type').forEach(r => {
                 if (r.checked) selectedType = r.value;
             });
 
             const filteredProjects = allProjects.filter(p => p.training_type === selectedType);
-            
+
             if (filteredProjects.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 30px; color: #666;">📝 此分类下暂无项目配置数据，您可以通过添加来初始化</td></tr>`;
                 return;
@@ -232,7 +338,7 @@
         function openAddModal() {
             document.getElementById('modal_editing_id').value = '';
             document.getElementById('projectModalForm').reset();
-            
+
             let selectedType = 'special_equipment';
             document.getElementsByName('filter_training_type').forEach(r => {
                 if (r.checked) selectedType = r.value;
@@ -240,29 +346,29 @@
             document.getElementsByName('modal_training_type').forEach(r => {
                 r.checked = (r.value === selectedType);
             });
-            
+
             document.getElementById('modalTitle').innerHTML = '✚ 新增培训项目 <span style="font-size:0.8em; color:#888; font-weight:normal;">(实时生效)</span>';
             document.getElementById('modalSubmitBtn').textContent = '保存添加';
             document.getElementById('modalSubmitBtn').style.background = '#4f46e5';
-            
+
             document.getElementById('projectModal').style.display = 'flex';
         }
 
         function editProject(id, training_type, job_category, exam_project, project_code) {
             document.getElementById('modal_editing_id').value = id;
-            
+
             document.getElementsByName('modal_training_type').forEach(r => {
                 r.checked = (r.value === training_type);
             });
-            
+
             document.getElementById('modal_job_category').value = job_category;
             document.getElementById('modal_exam_project').value = exam_project;
             document.getElementById('modal_project_code').value = project_code;
-            
+
             document.getElementById('modalTitle').innerHTML = '✏️ 修改培训项目 <span style="font-size:0.5em; color:#ef4444; font-weight:normal; display:block;">修改后将热更新并同步历史数据，同时写入JSON文件</span>';
             document.getElementById('modalSubmitBtn').textContent = '保存修改';
             document.getElementById('modalSubmitBtn').style.background = '#f59e0b';
-            
+
             document.getElementById('projectModal').style.display = 'flex';
         }
 
@@ -279,7 +385,7 @@
             btn.textContent = '请求中...';
 
             const editingId = document.getElementById('modal_editing_id').value;
-            
+
             let selectedType = 'special_equipment';
             document.getElementsByName('modal_training_type').forEach(r => {
                 if (r.checked) selectedType = r.value;
@@ -291,7 +397,7 @@
                 exam_project: document.getElementById('modal_exam_project').value,
                 project_code: document.getElementById('modal_project_code').value
             };
-            
+
             try {
                 const url = editingId ? `/api/config/projects/${editingId}` : '/api/config/projects';
                 const method = editingId ? 'PUT' : 'POST';
@@ -320,4 +426,5 @@
         loadProjects();
     </script>
 </body>
+
 </html>

@@ -196,6 +196,7 @@ def init_db(database_path):
                 diploma_path TEXT,
                 id_card_front_path TEXT,
                 id_card_back_path TEXT,
+                hukou_residence_path TEXT,
                 hukou_personal_path TEXT,
                 training_form_path TEXT,
                 submitter_openid TEXT,
@@ -205,6 +206,7 @@ def init_db(database_path):
         # 向前兼容
         _ensure_column_exists(conn, 'students', 'submitter_openid', 'submitter_openid TEXT')
         _ensure_column_exists(conn, 'students', 'training_project_id', 'training_project_id INTEGER')
+        _ensure_column_exists(conn, 'students', 'hukou_residence_path', 'hukou_residence_path TEXT')
 
         # 创建高级字典表
         conn.execute('''
