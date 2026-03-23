@@ -442,6 +442,7 @@ function buildStudentPayload(student = {}, trainingType = '') {
     exam_project: trimText(student.exam_project),
     project_code: trimText(student.project_code),
     training_type: normalizedType,
+    training_project_id: student.training_project_id || null,
     files: normalizeStudentFiles(student.files || {}, normalizedType)
   }
 }
