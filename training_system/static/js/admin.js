@@ -1105,6 +1105,88 @@ document.addEventListener('DOMContentLoaded', () => {
             filesContainer.appendChild(healthCheckWrapper);
         }
 
+        if (student.status === 'reviewed') {
+            const materialsSection = document.createElement('div');
+            materialsSection.className = 'generated-materials-section';
+            materialsSection.style.marginTop = '20px';
+            materialsSection.style.borderTop = '1px dashed #ddd';
+            materialsSection.style.paddingTop = '15px';
+            materialsSection.style.display = 'none';
+
+            const materialsTitle = document.createElement('h3');
+            materialsTitle.textContent = '处理好的报名材料';
+            materialsTitle.style.fontSize = '14px';
+            materialsTitle.style.marginBottom = '10px';
+            materialsTitle.style.color = '#333';
+            materialsSection.appendChild(materialsTitle);
+
+            const materialsContainer = document.createElement('div');
+            materialsContainer.style.display = 'flex';
+            materialsContainer.style.flexWrap = 'nowrap';
+            materialsContainer.style.gap = '15px';
+            materialsContainer.style.overflowX = 'auto';
+            materialsContainer.style.padding = '10px 0';
+            materialsSection.appendChild(materialsContainer);
+
+            filesContainer.parentNode.insertBefore(materialsSection, filesContainer.nextSibling);
+
+            const loadMaterials = async () => {
+                try {
+                    const res = await fetch(`/api/students/${student.id}/generated_materials`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.exists && data.materials && data.materials.length > 0) {
+                            materialsSection.style.display = 'block';
+                            materialsContainer.innerHTML = '';
+                            data.materials.forEach(mat => {
+                                const wrapper = document.createElement('div');
+                                wrapper.style.display = 'flex';
+                                wrapper.style.flexDirection = 'column';
+                                wrapper.style.alignItems = 'center';
+                                wrapper.style.gap = '5px';
+                                wrapper.style.minWidth = '100px';
+
+                                const imgBox = document.createElement('div');
+                                imgBox.style.width = '100px';
+                                imgBox.style.height = '100px';
+                                imgBox.style.border = '1px solid #ddd';
+                                imgBox.style.borderRadius = '8px';
+                                imgBox.style.overflow = 'hidden';
+                                imgBox.style.cursor = 'pointer';
+
+                                if (mat.name.endsWith('.docx') || mat.name.endsWith('.doc')) {
+                                    imgBox.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;background:#f9fafb;">📄</div>';
+                                    imgBox.onclick = () => window.open('/' + mat.url, '_blank');
+                                } else {
+                                    imgBox.innerHTML = `<img src="/${mat.url}?t=${Date.now()}" style="width:100%;height:100%;object-fit:cover;">`;
+                                    imgBox.onclick = () => window.open('/' + mat.url + '?t=' + Date.now(), '_blank');
+                                }
+
+                                const caption = document.createElement('div');
+                                caption.textContent = mat.name.replace(/^[^-]+-[^-]+-/, ''); 
+                                caption.style.fontSize = '12px';
+                                caption.style.color = '#666';
+                                caption.style.textAlign = 'center';
+                                caption.style.maxWidth = '100px';
+                                caption.style.wordBreak = 'break-all';
+
+                                wrapper.appendChild(imgBox);
+                                wrapper.appendChild(caption);
+                                materialsContainer.appendChild(wrapper);
+                            });
+                        } else {
+                            materialsSection.style.display = 'none';
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to load generated materials', e);
+                }
+            };
+            
+            loadMaterials();
+            student._reloadMaterials = loadMaterials;
+        }
+
         const actionBar = clone.querySelector('.action-bar');
         if (actionBar) {
             if (currentStatus === 'unreviewed') {
@@ -1125,9 +1207,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 approveBtn.onclick = () => approveStudent();
                 actionBar.appendChild(approveBtn);
             } else {
+                const generateMaterialsBtn = document.createElement('button');
+                generateMaterialsBtn.className = 'btn primary';
+                generateMaterialsBtn.textContent = '生成报名材料';
+                generateMaterialsBtn.style.marginRight = '8px';
+                generateMaterialsBtn.style.background = '#4F46E5';
+                generateMaterialsBtn.onclick = async () => {
+                    const originalText = generateMaterialsBtn.textContent;
+                    generateMaterialsBtn.textContent = '生成中...';
+                    generateMaterialsBtn.disabled = true;
+                    try {
+                        const res = await fetch(`/api/students/${student.id}/generate_materials`, { method: 'POST' });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error || '生成失败');
+                        showMessage('报名材料生成成功', 'success');
+                        if (student._reloadMaterials) {
+                            student._reloadMaterials();
+                        }
+                    } catch (e) {
+                        showMessage(e.message, 'error');
+                    } finally {
+                        generateMaterialsBtn.textContent = originalText;
+                        generateMaterialsBtn.disabled = false;
+                    }
+                };
+                actionBar.appendChild(generateMaterialsBtn);
+
+                const downloadMaterialsBtn = document.createElement('button');
+                downloadMaterialsBtn.className = 'btn secondary';
+                downloadMaterialsBtn.textContent = '报名材料下载';
+                downloadMaterialsBtn.style.marginRight = '8px';
+                downloadMaterialsBtn.onclick = () => {
+                    window.open(`/api/students/${student.id}/download_materials.zip`, '_blank');
+                };
+                actionBar.appendChild(downloadMaterialsBtn);
+
                 const downloadZipBtn = document.createElement('button');
                 downloadZipBtn.className = 'btn secondary';
                 downloadZipBtn.textContent = '打包下载';
+                downloadZipBtn.title = '仅下载原附件(剔除报名材料)';
                 downloadZipBtn.style.marginRight = '8px';
                 downloadZipBtn.onclick = () => {
                     window.open(`/api/students/${student.id}/attachments.zip`, '_blank');

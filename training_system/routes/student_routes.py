@@ -1051,6 +1051,158 @@ def download_attachments_zip_route(id):
         return build_internal_error_response('打包附件失败，请稍后重试')
 
 
+@student_bp.route('/api/students/<int:id>/generate_materials', methods=['POST'])
+def generate_materials_route(id):
+    """
+    生成报名材料。
+    """
+    try:
+        ensure_mini_admin()
+        student = get_student_by_id(id)
+        if student.get('status') != 'reviewed':
+            return jsonify({'error': '仅支持已审核学员生成报名材料'}), 400
+            
+        from services.material_service import generate_student_materials
+        base_dir = current_app.config['BASE_DIR']
+        output_root = current_app.config['STUDENTS_FOLDER']
+        
+        # We need to construct the exact folder name for output_root
+        training_type = student.get('training_type', 'special_operation')
+        company = student.get('company', '')
+        name = student.get('name', '')
+        training_type_map = {
+            'special_operation': '特种作业',
+            'special_equipment': '特种设备'
+        }
+        training_type_name = training_type_map.get(training_type, '特种作业')
+        student_folder_name = f"{training_type_name}-{company}-{name}"
+        actual_output_root = os.path.join(output_root, student_folder_name)
+        
+        output_dir = generate_student_materials(student, base_dir, actual_output_root)
+        
+        return jsonify({'message': '生成成功'})
+    except Exception as e:
+        current_app.logger.exception('Error generating materials for student %s', id)
+        return build_internal_error_response('生成报名材料失败，请稍后重试')
+
+
+@student_bp.route('/api/students/<int:id>/generated_materials', methods=['GET'])
+def get_generated_materials_route(id):
+    """
+    获取已生成的报名材料预览列表。
+    """
+    try:
+        ensure_mini_admin()
+        student = get_student_by_id(id)
+        
+        id_card = student.get('id_card', '')
+        name = student.get('name', '')
+        name_prefix = f"{id_card}-{name}"
+        
+        training_type = student.get('training_type', 'special_operation')
+        company = student.get('company', '')
+        training_type_map = {
+            'special_operation': '特种作业',
+            'special_equipment': '特种设备'
+        }
+        training_type_name = training_type_map.get(training_type, '特种作业')
+        student_folder_name = f"{training_type_name}-{company}-{name}"
+        material_folder_name = f"{name_prefix}-报名材料"
+        
+        output_dir = os.path.join(current_app.config['STUDENTS_FOLDER'], student_folder_name, material_folder_name)
+        
+        if not os.path.exists(output_dir) or not os.path.isdir(output_dir):
+            return jsonify({'exists': False, 'materials': []}), 200
+            
+        materials = []
+        for filename in sorted(os.listdir(output_dir)):
+            if filename.startswith('.'):
+                continue
+            abs_path = os.path.join(output_dir, filename)
+            if os.path.isfile(abs_path):
+                # We need to construct the URL: /students/<student_folder>/<material_folder>/<filename>
+                # Using forward slashes for URLs
+                url = f"students/{student_folder_name}/{material_folder_name}/{filename}"
+                materials.append({
+                    "name": filename,
+                    "url": url
+                })
+
+        return jsonify({'exists': True, 'materials': materials}), 200
+
+    except NotFoundError as e:
+        return jsonify(e.to_dict()), e.status_code
+    except AppError as e:
+        return jsonify(e.to_dict()), e.status_code
+    except Exception as e:
+        current_app.logger.exception('Error fetching generated materials for student %s', id)
+        return build_internal_error_response('获取报名材料失败，请稍后重试')
+
+
+@student_bp.route('/api/students/<int:id>/download_materials.zip', methods=['GET'])
+def download_materials_zip_route(id):
+    """
+    下载生成的报名材料（ZIP）。
+    """
+    try:
+        ensure_mini_admin()
+        student = get_student_by_id(id)
+        if student.get('status') != 'reviewed':
+            return jsonify({'error': '仅支持已审核学员打包下载'}), 400
+            
+        id_card = student.get('id_card', '')
+        name = student.get('name', '')
+        name_prefix = f"{id_card}-{name}"
+        
+        training_type = student.get('training_type', 'special_operation')
+        company = student.get('company', '')
+        training_type_map = {
+            'special_operation': '特种作业',
+            'special_equipment': '特种设备'
+        }
+        training_type_name = training_type_map.get(training_type, '特种作业')
+        student_folder_name = f"{training_type_name}-{company}-{name}"
+        
+        output_dir = os.path.join(current_app.config['STUDENTS_FOLDER'], student_folder_name, f"{name_prefix}-报名材料")
+        
+        if not os.path.exists(output_dir) or not os.path.isdir(output_dir):
+            return jsonify({'error': '该学员暂未生成报名材料子文件夹'}), 400
+            
+        files_to_zip = []
+        for filename in os.listdir(output_dir):
+            abs_path = os.path.join(output_dir, filename)
+            if os.path.isfile(abs_path):
+                # 为了保留子文件夹结构
+                arcname = os.path.join(f"{name_prefix}-报名材料", filename)
+                files_to_zip.append((abs_path, arcname))
+
+        if not files_to_zip:
+            return jsonify({'error': '报名材料文件夹为空'}), 400
+
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
+            for abs_path, arcname in files_to_zip:
+                try:
+                    zf.write(abs_path, arcname)
+                except Exception as e:
+                    current_app.logger.error(f'Failed to add file to ZIP: {str(e)}')
+
+        buffer.seek(0)
+
+        from flask import send_file
+        safe_name = f"{name_prefix}-报名材料".replace('/', '-').replace('\\', '-')
+
+        return send_file(
+            buffer,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f"{safe_name}.zip"
+        )
+
+    except Exception as e:
+        current_app.logger.exception('Error generating materials ZIP for student %s', id)
+        return build_internal_error_response('打包报名材料失败，请稍后重试')
+
 
 @student_bp.route('/api/companies', methods=['GET'])
 def get_companies_route():
