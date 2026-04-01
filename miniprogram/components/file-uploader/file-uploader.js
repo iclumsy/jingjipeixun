@@ -111,8 +111,12 @@ Component({
         })
         const tempFilePath = res.tempFilePaths[0]
 
-        const fileInfo = await wx.getFileInfo({
-          filePath: tempFilePath
+        const fileInfo = await new Promise((resolve, reject) => {
+          wx.getFileSystemManager().getFileInfo({
+            filePath: tempFilePath,
+            success: resolve,
+            fail: reject
+          })
         })
         if (!validateFileSize(fileInfo.size, MAX_FILE_SIZE)) {
           this.setData({
