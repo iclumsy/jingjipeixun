@@ -120,6 +120,102 @@ def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
         return input_path
 
 
+def save_temp_file(file_storage, file_type):
+    """
+    小程序预上传时，将文件暂存到 students/tmp/<uuid>/ 下。
+    返回临时相对路径，格式：students/tmp/<uuid>/<file_type><ext>
+
+    提交学员表单时，调用 commit_temp_files() 将所有临时文件
+    整体移动到正式目录，并返回正式相对路径。
+    """
+    import uuid
+    if not file_storage or not file_storage.filename:
+        return ''
+
+    _, ext = os.path.splitext(file_storage.filename)
+    orig_ext = ext.lower() if ext else '.jpg'
+
+    tmp_id = str(uuid.uuid4())
+    tmp_folder = os.path.join(current_app.config['STUDENTS_FOLDER'], 'tmp', tmp_id)
+    os.makedirs(tmp_folder, exist_ok=True)
+
+    filename = f"{file_type}{orig_ext}"
+    abs_path = os.path.join(tmp_folder, filename)
+    file_storage.save(abs_path)
+    current_app.logger.info(f'Temp file saved: {abs_path}')
+
+    return f"students/tmp/{tmp_id}/{filename}"
+
+
+def commit_temp_files(tmp_paths_by_input_name, id_card, name, company, training_type):
+    """
+    提交阶段：将预上传的临时文件移动到学员正式目录，返回正式的相对路径字典。
+
+    参数:
+        tmp_paths_by_input_name : {input_name -> tmp relative path}
+        id_card, name, company, training_type : 用于生成正式文件夹名
+    返回:
+        {db_key -> formal relative path}
+    """
+    label_name_map = {
+        'photo': '个人照片',
+        'diploma': '学历证书',
+        'id_card_front': '身份证正面',
+        'id_card_back': '身份证反面',
+        'hukou_residence': '户口本户籍页',
+        'hukou_personal': '户口本个人页',
+    }
+    training_type_map = {
+        'special_operation': '特种作业',
+        'special_equipment': '特种设备',
+    }
+    training_type_name = training_type_map.get(training_type, '特种作业')
+    student_folder_name = f"{training_type_name}-{company}-{name}"
+    student_folder_path = os.path.join(current_app.config['STUDENTS_FOLDER'], student_folder_name)
+    os.makedirs(student_folder_path, exist_ok=True)
+
+    from routes.student_routes import FILE_MAP  # 延迟导入避免循环
+    result = {}
+    tmp_dirs_to_clean = set()
+
+    for input_name, db_key in FILE_MAP.items():
+        tmp_rel = tmp_paths_by_input_name.get(input_name, '')
+        if not tmp_rel or not tmp_rel.startswith('students/tmp/'):
+            result[db_key] = ''
+            continue
+
+        tmp_abs = os.path.join(current_app.config['BASE_DIR'], tmp_rel)
+        if not os.path.exists(tmp_abs):
+            result[db_key] = ''
+            continue
+
+        _, ext = os.path.splitext(tmp_abs)
+        label_name = label_name_map.get(input_name, input_name)
+        safe_name = f"{id_card}-{name}-{label_name}{ext}"
+        dest_abs = os.path.join(student_folder_path, safe_name)
+
+        try:
+            shutil.move(tmp_abs, dest_abs)
+            current_app.logger.info(f'Committed temp file: {tmp_abs} -> {dest_abs}')
+            result[db_key] = f"students/{student_folder_name}/{safe_name}"
+            # 记录需要清理的临时文件夹
+            tmp_dir = os.path.dirname(tmp_abs)
+            tmp_dirs_to_clean.add(tmp_dir)
+        except Exception as e:
+            current_app.logger.error(f'Failed to commit temp file {tmp_abs}: {e}')
+            result[db_key] = ''
+
+    # 清理已经搬空的临时文件夹
+    for tmp_dir in tmp_dirs_to_clean:
+        try:
+            if os.path.isdir(tmp_dir) and not os.listdir(tmp_dir):
+                os.rmdir(tmp_dir)
+        except Exception:
+            pass
+
+    return result
+
+
 def process_and_save_file(file_storage, id_card, name, label_key, company='', training_type='special_operation'):
     """
     保存上传文件，命名格式为 '<公司>-<姓名>/<身份证号><姓名>-<标签>.<扩展名>'。

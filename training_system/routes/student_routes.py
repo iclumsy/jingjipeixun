@@ -355,18 +355,34 @@ def create_student_route():
 
             # 从 JSON 的 files 字段中提取并校验文件路径
             files_payload = payload.get('files', {}) if isinstance(payload.get('files', {}), dict) else {}
-            for input_name, db_key in FILE_MAP.items():
-                file_paths[db_key] = ensure_safe_relative_student_path(files_payload.get(input_name, ''))
 
-            # 检查必传附件路径是否齐全
+            # 检查必传附件路径是否齐全（提交时校验）
             required_attachments = REQUIRED_ATTACHMENTS.get(training_type, REQUIRED_ATTACHMENTS['special_operation'])
             missing_files = [
                 field for field in required_attachments
-                if not file_paths.get(FILE_MAP[field], '')
+                if not files_payload.get(field, '')
             ]
             if missing_files:
                 fields = {field: '该培训项目下此附件为必传项' for field in missing_files}
                 raise ValidationError('缺少必传附件', fields=fields)
+
+            # 把临时文件 move 到学员正式目录，获取正式路径
+            from services.image_service import commit_temp_files
+            id_card_val = payload.get('id_card', '').strip()
+            name_val = payload.get('name', '').strip()
+            company_val = payload.get('company', '').strip()
+            file_paths = commit_temp_files(
+                files_payload, id_card_val, name_val, company_val, training_type
+            )
+
+            # 再次确认必传路径有效（commit 后再校验一次，防止文件缺失）
+            still_missing = [
+                field for field in required_attachments
+                if not file_paths.get(FILE_MAP[field], '')
+            ]
+            if still_missing:
+                fields = {field: '附件文件不存在或已过期，请重新上传' for field in still_missing}
+                raise ValidationError('必传附件处理失败', fields=fields)
 
             student_payload = dict(payload)
 
@@ -813,32 +829,17 @@ def miniprogram_upload_attachment_route():
         if file_type not in FILE_MAP:
             raise ValidationError('附件类型无效')
 
-        training_type = normalize_training_type(
-            request.form.get('training_type') or request.form.get('trainingType') or 'special_operation'
-        )
-        # 上传阶段宽松处理：允许替换任何已知附件类型
-        # 必传附件约束在最终提交/更新校验时强制执行
-
         validate_file_upload(upload_file)
 
-        # 文件命名信息：如果未提供身份证号，使用时间戳作为临时标识
-        id_card_for_name = str(request.form.get('id_card', '') or '').strip() or f"temp{int(time.time())}"
-        name_for_save = str(request.form.get('name', '') or '').strip() or '未命名'
-        company_for_name = str(request.form.get('company', '') or '').strip()
-
-        # 保存文件并返回相对路径
-        rel = process_and_save_file(
-            upload_file,
-            id_card_for_name,
-            name_for_save,
-            file_type,
-            company_for_name,
-            training_type
-        )
+        # 保存到临时目录（提交时再 move 到正式目录）
+        from services.image_service import save_temp_file
+        tmp_rel = save_temp_file(upload_file, file_type)
+        if not tmp_rel:
+            raise AppError('临时文件保存失败', status_code=500)
 
         return jsonify({
             'success': True,
-            'path': rel,
+            'path': tmp_rel,
             'file_type': file_type
         })
 

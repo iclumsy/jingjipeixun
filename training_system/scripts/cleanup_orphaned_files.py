@@ -1,52 +1,172 @@
 import os
 import sqlite3
+import time
 
-def cleanup_orphaned_images():
-    # 获取项目根目录 /Users/ditto/Documents/jingjipeixun/training_system
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    db_path = os.path.join(base_dir, 'database/students.db')
-    students_folder = os.path.join(base_dir, 'students')
-    
-    # 1. 把数据库里所有被引用过的图片路径全提取出来，放入白名单集合
+
+# 文件必须比这个时间更老才会被清理（避免误删刚上传但未提交的文件）
+MIN_AGE_HOURS = 24
+
+
+def get_valid_paths(db_path, base_dir):
+    """从数据库中提取所有被引用的文件绝对路径作为白名单。"""
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
-    records = conn.execute("SELECT photo_path, diploma_path, id_card_front_path, id_card_back_path, hukou_residence_path, hukou_personal_path FROM students").fetchall()
+    records = conn.execute("""
+        SELECT photo_path, diploma_path,
+               id_card_front_path, id_card_back_path,
+               hukou_residence_path, hukou_personal_path,
+               training_form_path
+        FROM students
+    """).fetchall()
     conn.close()
-    
-    # 构建所有有效路径的绝对路径集合 Set
+
     valid_paths = set()
     for row in records:
         for path in dict(row).values():
             if path:
-                # 统一拼装为操作系统的真实绝对路径
                 valid_paths.add(os.path.abspath(os.path.join(base_dir, path)))
+    return valid_paths
 
-    freed_mb = 0
-    deleted_count = 0
-    
-    # 2. 遍历咱们服务器硬盘上的 /students/ 文件夹
+
+def is_inside_materials_folder(file_abs_path):
+    """判断文件是否位于生成的报名材料子文件夹中（不能删除）。"""
+    # 报名材料文件夹命名格式：身份证号-姓名-报名材料
+    parts = file_abs_path.replace('\\', '/').split('/')
+    return any(part.endswith('-报名材料') for part in parts)
+
+
+def cleanup_tmp_folder(students_folder, min_age_hours, dry_run):
+    """清理 students/tmp/ 目录中超过指定时间的孤立临时文件夹。"""
+    tmp_root = os.path.join(students_folder, 'tmp')
+    if not os.path.exists(tmp_root):
+        return 0, 0.0
+
+    now = time.time()
+    min_age_seconds = min_age_hours * 3600
+    deleted_dirs = 0
+    freed_mb = 0.0
+
+    for entry in os.listdir(tmp_root):
+        tmp_dir = os.path.join(tmp_root, entry)
+        if not os.path.isdir(tmp_dir):
+            continue
+        # 以目录修改时间判断年龄（文件夹创建后即写入文件，mtime 即上传时间）
+        try:
+            mtime = os.path.getmtime(tmp_dir)
+        except OSError:
+            continue
+        if (now - mtime) < min_age_seconds:
+            continue
+
+        # 统计目录大小
+        for fname in os.listdir(tmp_dir):
+            fpath = os.path.join(tmp_dir, fname)
+            if os.path.isfile(fpath):
+                try:
+                    freed_mb += os.path.getsize(fpath) / (1024 * 1024)
+                except OSError:
+                    pass
+
+        if dry_run:
+            print(f"  [将删除临时文件夹] {tmp_dir}")
+        else:
+            try:
+                import shutil as _shutil
+                _shutil.rmtree(tmp_dir)
+                deleted_dirs += 1
+            except Exception as e:
+                print(f"❌ 删除临时文件夹失败: {tmp_dir}，原因: {e}")
+
+    return deleted_dirs, freed_mb
+
+
+def cleanup_orphaned_images(dry_run=True, min_age_hours=MIN_AGE_HOURS):
+    """
+    清理 students/ 目录中不再被数据库引用的孤立文件。
+
+    参数:
+        dry_run      : True 时只打印将要删除的文件，不实际操作（默认开启，安全模式）
+        min_age_hours: 文件最小存在时间（小时），防止误删刚上传的临时文件
+    """
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    db_path = os.path.join(base_dir, 'database/students.db')
+    students_folder = os.path.join(base_dir, 'students')
+
     if not os.path.exists(students_folder):
         print("📁 附件文件夹尚不存在，无需清理。")
         return
 
+    if dry_run:
+        print("⚠️  [DRY RUN 模式] 不会实际删除任何文件，仅列出将会被删除的内容。")
+        print("    确认无误后，请以 --delete 参数再次运行。\n")
+
+    valid_paths = get_valid_paths(db_path, base_dir)
+    now = time.time()
+    min_age_seconds = min_age_hours * 3600
+
+    freed_mb = 0.0
+    deleted_count = 0
+    skipped_materials = 0
+    skipped_young = 0
+
     for root, dirs, files in os.walk(students_folder):
+        # 跳过隐藏目录和 tmp 目录（tmp 目录走单独清理逻辑）
+        dirs[:] = [d for d in dirs if not d.startswith('.') and d != 'tmp']
+
         for file in files:
-            # 忽略隐藏文件，比如 .DS_Store
             if file.startswith('.'):
                 continue
-                
+
             file_abs_path = os.path.abspath(os.path.join(root, file))
-            # 3. 如果物理文件完全不在咱们的数据库白名单里，格杀勿论
-            if file_abs_path not in valid_paths:
-                file_size = os.path.getsize(file_abs_path)
-                freed_mb += file_size / (1024 * 1024)
+
+            # ✅ 保护：报名材料子文件夹中生成的处理图不在数据库里，绝不能删
+            if is_inside_materials_folder(file_abs_path):
+                skipped_materials += 1
+                continue
+
+            # ✅ 保护：已被数据库引用的文件不能删
+            if file_abs_path in valid_paths:
+                continue
+
+            # ✅ 保护：文件太新，可能是还没提交的表单附件
+            try:
+                mtime = os.path.getmtime(file_abs_path)
+            except OSError:
+                continue
+            if (now - mtime) < min_age_seconds:
+                skipped_young += 1
+                continue
+
+            file_size = os.path.getsize(file_abs_path)
+            freed_mb += file_size / (1024 * 1024)
+
+            if dry_run:
+                print(f"  [将删除] {file_abs_path}  ({file_size / 1024:.1f} KB)")
+            else:
                 try:
                     os.remove(file_abs_path)
                     deleted_count += 1
                 except Exception as e:
-                    print(f"❌ 删除文件失败: {file_abs_path}, 原因: {e}")
-                
-    print(f"✅ 清理完成！共清扫掉 {deleted_count} 个半途而废的孤儿文件/历史垃圾，为您服务器腾出 {freed_mb:.2f} MB 空间！")
+                    print(f"❌ 删除失败: {file_abs_path}，原因: {e}")
+
+    if dry_run:
+        print(f"\n📊 预计将删除 {int(freed_mb * 1024 / 1024)} 个文件，释放约 {freed_mb:.2f} MB")
+        print(f"   （已保护 {skipped_materials} 个报名材料文件，跳过 {skipped_young} 个刚上传的临时文件）")
+    else:
+        print(f"\n✅ 清理完成！删除 {deleted_count} 个孤立文件，释放 {freed_mb:.2f} MB")
+        print(f"   （已保护 {skipped_materials} 个报名材料文件，跳过 {skipped_young} 个刚上传的临时文件）")
+
+    # 清理 tmp/ 目录中超时的临时文件夹
+    print(f"\n🗂  清理 students/tmp/ 目录（超过 {min_age_hours} 小时的孤立上传）...")
+    tmp_dirs, tmp_mb = cleanup_tmp_folder(students_folder, min_age_hours, dry_run)
+    if dry_run:
+        print(f"   预计删除过期临时文件夹，释放约 {tmp_mb:.2f} MB")
+    else:
+        print(f"   删除 {tmp_dirs} 个过期临时文件夹，释放 {tmp_mb:.2f} MB")
+
 
 if __name__ == '__main__':
-    cleanup_orphaned_images()
+    import sys
+    # 命令行传入 --delete 参数才真正删除，否则只走 dry-run 安全预览
+    actually_delete = '--delete' in sys.argv
+    cleanup_orphaned_images(dry_run=not actually_delete)
