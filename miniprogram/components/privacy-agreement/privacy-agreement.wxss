@@ -20,8 +20,6 @@
   z-index: 1;
   width: 100%;
   max-width: 680rpx;
-  max-height: 82vh;
-  min-height: 0;
   background: #ffffff;
   border-radius: 24rpx;
   box-shadow: 0 14rpx 32rpx rgba(19, 37, 69, 0.16);
@@ -33,6 +31,7 @@
 .dialog-header {
   padding: 30rpx 28rpx 24rpx;
   border-bottom: 1rpx solid #e9eff7;
+  flex-shrink: 0;
 }
 
 .dialog-title {
@@ -44,10 +43,57 @@
 }
 
 .dialog-content {
-  flex: 1;
-  min-height: 0;
-  padding: 24rpx 28rpx;
+  padding: 24rpx 28rpx 10rpx;
   box-sizing: border-box;
+}
+
+.summary-card {
+  margin-top: 16rpx;
+  padding: 20rpx 18rpx;
+  border-radius: 18rpx;
+  border: 1rpx solid #dce6f2;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+
+.agreement-link-row {
+  margin-top: 18rpx;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.inline-text {
+  margin-bottom: 0;
+}
+
+.link-sep {
+  margin: 0 6rpx;
+  font-size: 24rpx;
+  color: #6b7c93;
+}
+
+.dialog-content .section-title {
+  margin-top: 0;
+}
+
+.summary-card .info-list {
+  margin-bottom: 0;
+}
+
+.summary-card .info-item:last-child {
+  margin-bottom: 0;
+}
+
+.agreement-link-row .link {
+  font-size: 24rpx;
+}
+
+.dialog-content .content-text:last-child {
+  margin-bottom: 0;
+}
+
+.dialog-content .highlight {
+  margin-top: 18rpx;
 }
 
 .content-text {
@@ -94,6 +140,7 @@
   align-items: center;
   gap: 14rpx;
   border-top: 1rpx solid #e9eff7;
+  flex-shrink: 0;
   padding: 18rpx 20rpx calc(18rpx + env(safe-area-inset-bottom));
   padding-bottom: calc(18rpx + constant(safe-area-inset-bottom));
 }

@@ -1,53 +1,45 @@
 <!-- components/privacy-agreement/privacy-agreement.wxml -->
 <view class="privacy-mask" wx:if="{{show}}">
   <view class="privacy-backdrop" catchtouchmove="preventTouchMove"></view>
-  <view class="privacy-dialog" catchtap="noop">
+  <view class="privacy-dialog">
     <view class="dialog-header">
       <text class="dialog-title">用户隐私保护提示</text>
     </view>
 
-    <scroll-view class="dialog-content" scroll-y>
+    <view class="dialog-content">
       <view class="content-text">
-        <text>感谢您使用阳泉精技培训管理小程序！</text>
+        <text>欢迎使用阳泉精技培训管理小程序。继续使用前，请先阅读并同意相关协议。</text>
       </view>
 
-      <view class="content-text">
-        <text>在使用本小程序前，请您仔细阅读并同意</text>
+      <view class="summary-card">
+        <view class="section-title">我们会收集什么</view>
+        <view class="info-list">
+          <text class="info-item">• 学员基本信息、联系方式、报名项目</text>
+          <text class="info-item">• 身份证、学历证书、户口本等报名附件</text>
+          <text class="info-item">• 微信 OpenID，用于识别提交人</text>
+        </view>
+      </view>
+
+      <view class="summary-card">
+        <view class="section-title">我们如何使用</view>
+        <view class="info-list">
+          <text class="info-item">• 用于培训报名资料提交、审核与办理</text>
+          <text class="info-item">• 用于查看审核状态、驳回修改与通知提醒</text>
+          <text class="info-item">• 不用于与培训报名无关的用途</text>
+        </view>
+      </view>
+
+      <view class="agreement-link-row">
+        <text class="content-text inline-text">查看完整内容：</text>
         <text class="link" bindtap="openUserAgreement">《用户服务协议》</text>
-        <text>和</text>
+        <text class="link-sep">和</text>
         <text class="link" bindtap="openPrivacyPolicy">《隐私政策》</text>
-        <text>。</text>
-      </view>
-
-      <view class="content-text">
-        <text>我们仅在您授权同意后收集必要信息，且仅用于学员培训报名相关的提交、审核与办理。</text>
-      </view>
-
-      <view class="section-title">我们会收集以下信息：</view>
-      <view class="info-list">
-        <text class="info-item">• 学员基本信息（姓名、性别、身份证号等）</text>
-        <text class="info-item">• 联系方式（手机号）</text>
-        <text class="info-item">• 证件照片（身份证、学历证书等）</text>
-        <text class="info-item">• 微信OpenID（用于身份识别）</text>
-      </view>
-
-      <view class="section-title">信息用途：</view>
-      <view class="info-list">
-        <text class="info-item">• 学员培训报名资料提交与存档</text>
-        <text class="info-item">• 学员信息审核与驳回处理</text>
-        <text class="info-item">• 培训报名办理所需表单与名单生成</text>
-      </view>
-
-      <view class="section-title">您的权利：</view>
-      <view class="info-list">
-        <text class="info-item">• 查询、更正、删除您的个人信息</text>
-        <text class="info-item">• 随时撤回授权同意</text>
       </view>
 
       <view class="content-text highlight">
-        <text>点击"同意"即表示您已阅读并同意以上两份协议。</text>
+        <text>点击“同意”即表示您已阅读并接受以上协议。</text>
       </view>
-    </scroll-view>
+    </view>
 
     <view class="dialog-footer">
       <button class="btn btn-secondary" bindtap="onDisagree">不同意</button>
