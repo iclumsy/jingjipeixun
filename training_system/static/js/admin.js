@@ -1277,11 +1277,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                             // 给关键词上色
                             const colored = data.logs
-                                .replace(/\[diploma\]/g, '<span style="color:#38BDF8">[diploma]</span>')
-                                .replace(/\[id-card\]/g, '<span style="color:#34D399">[id-card]</span>')
-                                .replace(/\[hukou-compose\](?:\[\w+\])?/g, '<span style="color:#F472B6">$0</span>')
-                                .replace(/\[hukou-orient\](?:\[\w+\])?/g, '<span style="color:#FB923C">$0</span>')
-                                .replace(/\[material_crop\]/g, '<span style="color:#6EE7B7">[material_crop]</span>')
+                                .replace(/\[diploma\]/g, '<span style="color:#38BDF8">$&</span>')
+                                .replace(/\[id-card\]/g, '<span style="color:#34D399">$&</span>')
+                                .replace(/\[hukou\](?:\[[^\]]+\])?/g, '<span style="color:#F472B6">$&</span>')
+                                .replace(/\[material_crop\]/g, '<span style="color:#6EE7B7">$&</span>')
                                 .replace(/(决策:.*)/g, '<span style="color:#4ADE80">$1</span>')
                                 .replace(/(处理失败.*|Error.*)/g, '<span style="color:#F87171">$1</span>')
                                 .replace(/(已输出:.*)/g, '<span style="color:#A78BFA">$1</span>');

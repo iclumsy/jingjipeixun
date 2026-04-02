@@ -582,7 +582,8 @@ def estimate_orientation_by_projection(image):
 
 def normalize_hukou_page_orientation(image, original_image=None, page_kind="personal"):
     source_image = original_image if original_image is not None else image
-    tag = f"[hukou-orient][{page_kind}]"
+    kind_label = "首页" if page_kind == "home" else "本人页"
+    tag = f"[hukou][{kind_label}]"
 
     # 优先用 Tesseract OSD（精度最高）
     raw_osd = detect_text_osd_rotation(source_image)
@@ -594,10 +595,10 @@ def normalize_hukou_page_orientation(image, original_image=None, page_kind="pers
     if raw_osd and raw_osd["confidence"] >= HUKOU_OSD_MIN_CONFIDENCE:
         rotate_degrees = raw_osd["rotate_degrees"]
         if rotate_degrees in (90, 270):
-            print(f"{tag} 决策: OSD 邋转 {rotate_degrees}°（横向竖放图片）")
+            print(f"{tag} 决策: OSD 旋转 {rotate_degrees}°（横向竖放图片）")
             return rotate_image_by_degrees(image, rotate_degrees)
         if page_kind != "home" or raw_osd["confidence"] >= HUKOU_OSD_STRONG_CONFIDENCE:
-            print(f"{tag} 决策: OSD 邋转 {rotate_degrees}°")
+            print(f"{tag} 决策: OSD 旋转 {rotate_degrees}°")
             return rotate_image_by_degrees(image, rotate_degrees)
         print(f"{tag} OSD 置信度不足（{raw_osd['confidence']:.2f} < {HUKOU_OSD_STRONG_CONFIDENCE}），跳过 OSD 结果")
     elif raw_osd:
@@ -608,7 +609,7 @@ def normalize_hukou_page_orientation(image, original_image=None, page_kind="pers
         before_shape = image.shape
         stamped = normalize_hukou_home_page(image)
         if stamped.shape != before_shape or not np.array_equal(stamped, image):
-            print(f"{tag} 决策: 印章颜色检测成功，已调整方向")
+            print(f"{tag} 决策: 印章颜色检测成功，已旋转调整方向")
             return stamped
         print(f"{tag} 印章颜色检测: 未触发（印章不够清晰或不存在），进入投影方法")
 
@@ -618,9 +619,10 @@ def normalize_hukou_page_orientation(image, original_image=None, page_kind="pers
     scores_str = "  ".join(f"{ang}°={s:.1f}" for ang, s in sorted_proj)
     print(f"{tag} 投影得分: {scores_str}")
     if best_angle != 0:
-        print(f"{tag} 决策: 投影备选邋转 {best_angle}°")
+        print(f"{tag} 决策: 投影备选旋转 {best_angle}°")
         return rotate_image_by_degrees(image, best_angle)
     print(f"{tag} 投影方法: 得分差异不显著，不旋转")
+
 
     # 如果裁剪图和原图都没能确定方向，再试一次裁剪后的 OSD
     if original_image is not None:
@@ -628,7 +630,7 @@ def normalize_hukou_page_orientation(image, original_image=None, page_kind="pers
         if crop_osd:
             print(f"{tag} 裁剪后二次 OSD: rotate={crop_osd['rotate_degrees']}°  confidence={crop_osd['confidence']:.2f}")
         if crop_osd and crop_osd["confidence"] >= HUKOU_OSD_MIN_CONFIDENCE:
-            print(f"{tag} 决策: 二次 OSD 邋转 {crop_osd['rotate_degrees']}°")
+            print(f"{tag} 决策: 二次 OSD 旋转 {crop_osd['rotate_degrees']}°")
             return rotate_image_by_degrees(image, crop_osd["rotate_degrees"])
 
     print(f"{tag} 所有方法均未成功识别方向，保持原图不动")
@@ -703,20 +705,22 @@ def trim_hukou_home_page_margins(image):
 
 
 def prepare_hukou_output_page(image, page_kind):
-    tag = f"[hukou-compose][{page_kind}]"
+    kind_label = "首页" if page_kind == "home" else "本人页"
+    tag = f"[hukou][{kind_label}]"
     h0, w0 = image.shape[:2]
-    print(f"{tag} 输入图尺寸: {w0}x{h0}")
+    print(f"{tag} 原图尺寸: {w0}x{h0}")
 
     page, meta = auto_crop_hukou_page(image, expand_px=90, return_meta=True)
     selected = meta.get("selected_candidate") or {}
     h1, w1 = page.shape[:2]
     print(
-        f"{tag} 第一次裁剪: {w1}x{h1}  "
+        f"{tag} 裁剪后: {w1}x{h1}  "
         f"mode={meta.get('crop_mode')}  "
         f"detector={selected.get('detector', 'N/A')}  "
         f"area_ratio={selected.get('area_ratio', 0):.3f}  "
         f"confidence={selected.get('confidence', 0):.3f}  "
-        f"edge_density={selected.get('edge_density_on_border', 0):.3f}"
+        f"edge_density={selected.get('edge_density_on_border', 0):.3f}  "
+        f"analysis_enhanced={meta.get('analysis_enhancement_enabled', False)}"
     )
 
     if (
@@ -727,16 +731,17 @@ def prepare_hukou_output_page(image, page_kind):
         refined_page, refined_meta = auto_crop_hukou_page(page, expand_px=90, return_meta=True)
         h2, w2 = refined_page.shape[:2]
         if refined_page.shape[0] * refined_page.shape[1] < page.shape[0] * page.shape[1] * 0.96:
-            print(f"{tag} 二次裁剪生效: {w2}x{h2}")
+            print(f"{tag} 二次精细裁剪生效: {w2}x{h2}")
             page = refined_page
             meta = refined_meta
             selected = meta.get("selected_candidate") or selected
         else:
-            print(f"{tag} 二次裁剪未生效（面积没有明显缩小），保持第一次结果")
+            print(f"{tag} 二次精细裁剪未生效（面积没有明显缩小），保持第一次结果")
 
     page = normalize_hukou_page_orientation(page, original_image=image, page_kind=page_kind)
     h3, w3 = page.shape[:2]
-    print(f"{tag} 方向校正后: {w3}x{h3}")
+    if (h3, w3) != (h1, w1):
+        print(f"{tag} 方向校正后: {w3}x{h3}")
 
     if (
         page_kind == "home"
@@ -744,7 +749,7 @@ def prepare_hukou_output_page(image, page_kind):
         and selected.get("area_ratio", 0.0) >= 0.82
         and selected.get("edge_density_on_border", 1.0) < 0.40
     ):
-        print(f"{tag} 触发边缘修剪（area_ratio={selected.get('area_ratio', 0):.3f}, edge_density={selected.get('edge_density_on_border', 0):.3f}\uff09")
+        print(f"{tag} 触发边缘修剪（area_ratio={selected.get('area_ratio', 0):.3f}, edge_density={selected.get('edge_density_on_border', 0):.3f}）")
         page = trim_hukou_home_page_margins(page)
         h4, w4 = page.shape[:2]
         print(f"{tag} 边缘修剪后: {w4}x{h4}")
@@ -1427,6 +1432,7 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix):
 
 
 def process_hukou(residence_path, personal_path, output_dir, name_prefix):
+    tag = "[hukou]"
     try:
         canvas = create_a4_canvas()
 
@@ -1437,25 +1443,31 @@ def process_hukou(residence_path, personal_path, output_dir, name_prefix):
         h1, h2 = 0, 0
 
         if residence_path and os.path.exists(residence_path):
+            print(f"{tag}[首页] 开始处理: {os.path.basename(residence_path)}")
             img1 = read_cv_image(residence_path)
             if img1 is not None:
                 img1 = prepare_hukou_output_page(img1, "home")
                 img1, h1 = resize_document_to_width(img1, target_width)
+                print(f"{tag}[首页] 缩放后: {target_width}x{h1}")
 
         if personal_path and os.path.exists(personal_path):
+            print(f"{tag}[本人页] 开始处理: {os.path.basename(personal_path)}")
             img2 = read_cv_image(personal_path)
             if img2 is not None:
                 img2 = prepare_hukou_output_page(img2, "personal")
                 img2, h2 = resize_document_to_width(img2, target_width)
+                print(f"{tag}[本人页] 缩放后: {target_width}x{h2}")
 
         gap = CM_IN_PX
         total_height = h1 + h2 + gap
         max_height = A4_HEIGHT - 2 * CM_IN_PX
+        print(f"{tag} 拼接规划: home_h={h1}  personal_h={h2}  gap={gap}  total={total_height}  max={max_height}")
 
         if total_height > max_height and target_width > MIN_CROP_DIM:
             fit_scale = max_height / float(total_height)
             target_width = max(MIN_CROP_DIM, int(target_width * fit_scale))
             x_offset = (A4_WIDTH - target_width) // 2
+            print(f"{tag} 高度超出，整体缩放: scale={fit_scale:.3f}  新宽={target_width}")
 
             if img1 is not None:
                 img1, h1 = resize_document_to_width(img1, target_width)
@@ -1464,23 +1476,29 @@ def process_hukou(residence_path, personal_path, output_dir, name_prefix):
 
             gap = max(20, int(CM_IN_PX * fit_scale))
             total_height = h1 + h2 + gap
+            print(f"{tag} 缩放后: home_h={h1}  personal_h={h2}  gap={gap}  total={total_height}")
 
         if img1 is not None and img2 is not None:
             y_start = (A4_HEIGHT - total_height) // 2
+            print(f"{tag} 排版: 首页 y={y_start}  本人页 y={y_start + h1 + gap}  x={x_offset}")
             canvas[y_start:y_start + h1, x_offset:x_offset + target_width] = img1
             canvas[y_start + h1 + gap:y_start + h1 + gap + h2, x_offset:x_offset + target_width] = img2
         elif img1 is not None:
             y_start = (A4_HEIGHT - h1) // 2
+            print(f"{tag} 排版: 仅首页 y={y_start}  x={x_offset}")
             canvas[y_start:y_start + h1, x_offset:x_offset + target_width] = img1
         elif img2 is not None:
             y_start = (A4_HEIGHT - h2) // 2
+            print(f"{tag} 排版: 仅本人页 y={y_start}  x={x_offset}")
             canvas[y_start:y_start + h2, x_offset:x_offset + target_width] = img2
 
         if img1 is not None or img2 is not None:
             output_path = os.path.join(output_dir, f"{name_prefix}-户口本.jpg")
             write_cv_image(output_path, canvas)
+            print(f"{tag} 已输出: {output_path}")
     except Exception as exc:
-        print("Error processing hukou:", exc)
+        print(f"{tag} 处理失败:", exc)
+
 
 
 def copy_health_form(form_path, output_dir, name_prefix):
