@@ -7,6 +7,7 @@
   <view class="meta-row">
     <text class="meta-chip">{{trainingTypeText || '-'}}</text>
     <text class="meta-chip">{{student.job_category || '-'}}</text>
+    <text wx:if="{{student.exam_project}}" class="meta-chip">{{student.exam_project}}</text>
   </view>
 
   <view class="detail-list">

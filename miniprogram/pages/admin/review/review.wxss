@@ -176,11 +176,12 @@
 .meta-row {
   margin-top: 10rpx;
   display: flex;
+  flex-wrap: wrap;
   gap: 8rpx;
 }
 
 .meta-chip {
-  max-width: 50%;
+  max-width: 100%;
   border-radius: 10rpx;
   border: 1rpx solid #dfe9f6;
   background: #f2f7ff;

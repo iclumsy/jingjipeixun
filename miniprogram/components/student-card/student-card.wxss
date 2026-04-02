@@ -64,12 +64,13 @@
 .meta-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8rpx;
   margin-top: 12rpx;
 }
 
 .meta-chip {
-  max-width: 50%;
+  max-width: 100%;
   border-radius: 10rpx;
   border: 1rpx solid #dfe9f6;
   background: #f2f7ff;
