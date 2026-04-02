@@ -1064,10 +1064,11 @@ def generate_materials_route(id):
             return jsonify({'error': '仅支持已审核学员生成报名材料'}), 400
             
         from services.material_service import generate_student_materials
+        import io as _io
+        import contextlib
         base_dir = current_app.config['BASE_DIR']
         output_root = current_app.config['STUDENTS_FOLDER']
         
-        # We need to construct the exact folder name for output_root
         training_type = student.get('training_type', 'special_operation')
         company = student.get('company', '')
         name = student.get('name', '')
@@ -1079,9 +1080,18 @@ def generate_materials_route(id):
         student_folder_name = f"{training_type_name}-{company}-{name}"
         actual_output_root = os.path.join(output_root, student_folder_name)
         
-        output_dir = generate_student_materials(student, base_dir, actual_output_root)
+        # 捕获 print 输出
+        log_buffer = _io.StringIO()
+        with contextlib.redirect_stdout(log_buffer):
+            output_dir = generate_student_materials(student, base_dir, actual_output_root)
+        logs = log_buffer.getvalue()
         
-        return jsonify({'message': '生成成功'})
+        # 同时输出到服务器日志
+        for line in logs.splitlines():
+            if line.strip():
+                current_app.logger.info(line)
+        
+        return jsonify({'message': '生成成功', 'logs': logs})
     except Exception as e:
         current_app.logger.exception('Error generating materials for student %s', id)
         return build_internal_error_response('生成报名材料失败，请稍后重试')

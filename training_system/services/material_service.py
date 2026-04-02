@@ -549,25 +549,89 @@ def normalize_hukou_home_page(image):
     return image
 
 
+def estimate_orientation_by_projection(image):
+    """
+    纯视觉方向检测：通过水平/垂直方向的文字行投影得分，
+    判断图像是否需要旋转。不依赖 Tesseract。
+
+    返回 0/90/180/270 中最可能正确的旋转角度（apply 后图片方向正确）。
+    """
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # 二值化提取暗色区域（文字）
+    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    def horizontal_line_score(img):
+        """
+        对水平方向投影每行的前景像素数求"方差"——文字行投影方差越大说明
+        行与行之间有明显的空白间隔，即方向正确的概率大。
+        """
+        row_sums = img.sum(axis=1).astype(np.float32)
+        return float(np.var(row_sums))
+
+    scores = {}
+    for angle in (0, 90, 180, 270):
+        rotated = rotate_image_by_degrees(binary, angle)
+        scores[angle] = horizontal_line_score(rotated)
+
+    best = max(scores, key=scores.get)
+    sorted_scores = sorted(scores.values(), reverse=True)
+    if sorted_scores[0] < sorted_scores[1] * 1.15:
+        return 0, scores
+    return best, scores
+
+
 def normalize_hukou_page_orientation(image, original_image=None, page_kind="personal"):
     source_image = original_image if original_image is not None else image
+    tag = f"[hukou-orient][{page_kind}]"
+
+    # 优先用 Tesseract OSD（精度最高）
     raw_osd = detect_text_osd_rotation(source_image)
+    if raw_osd:
+        print(f"{tag} Tesseract OSD: rotate={raw_osd['rotate_degrees']}°  confidence={raw_osd['confidence']:.2f}  (threshold={HUKOU_OSD_MIN_CONFIDENCE})")
+    else:
+        print(f"{tag} Tesseract OSD: 不可用（未安装或反馈为空）")
+
     if raw_osd and raw_osd["confidence"] >= HUKOU_OSD_MIN_CONFIDENCE:
         rotate_degrees = raw_osd["rotate_degrees"]
         if rotate_degrees in (90, 270):
+            print(f"{tag} 决策: OSD 邋转 {rotate_degrees}°（横向竖放图片）")
             return rotate_image_by_degrees(image, rotate_degrees)
         if page_kind != "home" or raw_osd["confidence"] >= HUKOU_OSD_STRONG_CONFIDENCE:
+            print(f"{tag} 决策: OSD 邋转 {rotate_degrees}°")
             return rotate_image_by_degrees(image, rotate_degrees)
+        print(f"{tag} OSD 置信度不足（{raw_osd['confidence']:.2f} < {HUKOU_OSD_STRONG_CONFIDENCE}），跳过 OSD 结果")
+    elif raw_osd:
+        print(f"{tag} OSD 置信度不足（{raw_osd['confidence']:.2f} < {HUKOU_OSD_MIN_CONFIDENCE}），进入备选逻辑")
 
+    # home 页：先试印章颜色方案
     if page_kind == "home":
+        before_shape = image.shape
         stamped = normalize_hukou_home_page(image)
-        if stamped.shape != image.shape or not np.array_equal(stamped, image):
+        if stamped.shape != before_shape or not np.array_equal(stamped, image):
+            print(f"{tag} 决策: 印章颜色检测成功，已调整方向")
             return stamped
-        return image
+        print(f"{tag} 印章颜色检测: 未触发（印章不够清晰或不存在），进入投影方法")
 
-    crop_osd = detect_text_osd_rotation(image)
-    if crop_osd and crop_osd["confidence"] >= HUKOU_OSD_MIN_CONFIDENCE:
-        return rotate_image_by_degrees(image, crop_osd["rotate_degrees"])
+    # 纯视觉投影方向检测
+    best_angle, proj_scores = estimate_orientation_by_projection(image)
+    sorted_proj = sorted(proj_scores.items(), key=lambda kv: -kv[1])
+    scores_str = "  ".join(f"{ang}°={s:.1f}" for ang, s in sorted_proj)
+    print(f"{tag} 投影得分: {scores_str}")
+    if best_angle != 0:
+        print(f"{tag} 决策: 投影备选邋转 {best_angle}°")
+        return rotate_image_by_degrees(image, best_angle)
+    print(f"{tag} 投影方法: 得分差异不显著，不旋转")
+
+    # 如果裁剪图和原图都没能确定方向，再试一次裁剪后的 OSD
+    if original_image is not None:
+        crop_osd = detect_text_osd_rotation(image)
+        if crop_osd:
+            print(f"{tag} 裁剪后二次 OSD: rotate={crop_osd['rotate_degrees']}°  confidence={crop_osd['confidence']:.2f}")
+        if crop_osd and crop_osd["confidence"] >= HUKOU_OSD_MIN_CONFIDENCE:
+            print(f"{tag} 决策: 二次 OSD 邋转 {crop_osd['rotate_degrees']}°")
+            return rotate_image_by_degrees(image, crop_osd["rotate_degrees"])
+
+    print(f"{tag} 所有方法均未成功识别方向，保持原图不动")
     return image
 
 
@@ -639,8 +703,21 @@ def trim_hukou_home_page_margins(image):
 
 
 def prepare_hukou_output_page(image, page_kind):
+    tag = f"[hukou-compose][{page_kind}]"
+    h0, w0 = image.shape[:2]
+    print(f"{tag} 输入图尺寸: {w0}x{h0}")
+
     page, meta = auto_crop_hukou_page(image, expand_px=90, return_meta=True)
     selected = meta.get("selected_candidate") or {}
+    h1, w1 = page.shape[:2]
+    print(
+        f"{tag} 第一次裁剪: {w1}x{h1}  "
+        f"mode={meta.get('crop_mode')}  "
+        f"detector={selected.get('detector', 'N/A')}  "
+        f"area_ratio={selected.get('area_ratio', 0):.3f}  "
+        f"confidence={selected.get('confidence', 0):.3f}  "
+        f"edge_density={selected.get('edge_density_on_border', 0):.3f}"
+    )
 
     if (
         page_kind == "home"
@@ -648,19 +725,29 @@ def prepare_hukou_output_page(image, page_kind):
         and selected.get("area_ratio", 0.0) < 0.85
     ):
         refined_page, refined_meta = auto_crop_hukou_page(page, expand_px=90, return_meta=True)
+        h2, w2 = refined_page.shape[:2]
         if refined_page.shape[0] * refined_page.shape[1] < page.shape[0] * page.shape[1] * 0.96:
+            print(f"{tag} 二次裁剪生效: {w2}x{h2}")
             page = refined_page
             meta = refined_meta
             selected = meta.get("selected_candidate") or selected
+        else:
+            print(f"{tag} 二次裁剪未生效（面积没有明显缩小），保持第一次结果")
 
     page = normalize_hukou_page_orientation(page, original_image=image, page_kind=page_kind)
+    h3, w3 = page.shape[:2]
+    print(f"{tag} 方向校正后: {w3}x{h3}")
+
     if (
         page_kind == "home"
         and selected.get("detector") == "foreground_mask"
         and selected.get("area_ratio", 0.0) >= 0.82
         and selected.get("edge_density_on_border", 1.0) < 0.40
     ):
+        print(f"{tag} 触发边缘修剪（area_ratio={selected.get('area_ratio', 0):.3f}, edge_density={selected.get('edge_density_on_border', 0):.3f}\uff09")
         page = trim_hukou_home_page_margins(page)
+        h4, w4 = page.shape[:2]
+        print(f"{tag} 边缘修剪后: {w4}x{h4}")
     return page
 
 
@@ -1194,14 +1281,32 @@ def process_personal_photo(input_path, output_dir, name_prefix):
 
 def process_diploma(input_path, output_dir, name_prefix):
     """学历证书照片，裁边，A4白色底，水平居中，宽两边留 1cm，水平校正"""
+    tag = "[diploma]"
     try:
+        print(f"{tag} 开始处理: {os.path.basename(input_path)}")
         img = read_cv_image(input_path)
         if img is None:
+            print(f"{tag} 读图失败，终止")
             return
-        img = auto_crop_diploma(img)
+        h0, w0 = img.shape[:2]
+        print(f"{tag} 原图尺寸: {w0}x{h0}")
+
+        img, meta = auto_crop_diploma(img, return_meta=True)
+        sel = meta.get("selected_candidate") or {}
+        hc, wc = img.shape[:2]
+        print(
+            f"{tag} 裁剪后: {wc}x{hc}  "
+            f"mode={meta.get('crop_mode')}  "
+            f"detector={sel.get('detector', 'N/A')}  "
+            f"area_ratio={sel.get('area_ratio', 0):.3f}  "
+            f"confidence={sel.get('confidence', 0):.3f}  "
+            f"edge_density={sel.get('edge_density_on_border', 0):.3f}  "
+            f"analysis_enhanced={meta.get('analysis_enhancement_enabled', False)}"
+        )
 
         target_width = A4_WIDTH - 2 * CM_IN_PX
         img_resized, target_height = resize_document_to_width(img, target_width)
+        print(f"{tag} 缩放腧50第 A4 画布: 宽={target_width}px  高={target_height}px")
 
         canvas = create_a4_canvas()
         x_offset = CM_IN_PX
@@ -1211,16 +1316,20 @@ def process_diploma(input_path, output_dir, name_prefix):
         if y_offset + target_height > canvas_h:
             target_height = canvas_h - y_offset
             img_resized = img_resized[:target_height, :]
+            print(f"{tag} 高度超出画布，功成截断到: {target_height}px")
 
         canvas[y_offset:y_offset + target_height, x_offset:x_offset + target_width] = img_resized
+        print(f"{tag} 排版位置: x={x_offset}  y={y_offset}")
 
         output_path = os.path.join(output_dir, f"{name_prefix}-学历证书.jpg")
         write_cv_image(output_path, canvas)
+        print(f"{tag} 已输出: {output_path}")
     except Exception as exc:
-        print("Error processing diploma:", exc)
+        print(f"{tag} 处理失败:", exc)
 
 
 def process_id_cards(front_path, back_path, output_dir, name_prefix):
+    tag = "[id-card]"
     try:
         canvas = create_a4_canvas()
 
@@ -1233,25 +1342,57 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix):
         if front_path and os.path.exists(front_path):
             front_img = read_cv_image(front_path)
             if front_img is not None:
-                front_img = auto_crop_id_card(front_img)
+                h0, w0 = front_img.shape[:2]
+                print(f"{tag}[正面] 原图: {w0}x{h0}")
+                front_img, meta = auto_crop_id_card(front_img, return_meta=True)
+                sel = meta.get("selected_candidate") or {}
+                hc, wc = front_img.shape[:2]
+                print(
+                    f"{tag}[正面] 裁剪后: {wc}x{hc}  "
+                    f"mode={meta.get('crop_mode')}  "
+                    f"detector={sel.get('detector', 'N/A')}  "
+                    f"area_ratio={sel.get('area_ratio', 0):.3f}  "
+                    f"confidence={sel.get('confidence', 0):.3f}"
+                )
                 front_img = normalize_id_card_side(front_img, "front")
+                hn, wn = front_img.shape[:2]
+                if (hn, wn) != (hc, wc):
+                    print(f"{tag}[正面] 方向正规化后: {wn}x{hn}")
                 front_img, front_h = resize_document_to_width(front_img, target_width)
+                print(f"{tag}[正面] 缩放后: {target_width}x{front_h}")
 
         if back_path and os.path.exists(back_path):
             back_img = read_cv_image(back_path)
             if back_img is not None:
-                back_img = auto_crop_id_card(back_img)
+                h0, w0 = back_img.shape[:2]
+                print(f"{tag}[反面] 原图: {w0}x{h0}")
+                back_img, meta = auto_crop_id_card(back_img, return_meta=True)
+                sel = meta.get("selected_candidate") or {}
+                hc, wc = back_img.shape[:2]
+                print(
+                    f"{tag}[反面] 裁剪后: {wc}x{hc}  "
+                    f"mode={meta.get('crop_mode')}  "
+                    f"detector={sel.get('detector', 'N/A')}  "
+                    f"area_ratio={sel.get('area_ratio', 0):.3f}  "
+                    f"confidence={sel.get('confidence', 0):.3f}"
+                )
                 back_img = normalize_id_card_side(back_img, "back")
+                hn, wn = back_img.shape[:2]
+                if (hn, wn) != (hc, wc):
+                    print(f"{tag}[反面] 方向正规化后: {wn}x{hn}")
                 back_img, back_h = resize_document_to_width(back_img, target_width)
+                print(f"{tag}[反面] 缩放后: {target_width}x{back_h}")
 
         gap = max(front_h, back_h) // 2 if max(front_h, back_h) > 0 else 0
         total_height = front_h + back_h + gap
         max_height = A4_HEIGHT - 2 * CM_IN_PX
+        print(f"{tag} 拼接规划: front_h={front_h}  back_h={back_h}  gap={gap}  total={total_height}  max={max_height}")
 
         if total_height > max_height and target_width > MIN_CROP_DIM:
             fit_scale = max_height / float(total_height)
             target_width = max(MIN_CROP_DIM, int(target_width * fit_scale))
             x_offset = (A4_WIDTH - target_width) // 2
+            print(f"{tag} 高度超出，整体缩放: scale={fit_scale:.3f}  新宽={target_width}")
 
             if front_img is not None:
                 front_img, front_h = resize_document_to_width(front_img, target_width)
@@ -1260,24 +1401,29 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix):
 
             gap = max(20, int(max(front_h, back_h) * 0.25)) if max(front_h, back_h) > 0 else 0
             total_height = front_h + back_h + gap
+            print(f"{tag} 缩放后: front_h={front_h}  back_h={back_h}  gap={gap}  total={total_height}")
 
         if front_img is not None and back_img is not None:
             y_front = (A4_HEIGHT - total_height) // 2
             y_back = y_front + front_h + gap
+            print(f"{tag} 排版: 正面 y={y_front}  反面 y={y_back}  x={x_offset}")
             canvas[y_front:y_front + front_h, x_offset:x_offset + target_width] = front_img
             canvas[y_back:y_back + back_h, x_offset:x_offset + target_width] = back_img
         elif front_img is not None:
             y_front = (A4_HEIGHT - front_h) // 2
+            print(f"{tag} 排版: 仅正面 y={y_front}  x={x_offset}")
             canvas[y_front:y_front + front_h, x_offset:x_offset + target_width] = front_img
         elif back_img is not None:
             y_back = (A4_HEIGHT - back_h) // 2
+            print(f"{tag} 排版: 仅反面 y={y_back}  x={x_offset}")
             canvas[y_back:y_back + back_h, x_offset:x_offset + target_width] = back_img
 
         if front_img is not None or back_img is not None:
             output_path = os.path.join(output_dir, f"{name_prefix}-身份证.jpg")
             write_cv_image(output_path, canvas)
+            print(f"{tag} 已输出: {output_path}")
     except Exception as exc:
-        print("Error processing ID cards:", exc)
+        print(f"{tag} 处理失败:", exc)
 
 
 def process_hukou(residence_path, personal_path, output_dir, name_prefix):

@@ -1216,6 +1216,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     const originalText = generateMaterialsBtn.textContent;
                     generateMaterialsBtn.textContent = '生成中...';
                     generateMaterialsBtn.disabled = true;
+
+                    // 清空旧日志面板
+                    const oldLog = document.getElementById('material-gen-log');
+                    if (oldLog) oldLog.remove();
+
                     try {
                         const res = await fetch(`/api/students/${student.id}/generate_materials`, { method: 'POST' });
                         const data = await res.json();
@@ -1223,6 +1228,77 @@ document.addEventListener('DOMContentLoaded', () => {
                         showMessage('报名材料生成成功', 'success');
                         if (student._reloadMaterials) {
                             student._reloadMaterials();
+                        }
+
+                        // 展示处理日志
+                        if (data.logs) {
+                            const logPanel = document.createElement('div');
+                            logPanel.id = 'material-gen-log';
+                            logPanel.style.cssText = `
+                                margin-top: 16px;
+                                border: 1px solid #E2E8F0;
+                                border-radius: 8px;
+                                overflow: hidden;
+                                font-size: 12px;
+                                width: 100%;
+                            `;
+
+                            const logHeader = document.createElement('div');
+                            logHeader.style.cssText = `
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: center;
+                                padding: 8px 14px;
+                                background: #F8FAFC;
+                                border-bottom: 1px solid #E2E8F0;
+                                cursor: pointer;
+                                user-select: none;
+                            `;
+                            logHeader.innerHTML = `
+                                <span style="font-weight:600;color:#475569;">📋 处理日志 (点击查看详情)</span>
+                                <span id="material-log-toggle" style="color:#94A3B8;font-size:11px;">▼ 展开</span>
+                            `;
+
+                            const logBody = document.createElement('pre');
+                            logBody.style.cssText = `
+                                display: none;
+                                margin: 0;
+                                padding: 12px 14px;
+                                background: #0F172A;
+                                color: #94A3B8;
+                                font-family: 'JetBrains Mono', 'Fira Code', monospace;
+                                font-size: 11px;
+                                line-height: 1.7;
+                                white-space: pre-wrap;
+                                word-break: break-all;
+                                max-height: 400px;
+                                overflow-y: auto;
+                            `;
+
+                            // 给关键词上色
+                            const colored = data.logs
+                                .replace(/\[diploma\]/g, '<span style="color:#38BDF8">[diploma]</span>')
+                                .replace(/\[id-card\]/g, '<span style="color:#34D399">[id-card]</span>')
+                                .replace(/\[hukou-compose\](?:\[\w+\])?/g, '<span style="color:#F472B6">$0</span>')
+                                .replace(/\[hukou-orient\](?:\[\w+\])?/g, '<span style="color:#FB923C">$0</span>')
+                                .replace(/\[material_crop\]/g, '<span style="color:#6EE7B7">[material_crop]</span>')
+                                .replace(/(决策:.*)/g, '<span style="color:#4ADE80">$1</span>')
+                                .replace(/(处理失败.*|Error.*)/g, '<span style="color:#F87171">$1</span>')
+                                .replace(/(已输出:.*)/g, '<span style="color:#A78BFA">$1</span>');
+                            logBody.innerHTML = colored;
+
+                            logHeader.onclick = () => {
+                                const toggle = document.getElementById('material-log-toggle');
+                                const isHidden = logBody.style.display === 'none';
+                                logBody.style.display = isHidden ? 'block' : 'none';
+                                if (toggle) toggle.textContent = isHidden ? '▲ 收起' : '▼ 展开';
+                            };
+
+                            logPanel.appendChild(logHeader);
+                            logPanel.appendChild(logBody);
+
+                            // 插入到操作栏下方
+                            actionBar.after(logPanel);
                         }
                     } catch (e) {
                         showMessage(e.message, 'error');
