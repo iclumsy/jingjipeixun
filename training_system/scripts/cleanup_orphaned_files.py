@@ -80,6 +80,33 @@ def cleanup_tmp_folder(students_folder, min_age_hours, dry_run):
     return deleted_dirs, freed_mb
 
 
+def cleanup_empty_dirs(students_folder, dry_run):
+    """递归清理 students/ 目录下的空文件夹。"""
+    deleted_count = 0
+    # topdown=False 确保从最深层开始往上删
+    for root, dirs, files in os.walk(students_folder, topdown=False):
+        # 保护：不要删除 students 根目录
+        if os.path.abspath(root) == os.path.abspath(students_folder):
+            continue
+
+        # 保护：tmp 目录本身不要删
+        if os.path.basename(root) == 'tmp':
+            continue
+
+        # 检查目录下是否还有文件或子目录
+        remaining = [i for i in os.listdir(root) if not i.startswith('.')]
+        if not remaining:
+            if dry_run:
+                print(f"  [将删除空文件夹] {root}")
+            else:
+                try:
+                    os.rmdir(root)
+                    deleted_count += 1
+                except Exception:
+                    pass
+    return deleted_count
+
+
 def cleanup_orphaned_images(dry_run=True, min_age_hours=MIN_AGE_HOURS):
     """
     清理 students/ 目录中不再被数据库引用的孤立文件。
@@ -163,6 +190,14 @@ def cleanup_orphaned_images(dry_run=True, min_age_hours=MIN_AGE_HOURS):
         print(f"   预计删除过期临时文件夹，释放约 {tmp_mb:.2f} MB")
     else:
         print(f"   删除 {tmp_dirs} 个过期临时文件夹，释放 {tmp_mb:.2f} MB")
+
+    # 清理遗留的空文件夹
+    print(f"\n📁 清理遗留空文件夹...")
+    empty_dirs = cleanup_empty_dirs(students_folder, dry_run)
+    if dry_run:
+        print(f"   预计清理 {empty_dirs} 个潜在空文件夹")
+    else:
+        print(f"   已清理 {empty_dirs} 个空文件夹")
 
 
 if __name__ == '__main__':
