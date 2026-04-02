@@ -1,6 +1,7 @@
 <!-- components/privacy-agreement/privacy-agreement.wxml -->
-<view class="privacy-mask" wx:if="{{show}}" catchtouchmove="preventTouchMove">
-  <view class="privacy-dialog">
+<view class="privacy-mask" wx:if="{{show}}">
+  <view class="privacy-backdrop" catchtouchmove="preventTouchMove"></view>
+  <view class="privacy-dialog" catchtap="noop">
     <view class="dialog-header">
       <text class="dialog-title">用户隐私保护提示</text>
     </view>

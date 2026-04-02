@@ -1,7 +1,6 @@
 .privacy-mask {
   position: fixed;
   inset: 0;
-  background: rgba(10, 15, 30, 0.55);
   z-index: 9999;
   display: flex;
   align-items: center;
@@ -10,10 +9,19 @@
   box-sizing: border-box;
 }
 
+.privacy-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 15, 30, 0.55);
+}
+
 .privacy-dialog {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 680rpx;
   max-height: 82vh;
+  min-height: 0;
   background: #ffffff;
   border-radius: 24rpx;
   box-shadow: 0 14rpx 32rpx rgba(19, 37, 69, 0.16);
@@ -37,6 +45,7 @@
 
 .dialog-content {
   flex: 1;
+  min-height: 0;
   padding: 24rpx 28rpx;
   box-sizing: border-box;
 }

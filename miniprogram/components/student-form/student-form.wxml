@@ -150,6 +150,6 @@
   <view class="agreement-tip">所收集信息仅用于学员培训报名资料提交、审核与办理。</view>
 </view>
 
-<view class="submit-bar" wx:if="{{showSubmit}}">
+<view class="submit-bar {{submitFixed ? 'submit-bar-fixed' : ''}}" wx:if="{{showSubmit}}">
   <button class="submit-btn" bindtap="onSubmitTap" disabled="{{submitDisabled}}">{{submitText}}</button>
 </view>

@@ -36,6 +36,10 @@ Component({
       type: Boolean,
       value: false
     },
+    submitFixed: {
+      type: Boolean,
+      value: false
+    },
     submitText: {
       type: String,
       value: '提交信息'

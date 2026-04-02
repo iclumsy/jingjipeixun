@@ -300,6 +300,21 @@
   padding: 34rpx 0 18rpx;
 }
 
+.submit-bar-fixed {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: calc(124rpx + env(safe-area-inset-bottom));
+  bottom: calc(124rpx + constant(safe-area-inset-bottom));
+  z-index: 55;
+  padding: 0;
+}
+
+.submit-bar-fixed .submit-btn {
+  width: 320rpx;
+  max-width: none;
+}
+
 .submit-btn {
   width: 320rpx;
   height: 84rpx;

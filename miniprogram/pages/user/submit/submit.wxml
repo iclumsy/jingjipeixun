@@ -21,6 +21,7 @@
       showAgreement="{{true}}"
       agreementChecked="{{agreementChecked}}"
       showSubmit="{{true}}"
+      submitFixed="{{true}}"
       submitText="提交信息"
       trainingCardTitle="培训类型"
       attachmentsTip="请上传清晰、完整的原件照片，避免反光和裁切。"

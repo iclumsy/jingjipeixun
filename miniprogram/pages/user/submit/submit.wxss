@@ -1,6 +1,6 @@
 @import "../../../styles/form-page.wxss";
 
 .container {
-  padding-bottom: calc(190rpx + env(safe-area-inset-bottom));
-  padding-bottom: calc(190rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(300rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(300rpx + constant(safe-area-inset-bottom));
 }

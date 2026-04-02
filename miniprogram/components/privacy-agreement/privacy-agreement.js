@@ -15,6 +15,8 @@ Component({
       return false
     },
 
+    noop() {},
+
     openPrivacyPolicy() {
       wx.navigateTo({
         url: '/pages/privacy/privacy'
