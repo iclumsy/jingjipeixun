@@ -1097,6 +1097,45 @@ def generate_materials_route(id):
         return build_internal_error_response('生成报名材料失败，请稍后重试')
 
 
+@student_bp.route('/api/students/<int:id>/regenerate_material', methods=['POST'])
+def regenerate_material_route(id):
+    """
+    重新生成单个报名材料（带调整参数）。
+    """
+    try:
+        ensure_mini_admin()
+        student = get_student_by_id(id)
+        if student.get('status') != 'reviewed':
+            return jsonify({'error': '仅支持已审核学员'}), 400
+
+        data = request.get_json(silent=True) or {}
+        material_type = data.get('material_type', '')
+        if material_type not in ('diploma', 'id_card', 'hukou'):
+            return jsonify({'error': '无效的 material_type'}), 400
+
+        adjustments = data.get('adjustments', {})
+
+        from services.material_service import regenerate_single_material
+        import io as _io
+        import contextlib
+        base_dir = current_app.config['BASE_DIR']
+        output_root = current_app.config['STUDENTS_FOLDER']
+
+        log_buffer = _io.StringIO()
+        with contextlib.redirect_stdout(log_buffer):
+            regenerate_single_material(student, base_dir, output_root, material_type, adjustments)
+        logs = log_buffer.getvalue()
+
+        for line in logs.splitlines():
+            if line.strip():
+                current_app.logger.info(line)
+
+        return jsonify({'message': '重新生成成功', 'logs': logs})
+    except Exception as e:
+        current_app.logger.exception('Error regenerating material for student %s', id)
+        return build_internal_error_response('重新生成失败，请稍后重试')
+
+
 @student_bp.route('/api/students/<int:id>/generated_materials', methods=['GET'])
 def get_generated_materials_route(id):
     """

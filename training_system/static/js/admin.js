@@ -1163,7 +1163,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 }
 
                                 const caption = document.createElement('div');
-                                caption.textContent = mat.name.replace(/^[^-]+-[^-]+-/, ''); 
+                                caption.textContent = mat.name.replace(/^[^-]+-[^-]+-/, '');
                                 caption.style.fontSize = '12px';
                                 caption.style.color = '#666';
                                 caption.style.textAlign = 'center';
@@ -1172,6 +1172,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
                                 wrapper.appendChild(imgBox);
                                 wrapper.appendChild(caption);
+
+                                const matType = detectMaterialType(mat.name);
+                                if (matType) {
+                                    const adjustBtn = document.createElement('button');
+                                    adjustBtn.textContent = '调整';
+                                    adjustBtn.style.cssText = 'font-size:11px;padding:2px 8px;border:1px solid #CBD5E1;border-radius:4px;background:#fff;color:#475569;cursor:pointer;';
+                                    adjustBtn.onclick = (e) => {
+                                        e.stopPropagation();
+                                        showAdjustPanel(student, matType, adjustBtn, loadMaterials);
+                                    };
+                                    wrapper.appendChild(adjustBtn);
+                                }
+
                                 materialsContainer.appendChild(wrapper);
                             });
                         } else {
@@ -1412,4 +1425,138 @@ document.addEventListener('DOMContentLoaded', () => {
             showMessage('操作失败: ' + e.message, 'error');
         }
     };
+
+    function detectMaterialType(filename) {
+        if (filename.includes('学历证书')) return 'diploma';
+        if (filename.includes('身份证')) return 'id_card';
+        if (filename.includes('户口本')) return 'hukou';
+        return null;
+    }
+
+    function showAdjustPanel(student, matType, anchorEl, reloadFn) {
+        const existingPanel = document.getElementById('mat-adjust-panel');
+        if (existingPanel) existingPanel.remove();
+
+        const panel = document.createElement('div');
+        panel.id = 'mat-adjust-panel';
+        panel.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);';
+
+        const configs = {
+            diploma: { title: '学历证书调整', rotateFields: [{ key: 'rotate', label: '旋转' }] },
+            id_card: { title: '身份证调整', rotateFields: [{ key: 'front_rotate', label: '正面旋转' }, { key: 'back_rotate', label: '反面旋转' }] },
+            hukou: { title: '户口本调整', rotateFields: [{ key: 'home_rotate', label: '首页旋转' }, { key: 'personal_rotate', label: '本人页旋转' }] },
+        };
+        const cfg = configs[matType];
+
+        const pillBase = 'display:inline-flex;align-items:center;padding:5px 12px;border:1px solid #CBD5E1;border-radius:6px;font-size:12px;cursor:pointer;transition:all .15s;margin:0 4px 4px 0;';
+        const pillOff = pillBase + 'background:#fff;color:#475569;';
+        const pillOn = pillBase + 'background:#4F46E5;color:#fff;border-color:#4F46E5;';
+
+        function pillGroup(groupName, options, defaultVal) {
+            return options.map(opt =>
+                `<span class="adj-pill" data-group="${groupName}" data-value="${opt.value}"${opt.value === defaultVal ? ' data-active="1"' : ''} style="${opt.value === defaultVal ? pillOn : pillOff}">${opt.label}</span>`
+            ).join('');
+        }
+
+        function fieldRow(label, desc, groupName, options, defaultVal) {
+            return `<div style="margin-bottom:14px;">
+                <div style="font-size:13px;color:#333;font-weight:500;margin-bottom:2px;">${label}</div>
+                <div style="font-size:11px;color:#999;margin-bottom:6px;">${desc}</div>
+                <div>${pillGroup(groupName, options, defaultVal)}</div>
+            </div>`;
+        }
+
+        const cropOptions = [
+            { value: 'auto', label: '自动' },
+            { value: 'rect_only', label: '仅矩形' },
+            { value: 'none', label: '不裁剪' },
+        ];
+        const expandOptions = [
+            { value: 'tight', label: '紧凑' },
+            { value: 'normal', label: '标准' },
+            { value: 'loose', label: '宽松' },
+            { value: 'x-loose', label: '超宽松' },
+        ];
+        const trimOptions = [
+            { value: 'on', label: '开启' },
+            { value: 'off', label: '关闭' },
+        ];
+        const rotateOptions = [
+            { value: '0', label: '0°' },
+            { value: '90', label: '90°' },
+            { value: '180', label: '180°' },
+            { value: '270', label: '270°' },
+        ];
+
+        let html = `<div style="background:#fff;border-radius:12px;padding:22px 26px;min-width:320px;max-width:420px;box-shadow:0 8px 30px rgba(0,0,0,0.15);">
+            <div style="font-size:15px;font-weight:600;margin-bottom:18px;color:#111;">${cfg.title}</div>
+            ${fieldRow('裁剪模式', '自动=智能透视校正，仅矩形=不做透视避免畸变，不裁剪=使用原图', 'crop_mode', cropOptions, 'auto')}
+            ${fieldRow('裁剪边距', '紧凑=贴边裁剪，标准=默认边距，宽松/超宽松=保留更多边缘防止内容丢失', 'expand_level', expandOptions, 'normal')}
+            ${fieldRow('比例修剪', '关闭后保留裁剪原始比例，不按标准证件比例二次修剪', 'ratio_trim', trimOptions, 'on')}`;
+        cfg.rotateFields.forEach(f => {
+            html += fieldRow(f.label, '在自动方向校正基础上额外旋转', f.key, rotateOptions, '0');
+        });
+        html += `<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
+                <button id="adj-cancel" style="padding:7px 20px;border:1px solid #CBD5E1;border-radius:6px;background:#fff;cursor:pointer;font-size:13px;color:#475569;">取消</button>
+                <button id="adj-submit" style="padding:7px 20px;border:none;border-radius:6px;background:#4F46E5;color:#fff;cursor:pointer;font-size:13px;">重新生成</button>
+            </div>
+        </div>`;
+
+        panel.innerHTML = html;
+        document.body.appendChild(panel);
+
+        panel.addEventListener('click', (e) => {
+            const pill = e.target.closest('.adj-pill');
+            if (!pill) return;
+            const group = pill.dataset.group;
+            panel.querySelectorAll(`.adj-pill[data-group="${group}"]`).forEach(p => {
+                p.style.cssText = pillOff;
+                p.removeAttribute('data-active');
+            });
+            pill.style.cssText = pillOn;
+            pill.setAttribute('data-active', '1');
+        });
+
+        panel.querySelector('#adj-cancel').onclick = () => panel.remove();
+        panel.onclick = (e) => { if (e.target === panel) panel.remove(); };
+
+        panel.querySelector('#adj-submit').onclick = async () => {
+            function getGroupVal(group) {
+                const active = panel.querySelector(`.adj-pill[data-group="${group}"][data-active="1"]`);
+                return active ? active.dataset.value : null;
+            }
+
+            const adjustments = {};
+            const cropMode = getGroupVal('crop_mode');
+            if (cropMode) adjustments.crop_mode = cropMode;
+            const expandLevel = getGroupVal('expand_level');
+            if (expandLevel && expandLevel !== 'normal') adjustments.expand_level = expandLevel;
+            if (getGroupVal('ratio_trim') === 'off') adjustments.skip_ratio_trim = true;
+            cfg.rotateFields.forEach(f => {
+                const val = parseInt(getGroupVal(f.key) || '0', 10);
+                if (val) adjustments[f.key] = val;
+            });
+
+            const submitBtn = panel.querySelector('#adj-submit');
+            submitBtn.textContent = '生成中...';
+            submitBtn.disabled = true;
+
+            try {
+                const res = await fetch(`/api/students/${student.id}/regenerate_material`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ material_type: matType, adjustments }),
+                });
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || '重新生成失败');
+                showMessage('重新生成成功', 'success');
+                panel.remove();
+                if (reloadFn) reloadFn();
+            } catch (e) {
+                showMessage(e.message, 'error');
+                submitBtn.textContent = '重新生成';
+                submitBtn.disabled = false;
+            }
+        };
+    }
 });

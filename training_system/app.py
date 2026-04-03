@@ -390,6 +390,6 @@ app = create_app()
 if __name__ == '__main__':
     # 开发模式：直接运行此文件启动内置服务器
     # 从环境变量读取调试模式开关
-    debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+    debug_mode = os.getenv('FLASK_DEBUG', 'True').lower() == 'true'
     # 监听所有网络接口的 5001 端口
     app.run(debug=debug_mode, host='0.0.0.0', port=5001) 

@@ -14,10 +14,17 @@ CM_IN_PX = 118  # roughly 300 DPI
 ANALYSIS_MAX_SIDE = 1800
 MIN_CROP_DIM = 24
 ID_CARD_RATIO = 85.6 / 54.0
+HUKOU_PAGE_RATIO = 20.5 / 14.5  # ~1.414, 户口本页面标准长宽比
 TESSERACT_BINARY = shutil.which("tesseract")
 HUKOU_OSD_MIN_CONFIDENCE = 0.9
 HUKOU_OSD_STRONG_CONFIDENCE = 1.6
 HUKOU_OSD_TIMEOUT_SEC = 8
+
+ANALYSIS_MAX_SIDES = {
+    "id_card": 2400,
+    "hukou": 1800,
+    "diploma": 1800,
+}
 
 CROP_PROFILES = {
     "id_card": {
@@ -33,22 +40,22 @@ CROP_PROFILES = {
         "perspective_threshold": 0.62,
         "analysis_enhancement": True,
         "export_enhancement": True,
-        "expand_px": 20,
+        "expand_ratio": 0.012,
     },
     "hukou": {
-        "target_ratio": None,
-        "ratio_tolerance": None,
-        "post_ratio_tolerance": None,
+        "target_ratio": HUKOU_PAGE_RATIO,
+        "ratio_tolerance": 0.30,
+        "post_ratio_tolerance": 0.30,
         "min_area_ratio": 0.18,
         "max_area_ratio": 0.95,
         "preferred_area_ratio": 0.58,
         "preferred_border_margin": 0.015,
         "allow_table_suppression": True,
-        "allow_perspective": True,
+        "allow_perspective": False,
         "perspective_threshold": 0.68,
         "analysis_enhancement": True,
         "export_enhancement": True,
-        "expand_px": 50,
+        "expand_ratio": 0.06,
     },
     "diploma": {
         "target_ratio": None,
@@ -63,7 +70,7 @@ CROP_PROFILES = {
         "perspective_threshold": 0.64,
         "analysis_enhancement": True,
         "export_enhancement": True,
-        "expand_px": 20,
+        "expand_ratio": 0.015,
     },
 }
 
@@ -227,8 +234,8 @@ def apply_low_light_enhancement_if_needed(image, stage="analysis"):
     }
 
 
-def prepare_analysis_image(image, enable_low_light=True):
-    analysis_image, scale = resize_for_analysis(image)
+def prepare_analysis_image(image, enable_low_light=True, max_side=ANALYSIS_MAX_SIDE):
+    analysis_image, scale = resize_for_analysis(image, max_side=max_side)
     enhancement_meta = {
         "enabled": False,
         "stage": "analysis",
@@ -283,10 +290,13 @@ def detect_edges(gray, profile_name):
     median = float(np.median(blurred))
     lower = int(max(25, 0.66 * median))
     upper = int(min(255, max(90, 1.33 * median)))
-    edges = cv2.Canny(blurred, lower, upper)
+
+    edges_high = cv2.Canny(blurred, lower, upper)
+    edges_low = cv2.Canny(blurred, int(lower * 0.6), int(upper * 0.6))
+    edges = cv2.bitwise_or(edges_high, edges_low)
 
     h, w = gray.shape[:2]
-    kernel_size = max(5, int(round(min(h, w) * 0.008)))
+    kernel_size = max(5, int(round(min(h, w) * 0.012)))
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
     edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
 
@@ -365,21 +375,50 @@ def preferred_score(value, preferred, tolerance):
     return float(max(0.0, 1.0 - abs(value - preferred) / tolerance))
 
 
+def preferred_score_asymmetric(value, preferred, tolerance_low, tolerance_high):
+    if value <= preferred:
+        if tolerance_low <= 1e-6:
+            return 1.0
+        return float(max(0.0, 1.0 - (preferred - value) / tolerance_low))
+    if tolerance_high <= 1e-6:
+        return 1.0
+    return float(max(0.0, 1.0 - (value - preferred) / tolerance_high))
+
+
 def expand_quad(points, expand_px, image_shape):
     if expand_px <= 0:
         return points.astype(np.float32)
 
-    center = points.mean(axis=0)
-    expanded = []
-    for point in points.astype(np.float32):
-        direction = point - center
-        norm = np.linalg.norm(direction)
-        if norm <= 1e-6:
-            expanded.append(point)
-            continue
-        expanded.append(point + direction / norm * expand_px)
+    ordered = order_points(points.astype(np.float32))
+    center = ordered.mean(axis=0)
 
-    expanded = np.array(expanded, dtype=np.float32)
+    edge_normals = []
+    for i in range(4):
+        p1 = ordered[i]
+        p2 = ordered[(i + 1) % 4]
+        edge = p2 - p1
+        normal = np.array([-edge[1], edge[0]], dtype=np.float32)
+        norm_len = np.linalg.norm(normal)
+        if norm_len > 1e-6:
+            normal /= norm_len
+        mid = (p1 + p2) / 2.0
+        if np.dot(normal, mid - center) < 0:
+            normal = -normal
+        edge_normals.append(normal)
+
+    expanded = ordered.copy()
+    for i in range(4):
+        n_prev = edge_normals[(i - 1) % 4]
+        n_curr = edge_normals[i]
+        direction = n_prev + n_curr
+        dir_len = np.linalg.norm(direction)
+        if dir_len > 1e-6:
+            direction /= dir_len
+            cos_half = max(float(np.dot(direction, n_curr)), 0.3)
+            expanded[i] = ordered[i] + direction * (expand_px / cos_half)
+        else:
+            expanded[i] = ordered[i] + n_curr * expand_px
+
     h, w = image_shape[:2]
     expanded[:, 0] = np.clip(expanded[:, 0], 0, w - 1)
     expanded[:, 1] = np.clip(expanded[:, 1], 0, h - 1)
@@ -504,16 +543,22 @@ def detect_hukou_home_stamp_centers(image):
     red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, kernel, iterations=1)
 
     contours, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    min_area = max(1500, int(image.shape[0] * image.shape[1] * 0.01))
+    image_area = float(image.shape[0] * image.shape[1])
+    min_area = max(1500, int(image_area * 0.01))
+    max_area = int(image_area * 0.12)
     components = []
     for contour in contours:
         area = cv2.contourArea(contour)
-        if area < min_area:
+        if area < min_area or area > max_area:
             continue
         x, y, w, h = cv2.boundingRect(contour)
         aspect_ratio = max(w, h) / float(max(1, min(w, h)))
         fill_ratio = area / float(max(1, w * h))
         if aspect_ratio > 1.8 or fill_ratio < 0.15:
+            continue
+        perimeter = cv2.arcLength(contour, True)
+        circularity = (4.0 * np.pi * area) / (perimeter * perimeter) if perimeter > 0 else 0
+        if circularity < 0.25:
             continue
         moments = cv2.moments(contour)
         if moments["m00"] <= 1e-6:
@@ -704,13 +749,18 @@ def trim_hukou_home_page_margins(image):
     return image[top:bottom, left:right].copy()
 
 
-def prepare_hukou_output_page(image, page_kind):
+def prepare_hukou_output_page(image, page_kind, crop_mode="auto", expand_level=None, skip_ratio_trim=False):
     kind_label = "首页" if page_kind == "home" else "本人页"
     tag = f"[hukou][{kind_label}]"
     h0, w0 = image.shape[:2]
     print(f"{tag} 原图尺寸: {w0}x{h0}")
 
-    page, meta = auto_crop_hukou_page(image, expand_px=90, return_meta=True)
+    if crop_mode == "none":
+        page = image.copy()
+        meta = {"crop_mode": "original", "selected_candidate": None}
+    else:
+        _allow_persp = None if crop_mode == "auto" else False
+        page, meta = auto_crop_hukou_page(image, return_meta=True, allow_perspective=_allow_persp, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
     selected = meta.get("selected_candidate") or {}
     h1, w1 = page.shape[:2]
     print(
@@ -728,7 +778,7 @@ def prepare_hukou_output_page(image, page_kind):
         and selected.get("detector") == "foreground_mask"
         and selected.get("area_ratio", 0.0) < 0.85
     ):
-        refined_page, refined_meta = auto_crop_hukou_page(page, expand_px=90, return_meta=True)
+        refined_page, refined_meta = auto_crop_hukou_page(page, return_meta=True)
         h2, w2 = refined_page.shape[:2]
         if refined_page.shape[0] * refined_page.shape[1] < page.shape[0] * page.shape[1] * 0.96:
             print(f"{tag} 二次精细裁剪生效: {w2}x{h2}")
@@ -795,14 +845,17 @@ def build_candidate_from_contour(contour, edges, image_shape, scale, line_mask=N
         return None
 
     perimeter = cv2.arcLength(hull, True)
-    approx = cv2.approxPolyDP(hull, 0.02 * perimeter, True)
-    if len(approx) == 4:
-        points = approx.reshape(4, 2).astype(np.float32)
-        source = "approx"
-    else:
+    points = None
+    source = "min_rect"
+    for eps_factor in (0.015, 0.02, 0.03, 0.04, 0.05):
+        approx = cv2.approxPolyDP(hull, eps_factor * perimeter, True)
+        if len(approx) == 4:
+            points = approx.reshape(4, 2).astype(np.float32)
+            source = "approx"
+            break
+    if points is None:
         rect = cv2.minAreaRect(hull)
         points = cv2.boxPoints(rect).astype(np.float32)
-        source = "min_rect"
 
     ordered = order_points(points)
     box_area = cv2.contourArea(ordered)
@@ -834,7 +887,6 @@ def build_candidate_from_contour(contour, edges, image_shape, scale, line_mask=N
 
 
 def detect_foreground_mask_contours(gray):
-    _, bright_mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     h, w = gray.shape[:2]
     close_kernel = cv2.getStructuringElement(
         cv2.MORPH_RECT,
@@ -844,10 +896,24 @@ def detect_foreground_mask_contours(gray):
         cv2.MORPH_RECT,
         (max(5, w // 200), max(5, h // 200)),
     )
-    bright_mask = cv2.morphologyEx(bright_mask, cv2.MORPH_CLOSE, close_kernel, iterations=2)
-    bright_mask = cv2.morphologyEx(bright_mask, cv2.MORPH_OPEN, open_kernel, iterations=1)
-    contours, _ = cv2.findContours(bright_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    return contours
+
+    _, otsu_mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    otsu_mask = cv2.morphologyEx(otsu_mask, cv2.MORPH_CLOSE, close_kernel, iterations=2)
+    otsu_mask = cv2.morphologyEx(otsu_mask, cv2.MORPH_OPEN, open_kernel, iterations=1)
+    otsu_contours, _ = cv2.findContours(otsu_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    block_size = max(51, int(min(h, w) * 0.08))
+    if block_size % 2 == 0:
+        block_size += 1
+    adaptive_mask = cv2.adaptiveThreshold(
+        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY, block_size, -5,
+    )
+    adaptive_mask = cv2.morphologyEx(adaptive_mask, cv2.MORPH_CLOSE, close_kernel, iterations=2)
+    adaptive_mask = cv2.morphologyEx(adaptive_mask, cv2.MORPH_OPEN, open_kernel, iterations=1)
+    adaptive_contours, _ = cv2.findContours(adaptive_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    return list(otsu_contours) + list(adaptive_contours)
 
 
 def detect_background_color_contours(image):
@@ -868,6 +934,11 @@ def detect_background_color_contours(image):
         axis=0,
     )
     background_chroma = np.median(border, axis=0)
+
+    chroma_std = float(np.std(border, axis=0).mean())
+    if chroma_std > 15:
+        return []
+
     distance = np.linalg.norm(chroma - background_chroma, axis=2)
     max_distance = float(distance.max())
     if max_distance <= 1e-6:
@@ -892,6 +963,31 @@ def detect_background_color_contours(image):
         threshold_contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours.extend(threshold_contours)
     return contours
+
+
+def deduplicate_candidates(candidates, iou_threshold=0.85):
+    if len(candidates) <= 1:
+        return candidates
+    keep = []
+    for candidate in candidates:
+        is_dup = False
+        for kept in keep:
+            if abs(candidate["area_ratio"] - kept["area_ratio"]) > 0.15:
+                continue
+            pts1 = candidate["points_analysis"].astype(np.int32)
+            pts2 = kept["points_analysis"].astype(np.int32)
+            r1 = cv2.boundingRect(pts1)
+            r2 = cv2.boundingRect(pts2)
+            x_overlap = max(0, min(r1[0] + r1[2], r2[0] + r2[2]) - max(r1[0], r2[0]))
+            y_overlap = max(0, min(r1[1] + r1[3], r2[1] + r2[3]) - max(r1[1], r2[1]))
+            inter = x_overlap * y_overlap
+            union = r1[2] * r1[3] + r2[2] * r2[3] - inter
+            if union > 0 and inter / float(union) >= iou_threshold:
+                is_dup = True
+                break
+        if not is_dup:
+            keep.append(candidate)
+    return keep
 
 
 def detect_document_candidates(analysis_image, gray, profile_name, scale=1.0, line_mask=None):
@@ -945,7 +1041,7 @@ def detect_document_candidates(analysis_image, gray, profile_name, scale=1.0, li
             )
             if candidate is not None:
                 candidates.append(candidate)
-    return candidates
+    return deduplicate_candidates(candidates)
 
 
 def score_candidate(candidate, profile_name):
@@ -975,14 +1071,11 @@ def score_candidate(candidate, profile_name):
         profile["min_area_ratio"],
         profile["max_area_ratio"],
     )
-    preferred_area_score = preferred_score(
+    preferred_area_score = preferred_score_asymmetric(
         candidate["area_ratio"],
         profile["preferred_area_ratio"],
-        max(
-            profile["preferred_area_ratio"] - profile["min_area_ratio"],
-            profile["max_area_ratio"] - profile["preferred_area_ratio"],
-            0.08,
-        ),
+        max(profile["preferred_area_ratio"] - profile["min_area_ratio"], 0.08),
+        max(profile["max_area_ratio"] - profile["preferred_area_ratio"], 0.08) * 1.5,
     )
     border_score = min(1.0, candidate["border_margin"] / profile["preferred_border_margin"])
     edge_score = candidate["edge_density_on_border"]
@@ -1001,12 +1094,13 @@ def score_candidate(candidate, profile_name):
         )
     elif profile_name == "hukou":
         confidence = (
-            0.24 * area_score
-            + 0.18 * preferred_area_score
-            + 0.21 * rect_score
-            + 0.18 * edge_score
-            + 0.11 * corner_score
-            + 0.08 * border_score
+            0.14 * ratio_score
+            + 0.20 * area_score
+            + 0.16 * preferred_area_score
+            + 0.19 * rect_score
+            + 0.16 * edge_score
+            + 0.09 * corner_score
+            + 0.06 * border_score
             - 0.16 * candidate["inner_line_density"]
         )
     else:
@@ -1098,9 +1192,9 @@ def select_best_candidate(candidates, profile_name):
             larger_card_candidates = [
                 item
                 for item in scored[1:]
-                if item["area_ratio"] >= 0.45
-                and item["rectangularity"] >= 0.95
-                and item["corner_quality"] >= 0.85
+                if item["area_ratio"] >= 0.20
+                and item["rectangularity"] >= 0.92
+                and item["corner_quality"] >= 0.80
             ]
             if larger_card_candidates:
                 larger_card_candidates.sort(
@@ -1116,11 +1210,12 @@ def select_best_candidate(candidates, profile_name):
     return scored[0]
 
 
-def crop_with_fallback(orig, candidate, *, allow_perspective, expand_px, profile_name):
+def crop_with_fallback(orig, candidate, *, allow_perspective, expand_ratio, profile_name):
     meta = {"crop_mode": "original"}
     if candidate is None:
         return orig.copy(), meta
 
+    expand_px = max(4, int(min(orig.shape[:2]) * expand_ratio))
     expanded = expand_quad(candidate["points_orig"], expand_px, orig.shape)
     if allow_perspective and candidate["confidence"] >= candidate["perspective_threshold"]:
         warped = four_point_transform(orig, expanded)
@@ -1149,6 +1244,71 @@ def enhance_document_output_if_needed(image):
     return apply_low_light_enhancement_if_needed(image, stage="export")
 
 
+def trim_to_target_ratio(image, target_ratio, max_trim_fraction=0.18):
+    """裁剪后修剪：如果长宽比偏离目标，沿过长的轴用投影法找到内容边界并修剪。"""
+    if target_ratio is None:
+        return image
+
+    h, w = image.shape[:2]
+    current_ratio = max(h, w) / float(max(1, min(h, w)))
+    if current_ratio <= target_ratio * 1.08:
+        return image
+
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    if w >= h:
+        target_w = max(MIN_CROP_DIM, int(round(h * target_ratio)))
+        if target_w >= w:
+            return image
+        trim_total = w - target_w
+        if trim_total > w * max_trim_fraction:
+            target_w = w - int(w * max_trim_fraction)
+        col_sums = binary.astype(np.float64).sum(axis=0)
+        kernel = np.ones(max(3, w // 60), dtype=np.float64)
+        col_sums = np.convolve(col_sums, kernel / kernel.sum(), mode="same")
+        peak = float(col_sums.max())
+        if peak <= 0:
+            return image
+        threshold = peak * 0.08
+        content_cols = np.where(col_sums > threshold)[0]
+        if len(content_cols) == 0:
+            return image
+        content_center = (int(content_cols[0]) + int(content_cols[-1])) // 2
+        half = target_w // 2
+        left = max(0, content_center - half)
+        right = min(w, left + target_w)
+        left = max(0, right - target_w)
+        if right - left < MIN_CROP_DIM:
+            return image
+        return image[:, left:right].copy()
+    else:
+        target_h = max(MIN_CROP_DIM, int(round(w * target_ratio)))
+        if target_h >= h:
+            return image
+        trim_total = h - target_h
+        if trim_total > h * max_trim_fraction:
+            target_h = h - int(h * max_trim_fraction)
+        row_sums = binary.astype(np.float64).sum(axis=1)
+        kernel = np.ones(max(3, h // 60), dtype=np.float64)
+        row_sums = np.convolve(row_sums, kernel / kernel.sum(), mode="same")
+        peak = float(row_sums.max())
+        if peak <= 0:
+            return image
+        threshold = peak * 0.08
+        content_rows = np.where(row_sums > threshold)[0]
+        if len(content_rows) == 0:
+            return image
+        content_center = (int(content_rows[0]) + int(content_rows[-1])) // 2
+        half = target_h // 2
+        top = max(0, content_center - half)
+        bottom = min(h, top + target_h)
+        top = max(0, bottom - target_h)
+        if bottom - top < MIN_CROP_DIM:
+            return image
+        return image[top:bottom, :].copy()
+
+
 def log_crop_decision(profile_name, meta):
     selected = meta.get("selected_candidate") or {}
     print(
@@ -1162,12 +1322,14 @@ def log_crop_decision(profile_name, meta):
     )
 
 
-def auto_crop_with_profile(image, profile_name, expand_px=None, return_meta=False):
+def auto_crop_with_profile(image, profile_name, expand_ratio=None, return_meta=False, allow_perspective=None, expand_level=None, skip_ratio_trim=False):
     try:
         profile = CROP_PROFILES[profile_name]
+        analysis_max_side = ANALYSIS_MAX_SIDES.get(profile_name, ANALYSIS_MAX_SIDE)
         analysis_image, gray, preprocess_meta, scale = prepare_analysis_image(
             image,
             enable_low_light=profile.get("analysis_enhancement", True),
+            max_side=analysis_max_side,
         )
 
         line_mask = None
@@ -1182,13 +1344,24 @@ def auto_crop_with_profile(image, profile_name, expand_px=None, return_meta=Fals
             line_mask=line_mask,
         )
         best = select_best_candidate(candidates, profile_name)
+        _allow_perspective = allow_perspective if allow_perspective is not None else profile.get("allow_perspective", True)
+        _expand_ratio = expand_ratio if expand_ratio is not None else profile["expand_ratio"]
+        if expand_level == "tight":
+            _expand_ratio *= 0.3
+        elif expand_level == "loose":
+            _expand_ratio *= 2.5
+        elif expand_level == "x-loose":
+            _expand_ratio *= 4.0
         cropped, crop_meta = crop_with_fallback(
             image,
             best,
-            allow_perspective=profile.get("allow_perspective", True),
-            expand_px=expand_px if expand_px is not None else profile["expand_px"],
+            allow_perspective=_allow_perspective,
+            expand_ratio=_expand_ratio,
             profile_name=profile_name,
         )
+
+        if not skip_ratio_trim and crop_meta["crop_mode"] != "original" and profile.get("target_ratio"):
+            cropped = trim_to_target_ratio(cropped, profile["target_ratio"])
 
         export_meta = {"enabled": False, "stage": "export"}
         if profile.get("export_enhancement", True):
@@ -1220,20 +1393,20 @@ def auto_crop_with_profile(image, profile_name, expand_px=None, return_meta=Fals
         return image
 
 
-def auto_crop_id_card(image, expand_px=20, return_meta=False):
-    return auto_crop_with_profile(image, "id_card", expand_px=expand_px, return_meta=return_meta)
+def auto_crop_id_card(image, return_meta=False, allow_perspective=None, expand_level=None, skip_ratio_trim=False):
+    return auto_crop_with_profile(image, "id_card", return_meta=return_meta, allow_perspective=allow_perspective, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
 
 
-def auto_crop_hukou_page(image, expand_px=50, return_meta=False):
-    return auto_crop_with_profile(image, "hukou", expand_px=expand_px, return_meta=return_meta)
+def auto_crop_hukou_page(image, expand_ratio=None, return_meta=False, allow_perspective=None, expand_level=None, skip_ratio_trim=False):
+    return auto_crop_with_profile(image, "hukou", expand_ratio=expand_ratio, return_meta=return_meta, allow_perspective=allow_perspective, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
 
 
-def auto_crop_diploma(image, expand_px=20, return_meta=False):
-    return auto_crop_with_profile(image, "diploma", expand_px=expand_px, return_meta=return_meta)
+def auto_crop_diploma(image, return_meta=False, allow_perspective=None, expand_level=None, skip_ratio_trim=False):
+    return auto_crop_with_profile(image, "diploma", return_meta=return_meta, allow_perspective=allow_perspective, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
 
 
-def auto_crop_document(image, expand_px=20):
-    return auto_crop_diploma(image, expand_px=expand_px)
+def auto_crop_document(image):
+    return auto_crop_diploma(image)
 
 
 def read_cv_image(path):
@@ -1284,8 +1457,13 @@ def process_personal_photo(input_path, output_dir, name_prefix):
         print("Error processing personal photo:", exc)
 
 
-def process_diploma(input_path, output_dir, name_prefix):
+def process_diploma(input_path, output_dir, name_prefix, adjustments=None):
     """学历证书照片，裁边，A4白色底，水平居中，宽两边留 1cm，水平校正"""
+    adjustments = adjustments or {}
+    crop_mode = adjustments.get("crop_mode", "auto")
+    extra_rotate = adjustments.get("rotate", 0)
+    expand_level = adjustments.get("expand_level")
+    skip_ratio_trim = adjustments.get("skip_ratio_trim", False)
     tag = "[diploma]"
     try:
         print(f"{tag} 开始处理: {os.path.basename(input_path)}")
@@ -1296,18 +1474,26 @@ def process_diploma(input_path, output_dir, name_prefix):
         h0, w0 = img.shape[:2]
         print(f"{tag} 原图尺寸: {w0}x{h0}")
 
-        img, meta = auto_crop_diploma(img, return_meta=True)
-        sel = meta.get("selected_candidate") or {}
-        hc, wc = img.shape[:2]
-        print(
-            f"{tag} 裁剪后: {wc}x{hc}  "
-            f"mode={meta.get('crop_mode')}  "
-            f"detector={sel.get('detector', 'N/A')}  "
-            f"area_ratio={sel.get('area_ratio', 0):.3f}  "
-            f"confidence={sel.get('confidence', 0):.3f}  "
-            f"edge_density={sel.get('edge_density_on_border', 0):.3f}  "
-            f"analysis_enhanced={meta.get('analysis_enhancement_enabled', False)}"
-        )
+        if crop_mode == "none":
+            pass
+        else:
+            _allow_persp = None if crop_mode == "auto" else False
+            img, meta = auto_crop_diploma(img, return_meta=True, allow_perspective=_allow_persp, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
+            sel = meta.get("selected_candidate") or {}
+            hc, wc = img.shape[:2]
+            print(
+                f"{tag} 裁剪后: {wc}x{hc}  "
+                f"mode={meta.get('crop_mode')}  "
+                f"detector={sel.get('detector', 'N/A')}  "
+                f"area_ratio={sel.get('area_ratio', 0):.3f}  "
+                f"confidence={sel.get('confidence', 0):.3f}  "
+                f"edge_density={sel.get('edge_density_on_border', 0):.3f}  "
+                f"analysis_enhanced={meta.get('analysis_enhancement_enabled', False)}"
+            )
+
+        if extra_rotate:
+            img = rotate_image_by_degrees(img, extra_rotate)
+            print(f"{tag} 额外旋转 {extra_rotate}°")
 
         target_width = A4_WIDTH - 2 * CM_IN_PX
         img_resized, target_height = resize_document_to_width(img, target_width)
@@ -1333,7 +1519,13 @@ def process_diploma(input_path, output_dir, name_prefix):
         print(f"{tag} 处理失败:", exc)
 
 
-def process_id_cards(front_path, back_path, output_dir, name_prefix):
+def process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments=None):
+    adjustments = adjustments or {}
+    crop_mode = adjustments.get("crop_mode", "auto")
+    front_rotate = adjustments.get("front_rotate", 0)
+    back_rotate = adjustments.get("back_rotate", 0)
+    expand_level = adjustments.get("expand_level")
+    skip_ratio_trim = adjustments.get("skip_ratio_trim", False)
     tag = "[id-card]"
     try:
         canvas = create_a4_canvas()
@@ -1349,17 +1541,22 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix):
             if front_img is not None:
                 h0, w0 = front_img.shape[:2]
                 print(f"{tag}[正面] 原图: {w0}x{h0}")
-                front_img, meta = auto_crop_id_card(front_img, return_meta=True)
-                sel = meta.get("selected_candidate") or {}
-                hc, wc = front_img.shape[:2]
-                print(
-                    f"{tag}[正面] 裁剪后: {wc}x{hc}  "
-                    f"mode={meta.get('crop_mode')}  "
-                    f"detector={sel.get('detector', 'N/A')}  "
-                    f"area_ratio={sel.get('area_ratio', 0):.3f}  "
-                    f"confidence={sel.get('confidence', 0):.3f}"
-                )
+                if crop_mode != "none":
+                    _allow_persp = None if crop_mode == "auto" else False
+                    front_img, meta = auto_crop_id_card(front_img, return_meta=True, allow_perspective=_allow_persp, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
+                    sel = meta.get("selected_candidate") or {}
+                    hc, wc = front_img.shape[:2]
+                    print(
+                        f"{tag}[正面] 裁剪后: {wc}x{hc}  "
+                        f"mode={meta.get('crop_mode')}  "
+                        f"detector={sel.get('detector', 'N/A')}  "
+                        f"area_ratio={sel.get('area_ratio', 0):.3f}  "
+                        f"confidence={sel.get('confidence', 0):.3f}"
+                    )
                 front_img = normalize_id_card_side(front_img, "front")
+                if front_rotate:
+                    front_img = rotate_image_by_degrees(front_img, front_rotate)
+                    print(f"{tag}[正面] 额外旋转 {front_rotate}°")
                 hn, wn = front_img.shape[:2]
                 if (hn, wn) != (hc, wc):
                     print(f"{tag}[正面] 方向正规化后: {wn}x{hn}")
@@ -1371,20 +1568,22 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix):
             if back_img is not None:
                 h0, w0 = back_img.shape[:2]
                 print(f"{tag}[反面] 原图: {w0}x{h0}")
-                back_img, meta = auto_crop_id_card(back_img, return_meta=True)
-                sel = meta.get("selected_candidate") or {}
-                hc, wc = back_img.shape[:2]
-                print(
-                    f"{tag}[反面] 裁剪后: {wc}x{hc}  "
-                    f"mode={meta.get('crop_mode')}  "
-                    f"detector={sel.get('detector', 'N/A')}  "
-                    f"area_ratio={sel.get('area_ratio', 0):.3f}  "
-                    f"confidence={sel.get('confidence', 0):.3f}"
-                )
+                if crop_mode != "none":
+                    _allow_persp = None if crop_mode == "auto" else False
+                    back_img, meta = auto_crop_id_card(back_img, return_meta=True, allow_perspective=_allow_persp, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
+                    sel = meta.get("selected_candidate") or {}
+                    hc, wc = back_img.shape[:2]
+                    print(
+                        f"{tag}[反面] 裁剪后: {wc}x{hc}  "
+                        f"mode={meta.get('crop_mode')}  "
+                        f"detector={sel.get('detector', 'N/A')}  "
+                        f"area_ratio={sel.get('area_ratio', 0):.3f}  "
+                        f"confidence={sel.get('confidence', 0):.3f}"
+                    )
                 back_img = normalize_id_card_side(back_img, "back")
-                hn, wn = back_img.shape[:2]
-                if (hn, wn) != (hc, wc):
-                    print(f"{tag}[反面] 方向正规化后: {wn}x{hn}")
+                if back_rotate:
+                    back_img = rotate_image_by_degrees(back_img, back_rotate)
+                    print(f"{tag}[反面] 额外旋转 {back_rotate}°")
                 back_img, back_h = resize_document_to_width(back_img, target_width)
                 print(f"{tag}[反面] 缩放后: {target_width}x{back_h}")
 
@@ -1431,7 +1630,13 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix):
         print(f"{tag} 处理失败:", exc)
 
 
-def process_hukou(residence_path, personal_path, output_dir, name_prefix):
+def process_hukou(residence_path, personal_path, output_dir, name_prefix, adjustments=None):
+    adjustments = adjustments or {}
+    crop_mode = adjustments.get("crop_mode", "auto")
+    home_rotate = adjustments.get("home_rotate", 0)
+    personal_rotate = adjustments.get("personal_rotate", 0)
+    expand_level = adjustments.get("expand_level")
+    skip_ratio_trim = adjustments.get("skip_ratio_trim", False)
     tag = "[hukou]"
     try:
         canvas = create_a4_canvas()
@@ -1446,7 +1651,10 @@ def process_hukou(residence_path, personal_path, output_dir, name_prefix):
             print(f"{tag}[首页] 开始处理: {os.path.basename(residence_path)}")
             img1 = read_cv_image(residence_path)
             if img1 is not None:
-                img1 = prepare_hukou_output_page(img1, "home")
+                img1 = prepare_hukou_output_page(img1, "home", crop_mode=crop_mode, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
+                if home_rotate:
+                    img1 = rotate_image_by_degrees(img1, home_rotate)
+                    print(f"{tag}[首页] 额外旋转 {home_rotate}°")
                 img1, h1 = resize_document_to_width(img1, target_width)
                 print(f"{tag}[首页] 缩放后: {target_width}x{h1}")
 
@@ -1454,7 +1662,10 @@ def process_hukou(residence_path, personal_path, output_dir, name_prefix):
             print(f"{tag}[本人页] 开始处理: {os.path.basename(personal_path)}")
             img2 = read_cv_image(personal_path)
             if img2 is not None:
-                img2 = prepare_hukou_output_page(img2, "personal")
+                img2 = prepare_hukou_output_page(img2, "personal", crop_mode=crop_mode, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
+                if personal_rotate:
+                    img2 = rotate_image_by_degrees(img2, personal_rotate)
+                    print(f"{tag}[本人页] 额外旋转 {personal_rotate}°")
                 img2, h2 = resize_document_to_width(img2, target_width)
                 print(f"{tag}[本人页] 缩放后: {target_width}x{h2}")
 
@@ -1552,3 +1763,46 @@ def generate_student_materials(student, base_dir, output_root):
         copy_health_form(training_form_path, output_dir, name_prefix)
 
     return output_dir
+
+
+def regenerate_single_material(student, base_dir, output_root, material_type, adjustments=None):
+    """
+    重新生成单个材料文件。
+    material_type: "diploma" | "id_card" | "hukou"
+    adjustments: dict，可选调整参数
+    """
+    adjustments = adjustments or {}
+
+    id_card_num = student.get("id_card", "")
+    name = student.get("name", "")
+    name_prefix = f"{id_card_num}-{name}"
+
+    training_type = student.get("training_type", "special_operation")
+    company = student.get("company", "")
+    training_type_map = {"special_operation": "特种作业", "special_equipment": "特种设备"}
+    training_type_name = training_type_map.get(training_type, "特种作业")
+    student_folder_name = f"{training_type_name}-{company}-{name}"
+
+    output_dir = os.path.join(output_root, student_folder_name, f"{name_prefix}-报名材料")
+    os.makedirs(output_dir, exist_ok=True)
+
+    def get_abs_path(key):
+        rel = student.get(key)
+        return os.path.join(base_dir, rel) if rel else None
+
+    if material_type == "diploma":
+        diploma_path = get_abs_path("diploma_path")
+        if diploma_path and os.path.exists(diploma_path):
+            process_diploma(diploma_path, output_dir, name_prefix, adjustments=adjustments)
+
+    elif material_type == "id_card":
+        front_path = get_abs_path("id_card_front_path")
+        back_path = get_abs_path("id_card_back_path")
+        if (front_path and os.path.exists(front_path)) or (back_path and os.path.exists(back_path)):
+            process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments=adjustments)
+
+    elif material_type == "hukou":
+        residence_path = get_abs_path("hukou_residence_path")
+        personal_path = get_abs_path("hukou_personal_path")
+        if (residence_path and os.path.exists(residence_path)) or (personal_path and os.path.exists(personal_path)):
+            process_hukou(residence_path, personal_path, output_dir, name_prefix, adjustments=adjustments)
