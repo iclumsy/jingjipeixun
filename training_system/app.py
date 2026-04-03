@@ -362,6 +362,11 @@ def create_app():
         """渲染管理后台页面（需要登录认证）。"""
         return render_template('admin.html', training_type='special_equipment')
 
+    @app.route('/admin/files')
+    def admin_files():
+        """渲染文件浏览管理页面（需要登录认证）。"""
+        return render_template('files_admin.html')
+
     # ======================== 启动警告 ========================
     # 检查是否使用默认密码并发出警告
     if using_default_admin_password():
