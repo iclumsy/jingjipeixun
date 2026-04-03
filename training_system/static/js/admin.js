@@ -1131,7 +1131,6 @@ document.addEventListener('DOMContentLoaded', () => {
             filesContainer.parentNode.insertBefore(materialsSection, filesContainer.nextSibling);
 
             const loadMaterials = async () => {
-                const cacheKey = Date.now();
                 try {
                     const res = await fetch(`/api/students/${student.id}/generated_materials`);
                     if (res.ok) {
@@ -1159,8 +1158,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                     imgBox.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;background:#f9fafb;">📄</div>';
                                     imgBox.onclick = () => window.open('/' + mat.url, '_blank');
                                 } else {
-                                    imgBox.innerHTML = `<img src="/${mat.url}?t=${cacheKey}" style="width:100%;height:100%;object-fit:cover;">`;
-                                    imgBox.onclick = () => window.open('/' + mat.url + '?t=' + cacheKey, '_blank');
+                                    imgBox.innerHTML = `<img src="/${mat.url}?v=${mat.mtime || ''}" style="width:100%;height:100%;object-fit:cover;">`;
+                                    imgBox.onclick = () => window.open('/' + mat.url + '?v=' + (mat.mtime || ''), '_blank');
                                 }
 
                                 const caption = document.createElement('div');

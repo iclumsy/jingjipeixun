@@ -1170,12 +1170,12 @@ def get_generated_materials_route(id):
                 continue
             abs_path = os.path.join(output_dir, filename)
             if os.path.isfile(abs_path):
-                # We need to construct the URL: /students/<student_folder>/<material_folder>/<filename>
-                # Using forward slashes for URLs
+                mtime = int(os.path.getmtime(abs_path))
                 url = f"students/{student_folder_name}/{material_folder_name}/{filename}"
                 materials.append({
                     "name": filename,
-                    "url": url
+                    "url": url,
+                    "mtime": mtime
                 })
 
         return jsonify({'exists': True, 'materials': materials}), 200
