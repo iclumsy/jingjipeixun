@@ -40,28 +40,28 @@ def serve_students(filename):
     """
     提供学员文件夹中的文件访问。
 
-    local/dual 模式：从本地磁盘服务，强制设置 Content-Disposition: inline，
-                    确保浏览器内联预览（不弹下载框），不依赖 COS 元数据。
-    cos-only 模式：重定向到 COS 公网 URL（302）。
+    cos/dual 模式：302 重定向到 COS 公网 URL，由 COS 直接提供文件。
+                  COS 对象须设置 Content-Disposition: inline（通过 fix_cos_headers 脚本）。
+    local 模式：从本地磁盘服务，强制 Content-Disposition: inline。
 
     参数:
         filename (str): 相对于 students 目录的文件路径
 
     返回:
-        200: 文件内容（local/dual 模式，带 inline 头）
-        302: 重定向到 COS URL（cos-only 模式）
+        302: 重定向到 COS URL（cos/dual 模式）
+        200: 文件内容（local 模式，带 inline 头）
         404: 文件不存在
     """
     try:
         backend = storage_service._get_backend()
 
-        if backend == 'cos':
-            # 纯 COS 模式：重定向到 COS 公网 URL
+        if backend in ('cos', 'dual'):
+            # COS/双写模式：重定向到 COS 公网 URL（COS 对象已设置 inline 元数据）
             url = storage_service.get_url(f'students/{filename}')
             if url.startswith('https://'):
                 return redirect(url, code=302)
 
-        # local / dual 模式：本地有备份，直接服务，强制内联预览
+        # local 模式（或 COS 未配置降级）：本地服务 + 强制内联预览
         parts = filename.split('/', 1)
         if len(parts) == 2:
             student_folder, actual_filename = parts
@@ -72,13 +72,13 @@ def serve_students(filename):
         else:
             resp = send_from_directory(current_app.config['STUDENTS_FOLDER'], filename)
 
-        # 强制内联显示，让浏览器预览而非下载
         resp.headers['Content-Disposition'] = 'inline'
         return resp
 
     except Exception as e:
         current_app.logger.error(f'Error serving student file {filename}: {str(e)}')
         return "文件未找到", 404
+
 
 
 # ======================== 图片扩展名集合 ========================
