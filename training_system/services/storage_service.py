@@ -102,14 +102,24 @@ def _push_to_cos(data_bytes, key):
         data_bytes: bytes 对象
         key: 存储 key（相对路径）
     """
+    import mimetypes
     client, config = _get_cos_client()
     full = _full_cos_key(key, config)
+
+    # 推断 Content-Type，避免 COS 默认返回 application/octet-stream 导致浏览器下载
+    content_type, _ = mimetypes.guess_type(key)
+    if not content_type:
+        content_type = 'application/octet-stream'
+
     client.put_object(
         Bucket=config['bucket'],
         Body=data_bytes,
         Key=full,
+        ContentType=content_type,
+        # inline 使浏览器直接预览（图片/文档），而非弹出下载框
+        ContentDisposition='inline',
     )
-    _log_info(f'COS upload: key={key}')
+    _log_info(f'COS upload: key={key} content_type={content_type}')
 
 
 # ======================== 基础目录 ========================

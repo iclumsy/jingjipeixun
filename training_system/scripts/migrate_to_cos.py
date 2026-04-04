@@ -150,8 +150,18 @@ def main():
 
         # 上传
         try:
+            import mimetypes as _mt
+            content_type, _ = _mt.guess_type(abs_path)
+            if not content_type:
+                content_type = 'application/octet-stream'
             with open(abs_path, 'rb') as f:
-                client.put_object(Bucket=bucket, Body=f, Key=full_key)
+                client.put_object(
+                    Bucket=bucket,
+                    Body=f,
+                    Key=full_key,
+                    ContentType=content_type,
+                    ContentDisposition='inline',
+                )
             print(f'[OK  ] ({i}/{len(all_files)}) {rel_key}')
             stats['upload'] += 1
         except Exception as e:
