@@ -46,6 +46,28 @@ window.fetch = async (...args) => {
     return response;
 };
 
+// ======================== 全局存储配置 ========================
+// COS 根地址，由 /api/config/storage 接口在页面加载时赋值
+// 形如: "https://mybucket-123.cos.ap-beijing.myqcloud.com"
+// 未配置时为空字符串，toFileUrl() 自动降级为 Flask 本地路由
+let COS_BASE_URL = '';
+
+/**
+ * 将相对存储路径转换为可访问 URL。
+ * 若已获取到 COS_BASE_URL，返回直接 COS 公网 URL；
+ * 否则降级为 Flask 路由（/students/...）。
+ *
+ * @param {string} relativePath - 数据库中的相对路径，如 'students/xxx/yyy.jpg'
+ * @returns {string} 完整 URL
+ */
+function toFileUrl(relativePath) {
+    if (!relativePath) return '';
+    if (COS_BASE_URL) {
+        return `${COS_BASE_URL}/${relativePath}`;
+    }
+    return '/' + relativePath;
+}
+
 // ======================== 图片灯箱预览 ========================
 /**
  * 在页面内弹出图片预览层（灯箱）。
@@ -124,7 +146,18 @@ function showImagePreview(url, label) {
     document.addEventListener('keydown', onKey);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // 最先获取存储配置，确保后续所有 URL 都能直接用 COS 地址
+    try {
+        const storageRes = await fetch('/api/config/storage');
+        if (storageRes.ok) {
+            const storageData = await storageRes.json();
+            COS_BASE_URL = storageData.cos_base_url || '';
+        }
+    } catch (e) {
+        console.warn('获取存储配置失败，降级为本地路由', e);
+    }
+
     // ======================== 全局状态 ========================
     let currentStatus = 'unreviewed';                  // 当前筛选的审核状态
     let currentStudentId = null;                        // 当前查看的学员 ID
@@ -1037,7 +1070,7 @@ document.addEventListener('DOMContentLoaded', () => {
             img.style.height = '100%';
             img.style.objectFit = 'cover';
             if (existingPath) {
-                img.src = '/' + existingPath;
+                img.src = toFileUrl(existingPath);
             }
 
             const input = document.createElement('input');
@@ -1083,7 +1116,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const latest = students.find(s => s.id === student.id) || student;
                 const latestPath = latest[attachment.dbKey];
                 if (latestPath) {
-                    showImagePreview('/' + latestPath, attachment.label);
+                    showImagePreview(toFileUrl(latestPath), attachment.label);
                 }
             };
 
@@ -1155,7 +1188,7 @@ document.addEventListener('DOMContentLoaded', () => {
             healthCheckBox.appendChild(docLabel);
 
             healthCheckBox.onclick = () => {
-                window.open('/' + student.training_form_path, '_blank');
+                window.open(toFileUrl(student.training_form_path), '_blank');
             };
 
             const downloadBtn = document.createElement('button');
@@ -1173,7 +1206,7 @@ document.addEventListener('DOMContentLoaded', () => {
             downloadBtn.onclick = (e) => {
                 e.stopPropagation();
                 const link = document.createElement('a');
-                link.href = '/' + student.training_form_path;
+                link.href = toFileUrl(student.training_form_path);
                 link.download = `${student.id_card}-${student.name}-体检表.docx`;
                 link.click();
             };
@@ -1234,9 +1267,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                                 if (mat.name.endsWith('.docx') || mat.name.endsWith('.doc')) {
                                     imgBox.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;background:#f9fafb;">📄</div>';
-                                    imgBox.onclick = () => window.open('/' + mat.url, '_blank');
+                                    imgBox.onclick = () => window.open(toFileUrl(mat.url), '_blank');
                                 } else {
-                                    const imgUrl = '/' + mat.url + '?v=' + (mat.mtime || '');
+                                    const imgUrl = toFileUrl(mat.url) + '?v=' + (mat.mtime || '');
                                     imgBox.innerHTML = `<img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover;">`;
                                     imgBox.onclick = () => showImagePreview(imgUrl, mat.name.replace(/^[^-]+-[^-]+-/, ''));
                                 }
@@ -1274,7 +1307,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.error('Failed to load generated materials', e);
                 }
             };
-            
+
             loadMaterials();
             student._reloadMaterials = loadMaterials;
         }

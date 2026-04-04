@@ -99,6 +99,36 @@ def get_job_categories():
         current_app.logger.error(f'Error loading job categories from db: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
+
+@config_bp.route('/api/config/storage', methods=['GET'])
+def get_storage_config():
+    """
+    获取存储配置，供前端直接构建 COS 文件 URL 使用。
+
+    返回:
+        {
+            "cos_base_url": "https://bucket.cos.region.myqcloud.com",  // COS 根地址（含前缀）
+            "backend": "dual"  // 当前存储后端
+        }
+    """
+    from services import storage_service
+    import os
+
+    backend = storage_service._get_backend()
+    bucket = os.getenv('COS_BUCKET', '').strip()
+    region = os.getenv('COS_REGION', '').strip()
+    prefix = os.getenv('COS_KEY_PREFIX', '').strip().rstrip('/')
+
+    cos_base_url = ''
+    if bucket and region:
+        base = f'https://{bucket}.cos.{region}.myqcloud.com'
+        cos_base_url = f'{base}/{prefix}' if prefix else base
+
+    return jsonify({
+        'backend': backend,
+        'cos_base_url': cos_base_url,  # 空字符串表示 COS 未配置，前端降级为本地路由
+    })
+
 @config_bp.route('/api/config/wechat', methods=['GET'])
 def get_wechat_config():
     """
