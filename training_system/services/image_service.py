@@ -13,6 +13,10 @@
     文件: <身份证号>-<姓名>-<附件类型>.<扩展名>
     示例: students/特种设备-阳泉市公司-张三/123456789012345678-张三-个人照片.jpg
 
+存储后端:
+    通过 services/storage_service.py 统一管理，支持本地、COS、双写三种模式。
+    dual 模式下文件同时保存到本地和 COS，本地用于服务端处理，COS 提供对外访问 URL。
+
 可选依赖:
     - rembg : AI 背景去除库（未安装时背景替换功能自动跳过）
     - cv2   : OpenCV，用于图像掩码修复（未安装时同上）
@@ -22,6 +26,7 @@ import io
 from PIL import Image, ImageOps
 import numpy as np
 from flask import current_app
+from services import storage_service
 
 # ======================== 可选依赖加载 ========================
 # rembg 和 cv2 是可选依赖，未安装时背景替换功能自动降级（返回原图）
@@ -53,8 +58,8 @@ def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
     将证件照背景替换为指定颜色（默认白色）。
 
     参数:
-        input_path: 输入照片路径
-        output_path: 输出照片路径
+        input_path: 输入照片本地路径
+        output_path: 输出照片本地路径
         bg_color: 背景颜色元组 (R, G, B)
 
     返回:
@@ -123,10 +128,19 @@ def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
 def save_temp_file(file_storage, file_type):
     """
     小程序预上传时，将文件暂存到 students/tmp/<uuid>/ 下。
+
+    dual/local 模式：保存到本地并同步至 COS（如果配置了 COS）。
     返回临时相对路径，格式：students/tmp/<uuid>/<file_type><ext>
 
     提交学员表单时，调用 commit_temp_files() 将所有临时文件
     整体移动到正式目录，并返回正式相对路径。
+
+    参数:
+        file_storage: werkzeug FileStorage 对象
+        file_type: 附件类型（如 'photo', 'diploma'）
+
+    返回:
+        str: 临时 key（相对路径），失败返回空字符串
     """
     import uuid
     if not file_storage or not file_storage.filename:
@@ -136,20 +150,21 @@ def save_temp_file(file_storage, file_type):
     orig_ext = ext.lower() if ext else '.jpg'
 
     tmp_id = str(uuid.uuid4())
-    tmp_folder = os.path.join(current_app.config['STUDENTS_FOLDER'], 'tmp', tmp_id)
-    os.makedirs(tmp_folder, exist_ok=True)
-
     filename = f"{file_type}{orig_ext}"
-    abs_path = os.path.join(tmp_folder, filename)
-    file_storage.save(abs_path)
-    current_app.logger.info(f'Temp file saved: {abs_path}')
+    tmp_key = f"students/tmp/{tmp_id}/{filename}"
 
-    return f"students/tmp/{tmp_id}/{filename}"
+    # 通过存储服务保存（dual 模式同时写本地和 COS）
+    storage_service.save_file(file_storage, tmp_key)
+    current_app.logger.info(f'Temp file saved: {tmp_key}')
+
+    return tmp_key
 
 
 def commit_temp_files(tmp_paths_by_input_name, id_card, name, company, training_type):
     """
     提交阶段：将预上传的临时文件移动到学员正式目录，返回正式的相对路径字典。
+
+    dual 模式下本地和 COS 同步移动（本地 shutil.move + COS 服务端复制删除）。
 
     参数:
         tmp_paths_by_input_name : {input_name -> tmp relative path}
@@ -171,8 +186,6 @@ def commit_temp_files(tmp_paths_by_input_name, id_card, name, company, training_
     }
     training_type_name = training_type_map.get(training_type, '特种作业')
     student_folder_name = f"{training_type_name}-{company}-{name}"
-    student_folder_path = os.path.join(current_app.config['STUDENTS_FOLDER'], student_folder_name)
-    os.makedirs(student_folder_path, exist_ok=True)
 
     from routes.student_routes import FILE_MAP  # 延迟导入避免循环
     result = {}
@@ -184,32 +197,35 @@ def commit_temp_files(tmp_paths_by_input_name, id_card, name, company, training_
             result[db_key] = ''
             continue
 
-        tmp_abs = os.path.join(current_app.config['BASE_DIR'], tmp_rel)
-        if not os.path.exists(tmp_abs):
+        # 检查临时文件是否存在（本地或 COS）
+        if not storage_service.file_exists_local(tmp_rel):
+            current_app.logger.warning(f'Temp file not found: {tmp_rel}')
             result[db_key] = ''
             continue
 
-        _, ext = os.path.splitext(tmp_abs)
+        _, ext = os.path.splitext(tmp_rel)
         label_name = label_name_map.get(input_name, input_name)
         safe_name = f"{id_card}-{name}-{label_name}{ext}"
-        dest_abs = os.path.join(student_folder_path, safe_name)
+        formal_key = f"students/{student_folder_name}/{safe_name}"
 
-        try:
-            shutil.move(tmp_abs, dest_abs)
-            current_app.logger.info(f'Committed temp file: {tmp_abs} -> {dest_abs}')
-            result[db_key] = f"students/{student_folder_name}/{safe_name}"
-            # 记录需要清理的临时文件夹
-            tmp_dir = os.path.dirname(tmp_abs)
-            tmp_dirs_to_clean.add(tmp_dir)
-        except Exception as e:
-            current_app.logger.error(f'Failed to commit temp file {tmp_abs}: {e}')
+        # 通过存储服务移动（dual 模式本地 + COS 同步移动）
+        ok = storage_service.move_temp_file(tmp_rel, formal_key)
+        if ok:
+            current_app.logger.info(f'Committed temp file: {tmp_rel} -> {formal_key}')
+            result[db_key] = formal_key
+            # 记录临时目录用于后续清理
+            tmp_dirs_to_clean.add(os.path.dirname(tmp_rel))
+        else:
+            current_app.logger.error(f'Failed to commit temp file {tmp_rel}')
             result[db_key] = ''
 
-    # 清理已经搬空的临时文件夹
-    for tmp_dir in tmp_dirs_to_clean:
+    # 清理已搬空的本地临时文件夹
+    base_dir = current_app.config['BASE_DIR']
+    for tmp_rel_dir in tmp_dirs_to_clean:
+        tmp_abs_dir = os.path.join(base_dir, tmp_rel_dir)
         try:
-            if os.path.isdir(tmp_dir) and not os.listdir(tmp_dir):
-                os.rmdir(tmp_dir)
+            if os.path.isdir(tmp_abs_dir) and not os.listdir(tmp_abs_dir):
+                os.rmdir(tmp_abs_dir)
         except Exception:
             pass
 
@@ -218,7 +234,10 @@ def commit_temp_files(tmp_paths_by_input_name, id_card, name, company, training_
 
 def process_and_save_file(file_storage, id_card, name, label_key, company='', training_type='special_operation'):
     """
-    保存上传文件，命名格式为 '<公司>-<姓名>/<身份证号><姓名>-<标签>.<扩展名>'。
+    保存上传文件，命名格式为 '<培训类型>-<公司>-<姓名>/<身份证号>-<姓名>-<标签>.<扩展名>'。
+
+    dual 模式：先写入本地，再同步至 COS。
+    本地文件供服务端处理（材料生成等）使用，COS 文件提供给用户访问。
 
     参数:
         file_storage: 来自 request.files 的 FileStorage 对象
@@ -229,7 +248,10 @@ def process_and_save_file(file_storage, id_card, name, label_key, company='', tr
         training_type: 培训类型（special_operation 或 special_equipment）
 
     返回:
-        str: 相对路径，如 'students/<培训类型>-<公司>-<姓名>/...'
+        str: 相对路径（存储 key），如 'students/<培训类型>-<公司>-<姓名>/...'
+
+    异常:
+        文件保存失败时向上抛出异常
     """
     if not file_storage or not file_storage.filename:
         return ''
@@ -255,80 +277,41 @@ def process_and_save_file(file_storage, id_card, name, label_key, company='', tr
     }
     training_type_name = training_type_map.get(training_type, '特种作业')
 
-    # 创建学员文件夹，格式：<培训类型>-<公司名称>-<姓名>
+    # 生成存储 key（相对路径）
     student_folder_name = f"{training_type_name}-{company}-{name}"
-    student_folder_path = os.path.join(
-        current_app.config['STUDENTS_FOLDER'],
-        student_folder_name
-    )
-    os.makedirs(student_folder_path, exist_ok=True)  # 目录已存在时不报错
-
-    # 生成文件名，格式：<身份证号>-<姓名>-<附件类型>.<扩展名>
     safe_name = f"{id_card}-{name}-{label_name}{orig_ext}"
-    abs_path = os.path.join(student_folder_path, safe_name)
-    
-    import time
-    temp_path = abs_path + f".tmp_{int(time.time())}"
+    key = f"students/{student_folder_name}/{safe_name}"
 
-    # 保存文件到磁盘临时路径，然后原子替换，确保同名覆盖的安全
-    try:
-        file_storage.save(temp_path)
-        os.replace(temp_path, abs_path)
-        current_app.logger.info(f'File saved atomically: {abs_path}')
-    except Exception as e:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-        current_app.logger.error(f'Failed to save file: {str(e)}')
-        raise
+    # 通过存储服务保存（dual 模式同时写本地和 COS，原子写保证本地安全）
+    storage_service.save_file(file_storage, key)
+    current_app.logger.info(f'File saved: {key}')
 
-    # 返回相对路径（存入数据库，用于前端文件访问）
-    return f"students/{student_folder_name}/{safe_name}"
+    return key
 
 
 def delete_file_if_exists(file_path, base_dir):
     """
-    如果文件存在则删除。
+    如果文件存在则删除（本地 + COS）。
 
     参数:
-        file_path: 相对文件路径
-        base_dir: 基础目录
+        file_path: 相对文件路径（存储 key）
+        base_dir: 基础目录（兼容旧接口，实际由 storage_service 内部获取）
 
     返回:
         bool: 删除成功返回 True，否则返回 False
     """
     if not file_path:
         return False
-
-    try:
-        # 将相对路径转换为绝对路径
-        abs_path = os.path.join(base_dir, file_path)
-
-        if os.path.exists(abs_path):
-            os.remove(abs_path)
-            current_app.logger.info(f'File deleted: {abs_path}')
-
-            # 如果删除文件后学员文件夹变为空，则一并清理空目录
-            # 避免留下大量空文件夹占用磁盘空间
-            if file_path.startswith('students/'):
-                folder_path = os.path.dirname(abs_path)
-                if os.path.isdir(folder_path) and not os.listdir(folder_path):
-                    os.rmdir(folder_path)
-                    current_app.logger.info(f'Empty folder removed: {folder_path}')
-
-            return True
-    except Exception as e:
-        current_app.logger.error(f'Failed to delete file {file_path}: {str(e)}')
-
-    return False
+    return storage_service.delete_file(file_path)
 
 
 def delete_student_files(student_record, base_dir):
     """
-    删除学员关联的所有文件。
+    删除学员关联的所有文件（本地 + COS）。
 
     参数:
-        student_record: 学员记录字典
-        base_dir: 基础目录
+        student_record: 学员记录字典（含各 *_path 字段）
+        base_dir: 基础目录（兼容旧接口，实际由 storage_service 内部获取）
     """
     # 所有可能含有文件路径的数据库字段
     file_keys = [
@@ -340,4 +323,4 @@ def delete_student_files(student_record, base_dir):
     # 逐个删除关联文件
     for key in file_keys:
         if student_record.get(key):
-            delete_file_if_exists(student_record[key], base_dir)
+            storage_service.delete_file(student_record[key])

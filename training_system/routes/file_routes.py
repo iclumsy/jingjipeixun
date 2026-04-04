@@ -24,8 +24,9 @@ API 端点:
     不易被猜测，且文件内容为学员自行上传的资料。
     /api/files/browse 系列端点受 session 认证保护。
 """
-from flask import Blueprint, current_app, jsonify, send_from_directory
+from flask import Blueprint, current_app, jsonify, redirect, send_from_directory
 from models.student import get_db_connection
+from services import storage_service
 import os
 import sqlite3
 
@@ -39,28 +40,35 @@ def serve_students(filename):
     """
     提供学员文件夹中的文件访问。
 
-    URL 路径格式: /students/<学员文件夹>/<文件名>
-    例如: /students/特种设备-阳泉市公司-张三/123456789012345678-张三-个人照片.jpg
+    COS 模式：重定向到 COS 公网 URL（302）。
+    本地模式：直接由本地磁盘提供文件。
 
     参数:
         filename (str): 相对于 students 目录的文件路径
 
     返回:
-        200: 文件内容
+        302: 重定向到 COS URL（cos/dual 模式）
+        200: 文件内容（local 模式）
         404: 文件不存在
     """
     try:
-        # 解析路径：分为学员文件夹名和实际文件名两部分
+        key = f'students/{filename}'
+        backend = storage_service._get_backend()
+
+        if backend in ('cos', 'dual'):
+            # COS 模式：返回 COS 公网 URL，客户端直接访问 COS
+            url = storage_service.get_url(key)
+            return redirect(url, code=302)
+
+        # local 模式：本地文件服务
         parts = filename.split('/', 1)
         if len(parts) == 2:
-            # 标准路径：students/<文件夹>/<文件名>
             student_folder, actual_filename = parts
             return send_from_directory(
                 os.path.join(current_app.config['STUDENTS_FOLDER'], student_folder),
                 actual_filename
             )
         else:
-            # 简单路径：直接在 students 目录下查找
             return send_from_directory(current_app.config['STUDENTS_FOLDER'], filename)
 
     except Exception as e:
@@ -233,8 +241,14 @@ def browse_folder_contents(folder_name):
                 stat = entry.stat(follow_symlinks=False)
                 ext = os.path.splitext(entry.name)[1].lower()
                 is_image = ext in IMAGE_EXTENSIONS
-                # 构建预览 URL：/students/文件夹路径/文件名
-                preview_url = f'/students/{folder_name}/{entry.name}' if is_image else None
+                # 构建预览 URL：
+                # cos/dual 模式返回 COS 公网 URL，永久有效
+                # local 模式返回本地路由 URL
+                if is_image:
+                    cos_key = f'students/{folder_name}/{entry.name}'
+                    preview_url = storage_service.get_url(cos_key)
+                else:
+                    preview_url = None
                 items.append({
                     'name': entry.name,
                     'type': 'file',

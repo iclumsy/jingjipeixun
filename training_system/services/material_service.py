@@ -7,6 +7,7 @@ import tempfile
 import cv2
 import numpy as np
 from PIL import Image
+from services import storage_service
 
 A4_WIDTH = 2480
 A4_HEIGHT = 3508
@@ -1762,6 +1763,9 @@ def generate_student_materials(student, base_dir, output_root):
     if training_form_path and os.path.exists(training_form_path):
         copy_health_form(training_form_path, output_dir, name_prefix)
 
+    # 生成完成后，批量同步报名材料目录内所有文件至 COS
+    _sync_output_dir_to_cos(output_dir, base_dir)
+
     return output_dir
 
 
@@ -1806,3 +1810,39 @@ def regenerate_single_material(student, base_dir, output_root, material_type, ad
         personal_path = get_abs_path("hukou_personal_path")
         if (residence_path and os.path.exists(residence_path)) or (personal_path and os.path.exists(personal_path)):
             process_hukou(residence_path, personal_path, output_dir, name_prefix, adjustments=adjustments)
+
+    # 生成完成后，同步该目录内所有文件至 COS
+    _sync_output_dir_to_cos(output_dir, base_dir)
+
+
+def _sync_output_dir_to_cos(output_dir, base_dir):
+    """
+    将本地 output_dir 目录下所有文件同步到 COS。
+    仅在 STORAGE_BACKEND=cos 或 dual 时执行。
+    同步失败持续处理（本地已有文件）。
+    """
+    import os as _os
+    from services import storage_service as _ss
+
+    backend = _ss._get_backend()
+    if backend not in ('cos', 'dual'):
+        return
+
+    if not _os.path.isdir(output_dir):
+        return
+
+    synced, failed = 0, 0
+    for filename in _os.listdir(output_dir):
+        abs_path = _os.path.join(output_dir, filename)
+        if not _os.path.isfile(abs_path):
+            continue
+        # 计算相对 key：将本地绝对路径转为相对于 base_dir 的路径
+        rel_key = _os.path.relpath(abs_path, base_dir).replace('\\', '/')
+        try:
+            _ss.save_from_local(abs_path, rel_key)
+            synced += 1
+        except Exception as exc:
+            failed += 1
+            print(f'[material_service] COS 同步失败: {rel_key} -> {exc}')
+
+    print(f'[material_service] COS 同步完成: 成功 {synced} 个，失败 {failed} 个')

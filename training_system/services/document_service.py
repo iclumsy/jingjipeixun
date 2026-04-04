@@ -30,6 +30,7 @@ from PIL import Image
 from lxml import etree
 from flask import current_app
 from services.image_service import change_id_photo_bg
+from services import storage_service
 
 
 # ======================== 体检表模板配置 ========================
@@ -119,10 +120,16 @@ def generate_health_check_form(student, base_dir, students_folder):
         f"{student['id_card']}-{student['name']}-体检表.docx"
     )
     
-    # 获取学员照片的绝对路径（用于插入体检表）
+    # 获取学员照片的本地绝对路径（用于插入体检表）
+    # dual 模式下本地有文件，直接使用；cos-only 模式下为 None，由 _insert_photo_into_doc 负责从 COS 拉取
     photo_abs_path = None
     if student.get('photo_path'):
-        photo_abs_path = os.path.join(base_dir, student['photo_path'])
+        candidate = os.path.join(base_dir, student['photo_path'])
+        if os.path.exists(candidate):
+            photo_abs_path = candidate
+        else:
+            # 本地不存在（cos-only 模式），传入 key 让函数自行下载
+            photo_abs_path = student['photo_path']  # 传相对 key，下方函数识别处理
     
     # 准备模板填充数据
     data = {
@@ -136,6 +143,10 @@ def generate_health_check_form(student, base_dir, students_folder):
     
     # 返回相对路径（用于数据库存储）
     rel_path = f"students/{student_folder_name}/{os.path.basename(doc_path)}"
+    
+    # 同步至 COS（dual/cos 模式）
+    storage_service.save_from_local(doc_path, rel_path)
+    
     return rel_path
 
 
@@ -197,8 +208,32 @@ def generate_word_doc(template_path, output_path, data, photo_path=None):
                                 target_cell.text = new_val
 
         # ---- 第二步：将学员证件照插入文档中的照片区域 ----
-        if photo_path and os.path.exists(photo_path):
-            _insert_photo_into_doc(doc, photo_path)
+        # photo_path 可能是本地绝对路径（dual/local 模式）或相对 key（cos-only 模式）
+        if photo_path:
+            # 若是相对 key（不以 / 开头且本地不存在），尝试从 COS 下载到临时文件
+            effective_photo_path = photo_path
+            _tmp_photo = None
+            if not os.path.isabs(photo_path) and not os.path.exists(photo_path):
+                try:
+                    import tempfile as _tf
+                    tmp_fd, _tmp_photo = _tf.mkstemp(suffix=os.path.splitext(photo_path)[1] or '.jpg')
+                    os.close(tmp_fd)
+                    if storage_service.download_to_file(photo_path, _tmp_photo):
+                        effective_photo_path = _tmp_photo
+                    else:
+                        effective_photo_path = None
+                except Exception as _e:
+                    current_app.logger.warning(f'Failed to download photo from COS: {_e}')
+                    effective_photo_path = None
+            if effective_photo_path and os.path.exists(effective_photo_path):
+                try:
+                    _insert_photo_into_doc(doc, effective_photo_path)
+                finally:
+                    if _tmp_photo and os.path.exists(_tmp_photo):
+                        try:
+                            os.remove(_tmp_photo)
+                        except Exception:
+                            pass
 
         doc.save(output_path)
         current_app.logger.info(f'Document generated: {output_path}')

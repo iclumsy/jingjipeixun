@@ -36,6 +36,7 @@ from models.student import (
 from services.wechat_service import send_review_result_message, broadcast_new_student_to_admins
 from services.image_service import process_and_save_file, delete_student_files
 from services.document_service import generate_health_check_form
+from services import storage_service
 from utils.validators import validate_student_data, validate_file_upload
 from utils.error_handlers import AppError, ValidationError, NotFoundError
 import os
@@ -1171,7 +1172,9 @@ def get_generated_materials_route(id):
             abs_path = os.path.join(output_dir, filename)
             if os.path.isfile(abs_path):
                 mtime = int(os.path.getmtime(abs_path))
-                url = f"students/{student_folder_name}/{material_folder_name}/{filename}"
+                # 构建访问 URL：cos/dual 模式返回 COS 公网 URL，local 模式返回本地路由
+                rel_key = f"students/{student_folder_name}/{material_folder_name}/{filename}"
+                url = storage_service.get_url(rel_key)
                 materials.append({
                     "name": filename,
                     "url": url,

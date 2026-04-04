@@ -8,3 +8,4 @@ rembg
 onnxruntime
 lxml
 openpyxl
+cos-python-sdk-v5
