@@ -1023,7 +1023,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             uploadBox.onclick = (e) => {
                 if (!e.target.closest('button')) {
-                    uploadBox.querySelector('input').click();
+                    if (img.style.display !== 'none') {
+                        showImagePreview(img.src, attachment.label);
+                    } else {
+                        input.click();
+                    }
                 }
             };
 
@@ -1095,6 +1099,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         img.src = ev.target.result;
                         img.style.display = 'block';
                         placeholder.style.display = 'none';
+                        actionBtn.style.display = 'block';
+                        actionBtn.textContent = '修改';
 
                         uploadFile(student.id, attachment.fieldName, file, attachment.dbKey);
                     };
@@ -1102,22 +1108,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
 
-            const viewBtn = document.createElement('button');
-            viewBtn.textContent = '查看';
-            viewBtn.style.marginTop = '5px';
-            viewBtn.style.fontSize = '12px';
-            viewBtn.style.padding = '2px 8px';
-            viewBtn.style.border = '1px solid #ddd';
-            viewBtn.style.borderRadius = '4px';
-            viewBtn.style.background = '#fff';
-            viewBtn.style.cursor = 'pointer';
-            viewBtn.style.display = existingPath ? 'block' : 'none';
-            viewBtn.onclick = () => {
-                const latest = students.find(s => s.id === student.id) || student;
-                const latestPath = latest[attachment.dbKey];
-                if (latestPath) {
-                    showImagePreview(toFileUrl(latestPath), attachment.label);
-                }
+            const actionBtn = document.createElement('button');
+            actionBtn.textContent = existingPath ? '修改' : '上传';
+            actionBtn.style.marginTop = '5px';
+            actionBtn.style.fontSize = '12px';
+            actionBtn.style.padding = '2px 8px';
+            actionBtn.style.border = '1px solid #ddd';
+            actionBtn.style.borderRadius = '4px';
+            actionBtn.style.background = '#fff';
+            actionBtn.style.cursor = 'pointer';
+            actionBtn.style.display = existingPath ? 'block' : 'none';
+            actionBtn.onclick = () => {
+                input.click();
             };
 
             const caption = document.createElement('div');
@@ -1136,7 +1138,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             uploadBox.appendChild(input);
             wrapper.appendChild(uploadBox);
             wrapper.appendChild(caption);
-            wrapper.appendChild(viewBtn);
+            wrapper.appendChild(actionBtn);
             filesContainer.appendChild(wrapper);
         });
 
