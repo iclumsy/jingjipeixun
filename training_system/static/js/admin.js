@@ -46,6 +46,84 @@ window.fetch = async (...args) => {
     return response;
 };
 
+// ======================== 图片灯箱预览 ========================
+/**
+ * 在页面内弹出图片预览层（灯箱）。
+ * 点击图片本身会在新窗口全屏打开；点击遮罩或按 ESC 关闭。
+ *
+ * @param {string} url      - 图片 URL
+ * @param {string} [label]  - 可选标题
+ */
+function showImagePreview(url, label) {
+    // 移除已存在的预览层
+    const existing = document.getElementById('_lightbox_overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = '_lightbox_overlay';
+    overlay.style.cssText = [
+        'position:fixed', 'inset:0', 'z-index:99999',
+        'background:rgba(0,0,0,0.82)',
+        'display:flex', 'flex-direction:column',
+        'align-items:center', 'justify-content:center',
+        'cursor:zoom-out', 'animation:_lb_fadein 0.18s ease',
+    ].join(';');
+
+    // 注入淡入动画（只注入一次）
+    if (!document.getElementById('_lightbox_style')) {
+        const style = document.createElement('style');
+        style.id = '_lightbox_style';
+        style.textContent = [
+            '@keyframes _lb_fadein{from{opacity:0}to{opacity:1}}',
+            '@keyframes _lb_imgpop{from{transform:scale(0.88)}to{transform:scale(1)}}',
+        ].join('');
+        document.head.appendChild(style);
+    }
+
+    // 顶部工具栏
+    const toolbar = document.createElement('div');
+    toolbar.style.cssText = [
+        'display:flex', 'align-items:center', 'justify-content:space-between',
+        'width:min(90vw,900px)', 'padding:0 4px 10px',
+    ].join(';');
+    toolbar.innerHTML = `
+        <span style="color:#e2e8f0;font-size:0.92rem;max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            ${label || ''}
+        </span>
+        <div style="display:flex;gap:10px;">
+            <button id="_lb_newwin" title="在新窗口打开"
+                style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;
+                       border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.85rem;">↗ 新窗口</button>
+            <button id="_lb_close" title="关闭 (ESC)"
+                style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;
+                       border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.85rem;">✕ 关闭</button>
+        </div>
+    `;
+
+    // 图片
+    const img = document.createElement('img');
+    img.src = url;
+    img.title = '点击在新窗口打开';
+    img.style.cssText = [
+        'max-width:min(90vw,1000px)', 'max-height:80vh',
+        'border-radius:8px', 'box-shadow:0 8px 40px rgba(0,0,0,0.6)',
+        'cursor:zoom-in', 'animation:_lb_imgpop 0.18s ease',
+        'object-fit:contain',
+    ].join(';');
+    img.onclick = (e) => { e.stopPropagation(); window.open(url, '_blank'); };
+
+    overlay.appendChild(toolbar);
+    overlay.appendChild(img);
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', close);                            // 点遮罩关闭
+    document.getElementById('_lb_close').addEventListener('click', (e) => { e.stopPropagation(); close(); });
+    document.getElementById('_lb_newwin').addEventListener('click', (e) => { e.stopPropagation(); window.open(url, '_blank'); });
+    const onKey = (e) => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); } };
+    document.addEventListener('keydown', onKey);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // ======================== 全局状态 ========================
     let currentStatus = 'unreviewed';                  // 当前筛选的审核状态
@@ -1005,7 +1083,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const latest = students.find(s => s.id === student.id) || student;
                 const latestPath = latest[attachment.dbKey];
                 if (latestPath) {
-                    window.open('/' + latestPath, '_blank');
+                    showImagePreview('/' + latestPath, attachment.label);
                 }
             };
 
@@ -1158,8 +1236,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                     imgBox.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;background:#f9fafb;">📄</div>';
                                     imgBox.onclick = () => window.open('/' + mat.url, '_blank');
                                 } else {
-                                    imgBox.innerHTML = `<img src="/${mat.url}?v=${mat.mtime || ''}" style="width:100%;height:100%;object-fit:cover;">`;
-                                    imgBox.onclick = () => window.open('/' + mat.url + '?v=' + (mat.mtime || ''), '_blank');
+                                    const imgUrl = '/' + mat.url + '?v=' + (mat.mtime || '');
+                                    imgBox.innerHTML = `<img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+                                    imgBox.onclick = () => showImagePreview(imgUrl, mat.name.replace(/^[^-]+-[^-]+-/, ''));
                                 }
 
                                 const caption = document.createElement('div');
