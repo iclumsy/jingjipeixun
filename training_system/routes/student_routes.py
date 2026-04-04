@@ -1172,9 +1172,9 @@ def get_generated_materials_route(id):
             abs_path = os.path.join(output_dir, filename)
             if os.path.isfile(abs_path):
                 mtime = int(os.path.getmtime(abs_path))
-                # 构建访问 URL：cos/dual 模式返回 COS 公网 URL，local 模式返回本地路由
-                rel_key = f"students/{student_folder_name}/{material_folder_name}/{filename}"
-                url = storage_service.get_url(rel_key)
+                # 返回相对路径（前端会加 / 前缀变成 /students/...）
+                # serve_students 会自动重定向到 COS URL，前端无需感知
+                url = f"students/{student_folder_name}/{material_folder_name}/{filename}"
                 materials.append({
                     "name": filename,
                     "url": url,

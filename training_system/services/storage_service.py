@@ -422,8 +422,13 @@ def get_url(key):
     """
     获取文件的访问 URL。
 
-    - cos/dual : 返回 COS 公网 URL（公读桶，永久有效）
-    - local    : 返回 Flask 路由 URL（/students/xxx/yyy.jpg）
+    - cos/dual 且 COS 已配置：返回 COS 公网 URL（公读桶，永久有效）
+    - cos/dual 但 COS 尚未配置：降级为本地 URL，避免循环跳转
+    - local：返回 Flask 路由 URL（/key）
+
+    注意：直接读环境变量拼 URL，不刚建 SDK 客户端，
+    避免配置不完整时异常降级为本地 URL 再被 serve_students 重定向，
+    造成循环跳转。
 
     参数:
         key: 存储 key，如 'students/xxx/photo.jpg'
@@ -434,15 +439,17 @@ def get_url(key):
     backend = _get_backend()
 
     if backend in ('cos', 'dual'):
-        try:
-            _, config = _get_cos_client()
-            bucket = config['bucket']
-            region = config['region']
-            full = _full_cos_key(key, config)
+        # 直接读环境变量，不需要初始化 SDK
+        bucket = os.getenv('COS_BUCKET', '').strip()
+        region = os.getenv('COS_REGION', '').strip()
+        if bucket and region:
+            prefix = os.getenv('COS_KEY_PREFIX', '').strip().rstrip('/')
+            full = f"{prefix}/{key}" if prefix else key
             return f"https://{bucket}.cos.{region}.myqcloud.com/{full}"
-        except Exception:
-            # COS 配置未初始化时降级为本地 URL
-            pass
+        # COS 配置不完整，降级本地 URL
+        _log_warning(
+            'COS_BUCKET 或 COS_REGION 未配置，当前降级为本地 URL'
+        )
 
     return f"/{key}"
 

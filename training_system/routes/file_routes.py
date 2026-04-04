@@ -241,14 +241,8 @@ def browse_folder_contents(folder_name):
                 stat = entry.stat(follow_symlinks=False)
                 ext = os.path.splitext(entry.name)[1].lower()
                 is_image = ext in IMAGE_EXTENSIONS
-                # 构建预览 URL：
-                # cos/dual 模式返回 COS 公网 URL，永久有效
-                # local 模式返回本地路由 URL
-                if is_image:
-                    cos_key = f'students/{folder_name}/{entry.name}'
-                    preview_url = storage_service.get_url(cos_key)
-                else:
-                    preview_url = None
+                # 返回相对路径，前端请求 /students/... 时 serve_students 会透明重定向到 COS
+                preview_url = f'/students/{folder_name}/{entry.name}' if is_image else None
                 items.append({
                     'name': entry.name,
                     'type': 'file',
