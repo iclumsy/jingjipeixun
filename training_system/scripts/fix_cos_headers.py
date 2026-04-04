@@ -75,7 +75,8 @@ def list_all_objects(client, bucket, prefix):
 
 def fix_object_headers(client, bucket, region, full_key, dry_run=False):
     """
-    使用 copy-to-self 更新对象元数据（不重新传内容）。
+    重新 put_object 以更新元数据（ContentType + ContentDisposition）。
+    腾讯 COS SDK v5 不支持 copy-to-self 修改元数据，故先 get 再 put。
     """
     content_type, _ = mimetypes.guess_type(full_key)
     if not content_type:
@@ -86,16 +87,15 @@ def fix_object_headers(client, bucket, region, full_key, dry_run=False):
         return True
 
     try:
-        client.copy_object(
+        # 1. 下载原始内容
+        resp = client.get_object(Bucket=bucket, Key=full_key)
+        data = resp['Body'].get_raw_stream().read()
+
+        # 2. 用正确元数据重新上传（覆盖同一 Key）
+        client.put_object(
             Bucket=bucket,
             Key=full_key,
-            CopySource={
-                'Bucket': bucket,
-                'Key': full_key,
-                'Region': region,
-            },
-            # Replaced 表示使用下方指定的 Header，而非保留源对象的 Header
-            MetadataDirective='Replaced',
+            Body=data,
             ContentType=content_type,
             ContentDisposition='inline',
         )
