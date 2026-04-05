@@ -262,3 +262,55 @@ def browse_folder_contents(folder_name):
         return jsonify({'error': str(e)}), 500
 
     return jsonify(items)
+
+
+@file_bp.route('/api/files/delete', methods=['POST'])
+def delete_local_file():
+    """
+    删除指定的本地文件或文件夹（仅限 students/ 目录内）。
+    受 admin session 认证保护。
+
+    请求体 (JSON):
+        path: 相对于 students/ 的路径，如 "tmp/xxx/photo.jpg" 或 "tmp/xxx"
+        type: "file" 或 "directory"
+    """
+    from flask import request, session
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': '未登录'}), 401
+
+    data = request.json or {}
+    rel_path = str(data.get('path') or '').strip().replace('\\', '/')
+
+    if not rel_path:
+        return jsonify({'error': '路径不能为空'}), 400
+
+    # 安全：不允许路径穿越
+    if '..' in rel_path.split('/'):
+        return jsonify({'error': '非法路径'}), 403
+
+    students_dir = current_app.config['STUDENTS_FOLDER']
+    target = os.path.normpath(os.path.join(students_dir, rel_path))
+
+    # 再次确认还在 students 目录范围内
+    if not target.startswith(os.path.normpath(students_dir)):
+        return jsonify({'error': '路径越界'}), 403
+
+    try:
+        if os.path.isfile(target):
+            os.remove(target)
+            # 如果父目录变成空了，顺手删掉空目录
+            parent = os.path.dirname(target)
+            if os.path.isdir(parent) and not os.listdir(parent):
+                os.rmdir(parent)
+            current_app.logger.info(f'Admin deleted local file: {rel_path}')
+            return jsonify({'success': True, 'message': '文件已删除'})
+        elif os.path.isdir(target):
+            import shutil
+            shutil.rmtree(target)
+            current_app.logger.info(f'Admin deleted local folder: {rel_path}')
+            return jsonify({'success': True, 'message': '文件夹已删除'})
+        else:
+            return jsonify({'error': '文件或文件夹不存在'}), 404
+    except Exception as e:
+        current_app.logger.error(f'Error deleting {rel_path}: {e}')
+        return jsonify({'error': str(e)}), 500

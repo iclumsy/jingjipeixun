@@ -32,7 +32,7 @@ const EDUCATION_OPTIONS = [
 ]
 
 // 文件大小限制（字节）
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 
 module.exports = {
   TRAINING_TYPE_LABELS,

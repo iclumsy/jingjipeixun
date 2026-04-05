@@ -807,7 +807,7 @@ async function uploadAttachment(filePath, options = {}) {
         Region: currentCosRegion,
         Key: cosKey,
         FilePath: filePath,
-        SliceSize: 1024 * 1024 * 5, // 大于5MB才进行分块上传
+        SliceSize: 1024 * 1024 * 50, // 改为50MB，只要不超过50M都用原生单文件跑
         onProgress: function (info) {
             // (可选) 进度回调
         }

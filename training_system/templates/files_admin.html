@@ -162,6 +162,37 @@
             margin-top: 4px;
         }
 
+        .btn-delete-folder {
+            flex-shrink: 0;
+            margin-left: 6px;
+            padding: 3px 8px;
+            border: none;
+            border-radius: 6px;
+            background: #fee2e2;
+            color: #dc2626;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .btn-delete-folder:hover { background: #fecaca; }
+        .file-card-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .btn-delete-file {
+            width: 100%;
+            padding: 4px 0;
+            border: none;
+            border-radius: 6px;
+            background: #fee2e2;
+            color: #dc2626;
+            font-size: 0.76rem;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .btn-delete-file:hover { background: #fecaca; }
+
         /* Lightbox */
         .lightbox-overlay {
             display: none;
@@ -274,6 +305,7 @@
                         <div class="folder-badge ${isMatched ? 'badge-matched' : 'badge-orphan'}">
                             ${isMatched ? '✓ ID:' + item.student_id : '未匹配'}
                         </div>
+                        <button class="btn-delete-folder" onclick="event.stopPropagation(); window._deleteItem('${item.name.replace(/'/g, "\\'")}')">🗑️</button>
                     `;
                     el.addEventListener('click', () => {
                         document.querySelectorAll('.folder-item').forEach(e => e.classList.remove('active'));
@@ -345,8 +377,9 @@
                         </div>
                     `;
                 } else if (item.is_image && item.preview_url) {
+                    const filePath = `${folderPath}/${item.name}`;
                     gridHtml += `
-                        <div class="file-card">
+                        <div class="file-card" id="card-${item.name.replace(/[^a-zA-Z0-9]/g, '_')}">
                             <div class="file-card-thumb">
                                 <img src="${item.preview_url}" alt="${item.name}" loading="lazy"
                                      onclick="window._openLightbox('${item.preview_url}')">
@@ -354,11 +387,15 @@
                             <div class="file-card-body">
                                 <div class="file-card-name" title="${item.name}">${item.name}</div>
                                 <div class="file-card-meta">${item.size_display}</div>
+                                <div class="file-card-actions">
+                                    <button class="btn-delete-file" onclick="window._deleteItem('${filePath.replace(/'/g, "\\'")}', 'file')">🗑️ 删除本地</button>
+                                </div>
                             </div>
                         </div>
                     `;
                 } else {
                     const ext = item.name.split('.').pop().toUpperCase();
+                    const filePath = `${folderPath}/${item.name}`;
                     gridHtml += `
                         <div class="file-card">
                             <div class="file-card-thumb">
@@ -367,6 +404,9 @@
                             <div class="file-card-body">
                                 <div class="file-card-name" title="${item.name}">${item.name}</div>
                                 <div class="file-card-meta">${item.size_display} · ${ext}</div>
+                                <div class="file-card-actions">
+                                    <button class="btn-delete-file" onclick="window._deleteItem('${filePath.replace(/'/g, "\\'")}', 'file')">🗑️ 删除本地</button>
+                                </div>
                             </div>
                         </div>
                     `;
@@ -382,6 +422,33 @@
             if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
             return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
         }
+
+        // Delete a file or folder (local only)
+        window._deleteItem = async function(path, type) {
+            const label = type === 'file' ? '文件' : '文件夹';
+            const fname = path.split('/').pop();
+            if (!confirm(`确定要删除本地${label}「${fname}」吗？\n此操作仅删除服务器本地的文件，COS 上的文件由腾讯云自动生命周期清理。`)) return;
+            try {
+                const res = await fetch('/api/files/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path, type: type || 'file' })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    alert('删除失败：' + (data.error || res.status));
+                    return;
+                }
+                // 刷新当前视图
+                if (type === 'directory') {
+                    await loadFolders();
+                } else if (currentFolder) {
+                    await loadFolderContents(currentFolder);
+                }
+            } catch (err) {
+                alert('请求失败：' + err.message);
+            }
+        };
 
         // Expose for inline onclick handlers
         window._browseFolder = function(path) {

@@ -106,7 +106,7 @@ Component({
       try {
         const res = await wx.chooseImage({
           count: 1,
-          sizeType: ['compressed'],
+          sizeType: ['original', 'compressed'],
           sourceType: ['album', 'camera']
         })
         const tempFilePath = res.tempFilePaths[0]
@@ -120,7 +120,7 @@ Component({
         })
         if (!validateFileSize(fileInfo.size, MAX_FILE_SIZE)) {
           this.setData({
-            error: '文件大小不能超过10MB'
+            error: '文件大小不能超过50MB'
           })
           return
         }
