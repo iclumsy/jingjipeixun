@@ -63,17 +63,18 @@ def get_cos_sts_token():
     req.DurationSeconds = 1800
 
     try:
+        import time
         resp = client.GetFederationToken(req)
         # 转换为字典返回
         return {
             "TmpSecretId": resp.Credentials.TmpSecretId,
             "TmpSecretKey": resp.Credentials.TmpSecretKey,
             "Token": resp.Credentials.Token,
-            "StartTime": resp.StartTime,
+            "StartTime": int(time.time()),
             "ExpiredTime": resp.ExpiredTime,
             "Bucket": bucket,
             "Region": region
         }
     except Exception as e:
         current_app.logger.error(f"Failed to generate STS Token: {str(e)}")
-        raise RuntimeError("生成上传凭证失败")
+        raise RuntimeError(f"生成上传凭证失败: {str(e)}")
