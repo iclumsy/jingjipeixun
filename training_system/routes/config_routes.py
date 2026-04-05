@@ -129,6 +129,23 @@ def get_storage_config():
         'cos_base_url': cos_base_url,  # 空字符串表示 COS 未配置，前端降级为本地路由
     })
 
+@config_bp.route('/api/config/sts', methods=['GET'])
+def get_sts_route():
+    """
+    颁发 COS 上传的临时通行证（STS）。
+    确保小程序只往特定的临时目录进行直上传。
+    """
+    from services.sts_service import get_cos_sts_token
+    try:
+        credentials = get_cos_sts_token()
+        return jsonify({
+            'success': True,
+            'credentials': credentials
+        })
+    except Exception as e:
+        # 这个错会暴露给前端
+        return jsonify({'error': str(e)}), 500
+
 @config_bp.route('/api/config/wechat', methods=['GET'])
 def get_wechat_config():
     """

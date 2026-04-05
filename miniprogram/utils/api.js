@@ -730,30 +730,113 @@ async function getWechatConfig() {
   return data
 }
 
+const COS = require('./cos-wx-sdk-v5.js');
+
+let cosInstance = null;
+let currentCosRegion = '';
+let currentCosBucket = '';
+
 /**
- * 上传学员附件图片。
+ * 获取或初始化 COS 实例
+ */
+function getCosInstance() {
+  if (cosInstance) return cosInstance;
+  cosInstance = new COS({
+    getAuthorization: function (options, callback) {
+      requestApi('/api/config/sts', { method: 'GET', auth: true })
+        .then(res => {
+          if (!res || !res.credentials) {
+            return callback('STS 获取失败');
+          }
+          const cred = res.credentials;
+          currentCosRegion = cred.Region;
+          currentCosBucket = cred.Bucket;
+          callback({
+            TmpSecretId: cred.TmpSecretId,
+            TmpSecretKey: cred.TmpSecretKey,
+            SecurityToken: cred.Token,
+            StartTime: cred.StartTime,
+            ExpiredTime: cred.ExpiredTime,
+          });
+        })
+        .catch(err => {
+          callback('STS 获取失败: ' + err.message);
+        });
+    }
+  });
+  return cosInstance;
+}
+
+/**
+ * 上传学员附件图片 (直连 COS 版)。
+ *
+ * 流程：
+ * 1. 使用 COS SDK 和 STS 临时凭证，直接将文件推送到腾讯云（极速，不占服务器带宽）。
+ * 2. 上传成功后，通知服务器调用 /api/miniprogram/students/sync_cos 拉取文件。
  *
  * @param {string} filePath - 微信临时文件路径
  * @param {Object} options - 上传选项 {studentId, fieldName, name, idCard, company, trainingType}
- * @returns {Promise<Object>} 上传结果
+ * @returns {Promise<Object>} 上传结果对象
  */
 async function uploadAttachment(filePath, options = {}) {
-  const fileType = trimText(options.fileType || options.file_type)
+  const fileType = trimText(options.fileType || options.file_type);
   if (!fileType) {
-    throw new Error('文件类型不能为空')
+    throw new Error('文件类型不能为空');
   }
   if (!filePath) {
-    throw new Error('文件路径不能为空')
+    throw new Error('文件路径不能为空');
   }
 
-  return uploadFileApi('/api/miniprogram/upload', filePath, {
-    file_type: fileType,
-    training_type: trimText(options.trainingType || options.training_type || 'special_operation'),
-    id_card: trimText(options.idCard || options.id_card),
-    name: trimText(options.name),
-    company: trimText(options.company)
-  })
+  const cos = getCosInstance();
+
+  // 为了保证唯一性，生成一个临时 uuid 作为目录名称（兼容前后端结构）
+  const uuid = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  const ext = filePath.includes('.') ? '.' + filePath.split('.').pop() : '.jpg';
+  const cosKey = `students/tmp/${uuid()}/${fileType}${ext}`;
+
+  // 1. 直传至 COS
+  return new Promise((resolve, reject) => {
+    // 强制触发一次 getAuthorization 来拿到 bucket 和 region
+    cos.options.getAuthorization({ Method: 'POST', Key: cosKey }, (auth) => {
+      // 只有在 auth 拿到了的情况下才会继续，因为我们需要 bucket 和 region
+      if (typeof auth === 'string') {
+        return reject(new Error('无法获取上传凭证'));
+      }
+      cos.uploadFile({
+        Bucket: currentCosBucket,
+        Region: currentCosRegion,
+        Key: cosKey,
+        FilePath: filePath,
+        SliceSize: 1024 * 1024 * 5, // 大于5MB才进行分块上传
+        onProgress: function (info) {
+            // (可选) 进度回调
+        }
+      }, async function (err, data) {
+        if (err) {
+          return reject(new Error('上传到 COS 失败: ' + (err.message || JSON.stringify(err))));
+        }
+        if (data && data.statusCode === 200) {
+          // 2. 通知后端服务器立即从 COS 同步回来
+          try {
+            const syncResult = await requestApi('/api/miniprogram/students/sync_cos', {
+              method: 'POST',
+              data: {
+                cos_key: cosKey,
+                file_type: fileType
+              }
+            });
+            resolve(syncResult);
+          } catch (syncErr) {
+            reject(new Error('后端同步文件失败: ' + syncErr.message));
+          }
+        } else {
+          reject(new Error('上传异常: ' + JSON.stringify(data)));
+        }
+      });
+    });
+  });
 }
+
 
 // ======================== 导出接口 ========================
 module.exports = {

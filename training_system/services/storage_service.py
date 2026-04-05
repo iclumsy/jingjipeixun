@@ -405,6 +405,30 @@ def read_bytes(key):
             return None
         raise
 
+def pull_from_cos(key):
+    """
+    强制从 COS 下载文件并存储到本地路径。
+    用于小程序直传 COS 后，服务器将文件同步回本地。
+    """
+    backend = _get_backend()
+    if backend == 'local':
+        return False
+    try:
+        client, config = _get_cos_client()
+        full = _full_cos_key(key, config)
+        response = client.get_object(Bucket=config['bucket'], Key=full)
+        data = response['Body'].get_raw_stream().read()
+        
+        abs_path = local_abs_path(key)
+        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+        with open(abs_path, 'wb') as f:
+            f.write(data)
+        _log_info(f'Pulled from COS and saved locally: {key}')
+        return True
+    except Exception as e:
+        _log_warning(f'Failed to pull from COS {key}: {str(e)}')
+        return False
+
 
 def local_abs_path(key):
     """

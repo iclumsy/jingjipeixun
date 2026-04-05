@@ -848,7 +848,53 @@ def miniprogram_upload_attachment_route():
         return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         current_app.logger.exception('Error uploading mini attachment')
-        return build_internal_error_response('上传附件失败，请稍后重试')
+        return build_internal_error_response()
+
+@student_bp.route('/api/miniprogram/students/sync_cos', methods=['POST'])
+def miniprogram_sync_cos_route():
+    """
+    接收小程序直接上传到 COS 后的回调同步请求。
+    
+    请求体 (JSON):
+        cos_key   : COS 中的文件路径（如 students/tmp/.../xxx.jpg）
+        file_type : 附件类型
+    
+    返回:
+        200: {"success": true, "path": "students/...", "file_type": "photo"}
+    """
+    try:
+        data = request.json or {}
+        cos_key = data.get('cos_key')
+        file_type = str(data.get('file_type') or data.get('fileType') or '').strip()
+
+        if not cos_key or not cos_key.startswith('students/tmp/'):
+            raise ValidationError('无效的 COS 同步路径')
+            
+        if file_type not in FILE_MAP:
+            raise ValidationError('附件类型无效')
+
+        from services.storage_service import pull_from_cos
+        
+        # 将 COS 文件下载回本地（因为后续生成体检表需要本地文件参与处理）
+        success = pull_from_cos(cos_key)
+        if not success:
+            raise AppError('COS 文件同步到本地失败', status_code=500)
+
+        # 这里直接返回与原接口一致的结构，无需额外再走 local tmp generator，
+        # 因为 cos_key 本身已经包含了类似 tmp/... 的 uuid 格式，
+        # 且已被 pull_from_cos 放置在了本地严格对应的文件位置上，
+        # 在最终提交表单时，commit_temp_files 会顺畅地处理这些文件。
+        
+        return jsonify({
+            'success': True,
+            'path': cos_key,
+            'file_type': file_type
+        })
+    except (ValidationError, AppError) as e:
+        return jsonify(e.to_dict()), e.status_code
+    except Exception as e:
+        current_app.logger.exception('Error syncing cos attachment')
+        return build_internal_error_response()
 
 
 @student_bp.route('/api/students/<int:id>/reject', methods=['POST'])
