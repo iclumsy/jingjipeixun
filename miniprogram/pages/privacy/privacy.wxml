@@ -23,7 +23,7 @@
         <text class="list-item">• 联系方式：手机号码</text>
         <text class="list-item">• 单位信息：单位名称、单位地址</text>
         <text class="list-item">• 报名信息：培训类型、作业类别、操作项目</text>
-        <text class="list-item">• 附件资料：证件照片及报名所需附件</text>
+        <text class="list-item">• 附件资料：学历证书、身份证正反面复印件照片、个人免冠证件照（仅用于生成纸质报名表格，不做人脸识别或身份核验）</text>
         <text class="list-item">• 账号标识：微信 OpenID（用于识别提交人）</text>
       </view>
     </view>
