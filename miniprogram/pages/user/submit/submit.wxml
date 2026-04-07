@@ -1,4 +1,12 @@
 <view class="page">
+  <!-- 提交前未勾选协议时，弹窗再次获取同意 -->
+  <privacy-agreement
+    show="{{showPrivacyAgreement}}"
+    exitOnDisagree="{{false}}"
+    bind:agree="onPrivacyAgree"
+    bind:disagree="onPrivacyDisagree"
+  />
+
   <view class="header-bg"></view>
 
   <view class="container">

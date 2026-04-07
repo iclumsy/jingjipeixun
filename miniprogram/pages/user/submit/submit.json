@@ -1,6 +1,7 @@
 {
   "navigationBarTitleText": "信息采集",
   "usingComponents": {
-    "student-form": "/components/student-form/student-form"
+    "student-form": "/components/student-form/student-form",
+    "privacy-agreement": "/components/privacy-agreement/privacy-agreement"
   }
 }

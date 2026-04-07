@@ -53,6 +53,7 @@ Page({
   data: {
     trainingType: 'special_equipment',
     agreementChecked: false,  // 默认不勾选，用户需主动选择
+    showPrivacyAgreement: false,
     educationOptions: EDUCATION_OPTIONS,
     fieldErrors: {
       id_card: '',
@@ -304,6 +305,21 @@ Page({
     }
   },
 
+  onPrivacyAgree() {
+    // 弹窗同意后，记录状态并自动继续提交
+    markAgreementAccepted()
+    this.setData({
+      agreementChecked: true,
+      showPrivacyAgreement: false
+    })
+    this.submitForm()
+  },
+
+  onPrivacyDisagree() {
+    // 不同意：关闭弹窗，不退出小程序，不提交
+    this.setData({ showPrivacyAgreement: false })
+  },
+
   openUserAgreement() {
     wx.navigateTo({
       url: '/pages/agreement/agreement'
@@ -335,6 +351,13 @@ Page({
 
   async submitForm() {
     if (this._isSubmitting) return
+
+    // 未勾选协议时弹出弹窗重新获取用户同意
+    if (!this.data.agreementChecked) {
+      this.setData({ showPrivacyAgreement: true })
+      return
+    }
+
     this._isSubmitting = true
 
     const normalizedStudent = {
