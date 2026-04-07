@@ -192,9 +192,12 @@ def apply_low_light_enhancement_if_needed(image, stage="analysis"):
         blend_alpha = 0.60
         gamma_value = 1.12
 
+    # 若图像已有高动态范围（暗背景+亮证件场景），跳过增强：
+    # CLAHE 会给纯黑背景引入杂乱纹理，破坏 Canny 边缘检测和 Otsu 前景分割
+    high_dynamic_range = stats_before["dynamic_range"] > 150
     needs_enhancement = (
-        stats_before["mean"] < mean_threshold
-        or stats_before["dynamic_range"] < dynamic_threshold
+        (stats_before["mean"] < mean_threshold or stats_before["dynamic_range"] < dynamic_threshold)
+        and not high_dynamic_range
     )
     if not needs_enhancement:
         return image.copy(), {
@@ -925,25 +928,30 @@ def detect_background_color_contours(image):
     sigma = max(3.0, min(h, w) / 120.0)
     blurred = cv2.GaussianBlur(image, (0, 0), sigmaX=sigma, sigmaY=sigma)
     lab = cv2.cvtColor(blurred, cv2.COLOR_BGR2LAB).astype(np.float32)
-    chroma = lab[:, :, 1:3]
+
+    # 加入 L 通道（亮度），权重 0.6 以平衡色度通道：
+    # 原来只用 a/b 色度，无法区分纯黑背景（L≈0）和白色卡片（L≈255），
+    # 导致"暗背景+亮证件"场景距离 ≈ 0，检测完全失效
+    lab_weighted = lab.copy()
+    lab_weighted[:, :, 0] *= 0.6  # L 通道降权，避免亮度差异掩盖色彩差异
 
     margin = max(12, min(h, w) // 18)
     border = np.concatenate(
         [
-            chroma[:margin, :, :].reshape(-1, 2),
-            chroma[-margin:, :, :].reshape(-1, 2),
-            chroma[:, :margin, :].reshape(-1, 2),
-            chroma[:, -margin:, :].reshape(-1, 2),
+            lab_weighted[:margin, :, :].reshape(-1, 3),
+            lab_weighted[-margin:, :, :].reshape(-1, 3),
+            lab_weighted[:, :margin, :].reshape(-1, 3),
+            lab_weighted[:, -margin:, :].reshape(-1, 3),
         ],
         axis=0,
     )
-    background_chroma = np.median(border, axis=0)
+    background_color = np.median(border, axis=0)
 
-    chroma_std = float(np.std(border, axis=0).mean())
-    if chroma_std > 15:
+    color_std = float(np.std(border, axis=0).mean())
+    if color_std > 18:  # 边框颜色不均匀，背景色无法确定
         return []
 
-    distance = np.linalg.norm(chroma - background_chroma, axis=2)
+    distance = np.linalg.norm(lab_weighted - background_color, axis=2)
     max_distance = float(distance.max())
     if max_distance <= 1e-6:
         return []
