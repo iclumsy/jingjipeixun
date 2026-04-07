@@ -286,11 +286,14 @@ def suppress_table_lines_for_hukou(gray):
     return suppressed, line_mask
 
 
-def detect_edges(gray, profile_name):
+def detect_edges(gray, profile_name, canny_scale=1.0):
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     median = float(np.median(blurred))
-    lower = int(max(25, 0.66 * median))
-    upper = int(min(255, max(90, 1.33 * median)))
+    lower = int(max(25, 0.66 * median) * canny_scale)
+    upper = int(min(255, max(90, 1.33 * median)) * canny_scale)
+    # 防止 scale 过大时 upper 超限
+    lower = max(8, min(lower, 200))
+    upper = max(lower + 20, min(upper, 255))
 
     edges_high = cv2.Canny(blurred, lower, upper)
     edges_low = cv2.Canny(blurred, int(lower * 0.6), int(upper * 0.6))
@@ -750,7 +753,7 @@ def trim_hukou_home_page_margins(image):
     return image[top:bottom, left:right].copy()
 
 
-def prepare_hukou_output_page(image, page_kind, crop_mode="auto", expand_level=None, skip_ratio_trim=False):
+def prepare_hukou_output_page(image, page_kind, crop_mode="auto", expand_level=None, skip_ratio_trim=False, canny_scale=1.0):
     kind_label = "首页" if page_kind == "home" else "本人页"
     tag = f"[hukou][{kind_label}]"
     h0, w0 = image.shape[:2]
@@ -761,7 +764,7 @@ def prepare_hukou_output_page(image, page_kind, crop_mode="auto", expand_level=N
         meta = {"crop_mode": "original", "selected_candidate": None}
     else:
         _allow_persp = None if crop_mode == "auto" else False
-        page, meta = auto_crop_hukou_page(image, return_meta=True, allow_perspective=_allow_persp, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
+        page, meta = auto_crop_hukou_page(image, return_meta=True, allow_perspective=_allow_persp, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim, canny_scale=canny_scale)
     selected = meta.get("selected_candidate") or {}
     h1, w1 = page.shape[:2]
     print(
@@ -779,7 +782,7 @@ def prepare_hukou_output_page(image, page_kind, crop_mode="auto", expand_level=N
         and selected.get("detector") == "foreground_mask"
         and selected.get("area_ratio", 0.0) < 0.85
     ):
-        refined_page, refined_meta = auto_crop_hukou_page(page, return_meta=True)
+        refined_page, refined_meta = auto_crop_hukou_page(page, return_meta=True, canny_scale=canny_scale)
         h2, w2 = refined_page.shape[:2]
         if refined_page.shape[0] * refined_page.shape[1] < page.shape[0] * page.shape[1] * 0.96:
             print(f"{tag} 二次精细裁剪生效: {w2}x{h2}")
@@ -991,8 +994,8 @@ def deduplicate_candidates(candidates, iou_threshold=0.85):
     return keep
 
 
-def detect_document_candidates(analysis_image, gray, profile_name, scale=1.0, line_mask=None):
-    edges = detect_edges(gray, profile_name)
+def detect_document_candidates(analysis_image, gray, profile_name, scale=1.0, line_mask=None, canny_scale=1.0):
+    edges = detect_edges(gray, profile_name, canny_scale=canny_scale)
     retrieval_mode = cv2.RETR_LIST if profile_name == "id_card" else cv2.RETR_EXTERNAL
     contours, _ = cv2.findContours(edges.copy(), retrieval_mode, cv2.CHAIN_APPROX_SIMPLE)
     contours = sorted(contours, key=cv2.contourArea, reverse=True)[:18]
@@ -1323,7 +1326,7 @@ def log_crop_decision(profile_name, meta):
     )
 
 
-def auto_crop_with_profile(image, profile_name, expand_ratio=None, return_meta=False, allow_perspective=None, expand_level=None, skip_ratio_trim=False):
+def auto_crop_with_profile(image, profile_name, expand_ratio=None, return_meta=False, allow_perspective=None, expand_level=None, skip_ratio_trim=False, canny_scale=1.0):
     try:
         profile = CROP_PROFILES[profile_name]
         analysis_max_side = ANALYSIS_MAX_SIDES.get(profile_name, ANALYSIS_MAX_SIDE)
@@ -1343,6 +1346,7 @@ def auto_crop_with_profile(image, profile_name, expand_ratio=None, return_meta=F
             profile_name,
             scale=scale,
             line_mask=line_mask,
+            canny_scale=canny_scale,
         )
         best = select_best_candidate(candidates, profile_name)
         _allow_perspective = allow_perspective if allow_perspective is not None else profile.get("allow_perspective", True)
@@ -1394,12 +1398,12 @@ def auto_crop_with_profile(image, profile_name, expand_ratio=None, return_meta=F
         return image
 
 
-def auto_crop_id_card(image, return_meta=False, allow_perspective=None, expand_level=None, skip_ratio_trim=False):
-    return auto_crop_with_profile(image, "id_card", return_meta=return_meta, allow_perspective=allow_perspective, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
+def auto_crop_id_card(image, return_meta=False, allow_perspective=None, expand_level=None, skip_ratio_trim=False, canny_scale=1.0):
+    return auto_crop_with_profile(image, "id_card", return_meta=return_meta, allow_perspective=allow_perspective, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim, canny_scale=canny_scale)
 
 
-def auto_crop_hukou_page(image, expand_ratio=None, return_meta=False, allow_perspective=None, expand_level=None, skip_ratio_trim=False):
-    return auto_crop_with_profile(image, "hukou", expand_ratio=expand_ratio, return_meta=return_meta, allow_perspective=allow_perspective, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
+def auto_crop_hukou_page(image, expand_ratio=None, return_meta=False, allow_perspective=None, expand_level=None, skip_ratio_trim=False, canny_scale=1.0):
+    return auto_crop_with_profile(image, "hukou", expand_ratio=expand_ratio, return_meta=return_meta, allow_perspective=allow_perspective, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim, canny_scale=canny_scale)
 
 
 def auto_crop_diploma(image, return_meta=False, allow_perspective=None, expand_level=None, skip_ratio_trim=False):
@@ -1527,6 +1531,8 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments
     back_rotate = adjustments.get("back_rotate", 0)
     expand_level = adjustments.get("expand_level")
     skip_ratio_trim = adjustments.get("skip_ratio_trim", False)
+    # canny_scale < 1 提高边缘灵敏度（适合大面积纯黑背景 + 白色卡片），> 1 则降低噪声
+    canny_scale = float(adjustments.get("canny_scale", 1.0))
     tag = "[id-card]"
     try:
         canvas = create_a4_canvas()
@@ -1544,7 +1550,7 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments
                 print(f"{tag}[正面] 原图: {w0}x{h0}")
                 if crop_mode != "none":
                     _allow_persp = None if crop_mode == "auto" else False
-                    front_img, meta = auto_crop_id_card(front_img, return_meta=True, allow_perspective=_allow_persp, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
+                    front_img, meta = auto_crop_id_card(front_img, return_meta=True, allow_perspective=_allow_persp, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim, canny_scale=canny_scale)
                     sel = meta.get("selected_candidate") or {}
                     hc, wc = front_img.shape[:2]
                     print(
@@ -1571,7 +1577,7 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments
                 print(f"{tag}[反面] 原图: {w0}x{h0}")
                 if crop_mode != "none":
                     _allow_persp = None if crop_mode == "auto" else False
-                    back_img, meta = auto_crop_id_card(back_img, return_meta=True, allow_perspective=_allow_persp, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
+                    back_img, meta = auto_crop_id_card(back_img, return_meta=True, allow_perspective=_allow_persp, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim, canny_scale=canny_scale)
                     sel = meta.get("selected_candidate") or {}
                     hc, wc = back_img.shape[:2]
                     print(
@@ -1638,6 +1644,7 @@ def process_hukou(residence_path, personal_path, output_dir, name_prefix, adjust
     personal_rotate = adjustments.get("personal_rotate", 0)
     expand_level = adjustments.get("expand_level")
     skip_ratio_trim = adjustments.get("skip_ratio_trim", False)
+    canny_scale = float(adjustments.get("canny_scale", 1.0))
     tag = "[hukou]"
     try:
         canvas = create_a4_canvas()
@@ -1652,7 +1659,7 @@ def process_hukou(residence_path, personal_path, output_dir, name_prefix, adjust
             print(f"{tag}[首页] 开始处理: {os.path.basename(residence_path)}")
             img1 = read_cv_image(residence_path)
             if img1 is not None:
-                img1 = prepare_hukou_output_page(img1, "home", crop_mode=crop_mode, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
+                img1 = prepare_hukou_output_page(img1, "home", crop_mode=crop_mode, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim, canny_scale=canny_scale)
                 if home_rotate:
                     img1 = rotate_image_by_degrees(img1, home_rotate)
                     print(f"{tag}[首页] 额外旋转 {home_rotate}°")
@@ -1663,7 +1670,7 @@ def process_hukou(residence_path, personal_path, output_dir, name_prefix, adjust
             print(f"{tag}[本人页] 开始处理: {os.path.basename(personal_path)}")
             img2 = read_cv_image(personal_path)
             if img2 is not None:
-                img2 = prepare_hukou_output_page(img2, "personal", crop_mode=crop_mode, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
+                img2 = prepare_hukou_output_page(img2, "personal", crop_mode=crop_mode, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim, canny_scale=canny_scale)
                 if personal_rotate:
                     img2 = rotate_image_by_degrees(img2, personal_rotate)
                     print(f"{tag}[本人页] 额外旋转 {personal_rotate}°")

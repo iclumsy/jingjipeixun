@@ -1556,9 +1556,44 @@ document.addEventListener('DOMContentLoaded', async () => {
         panel.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);';
 
         const configs = {
-            diploma: { title: '学历证书调整', rotateFields: [{ key: 'rotate', label: '旋转' }] },
-            id_card: { title: '身份证调整', rotateFields: [{ key: 'front_rotate', label: '正面旋转' }, { key: 'back_rotate', label: '反面旋转' }] },
-            hukou: { title: '户口本调整', rotateFields: [{ key: 'home_rotate', label: '首页旋转' }, { key: 'personal_rotate', label: '本人页旋转' }] },
+            diploma: {
+                title: '学历证书调整',
+                rotateFields: [{
+                    key: 'rotate',
+                    label: '旋转',
+                    hint: '<span style="color:#6366f1;font-size:12px">📌 证书横着显示 → 90° 或 270°｜倒置显示 → 180°｜无问题保持 0°</span>'
+                }]
+            },
+            id_card: {
+                title: '身份证调整',
+                rotateFields: [
+                    {
+                        key: 'front_rotate',
+                        label: '正面旋转',
+                        hint: '<span style="color:#6366f1;font-size:12px">📌 正面人像倒置或横置 → 选对应角度｜不影响反面，可独立设置</span>'
+                    },
+                    {
+                        key: 'back_rotate',
+                        label: '反面旋转',
+                        hint: '<span style="color:#6366f1;font-size:12px">📌 国徽倒置或横置 → 选对应角度｜不影响正面，可独立设置</span>'
+                    }
+                ]
+            },
+            hukou: {
+                title: '户口本调整',
+                rotateFields: [
+                    {
+                        key: 'home_rotate',
+                        label: '首页旋转',
+                        hint: '<span style="color:#6366f1;font-size:12px">📌 首页方向不对 → 选对应角度｜本人页独立调整，互不影响</span>'
+                    },
+                    {
+                        key: 'personal_rotate',
+                        label: '本人页旋转',
+                        hint: '<span style="color:#6366f1;font-size:12px">📌 本人页方向不对 → 选对应角度｜首页独立调整，互不影响</span>'
+                    }
+                ]
+            },
         };
         const cfg = configs[matType];
 
@@ -1574,8 +1609,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function fieldRow(label, desc, groupName, options, defaultVal) {
             return `<div style="margin-bottom:14px;">
-                <div style="font-size:13px;color:#333;font-weight:500;margin-bottom:2px;">${label}</div>
-                <div style="font-size:11px;color:#999;margin-bottom:6px;">${desc}</div>
+                <div style="font-size:13px;color:#333;font-weight:500;margin-bottom:4px;">${label}</div>
+                <div style="font-size:12px;color:#555;margin-bottom:7px;line-height:1.55;">${desc}</div>
                 <div>${pillGroup(groupName, options, defaultVal)}</div>
             </div>`;
         }
@@ -1602,13 +1637,31 @@ document.addEventListener('DOMContentLoaded', async () => {
             { value: '270', label: '270°' },
         ];
 
-        let html = `<div style="background:#fff;border-radius:12px;padding:22px 26px;min-width:320px;max-width:420px;box-shadow:0 8px 30px rgba(0,0,0,0.15);">
+        const tip = (t) => `<span style="color:#6366f1;font-size:12px">${t}</span>`;
+
+        const cropDesc = tip('📌 裁出来变形/拉伸 → 改用「仅矩形」｜全部失败/背景极复杂 → 选「不裁剪」');
+        const expandDesc = tip('📌 角落被截断/内容丢失 → 选「宽松」或「超宽松」｜包含大量背景 → 选「紧凑」');
+        const ratioDesc = tip('📌 比例明显异常（过扁或过高）→ 尝试「关闭」｜多数情况保持「开启」');
+
+        let html = `<div style="background:#fff;border-radius:12px;padding:22px 26px;min-width:320px;max-width:440px;box-shadow:0 8px 30px rgba(0,0,0,0.15);overflow-y:auto;max-height:90vh;">
             <div style="font-size:15px;font-weight:600;margin-bottom:18px;color:#111;">${cfg.title}</div>
-            ${fieldRow('裁剪模式', '自动=智能透视校正，仅矩形=不做透视避免畸变，不裁剪=使用原图', 'crop_mode', cropOptions, 'auto')}
-            ${fieldRow('裁剪边距', '紧凑=贴边裁剪，标准=默认边距，宽松/超宽松=保留更多边缘防止内容丢失', 'expand_level', expandOptions, 'normal')}
-            ${fieldRow('比例修剪', '关闭后保留裁剪原始比例，不按标准证件比例二次修剪', 'ratio_trim', trimOptions, 'on')}`;
+            ${fieldRow('裁剪模式', cropDesc, 'crop_mode', cropOptions, 'auto')}
+            ${fieldRow('裁剪边距', expandDesc, 'expand_level', expandOptions, 'normal')}
+            ${fieldRow('比例修剪', ratioDesc, 'ratio_trim', trimOptions, 'on')}`;
+        if (matType === 'id_card' || matType === 'hukou') {
+            const cannyOptions = [
+                { value: '1.5', label: '低灵敏' },
+                { value: '1.0', label: '标准' },
+                { value: '0.6', label: '高灵敏' },
+                { value: '0.35', label: '极高灵敏' },
+            ];
+            const cannyDesc = matType === 'id_card'
+                ? tip('📌 纯黑背景+白色卡片 → 极高灵敏｜深色背景/边缘模糊 → 高灵敏｜被误识到背景纹理噪点 → 低灵敏｜不确定先试「高灵敏」')
+                : tip('📌 户口本放在深色桌面上拍 → 高灵敏｜扫描件/白底书页 → 标准｜识别到装订线等多余边缘 → 低灵敏');
+            html += fieldRow('边缘灵敏度', cannyDesc, 'canny_scale', cannyOptions, '1.0');
+        }
         cfg.rotateFields.forEach(f => {
-            html += fieldRow(f.label, '在自动方向校正基础上额外旋转', f.key, rotateOptions, '0');
+            html += fieldRow(f.label, f.hint || tip('📌 方向颠倒或横置时使用，每次旋转 90°'), f.key, rotateOptions, '0');
         });
         html += `<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
                 <button id="adj-cancel" style="padding:7px 20px;border:1px solid #CBD5E1;border-radius:6px;background:#fff;cursor:pointer;font-size:13px;color:#475569;">取消</button>
@@ -1646,6 +1699,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             const expandLevel = getGroupVal('expand_level');
             if (expandLevel && expandLevel !== 'normal') adjustments.expand_level = expandLevel;
             if (getGroupVal('ratio_trim') === 'off') adjustments.skip_ratio_trim = true;
+            // 边缘灵敏度（仅 id_card）
+            const cannyScaleVal = getGroupVal('canny_scale');
+            if (cannyScaleVal && parseFloat(cannyScaleVal) !== 1.0) adjustments.canny_scale = parseFloat(cannyScaleVal);
             cfg.rotateFields.forEach(f => {
                 const val = parseInt(getGroupVal(f.key) || '0', 10);
                 if (val) adjustments[f.key] = val;
