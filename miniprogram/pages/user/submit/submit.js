@@ -52,7 +52,7 @@ function createEmptyStudent() {
 Page({
   data: {
     trainingType: 'special_equipment',
-    agreementChecked: false,
+    agreementChecked: false,  // 默认不勾选，用户需主动选择
     educationOptions: EDUCATION_OPTIONS,
     fieldErrors: {
       id_card: '',
@@ -64,9 +64,6 @@ Page({
   },
 
   onLoad() {
-    this.setData({
-      agreementChecked: hasAcceptedLatestAgreement()
-    })
     this.loadJobCategories()
   },
 
@@ -339,11 +336,6 @@ Page({
   async submitForm() {
     if (this._isSubmitting) return
     this._isSubmitting = true
-
-    if (!this.ensureAgreementAccepted()) {
-      this._isSubmitting = false
-      return
-    }
 
     const normalizedStudent = {
       ...this.data.student,
