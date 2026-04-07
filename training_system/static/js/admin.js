@@ -1553,53 +1553,51 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const panel = document.createElement('div');
         panel.id = 'mat-adjust-panel';
-        panel.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);';
+        panel.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.35);padding:16px;box-sizing:border-box;';
 
+        // ── 数据：各 material 类型对应的调整字段 & 图片面板 ─────────────────
         const configs = {
             diploma: {
                 title: '学历证书调整',
                 rotateFields: [{
-                    key: 'rotate',
-                    label: '旋转',
+                    key: 'rotate', label: '旋转',
                     hint: '<span style="color:#6366f1;font-size:12px">📌 证书横着显示 → 90° 或 270°｜倒置显示 → 180°｜无问题保持 0°</span>'
-                }]
+                }],
+                imagePanels: [{ label: '学历证书', pathKey: 'diploma_path', pointsKey: 'points' }]
             },
             id_card: {
                 title: '身份证调整',
                 rotateFields: [
-                    {
-                        key: 'front_rotate',
-                        label: '正面旋转',
-                        hint: '<span style="color:#6366f1;font-size:12px">📌 正面人像倒置或横置 → 选对应角度｜不影响反面，可独立设置</span>'
-                    },
-                    {
-                        key: 'back_rotate',
-                        label: '反面旋转',
-                        hint: '<span style="color:#6366f1;font-size:12px">📌 国徽倒置或横置 → 选对应角度｜不影响正面，可独立设置</span>'
-                    }
+                    { key: 'front_rotate', label: '正面旋转',
+                      hint: '<span style="color:#6366f1;font-size:12px">📌 正面人像倒置或横置 → 选对应角度｜不影响反面，可独立设置</span>' },
+                    { key: 'back_rotate', label: '反面旋转',
+                      hint: '<span style="color:#6366f1;font-size:12px">📌 国徽倒置或横置 → 选对应角度｜不影响正面，可独立设置</span>' }
+                ],
+                imagePanels: [
+                    { label: '正面（信息面）', pathKey: 'id_card_front_path', pointsKey: 'front_points' },
+                    { label: '反面（国徽面）', pathKey: 'id_card_back_path',  pointsKey: 'back_points'  }
                 ]
             },
             hukou: {
                 title: '户口本调整',
                 rotateFields: [
-                    {
-                        key: 'home_rotate',
-                        label: '首页旋转',
-                        hint: '<span style="color:#6366f1;font-size:12px">📌 首页方向不对 → 选对应角度｜本人页独立调整，互不影响</span>'
-                    },
-                    {
-                        key: 'personal_rotate',
-                        label: '本人页旋转',
-                        hint: '<span style="color:#6366f1;font-size:12px">📌 本人页方向不对 → 选对应角度｜首页独立调整，互不影响</span>'
-                    }
+                    { key: 'home_rotate',     label: '首页旋转',
+                      hint: '<span style="color:#6366f1;font-size:12px">📌 首页方向不对 → 选对应角度｜本人页独立调整，互不影响</span>' },
+                    { key: 'personal_rotate', label: '本人页旋转',
+                      hint: '<span style="color:#6366f1;font-size:12px">📌 本人页方向不对 → 选对应角度｜首页独立调整，互不影响</span>' }
+                ],
+                imagePanels: [
+                    { label: '首页（户主页）', pathKey: 'hukou_residence_path', pointsKey: 'home_points'     },
+                    { label: '本人页',         pathKey: 'hukou_personal_path',  pointsKey: 'personal_points' }
                 ]
             },
         };
         const cfg = configs[matType];
 
+        // ── Pill 组件 ─────────────────────────────────────────────────────
         const pillBase = 'display:inline-flex;align-items:center;padding:5px 12px;border:1px solid #CBD5E1;border-radius:6px;font-size:12px;cursor:pointer;transition:all .15s;margin:0 4px 4px 0;';
         const pillOff = pillBase + 'background:#fff;color:#475569;';
-        const pillOn = pillBase + 'background:#4F46E5;color:#fff;border-color:#4F46E5;';
+        const pillOn  = pillBase + 'background:#4F46E5;color:#fff;border-color:#4F46E5;';
 
         function pillGroup(groupName, options, defaultVal) {
             return options.map(opt =>
@@ -1615,108 +1613,395 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>`;
         }
 
-        const cropOptions = [
-            { value: 'auto', label: '自动' },
-            { value: 'rect_only', label: '仅矩形' },
-            { value: 'none', label: '不裁剪' },
-        ];
-        const expandOptions = [
-            { value: 'tight', label: '紧凑' },
-            { value: 'normal', label: '标准' },
-            { value: 'loose', label: '宽松' },
-            { value: 'x-loose', label: '超宽松' },
-        ];
-        const trimOptions = [
-            { value: 'on', label: '开启' },
-            { value: 'off', label: '关闭' },
-        ];
-        const rotateOptions = [
-            { value: '0', label: '0°' },
-            { value: '90', label: '90°' },
-            { value: '180', label: '180°' },
-            { value: '270', label: '270°' },
-        ];
+        const cropOptions   = [{ value:'auto',label:'自动'},{value:'rect_only',label:'仅矩形'},{value:'none',label:'不裁剪'}];
+        const expandOptions = [{ value:'tight',label:'紧凑'},{value:'normal',label:'标准'},{value:'loose',label:'宽松'},{value:'x-loose',label:'超宽松'}];
+        const trimOptions   = [{ value:'on',label:'开启'},{value:'off',label:'关闭'}];
+        const rotateOptions = [{ value:'0',label:'0°'},{value:'90',label:'90°'},{value:'180',label:'180°'},{value:'270',label:'270°'}];
 
-        const tip = (t) => `<span style="color:#6366f1;font-size:12px">${t}</span>`;
-
-        const cropDesc = tip('📌 裁出来变形/拉伸 → 改用「仅矩形」｜全部失败/背景极复杂 → 选「不裁剪」');
+        const tip = t => `<span style="color:#6366f1;font-size:12px">${t}</span>`;
+        const cropDesc   = tip('📌 裁出来变形/拉伸 → 改用「仅矩形」｜全部失败/背景极复杂 → 选「不裁剪」');
         const expandDesc = tip('📌 角落被截断/内容丢失 → 选「宽松」或「超宽松」｜包含大量背景 → 选「紧凑」');
-        const ratioDesc = tip('📌 比例明显异常（过扁或过高）→ 尝试「关闭」｜多数情况保持「开启」');
+        const ratioDesc  = tip('📌 比例明显异常（过扁或过高）→ 尝试「关闭」｜多数情况保持「开启」');
 
-        let html = `<div style="background:#fff;border-radius:12px;padding:22px 26px;min-width:320px;max-width:440px;box-shadow:0 8px 30px rgba(0,0,0,0.15);overflow-y:auto;max-height:90vh;">
-            <div style="font-size:15px;font-weight:600;margin-bottom:18px;color:#111;">${cfg.title}</div>
-            ${fieldRow('裁剪模式', cropDesc, 'crop_mode', cropOptions, 'auto')}
-            ${fieldRow('裁剪边距', expandDesc, 'expand_level', expandOptions, 'normal')}
-            ${fieldRow('比例修剪', ratioDesc, 'ratio_trim', trimOptions, 'on')}`;
+        let leftHtml = fieldRow('裁剪模式', cropDesc, 'crop_mode', cropOptions, 'auto')
+                     + fieldRow('裁剪边距', expandDesc, 'expand_level', expandOptions, 'normal')
+                     + fieldRow('比例修剪', ratioDesc, 'ratio_trim', trimOptions, 'on');
+
         if (matType === 'id_card' || matType === 'hukou') {
-            const cannyOptions = [
-                { value: '1.5', label: '低灵敏' },
-                { value: '1.0', label: '标准' },
-                { value: '0.6', label: '高灵敏' },
-                { value: '0.35', label: '极高灵敏' },
-            ];
+            const cannyOptions = [{value:'1.5',label:'低灵敏'},{value:'1.0',label:'标准'},{value:'0.6',label:'高灵敏'},{value:'0.35',label:'极高灵敏'}];
             const cannyDesc = matType === 'id_card'
                 ? tip('📌 纯黑背景+白色卡片 → 极高灵敏｜深色背景/边缘模糊 → 高灵敏｜被误识到背景纹理噪点 → 低灵敏｜不确定先试「高灵敏」')
                 : tip('📌 户口本放在深色桌面上拍 → 高灵敏｜扫描件/白底书页 → 标准｜识别到装订线等多余边缘 → 低灵敏');
-            html += fieldRow('边缘灵敏度', cannyDesc, 'canny_scale', cannyOptions, '1.0');
+            leftHtml += fieldRow('边缘灵敏度', cannyDesc, 'canny_scale', cannyOptions, '1.0');
         }
         cfg.rotateFields.forEach(f => {
-            html += fieldRow(f.label, f.hint || tip('📌 方向颠倒或横置时使用，每次旋转 90°'), f.key, rotateOptions, '0');
+            leftHtml += fieldRow(f.label, f.hint || tip('📌 方向颠倒或横置时使用，每次旋转 90°'), f.key, rotateOptions, '0');
         });
-        html += `<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
-                <button id="adj-cancel" style="padding:7px 20px;border:1px solid #CBD5E1;border-radius:6px;background:#fff;cursor:pointer;font-size:13px;color:#475569;">取消</button>
-                <button id="adj-submit" style="padding:7px 20px;border:none;border-radius:6px;background:#4F46E5;color:#fff;cursor:pointer;font-size:13px;">重新生成</button>
-            </div>
-        </div>`;
 
-        panel.innerHTML = html;
+        // ── 画框区：状态和 canvas 数据 ────────────────────────────────────
+        const cropState = {}; // pointsKey → { displayPts[], originalPts[] }
+        cfg.imagePanels.forEach(p => { cropState[p.pointsKey] = { displayPts: [], originalPts: [] }; });
+
+        // 当前激活的 tab（多图时用）
+        let activeTab = cfg.imagePanels[0].pointsKey;
+
+        function buildImagePanel(ip) {
+            const url = toFileUrl(student[ip.pathKey]);
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'display:flex;flex-direction:column;gap:8px;height:100%;';
+
+            const imgWrap = document.createElement('div');
+            imgWrap.style.cssText = 'position:relative;flex:1;min-height:0;background:#f3f4f6;border-radius:8px;overflow:hidden;border:1.5px solid #e5e7eb;line-height:0;display:flex;align-items:center;justify-content:center;';
+
+            const img = document.createElement('img');
+            img.src = url || '';
+            img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;display:block;user-select:none;pointer-events:none;';
+            img.draggable = false;
+
+            // canvas 直接接收鼠标事件（pointer-events:auto）
+            const cvs = document.createElement('canvas');
+            cvs.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;';
+
+            const statusEl = document.createElement('div');
+            statusEl.style.cssText = 'font-size:11.5px;color:#6b7280;flex-shrink:0;height:16px;';
+            statusEl.textContent = '图片加载中...';
+
+            const bottomRow = document.createElement('div');
+            bottomRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;flex-shrink:0;';
+            const hintEl = document.createElement('div');
+            hintEl.style.cssText = 'font-size:11px;color:#9ca3af;';
+            hintEl.textContent = '不标记则按左侧参数自动裁剪';
+            const resetBtn = document.createElement('button');
+            resetBtn.textContent = '重置为整张图';
+            resetBtn.style.cssText = 'font-size:11px;padding:2px 10px;border:1px solid #d1d5db;border-radius:5px;background:#f9fafb;color:#374151;cursor:pointer;';
+            bottomRow.appendChild(hintEl);
+            bottomRow.appendChild(resetBtn);
+
+            // ── 角点状态（canvas 坐标）────────────────────────────────────
+            // null = 未初始化（不参与提交），4个点 = 已调整（参与提交）
+            const HANDLE_R = 8;
+            let dispPts = null;      // [[wx,wy],…]×4 或 null
+            let dragging = -1;       // 正在拖动的角点索引，-1=无
+            let hasDragged = false;   // 用户是否真正拖动过（用于决定是否提交坐标）
+
+            function getImgOffsets() {
+                const wR = imgWrap.getBoundingClientRect();
+                const iR = img.getBoundingClientRect();
+                return {
+                    left: iR.left - wR.left, top: iR.top - wR.top,
+                    w: iR.width, h: iR.height,
+                    wW: wR.width, wH: wR.height,
+                };
+            }
+
+            function initRect() {
+                const o = getImgOffsets();
+                if (!o.w) return;
+                dispPts = [
+                    [o.left,         o.top        ],   // 左上
+                    [o.left + o.w,   o.top        ],   // 右上
+                    [o.left + o.w,   o.top + o.h  ],   // 右下
+                    [o.left,         o.top + o.h  ],   // 左下
+                ];
+                syncCropState();
+            }
+
+            function dispToOrig([wx, wy]) {
+                const o = getImgOffsets();
+                const ix = Math.max(0, Math.min(o.w, wx - o.left));
+                const iy = Math.max(0, Math.min(o.h, wy - o.top));
+                return [
+                    Math.round(ix * img.naturalWidth  / o.w),
+                    Math.round(iy * img.naturalHeight / o.h),
+                ];
+            }
+
+            function syncCropState() {
+                if (!dispPts || !hasDragged) {
+                    // 未拖动 → 清空，提交时走自动裁剪
+                    cropState[ip.pointsKey] = { displayPts: [], originalPts: [] };
+                    return;
+                }
+                cropState[ip.pointsKey] = {
+                    displayPts: dispPts.map(p => [...p]),
+                    originalPts: dispPts.map(p => dispToOrig(p)),
+                };
+            }
+
+            function redraw() {
+                const W = cvs.clientWidth, H = cvs.clientHeight;
+                cvs.width = W; cvs.height = H;
+                const ctx = cvs.getContext('2d');
+                ctx.clearRect(0, 0, W, H);
+                if (!dispPts) return;
+
+                // 半透明遮罩（外区域）
+                ctx.fillStyle = 'rgba(0,0,0,0.32)';
+                ctx.fillRect(0, 0, W, H);
+
+                // 镂空裁剪区域
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(dispPts[0][0], dispPts[0][1]);
+                dispPts.slice(1).forEach(([x,y]) => ctx.lineTo(x, y));
+                ctx.closePath();
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.fill();
+                ctx.restore();
+
+                // 边框
+                ctx.beginPath();
+                ctx.moveTo(dispPts[0][0], dispPts[0][1]);
+                dispPts.slice(1).forEach(([x,y]) => ctx.lineTo(x, y));
+                ctx.closePath();
+                ctx.strokeStyle = '#6366f1';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([]);
+                ctx.stroke();
+
+                // 角点把手
+                dispPts.forEach(([x,y], i) => {
+                    ctx.beginPath();
+                    ctx.arc(x, y, HANDLE_R, 0, Math.PI * 2);
+                    ctx.fillStyle = '#fff';
+                    ctx.fill();
+                    ctx.strokeStyle = '#6366f1';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    // 对角序号
+                    ctx.fillStyle = '#4f46e5';
+                    ctx.font = 'bold 10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(String(i + 1), x, y);
+                });
+            }
+
+            function hitTest(mx, my) {
+                if (!dispPts) return -1;
+                let best = -1, bestD = HANDLE_R * 2;
+                dispPts.forEach(([x,y], i) => {
+                    const d = Math.hypot(mx - x, my - y);
+                    if (d < bestD) { bestD = d; best = i; }
+                });
+                return best;
+            }
+
+            // ── 鼠标事件 ─────────────────────────────────────────────────
+            cvs.addEventListener('mousedown', e => {
+                if (!dispPts) { initRect(); redraw(); }
+                const rect = cvs.getBoundingClientRect();
+                const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+                dragging = hitTest(mx, my);
+                if (dragging >= 0) { e.preventDefault(); cvs.style.cursor = 'grabbing'; }
+            });
+
+            cvs.addEventListener('mousemove', e => {
+                const rect = cvs.getBoundingClientRect();
+                const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+                if (dragging >= 0) {
+                    dispPts[dragging] = [mx, my];
+                    syncCropState();
+                    redraw();
+                } else {
+                    cvs.style.cursor = hitTest(mx, my) >= 0 ? 'grab' : 'default';
+                }
+            });
+
+            const stopDrag = (e) => {
+                if (dragging >= 0) {
+                    hasDragged = true;
+                    syncCropState();
+                    // 更新状态文字
+                    statusEl.style.color = '#059669';
+                    statusEl.textContent = '✓ 已调整裁剪区域，点击「重新生成」确认';
+                }
+                dragging = -1;
+                cvs.style.cursor = 'default';
+            };
+            cvs.addEventListener('mouseup', stopDrag);
+            cvs.addEventListener('mouseleave', stopDrag);
+
+            resetBtn.onclick = () => {
+                hasDragged = false;
+                initRect();   // initRect 内调 syncCropState，hasDragged=false → 清空 originalPts
+                redraw();
+                statusEl.textContent = '拖动角点调整裁剪区域';
+                statusEl.style.color = '#6b7280';
+            };
+
+            img.onload = () => {
+                setTimeout(() => {
+                    initRect();
+                    redraw();
+                    statusEl.textContent = '拖动角点调整裁剪区域（不需要手动裁剪可直接点击重新生成）';
+                    statusEl.style.color = '#6b7280';
+                }, 60);
+            };
+
+            if (!url) {
+                imgWrap.style.cursor = 'default';
+                imgWrap.innerHTML = '<div style="color:#9ca3af;font-size:13px;">未上传</div>';
+                statusEl.textContent = '未上传原图';
+            } else {
+                imgWrap.appendChild(img);
+                imgWrap.appendChild(cvs);
+            }
+
+            wrap.appendChild(imgWrap);
+            wrap.appendChild(statusEl);
+            wrap.appendChild(bottomRow);
+            return wrap;
+        }
+
+        // ── 构建右侧内容（Tab 或单面板）────────────────────────────────
+        let rightContent;
+        const multiPanel = cfg.imagePanels.length > 1;
+
+        if (multiPanel) {
+            rightContent = document.createElement('div');
+            rightContent.style.cssText = 'display:flex;flex-direction:column;height:100%;';
+
+            const tabBar = document.createElement('div');
+            tabBar.style.cssText = 'display:flex;gap:6px;margin-bottom:10px;flex-shrink:0;';
+
+            const panelContainer = document.createElement('div');
+            panelContainer.style.cssText = 'flex:1;min-height:0;overflow:hidden;';
+
+            const panelEls = {};
+            cfg.imagePanels.forEach((ip, idx) => {
+                const activeStyle = 'padding:5px 14px;border:none;border-radius:7px;font-size:12px;cursor:pointer;background:#4F46E5;color:#fff;font-weight:600;';
+                const inactiveStyle = 'padding:5px 14px;border:1px solid #e5e7eb;border-radius:7px;font-size:12px;cursor:pointer;background:#fff;color:#475569;';
+                const tab = document.createElement('button');
+                tab.textContent = ip.label;
+                tab.dataset.key = ip.pointsKey;
+                tab.style.cssText = idx === 0 ? activeStyle : inactiveStyle;
+                tab.onclick = () => {
+                    tabBar.querySelectorAll('button').forEach(b => {
+                        b.style.cssText = b.dataset.key === ip.pointsKey ? activeStyle : inactiveStyle;
+                    });
+                    Object.entries(panelEls).forEach(([k, el]) => {
+                        el.style.display = k === ip.pointsKey ? 'flex' : 'none';
+                    });
+                };
+                tabBar.appendChild(tab);
+
+                const el = buildImagePanel(ip);
+                el.style.display = idx === 0 ? 'flex' : 'none';
+                el.style.height = '100%';
+                panelEls[ip.pointsKey] = el;
+                panelContainer.appendChild(el);
+            });
+
+            rightContent.appendChild(tabBar);
+            rightContent.appendChild(panelContainer);
+        } else {
+            rightContent = buildImagePanel(cfg.imagePanels[0]);
+        }
+
+        // ── Modal 框架 ───────────────────────────────────────────────────
+        const modal = document.createElement('div');
+        modal.style.cssText = 'background:#fff;border-radius:14px;width:100%;max-width:1100px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;';
+
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid #e5e7eb;flex-shrink:0;';
+        header.innerHTML = `<div style="font-size:15px;font-weight:700;color:#111;">${cfg.title}</div>
+            <button id="adj-close" style="border:none;background:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1;">×</button>`;
+
+        const body = document.createElement('div');
+        body.style.cssText = 'display:flex;flex:1;min-height:0;overflow:hidden;';
+
+        const leftPane = document.createElement('div');
+        leftPane.style.cssText = 'width:380px;flex-shrink:0;border-right:1px solid #f0f0f0;overflow-y:auto;padding:18px 24px;';
+        leftPane.innerHTML = leftHtml;
+
+        const rightPane = document.createElement('div');
+        rightPane.style.cssText = 'flex:1;min-width:0;padding:16px 20px;overflow:hidden;display:flex;flex-direction:column;';
+        const rightTitle = document.createElement('div');
+        rightTitle.style.cssText = 'font-size:12px;color:#6b7280;margin-bottom:10px;flex-shrink:0;';
+        rightTitle.textContent = '可选：拖动角点调整裁剪区域（直接点「重新生成」则按左侧参数自动裁剪）';
+        rightContent.style.flex = '1';
+        rightContent.style.minHeight = '0';
+        rightPane.appendChild(rightTitle);
+        rightPane.appendChild(rightContent);
+
+        body.appendChild(leftPane);
+        body.appendChild(rightPane);
+
+        const footer = document.createElement('div');
+        footer.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;align-items:center;padding:12px 22px;border-top:1px solid #e5e7eb;flex-shrink:0;background:#fafafa;';
+        footer.innerHTML = `
+            <button id="adj-cancel" style="padding:7px 20px;border:1px solid #CBD5E1;border-radius:7px;background:#fff;cursor:pointer;font-size:13px;color:#475569;">取消</button>
+            <button id="adj-submit" style="padding:7px 22px;border:none;border-radius:7px;background:#4F46E5;color:#fff;cursor:pointer;font-size:13px;font-weight:600;">重新生成</button>`;
+
+        modal.appendChild(header);
+        modal.appendChild(body);
+        modal.appendChild(footer);
+        panel.appendChild(modal);
         document.body.appendChild(panel);
 
-        panel.addEventListener('click', (e) => {
+        // ── Pill 交互 ─────────────────────────────────────────────────────
+        panel.addEventListener('click', e => {
             const pill = e.target.closest('.adj-pill');
             if (!pill) return;
             const group = pill.dataset.group;
             panel.querySelectorAll(`.adj-pill[data-group="${group}"]`).forEach(p => {
-                p.style.cssText = pillOff;
-                p.removeAttribute('data-active');
+                p.style.cssText = pillOff; p.removeAttribute('data-active');
             });
-            pill.style.cssText = pillOn;
-            pill.setAttribute('data-active', '1');
+            pill.style.cssText = pillOn; pill.setAttribute('data-active', '1');
         });
 
-        panel.querySelector('#adj-cancel').onclick = () => panel.remove();
-        panel.onclick = (e) => { if (e.target === panel) panel.remove(); };
+        const close = () => panel.remove();
+        panel.querySelector('#adj-close').onclick = close;
+        panel.querySelector('#adj-cancel').onclick = close;
+        panel.addEventListener('click', e => { if (e.target === panel) close(); });
+
+        // ── 提交 ─────────────────────────────────────────────────────────
+        function getGroupVal(name) {
+            const el = panel.querySelector(`.adj-pill[data-group="${name}"][data-active="1"]`);
+            return el ? el.dataset.value : null;
+        }
 
         panel.querySelector('#adj-submit').onclick = async () => {
-            function getGroupVal(group) {
-                const active = panel.querySelector(`.adj-pill[data-group="${group}"][data-active="1"]`);
-                return active ? active.dataset.value : null;
-            }
-
             const adjustments = {};
             const cropMode = getGroupVal('crop_mode');
             if (cropMode) adjustments.crop_mode = cropMode;
             const expandLevel = getGroupVal('expand_level');
             if (expandLevel && expandLevel !== 'normal') adjustments.expand_level = expandLevel;
             if (getGroupVal('ratio_trim') === 'off') adjustments.skip_ratio_trim = true;
-            // 边缘灵敏度（仅 id_card）
-            const cannyScaleVal = getGroupVal('canny_scale');
-            if (cannyScaleVal && parseFloat(cannyScaleVal) !== 1.0) adjustments.canny_scale = parseFloat(cannyScaleVal);
+            const cannyVal = getGroupVal('canny_scale');
+            if (cannyVal && parseFloat(cannyVal) !== 1.0) adjustments.canny_scale = parseFloat(cannyVal);
             cfg.rotateFields.forEach(f => {
                 const val = parseInt(getGroupVal(f.key) || '0', 10);
                 if (val) adjustments[f.key] = val;
             });
 
+            // 收集已调整的角点（与全图一致的跳过，视为未调整）
+            const markedPoints = {};
+            cfg.imagePanels.forEach(ip => {
+                const s = cropState[ip.pointsKey];
+                if (s && s.originalPts && s.originalPts.length === 4) {
+                    markedPoints[ip.pointsKey] = s.originalPts;
+                }
+            });
+
             const submitBtn = panel.querySelector('#adj-submit');
-            submitBtn.textContent = '生成中...';
-            submitBtn.disabled = true;
+            submitBtn.textContent = '生成中...'; submitBtn.disabled = true;
 
             try {
-                const res = await fetch(`/api/students/${student.id}/regenerate_material`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ material_type: matType, adjustments }),
-                });
+                let res;
+                if (Object.keys(markedPoints).length > 0) {
+                    const payload = { material_type: matType, adjustments, ...markedPoints };
+                    res = await fetch(`/api/students/${student.id}/manual_crop_material`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include', body: JSON.stringify(payload),
+                    });
+                } else {
+                    res = await fetch(`/api/students/${student.id}/regenerate_material`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ material_type: matType, adjustments }),
+                    });
+                }
                 const result = await res.json();
                 if (!res.ok) throw new Error(result.error || '重新生成失败');
                 showMessage('重新生成成功', 'success');
@@ -1724,8 +2009,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (reloadFn) reloadFn();
             } catch (e) {
                 showMessage(e.message, 'error');
-                submitBtn.textContent = '重新生成';
-                submitBtn.disabled = false;
+                submitBtn.textContent = '重新生成'; submitBtn.disabled = false;
             }
         };
     }

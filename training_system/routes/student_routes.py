@@ -1144,6 +1144,112 @@ def generate_materials_route(id):
         return build_internal_error_response('生成报名材料失败，请稍后重试')
 
 
+@student_bp.route('/api/students/<int:id>/manual_crop_material', methods=['POST'])
+def manual_crop_material_route(id):
+    """
+    手动画框裁剪：接收用户在原图上标记的 4 个角点，对原始附件图像做透视变换，
+    然后以 crop_mode=none 调用 regenerate_single_material 完成 A4 排版和方向校正。
+    """
+    import tempfile
+    try:
+        ensure_mini_admin()
+        student = get_student_by_id(id)
+        if not student:
+            return jsonify({'error': '未找到学员'}), 404
+
+        data = request.get_json(silent=True) or {}
+        material_type = data.get('material_type', '')
+        if material_type not in ('diploma', 'id_card', 'hukou'):
+            return jsonify({'error': '无效的 material_type'}), 400
+
+        base_dir = current_app.config['BASE_DIR']
+        output_root = current_app.config['STUDENTS_FOLDER']
+
+        def perspective_crop_to_temp(abs_path, points):
+            """对原图做透视变换，写入临时文件并返回路径。"""
+            if not abs_path or not os.path.exists(abs_path):
+                return None
+            import numpy as np
+            from services.material_service import read_cv_image, write_cv_image, four_point_transform
+            img = read_cv_image(abs_path)
+            if img is None:
+                return None
+            pts = np.array(points, dtype='float32')
+            cropped = four_point_transform(img, pts)
+            suffix = os.path.splitext(abs_path)[1] or '.jpg'
+            tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False,
+                                              dir=os.path.dirname(abs_path))
+            tmp.close()
+            write_cv_image(tmp.name, cropped)
+            return tmp.name
+
+        def resolve(key, pts_key):
+            """返回 (abs_path, is_temp)：有 4 点则透视裁剪成临时文件，否则用原始路径。"""
+            rel = student.get(key)
+            abs_p = os.path.join(base_dir, rel) if rel else None
+            pts = data.get(pts_key)
+            if pts and len(pts) == 4:
+                tmp_path = perspective_crop_to_temp(abs_p, pts)
+                return tmp_path, True
+            return abs_p, False
+
+        tmp_files = []
+        adjustments = dict(data.get('adjustments', {}))
+        adjustments['crop_mode'] = 'none'   # 已手动裁剪，跳过自动识别，但保留方向校正
+
+        student_copy = dict(student)
+
+        if material_type == 'id_card':
+            front_path, front_tmp = resolve('id_card_front_path', 'front_points')
+            back_path,  back_tmp  = resolve('id_card_back_path',  'back_points')
+            if front_tmp and front_path:
+                tmp_files.append(front_path)
+                student_copy['id_card_front_path'] = os.path.relpath(front_path, base_dir)
+            if back_tmp and back_path:
+                tmp_files.append(back_path)
+                student_copy['id_card_back_path'] = os.path.relpath(back_path, base_dir)
+
+        elif material_type == 'diploma':
+            p, is_tmp = resolve('diploma_path', 'points')
+            if is_tmp and p:
+                tmp_files.append(p)
+                student_copy['diploma_path'] = os.path.relpath(p, base_dir)
+
+        elif material_type == 'hukou':
+            hp, h_tmp = resolve('hukou_residence_path', 'home_points')
+            pp, p_tmp = resolve('hukou_personal_path',  'personal_points')
+            if h_tmp and hp:
+                tmp_files.append(hp)
+                student_copy['hukou_residence_path'] = os.path.relpath(hp, base_dir)
+            if p_tmp and pp:
+                tmp_files.append(pp)
+                student_copy['hukou_personal_path'] = os.path.relpath(pp, base_dir)
+
+        import io as _io, contextlib
+        from services.material_service import regenerate_single_material
+
+        log_buffer = _io.StringIO()
+        try:
+            with contextlib.redirect_stdout(log_buffer):
+                regenerate_single_material(student_copy, base_dir, output_root, material_type, adjustments)
+        finally:
+            for f in tmp_files:
+                try:
+                    os.remove(f)
+                except Exception:
+                    pass
+
+        logs = log_buffer.getvalue()
+        for line in logs.splitlines():
+            if line.strip():
+                current_app.logger.info(line)
+
+        return jsonify({'message': '手动裁剪并重新生成成功', 'logs': logs})
+    except Exception as e:
+        current_app.logger.exception('Error in manual_crop_material for student %s', id)
+        return build_internal_error_response('手动裁剪失败，请稍后重试')
+
+
 @student_bp.route('/api/students/<int:id>/regenerate_material', methods=['POST'])
 def regenerate_material_route(id):
     """
