@@ -1319,7 +1319,6 @@ def get_companies_route():
         200: 公司名称数组 ["公司A", "公司B", ...]
     """
     try:
-        ensure_mini_admin()
         status = request.args.get('status', '')
         company_filter = request.args.get('company', '')
         training_type = request.args.get('training_type', '')
