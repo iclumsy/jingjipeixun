@@ -5,7 +5,8 @@ const {
   normalizeIdCard,
   normalizePhone,
   getIdCardError,
-  getPhoneError
+  getPhoneError,
+  getFileLabel
 } = require('../../../utils/validators')
 const { EDUCATION_OPTIONS } = require('../../../utils/constants')
 const {
@@ -54,6 +55,8 @@ Page({
     trainingType: 'special_equipment',
     agreementChecked: false,  // 默认不勾选，用户需主动选择
     showPrivacyAgreement: false,
+    attachmentConfig: {},   // 所有培训类型的附件配置 { type: [{key, label}] }
+    enabledAttachments: [], // 当前培训类型已启用附件列表
     educationOptions: EDUCATION_OPTIONS,
     fieldErrors: {
       id_card: '',
@@ -66,6 +69,38 @@ Page({
 
   onLoad() {
     this.loadJobCategories()
+    this.loadAttachmentConfig()
+  },
+
+  // 拉取后台附件配置，失败时除默认徽常用的后备选项
+  async loadAttachmentConfig() {
+    // 默认附件列表（接口失败时的备用）
+    const DEFAULTS = {
+      special_equipment: ['photo', 'diploma', 'id_card_front', 'id_card_back', 'hukou_residence', 'hukou_personal'],
+      special_operation: ['diploma', 'id_card_front', 'id_card_back']
+    }
+    const toList = (keys) => keys.map(key => ({ key, label: getFileLabel(key) }))
+
+    try {
+      const raw = await api.getAttachmentConfig()
+      const attachmentConfig = {}
+      Object.keys(DEFAULTS).forEach(type => {
+        const keys = Array.isArray(raw[type]) && raw[type].length > 0
+          ? raw[type]
+          : DEFAULTS[type]
+        attachmentConfig[type] = toList(keys)
+      })
+      this.setData({
+        attachmentConfig,
+        enabledAttachments: attachmentConfig[this.data.trainingType] || []
+      })
+    } catch (err) {
+      console.warn('加载附件配置失败，使用默认列表', err)
+      const type = this.data.trainingType
+      this.setData({
+        enabledAttachments: toList(DEFAULTS[type] || [])
+      })
+    }
   },
 
   async onShow() {
@@ -156,6 +191,7 @@ Page({
     this.setData({
       trainingType: type,
       jobCategoryNames: nextJobCategoryNames,
+      enabledAttachments: this.data.attachmentConfig[type] || [],
       'student.job_category': '',
       'student.jobCategoryIndex': -1,
       'student.examProjects': [],
@@ -373,7 +409,11 @@ Page({
       'fieldErrors.phone': getPhoneError(normalizedStudent.phone)
     })
 
-    const validation = validateStudent(normalizedStudent, this.data.trainingType)
+    const validation = validateStudent(
+      normalizedStudent,
+      this.data.trainingType,
+      this.data.enabledAttachments.map(a => a.key)  // 传入后台已启用的附件 key
+    )
 
     if (!validation.valid) {
       const errorMsg = Object.values(validation.errors)[0]

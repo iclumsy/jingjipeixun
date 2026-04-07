@@ -730,6 +730,18 @@ async function getWechatConfig() {
   return data
 }
 
+/**
+ * 获取各培训类型已启用的附件列表。
+ * @returns {Promise<Object>} {special_equipment: ['photo', 'diploma', ...], special_operation: [...]}
+ */
+async function getAttachmentConfig() {
+  const data = await requestApi('/api/config/attachments', {
+    method: 'GET',
+    auth: false
+  })
+  return data
+}
+
 const COS = require('./cos-wx-sdk-v5.js');
 
 let cosInstance = null;
@@ -851,6 +863,7 @@ module.exports = {
   getCompanies,         // 获取公司列表
   getJobCategories,     // 获取作业类别配置
   getWechatConfig,      // 获取微信配置
+  getAttachmentConfig,  // 获取附件启用配置
   uploadAttachment,     // 上传附件
   toAbsoluteFileUrl,    // 文件路径转 URL
   getBaseUrl,           // 获取 API 地址

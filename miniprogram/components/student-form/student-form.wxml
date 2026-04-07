@@ -109,28 +109,16 @@
   </view>
   <view class="attachments-tip">{{attachmentsTip}}</view>
   <view class="attachments-grid">
-    <view class="attachment-item" wx:if="{{trainingType === 'special_equipment'}}">
-      <file-uploader compact="{{true}}" fileType="photo" label="个人照片" required="{{true}}" value="{{(formData.files && formData.files.photo) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
-    </view>
-
-    <view class="attachment-item">
-      <file-uploader compact="{{true}}" fileType="diploma" label="学历证书" required="{{true}}" value="{{(formData.files && formData.files.diploma) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
-    </view>
-
-    <view class="attachment-item">
-      <file-uploader compact="{{true}}" fileType="id_card_front" label="身份证正面" required="{{true}}" value="{{(formData.files && formData.files.id_card_front) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
-    </view>
-
-    <view class="attachment-item">
-      <file-uploader compact="{{true}}" fileType="id_card_back" label="身份证反面" required="{{true}}" value="{{(formData.files && formData.files.id_card_back) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
-    </view>
-
-    <view class="attachment-item" wx:if="{{trainingType === 'special_equipment'}}">
-      <file-uploader compact="{{true}}" fileType="hukou_residence" label="户口本户籍页" required="{{true}}" value="{{(formData.files && formData.files.hukou_residence) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
-    </view>
-
-    <view class="attachment-item" wx:if="{{trainingType === 'special_equipment'}}">
-      <file-uploader compact="{{true}}" fileType="hukou_personal" label="户口本个人页" required="{{true}}" value="{{(formData.files && formData.files.hukou_personal) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
+    <view class="attachment-item" wx:for="{{enabledAttachments}}" wx:key="key">
+      <file-uploader
+        compact="{{true}}"
+        fileType="{{item.key}}"
+        label="{{item.label}}"
+        required="{{true}}"
+        value="{{(formData.files && formData.files[item.key]) || ''}}"
+        bind:uploaded="onFileUploaded"
+        bind:deleted="onFileDeleted"
+      />
     </view>
   </view>
 </view>

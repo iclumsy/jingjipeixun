@@ -223,6 +223,39 @@ def init_db(database_path):
         ''')
         _ensure_column_exists(conn, 'training_projects', 'attachments', 'attachments TEXT DEFAULT \'["photo","diploma","id_card_front","id_card_back","hukou_residence","hukou_personal"]\'')
 
+        # 附件配置表：控制小程序各培训类型显示哪些上传项
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS attachment_settings (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                training_type  TEXT NOT NULL,
+                attachment_key TEXT NOT NULL,
+                label          TEXT NOT NULL,
+                is_enabled     INTEGER DEFAULT 1,
+                sort_order     INTEGER DEFAULT 0,
+                UNIQUE(training_type, attachment_key)
+            )
+        ''')
+
+        # 写入默认数据（已存在则忽略，不会覆盖管理员的修改）
+        default_attachments = [
+            ('special_equipment', 'photo',           '个人照片',     1, 1),
+            ('special_equipment', 'diploma',         '学历证书',     1, 2),
+            ('special_equipment', 'id_card_front',   '身份证正面',   1, 3),
+            ('special_equipment', 'id_card_back',    '身份证反面',   1, 4),
+            ('special_equipment', 'hukou_residence', '户口本户籍页', 1, 5),
+            ('special_equipment', 'hukou_personal',  '户口本个人页', 1, 6),
+            ('special_operation', 'diploma',         '学历证书',     1, 1),
+            ('special_operation', 'id_card_front',   '身份证正面',   1, 2),
+            ('special_operation', 'id_card_back',    '身份证反面',   1, 3),
+        ]
+        for row in default_attachments:
+            conn.execute(
+                'INSERT OR IGNORE INTO attachment_settings '
+                '(training_type, attachment_key, label, is_enabled, sort_order) '
+                'VALUES (?, ?, ?, ?, ?)',
+                row
+            )
+
         # 同步字典表：以本地 JSON 为准，增量同步配置数据
         # 这样即使您未来直接修改 JSON 文件，重启服务后数据库能自动同步出最新选项，
         # 且改名或删除的老配置条目只会在前台隐藏，不会导致历史学员数据外键断裂。

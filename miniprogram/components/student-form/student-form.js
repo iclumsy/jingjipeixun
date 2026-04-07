@@ -51,6 +51,12 @@ Component({
     attachmentsTip: {
       type: String,
       value: '请上传清晰、完整的原件照片，避免反光和裁切。'
+    },
+    // 当前培训类型已启用的附件列表，由父页面从后台拉取后传入
+    // 格式: [{key: 'photo', label: '个人照片'}, ...]
+    enabledAttachments: {
+      type: Array,
+      value: []
     }
   },
 

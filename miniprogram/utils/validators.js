@@ -107,9 +107,10 @@ function validateRequired(value) {
  * 验证学员数据
  * @param {object} student - 学员数据
  * @param {string} trainingType - 培训类型
+ * @param {Array} [enabledAttachments] - 当前启用的附件 key 列表（由后台动态配置），未传时按 trainingType 默认
  * @returns {object} { valid: boolean, errors: object }
  */
-function validateStudent(student, trainingType) {
+function validateStudent(student, trainingType, enabledAttachments) {
   const errors = {}
 
   // 必填字段验证
@@ -147,8 +148,10 @@ function validateStudent(student, trainingType) {
     errors.training_project_id = '请选择报考项目'
   }
 
-  // 附件验证
-  const requiredFiles = getRequiredFiles(trainingType)
+  // 附件验证：优先使用动态配置的启用列表，未传时回退到默认规则
+  const requiredFiles = Array.isArray(enabledAttachments) && enabledAttachments.length > 0
+    ? enabledAttachments
+    : getRequiredFiles(trainingType)
   requiredFiles.forEach(fileType => {
     if (!student.files || !student.files[fileType]) {
       errors[fileType] = `请上传${getFileLabel(fileType)}`

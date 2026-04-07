@@ -232,6 +232,30 @@
             </div>
         </div>
 
+        <!-- 附件配置区块 -->
+        <div class="table-wrap" style="margin-bottom: 20px;">
+            <h3 style="margin-top: 0; color: #111;">
+                附件配置
+                <span style="font-size:0.8em; color:#888; font-weight:normal;">
+                    (控制小程序上传项，修改后小程序重启时生效)
+                </span>
+            </h3>
+            <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 240px;">
+                    <div style="font-weight: bold; color: #4338ca; margin-bottom: 10px; padding: 6px 12px; background: #e0e7ff; border-radius: 6px; display: inline-block;">
+                        📦 特种设备
+                    </div>
+                    <div id="att-special_equipment" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;"></div>
+                </div>
+                <div style="flex: 1; min-width: 240px;">
+                    <div style="font-weight: bold; color: #be185d; margin-bottom: 10px; padding: 6px 12px; background: #fce7f3; border-radius: 6px; display: inline-block;">
+                        ⚡️ 特种作业
+                    </div>
+                    <div id="att-special_operation" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;"></div>
+                </div>
+            </div>
+        </div>
+
         <div class="table-wrap">
             <h3 style="margin-top: 0; color: #111;">培训项目列表 <span
                     style="font-size:0.8em; color:#888; font-weight:normal;">(为防止历史数据断链，此列表只提供软下架切换，不提供物理删除)</span></h3>
@@ -422,8 +446,65 @@
             }
         });
 
+        // ======= 附件配置逻辑 =======
+
+        let allAttachments = [];
+
+        async function loadAttachments() {
+            try {
+                const res = await fetch('/api/config/attachments/admin');
+                allAttachments = await res.json();
+                renderAttachments();
+            } catch (err) {
+                console.error('加载附件配置失败:', err);
+            }
+        }
+
+        function renderAttachments() {
+            ['special_equipment', 'special_operation'].forEach(type => {
+                const container = document.getElementById(`att-${type}`);
+                if (!container) return;
+                const items = allAttachments.filter(a => a.training_type === type);
+                if (items.length === 0) {
+                    container.innerHTML = '<div style="color:#999; font-size:0.9em;">暂无数据</div>';
+                    return;
+                }
+                container.innerHTML = items.map(a => `
+                    <div style="display:flex; justify-content:space-between; align-items:center;
+                                padding: 8px 12px; border-radius: 6px;
+                                background: ${a.is_enabled ? '#f0fdf4' : '#fef2f2'};
+                                border: 1px solid ${a.is_enabled ? '#bbf7d0' : '#fecaca'};">
+                        <span style="font-size:0.95em; color:#374151;">${a.label}</span>
+                        <button class="btn-toggle ${a.is_enabled ? 'btn-active' : 'btn-inactive'}"
+                            onclick="toggleAttachment('${type}', '${a.attachment_key}', ${a.is_enabled ? 0 : 1})">
+                            ${a.is_enabled ? '● 已启用' : '○ 已关闭'}
+                        </button>
+                    </div>
+                `).join('');
+            });
+        }
+
+        async function toggleAttachment(type, key, newStatus) {
+            try {
+                const res = await fetch(`/api/config/attachments/${type}/${key}/toggle`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_enabled: newStatus })
+                });
+                if (res.ok) {
+                    loadAttachments();
+                } else {
+                    const err = await res.json();
+                    alert('操作失败: ' + (err.message || '未知错误'));
+                }
+            } catch (err) {
+                alert('网络异常');
+            }
+        }
+
         // Initialize table
         loadProjects();
+        loadAttachments();
     </script>
 </body>
 

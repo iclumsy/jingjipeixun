@@ -234,3 +234,65 @@ def toggle_project(id):
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
+# ======================== 附件配置 API ========================
+
+@config_bp.route('/api/config/attachments', methods=['GET'])
+def get_attachments_public():
+    """
+    获取各培训类型已启用的附件列表（小程序公开访问）。
+
+    返回格式:
+        {"special_equipment": ["photo", "diploma", ...], "special_operation": [...]}
+    """
+    try:
+        from models.student import get_db_connection
+        with get_db_connection() as conn:
+            rows = conn.execute(
+                'SELECT training_type, attachment_key FROM attachment_settings '
+                'WHERE is_enabled = 1 ORDER BY training_type, sort_order'
+            ).fetchall()
+        result = {}
+        for row in rows:
+            tt = row['training_type']
+            if tt not in result:
+                result[tt] = []
+            result[tt].append(row['attachment_key'])
+        return jsonify(result)
+    except Exception as e:
+        current_app.logger.error(f'get_attachments_public error: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
+@config_bp.route('/api/config/attachments/admin', methods=['GET'])
+def get_attachments_admin():
+    """获取全部附件及其启用状态（管理员认证）。"""
+    try:
+        from models.student import get_db_connection
+        with get_db_connection() as conn:
+            rows = conn.execute(
+                'SELECT * FROM attachment_settings ORDER BY training_type, sort_order'
+            ).fetchall()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@config_bp.route('/api/config/attachments/<training_type>/<attachment_key>/toggle', methods=['POST'])
+def toggle_attachment(training_type, attachment_key):
+    """切换指定附件的启用状态（管理员认证）。"""
+    try:
+        from models.student import get_db_connection
+        data = request.json or {}
+        new_status = int(data.get('is_enabled', 0))
+        with get_db_connection() as conn:
+            conn.execute(
+                'UPDATE attachment_settings SET is_enabled = ? '
+                'WHERE training_type = ? AND attachment_key = ?',
+                (new_status, training_type, attachment_key)
+            )
+            conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
