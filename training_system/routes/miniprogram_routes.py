@@ -100,6 +100,7 @@ def miniprogram_login_route():
 
     # 登录成功：签发 JWT 令牌
     openid = wx_result.get('openid', '')
+    current_app.logger.info(f"小程序用户鉴权成功，openid: {openid}")
     # 检查当前用户是否在管理员 openid 列表中
     is_admin = is_admin_openid(openid)
     # 使用应用密钥签名令牌，包含 openid 和管理员标识
