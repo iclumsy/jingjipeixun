@@ -842,6 +842,7 @@ def summarize_candidate(candidate):
         "confidence": round(candidate["confidence"], 4),
         "detector": candidate.get("detector", "edge"),
         "source": candidate["source"],
+        "points_orig": candidate.get("points_orig").tolist() if "points_orig" in candidate else None
     }
 
 
