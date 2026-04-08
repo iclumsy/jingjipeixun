@@ -37,6 +37,7 @@ function createEmptyEditStudent() {
     exam_project: '',
     examProjectIndex: -1,
     project_code: '',
+    training_project_id: '',
     examProjects: [],
     training_type: 'special_equipment',
     files: {
@@ -233,6 +234,7 @@ Page({
           exam_project: student.exam_project || '',
           examProjectIndex,
           project_code: student.project_code || '',
+          training_project_id: student.training_project_id || '',
           examProjects,
           training_type: trainingType,
           files: {
@@ -270,6 +272,7 @@ Page({
       'editStudent.exam_project': '',
       'editStudent.examProjectIndex': -1,
       'editStudent.project_code': '',
+      'editStudent.training_project_id': '',
       'editStudent.examProjects': []
     })
   },
@@ -290,7 +293,8 @@ Page({
         'editStudent.examProjects': examProjects,
         'editStudent.exam_project': examProjects[0].name,
         'editStudent.examProjectIndex': 0,
-        'editStudent.project_code': examProjects[0].code
+        'editStudent.project_code': examProjects[0].code,
+        'editStudent.training_project_id': examProjects[0].id
       })
       return
     }
@@ -301,7 +305,8 @@ Page({
       'editStudent.examProjects': examProjects,
       'editStudent.exam_project': '',
       'editStudent.examProjectIndex': -1,
-      'editStudent.project_code': ''
+      'editStudent.project_code': '',
+      'editStudent.training_project_id': ''
     })
   },
 
@@ -314,7 +319,8 @@ Page({
     this.setData({
       'editStudent.exam_project': project.name,
       'editStudent.examProjectIndex': projectIndex,
-      'editStudent.project_code': project.code
+      'editStudent.project_code': project.code,
+      'editStudent.training_project_id': project.id
     })
   },
 
