@@ -309,6 +309,7 @@
                 el.className = 'folder-item';
 
                 if (item.type === 'directory') {
+                    const isMatched = item.matched;
                     el.innerHTML = `
                         <div class="folder-icon">${isMatched ? '📂' : '📁'}</div>
                         <div class="folder-info">
