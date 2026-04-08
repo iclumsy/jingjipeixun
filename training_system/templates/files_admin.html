@@ -6,6 +6,7 @@
     <title>文件管理</title>
     <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
     <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/notifications.js"></script>
     <style>
         .files-layout {
             display: flex;
@@ -253,6 +254,19 @@
         const lightbox = document.getElementById('lightbox');
         const lightboxImg = document.getElementById('lightboxImg');
 
+        // Helper: Format Unix timestamp to local string
+        function formatTime(ts) {
+            if (!ts) return '-';
+            const date = new Date(ts * 1000);
+            const Y = date.getFullYear();
+            const M = String(date.getMonth() + 1).padStart(2, '0');
+            const D = String(date.getDate()).padStart(2, '0');
+            const h = String(date.getHours()).padStart(2, '0');
+            const m = String(date.getMinutes()).padStart(2, '0');
+            return `${Y}-${M}-${D} ${h}:${m}`;
+        }
+
+
         let folders = [];
         let currentFolder = null;
 
@@ -295,17 +309,16 @@
                 el.className = 'folder-item';
 
                 if (item.type === 'directory') {
-                    const isMatched = item.matched;
                     el.innerHTML = `
                         <div class="folder-icon">${isMatched ? '📂' : '📁'}</div>
                         <div class="folder-info">
                             <div class="folder-name" title="${item.name}">${item.name}</div>
-                            <div class="folder-meta">${item.size_display} · ${item.file_count} 个文件</div>
+                            <div class="folder-meta">${item.size_display} · ${item.file_count} 个文件 · ${formatTime(item.modified)}</div>
                         </div>
                         <div class="folder-badge ${isMatched ? 'badge-matched' : 'badge-orphan'}">
                             ${isMatched ? '✓ ID:' + item.student_id : '未匹配'}
                         </div>
-                        <button class="btn-delete-folder" onclick="event.stopPropagation(); window._deleteItem('${item.name.replace(/'/g, "\\'")}')">🗑️</button>
+                        <button class="btn-delete-folder" onclick="event.stopPropagation(); window._deleteItem('${item.name.replace(/'/g, "\\'")}', 'directory')">🗑️</button>
                     `;
                     el.addEventListener('click', () => {
                         document.querySelectorAll('.folder-item').forEach(e => e.classList.remove('active'));
@@ -318,7 +331,7 @@
                         <div class="folder-icon">📄</div>
                         <div class="folder-info">
                             <div class="folder-name" title="${item.name}">${item.name}</div>
-                            <div class="folder-meta">${item.size_display}</div>
+                            <div class="folder-meta">${item.size_display} · ${formatTime(item.modified)}</div>
                         </div>
                     `;
                 }
@@ -386,7 +399,7 @@
                             </div>
                             <div class="file-card-body">
                                 <div class="file-card-name" title="${item.name}">${item.name}</div>
-                                <div class="file-card-meta">${item.size_display}</div>
+                                <div class="file-card-meta">${item.size_display} · ${formatTime(item.modified)}</div>
                                 <div class="file-card-actions">
                                     <button class="btn-delete-file" onclick="window._deleteItem('${filePath.replace(/'/g, "\\'")}', 'file')">🗑️ 删除本地</button>
                                 </div>
@@ -404,6 +417,7 @@
                             <div class="file-card-body">
                                 <div class="file-card-name" title="${item.name}">${item.name}</div>
                                 <div class="file-card-meta">${item.size_display} · ${ext}</div>
+                                <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">${formatTime(item.modified)}</div>
                                 <div class="file-card-actions">
                                     <button class="btn-delete-file" onclick="window._deleteItem('${filePath.replace(/'/g, "\\'")}', 'file')">🗑️ 删除本地</button>
                                 </div>
@@ -423,11 +437,17 @@
             return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
         }
 
-        // Delete a file or folder (local only)
         window._deleteItem = async function(path, type) {
             const label = type === 'file' ? '文件' : '文件夹';
             const fname = path.split('/').pop();
-            if (!confirm(`确定要删除本地${label}「${fname}」吗？\n此操作仅删除服务器本地的文件，COS 上的文件由腾讯云自动生命周期清理。`)) return;
+            const confirmed = await showConfirm(
+                `确认删除${label}`,
+                `<div style="font-size:0.95rem;">确定要删除本地${label} <b style="color:#ef4444">「${fname}」</b> 吗？</div>
+                 <div style="font-size:0.82rem;color:#6b7280;margin-top:8px;">※ 此操作仅删除服务器本地备份，COS 云端文件将继续保留（由腾讯云生命周期策略自动清理）。</div>`,
+                `立即删除`,
+                'danger'
+            );
+            if (!confirmed) return;
             try {
                 const res = await fetch('/api/files/delete', {
                     method: 'POST',
@@ -436,9 +456,10 @@
                 });
                 const data = await res.json();
                 if (!res.ok) {
-                    alert('删除失败：' + (data.error || res.status));
+                    showToast('删除失败：' + (data.error || res.status), 'error');
                     return;
                 }
+                showToast(`${label}已成功从本地删除`, 'success');
                 // 刷新当前视图
                 if (type === 'directory') {
                     await loadFolders();
@@ -446,7 +467,7 @@
                     await loadFolderContents(currentFolder);
                 }
             } catch (err) {
-                alert('请求失败：' + err.message);
+                showToast('请求失败：' + err.message, 'error');
             }
         };
 

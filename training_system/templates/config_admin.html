@@ -7,6 +7,7 @@
     <title>系统配置管理</title>
     <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
     <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/notifications.js"></script>
     <style>
         .table-wrap {
             background: #fff;
@@ -351,11 +352,11 @@
                     loadProjects();
                 } else {
                     const err = await res.json();
-                    alert('操作失败: ' + err.message);
+                    showToast('操作失败: ' + err.message, 'error');
                 }
             } catch (err) {
                 console.error(err);
-                alert('网络异常');
+                showToast('网络异常', 'error');
             }
         }
 
@@ -435,11 +436,11 @@
                     loadProjects(); // 自动加载最新列表并保持过滤
                 } else {
                     const err = await res.json();
-                    alert('操作失败: ' + err.message);
+                    showToast('操作失败: ' + err.message, 'error');
                 }
             } catch (err) {
                 console.error(err);
-                alert('网络异常');
+                showToast('网络异常', 'error');
             } finally {
                 btn.disabled = false;
                 btn.textContent = originalText;
@@ -495,10 +496,10 @@
                     loadAttachments();
                 } else {
                     const err = await res.json();
-                    alert('操作失败: ' + (err.message || '未知错误'));
+                    showToast('操作失败: ' + (err.message || '未知错误'), 'error');
                 }
             } catch (err) {
-                alert('网络异常');
+                showToast('网络异常', 'error');
             }
         }
 

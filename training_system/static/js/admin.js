@@ -46,6 +46,8 @@ window.fetch = async (...args) => {
     return response;
 };
 
+
+
 // ======================== 全局存储配置 ========================
 // COS 根地址，由 /api/config/storage 接口在页面加载时赋值
 // 形如: "https://mybucket-123.cos.ap-beijing.myqcloud.com"

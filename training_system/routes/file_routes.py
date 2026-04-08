@@ -190,6 +190,7 @@ def browse_folders():
                 matched, student_id = _match_folder_to_student(
                     entry.name, name_company_map, name_map
                 )
+                stat = entry.stat(follow_symlinks=False)
                 items.append({
                     'name': entry.name,
                     'type': 'directory',
@@ -198,6 +199,7 @@ def browse_folders():
                     'file_count': file_count,
                     'matched': matched,
                     'student_id': student_id,
+                    'modified': stat.st_mtime,
                 })
             elif entry.is_file(follow_symlinks=False):
                 stat = entry.stat(follow_symlinks=False)
@@ -206,6 +208,7 @@ def browse_folders():
                     'type': 'file',
                     'size': stat.st_size,
                     'size_display': _format_size(stat.st_size),
+                    'modified': stat.st_mtime,
                 })
     except Exception as e:
         current_app.logger.error(f'Error browsing students folder: {e}')
@@ -234,6 +237,7 @@ def browse_folder_contents(folder_name):
     try:
         for entry in sorted(os.scandir(target_dir), key=lambda e: (not e.is_dir(), e.name)):
             if entry.is_dir(follow_symlinks=False):
+                stat = entry.stat(follow_symlinks=False)
                 size = _get_dir_size(entry.path)
                 items.append({
                     'name': entry.name,
@@ -241,6 +245,7 @@ def browse_folder_contents(folder_name):
                     'size': size,
                     'size_display': _format_size(size),
                     'file_count': _count_files(entry.path),
+                    'modified': stat.st_mtime,
                 })
             elif entry.is_file(follow_symlinks=False):
                 stat = entry.stat(follow_symlinks=False)
@@ -275,7 +280,7 @@ def delete_local_file():
         type: "file" 或 "directory"
     """
     from flask import request, session
-    if not session.get('admin_logged_in'):
+    if not session.get('auth_verified'):
         return jsonify({'error': '未登录'}), 401
 
     data = request.json or {}
