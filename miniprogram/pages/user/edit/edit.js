@@ -5,7 +5,8 @@ const {
   normalizeIdCard,
   normalizePhone,
   getIdCardError,
-  getPhoneError
+  getPhoneError,
+  getFileLabel
 } = require('../../../utils/validators')
 const { EDUCATION_OPTIONS } = require('../../../utils/constants')
 const {
@@ -76,6 +77,8 @@ Page({
     },
     jobCategories: {},
     jobCategoryNames: [],
+    attachmentConfig: {},
+    enabledAttachments: [],
     student: createEmptyStudent()
   },
 
@@ -95,7 +98,35 @@ Page({
       agreementChecked: hasAcceptedLatestAgreement()
     })
 
+    await this.loadAttachmentConfig()
     await this.loadJobCategories()
+  },
+
+  async loadAttachmentConfig() {
+    const DEFAULTS = {
+      special_equipment: ['photo', 'diploma', 'id_card_front', 'id_card_back', 'hukou_residence', 'hukou_personal'],
+      special_operation: ['diploma', 'id_card_front', 'id_card_back']
+    }
+    const toList = (keys) => keys.map(key => ({ key, label: getFileLabel(key) }))
+
+    try {
+      const raw = await api.getAttachmentConfig()
+      const attachmentConfig = {}
+      Object.keys(DEFAULTS).forEach(type => {
+        const keys = Array.isArray(raw[type]) && raw[type].length > 0 ? raw[type] : DEFAULTS[type]
+        attachmentConfig[type] = toList(keys)
+      })
+      this.setData({
+        attachmentConfig,
+        enabledAttachments: attachmentConfig[this.data.trainingType] || []
+      })
+    } catch (err) {
+      console.warn('加载附件配置失败，使用默认列表', err)
+      const type = this.data.trainingType
+      this.setData({
+        enabledAttachments: toList(DEFAULTS[type] || [])
+      })
+    }
   },
 
   safeBackToList() {
@@ -174,6 +205,7 @@ Page({
       this.setData({
         trainingType,
         jobCategoryNames: this.getJobCategoryNames(trainingType),
+        enabledAttachments: this.data.attachmentConfig[trainingType] || [],
         fieldErrors: {
           id_card: getIdCardError(normalizedIdCard),
           phone: getPhoneError(normalizedPhone)
@@ -240,6 +272,7 @@ Page({
     this.setData({
       trainingType: type,
       jobCategoryNames: nextJobCategoryNames,
+      enabledAttachments: this.data.attachmentConfig[type] || [],
       'student.job_category': '',
       'student.jobCategoryIndex': -1,
       'student.examProjects': [],
@@ -440,7 +473,8 @@ Page({
       'fieldErrors.phone': getPhoneError(normalizedStudent.phone)
     })
 
-    const validation = validateStudent(normalizedStudent, this.data.trainingType)
+    const enabledAttachmentKeys = this.data.enabledAttachments.map(a => a.key)
+    const validation = validateStudent(normalizedStudent, this.data.trainingType, enabledAttachmentKeys)
 
     if (!validation.valid) {
       const errorMsg = Object.values(validation.errors)[0]

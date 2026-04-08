@@ -6,7 +6,8 @@ const {
   normalizeIdCard,
   normalizePhone,
   getIdCardError,
-  getPhoneError
+  getPhoneError,
+  getFileLabel
 } = require('../../../utils/validators')
 const {
   readJobCategoriesCache,
@@ -77,6 +78,8 @@ Page({
     educationOptions: EDUCATION_OPTIONS,
     jobCategories: {},
     jobCategoryNames: [],
+    attachmentConfig: {},
+    enabledAttachments: [],
     fieldErrors: {
       id_card: '',
       phone: ''
@@ -100,8 +103,36 @@ Page({
 
   async initPage() {
     this.setData({ loading: true })
+    await this.loadAttachmentConfig()
     await this.loadJobCategories()
     await this.loadDetail()
+  },
+
+  async loadAttachmentConfig() {
+    const DEFAULTS = {
+      special_equipment: ['photo', 'diploma', 'id_card_front', 'id_card_back', 'hukou_residence', 'hukou_personal'],
+      special_operation: ['diploma', 'id_card_front', 'id_card_back']
+    }
+    const toList = (keys) => keys.map(key => ({ key, label: getFileLabel(key) }))
+
+    try {
+      const raw = await api.getAttachmentConfig()
+      const attachmentConfig = {}
+      Object.keys(DEFAULTS).forEach(type => {
+        const keys = Array.isArray(raw[type]) && raw[type].length > 0 ? raw[type] : DEFAULTS[type]
+        attachmentConfig[type] = toList(keys)
+      })
+      this.setData({
+        attachmentConfig,
+        enabledAttachments: attachmentConfig[this.data.trainingType] || []
+      })
+    } catch (err) {
+      console.warn('加载附件配置失败，使用默认列表', err)
+      const type = this.data.trainingType
+      this.setData({
+        enabledAttachments: toList(DEFAULTS[type] || [])
+      })
+    }
   },
 
   async loadJobCategories() {
@@ -175,6 +206,7 @@ Page({
         student,
         downloadUrls,
         trainingType,
+        enabledAttachments: this.data.attachmentConfig[trainingType] || [],
         jobCategoryNames: this.getJobCategoryNames(trainingType),
         trainingTypeText: TRAINING_TYPE_LABELS[trainingType] || trainingType,
         statusText: STATUS_TEXT_MAP[student.status] || student.status || '-',
@@ -229,6 +261,7 @@ Page({
     const nextJobCategoryNames = this.getJobCategoryNames(type)
     this.setData({
       trainingType: type,
+      enabledAttachments: this.data.attachmentConfig[type] || [],
       jobCategoryNames: nextJobCategoryNames,
       trainingTypeText: TRAINING_TYPE_LABELS[type] || type,
       'editStudent.training_type': type,
@@ -373,7 +406,8 @@ Page({
       'fieldErrors.phone': getPhoneError(normalizedStudent.phone)
     })
 
-    const validation = validateStudent(normalizedStudent, this.data.trainingType)
+    const enabledAttachmentKeys = this.data.enabledAttachments.map(a => a.key)
+    const validation = validateStudent(normalizedStudent, this.data.trainingType, enabledAttachmentKeys)
     if (!validation.valid) {
       const message = Object.values(validation.errors)[0] || '信息不完整'
       return {

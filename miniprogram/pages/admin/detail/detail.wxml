@@ -19,6 +19,7 @@
       formData="{{editStudent}}"
       educationOptions="{{educationOptions}}"
       jobCategoryNames="{{jobCategoryNames}}"
+      enabledAttachments="{{enabledAttachments}}"
       fieldErrors="{{fieldErrors}}"
       showAgreement="{{false}}"
       showSubmit="{{false}}"
