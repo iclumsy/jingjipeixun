@@ -218,6 +218,199 @@ document.addEventListener('DOMContentLoaded', async () => {
         return { label: '未审核', className: 'unreviewed' };
     }
 
+    const MATERIAL_LOG_SCOPE_LABELS = {
+        global: '整体流程',
+        photo: '个人照片',
+        diploma: '学历证书',
+        id_card: '身份证',
+        id_card_front: '身份证正面',
+        id_card_back: '身份证反面',
+        hukou: '户口本',
+        hukou_home: '户口本首页',
+        hukou_personal: '户口本人页',
+        training_form: '体检表',
+    };
+
+    function getMaterialLogHeadline(logData) {
+        const summary = logData?.log_summary || {};
+        const outputCount = Array.isArray(summary.output_files) ? summary.output_files.length : 0;
+        return `共处理 ${summary.material_count || 0} 项，成功 ${summary.success_count || 0}，警告 ${summary.warning_count || 0}，失败 ${summary.error_count || 0}，输出 ${outputCount} 个文件`;
+    }
+
+    function escapeHtml(text) {
+        return String(text || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function storeMaterialLog(student, payload) {
+        student._lastMaterialLog = {
+            logs: payload.logs || '',
+            log_summary: payload.log_summary || {},
+            log_events: Array.isArray(payload.log_events) ? payload.log_events : [],
+            message: payload.message || '',
+            capturedAt: new Date().toISOString(),
+        };
+        if (typeof student._renderMaterialLog === 'function') {
+            student._renderMaterialLog();
+        }
+        return student._lastMaterialLog;
+    }
+
+    function buildMaterialLogBody(logData) {
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
+
+        const summary = logData?.log_summary || {};
+        const summaryCard = document.createElement('div');
+        summaryCard.style.cssText = 'border:1px solid #E2E8F0;border-radius:10px;background:#F8FAFC;padding:12px 14px;';
+        summaryCard.innerHTML = `
+            <div style="font-size:13px;font-weight:700;color:#0F172A;margin-bottom:4px;">本次处理摘要</div>
+            <div style="font-size:12px;color:#475569;line-height:1.7;">${getMaterialLogHeadline(logData)}</div>
+        `;
+        wrapper.appendChild(summaryCard);
+
+        const events = Array.isArray(logData?.log_events) ? logData.log_events : [];
+        const grouped = new Map();
+        events.forEach(event => {
+            const scopeKey = event.scope || 'global';
+            if (!grouped.has(scopeKey)) grouped.set(scopeKey, []);
+            grouped.get(scopeKey).push(event);
+        });
+
+        grouped.forEach((groupEvents, scopeKey) => {
+            const groupBox = document.createElement('div');
+            groupBox.style.cssText = 'border:1px solid #E5E7EB;border-radius:10px;overflow:hidden;background:#fff;';
+
+            const header = document.createElement('div');
+            header.style.cssText = 'padding:10px 14px;background:#F8FAFC;border-bottom:1px solid #E5E7EB;font-size:13px;font-weight:700;color:#1F2937;';
+            header.textContent = MATERIAL_LOG_SCOPE_LABELS[scopeKey] || scopeKey;
+            groupBox.appendChild(header);
+
+            const list = document.createElement('div');
+            list.style.cssText = 'padding:10px 12px;display:flex;flex-direction:column;gap:10px;';
+
+            groupEvents.forEach(event => {
+                const tone = event.level === 'error'
+                    ? { border: '#FECACA', bg: '#FEF2F2', title: '#B91C1C', dot: '#EF4444' }
+                    : event.level === 'warning'
+                        ? { border: '#FDE68A', bg: '#FFFBEB', title: '#92400E', dot: '#F59E0B' }
+                        : event.level === 'success'
+                            ? { border: '#BBF7D0', bg: '#F0FDF4', title: '#166534', dot: '#22C55E' }
+                            : { border: '#CBD5E1', bg: '#F8FAFC', title: '#334155', dot: '#64748B' };
+
+                const card = document.createElement('div');
+                card.style.cssText = `border:1px solid ${tone.border};background:${tone.bg};border-radius:8px;padding:10px 12px;`;
+
+                const titleRow = document.createElement('div');
+                titleRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:4px;';
+                titleRow.innerHTML = `
+                    <span style="width:8px;height:8px;border-radius:999px;background:${tone.dot};display:inline-block;"></span>
+                    <span style="font-size:12.5px;font-weight:700;color:${tone.title};">${event.title || '处理日志'}</span>
+                `;
+                card.appendChild(titleRow);
+
+                const msg = document.createElement('div');
+                msg.style.cssText = 'font-size:12px;color:#475569;line-height:1.65;';
+                msg.textContent = event.message || '';
+                card.appendChild(msg);
+
+                const details = event.details && Object.keys(event.details).length > 0
+                    ? Object.entries(event.details)
+                    : [];
+                if (details.length > 0) {
+                    const detailBox = document.createElement('div');
+                    detailBox.style.cssText = 'margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;';
+                    details.forEach(([key, value]) => {
+                        const chip = document.createElement('span');
+                        chip.style.cssText = 'font-size:11px;color:#475569;background:rgba(255,255,255,0.7);border:1px solid rgba(148,163,184,0.35);border-radius:999px;padding:3px 8px;';
+                        chip.textContent = `${key}: ${value}`;
+                        detailBox.appendChild(chip);
+                    });
+                    card.appendChild(detailBox);
+                }
+
+                list.appendChild(card);
+            });
+
+            groupBox.appendChild(list);
+            wrapper.appendChild(groupBox);
+        });
+
+        if (logData?.logs) {
+            const rawDetails = document.createElement('details');
+            rawDetails.style.cssText = 'border:1px solid #CBD5E1;border-radius:10px;overflow:hidden;background:#fff;';
+            rawDetails.innerHTML = `
+                <summary style="padding:10px 14px;background:#F8FAFC;cursor:pointer;font-size:12.5px;font-weight:700;color:#334155;">查看原始技术日志</summary>
+                <pre style="margin:0;padding:12px 14px;background:#0F172A;color:#CBD5E1;font-size:11px;line-height:1.7;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow:auto;">${escapeHtml(logData.logs)}</pre>
+            `;
+            wrapper.appendChild(rawDetails);
+        }
+
+        return wrapper;
+    }
+
+    function renderLatestMaterialLog(container, logData) {
+        if (!container) return;
+        container.innerHTML = '';
+        if (!logData) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'block';
+        const panel = document.createElement('details');
+        panel.style.cssText = 'margin-top:14px;border:1px solid #CBD5E1;border-radius:10px;overflow:hidden;background:#fff;';
+        const capturedLabel = logData.capturedAt
+            ? new Date(logData.capturedAt).toLocaleString()
+            : '刚刚';
+        panel.innerHTML = `
+            <summary style="padding:12px 14px;background:#F8FAFC;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:13px;font-weight:700;color:#1F2937;">最近一次生成日志</span>
+                <span style="font-size:11.5px;color:#64748B;">${capturedLabel} · ${getMaterialLogHeadline(logData)}</span>
+            </summary>
+        `;
+        const body = document.createElement('div');
+        body.style.cssText = 'padding:14px;';
+        body.appendChild(buildMaterialLogBody(logData));
+        panel.appendChild(body);
+        container.appendChild(panel);
+    }
+
+    function showMaterialLogModal(logData) {
+        const existing = document.getElementById('material-log-modal');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'material-log-modal';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,0.5);display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;';
+
+        const modal = document.createElement('div');
+        modal.style.cssText = 'width:min(980px,100%);max-height:90vh;background:#fff;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,0.25);display:flex;flex-direction:column;overflow:hidden;';
+        modal.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #E5E7EB;">
+                <div>
+                    <div style="font-size:15px;font-weight:700;color:#111827;">报名材料处理日志</div>
+                    <div style="margin-top:4px;font-size:12px;color:#64748B;">${getMaterialLogHeadline(logData)}</div>
+                </div>
+                <button id="material-log-modal-close" style="border:none;background:none;font-size:24px;line-height:1;color:#94A3B8;cursor:pointer;">×</button>
+            </div>
+        `;
+        const body = document.createElement('div');
+        body.style.cssText = 'padding:18px;overflow:auto;';
+        body.appendChild(buildMaterialLogBody(logData));
+        modal.appendChild(body);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        const close = () => overlay.remove();
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        modal.querySelector('#material-log-modal-close').onclick = close;
+    }
+
     syncGlobalAdminState();
 
     /** 从服务器加载作业类别配置数据（用于编辑时的下拉选项）。 */
@@ -1243,7 +1436,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             materialsContainer.style.padding = '10px 0';
             materialsSection.appendChild(materialsContainer);
 
+            const latestLogSection = document.createElement('div');
+            latestLogSection.style.display = 'none';
+
             filesContainer.parentNode.insertBefore(materialsSection, filesContainer.nextSibling);
+            materialsSection.after(latestLogSection);
 
             const loadMaterials = async () => {
                 try {
@@ -1314,6 +1511,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             loadMaterials();
             student._reloadMaterials = loadMaterials;
+            student._renderMaterialLog = () => renderLatestMaterialLog(latestLogSection, student._lastMaterialLog);
+            student._renderMaterialLog();
         }
 
         const actionBar = clone.querySelector('.action-bar');
@@ -1346,88 +1545,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                     generateMaterialsBtn.textContent = '生成中...';
                     generateMaterialsBtn.disabled = true;
 
-                    // 清空旧日志面板
-                    const oldLog = document.getElementById('material-gen-log');
-                    if (oldLog) oldLog.remove();
-
                     try {
                         const res = await fetch(`/api/students/${student.id}/generate_materials`, { method: 'POST' });
                         const data = await res.json();
-                        if (!res.ok) throw new Error(data.error || '生成失败');
-                        showMessage('报名材料生成成功', 'success');
+                        const latestLog = storeMaterialLog(student, data);
+                        showMaterialLogModal(latestLog);
                         if (student._reloadMaterials) {
                             student._reloadMaterials();
                         }
-
-                        // 展示处理日志
-                        if (data.logs) {
-                            const logPanel = document.createElement('div');
-                            logPanel.id = 'material-gen-log';
-                            logPanel.style.cssText = `
-                                margin-top: 16px;
-                                border: 1px solid #E2E8F0;
-                                border-radius: 8px;
-                                overflow: hidden;
-                                font-size: 12px;
-                                width: 100%;
-                            `;
-
-                            const logHeader = document.createElement('div');
-                            logHeader.style.cssText = `
-                                display: flex;
-                                justify-content: space-between;
-                                align-items: center;
-                                padding: 8px 14px;
-                                background: #F8FAFC;
-                                border-bottom: 1px solid #E2E8F0;
-                                cursor: pointer;
-                                user-select: none;
-                            `;
-                            logHeader.innerHTML = `
-                                <span style="font-weight:600;color:#475569;">📋 处理日志 (点击查看详情)</span>
-                                <span id="material-log-toggle" style="color:#94A3B8;font-size:11px;">▼ 展开</span>
-                            `;
-
-                            const logBody = document.createElement('pre');
-                            logBody.style.cssText = `
-                                display: none;
-                                margin: 0;
-                                padding: 12px 14px;
-                                background: #0F172A;
-                                color: #94A3B8;
-                                font-family: 'JetBrains Mono', 'Fira Code', monospace;
-                                font-size: 11px;
-                                line-height: 1.7;
-                                white-space: pre-wrap;
-                                word-break: break-all;
-                                max-height: 400px;
-                                overflow-y: auto;
-                            `;
-
-                            // 给关键词上色
-                            const colored = data.logs
-                                .replace(/\[diploma\]/g, '<span style="color:#38BDF8">$&</span>')
-                                .replace(/\[id-card\]/g, '<span style="color:#34D399">$&</span>')
-                                .replace(/\[hukou\](?:\[[^\]]+\])?/g, '<span style="color:#F472B6">$&</span>')
-                                .replace(/\[material_crop\]/g, '<span style="color:#6EE7B7">$&</span>')
-                                .replace(/(决策:.*)/g, '<span style="color:#4ADE80">$1</span>')
-                                .replace(/(处理失败.*|Error.*)/g, '<span style="color:#F87171">$1</span>')
-                                .replace(/(已输出:.*)/g, '<span style="color:#A78BFA">$1</span>');
-                            logBody.innerHTML = colored;
-
-                            logHeader.onclick = () => {
-                                const toggle = document.getElementById('material-log-toggle');
-                                const isHidden = logBody.style.display === 'none';
-                                logBody.style.display = isHidden ? 'block' : 'none';
-                                if (toggle) toggle.textContent = isHidden ? '▲ 收起' : '▼ 展开';
-                            };
-
-                            logPanel.appendChild(logHeader);
-                            logPanel.appendChild(logBody);
-
-                            // 插入到操作栏下方
-                            actionBar.after(logPanel);
-                        }
+                        if (!res.ok) throw new Error(data.message || data.error || '生成失败');
+                        showMessage('报名材料生成成功', 'success');
                     } catch (e) {
                         showMessage(e.message, 'error');
                     } finally {
@@ -1689,7 +1816,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             let dispPts    = null;   // 4×[cx,cy] canvas 坐标（由 origToDisp 动态派生）
             let dragging   = -1;
             let userDragged = false; // 用户真正手动拖动过
-            let hasDragged  = false; // 任何角点已被应用（用于 syncCropState）
+            let hasConfirmedPoints = false; // 仅用户确认过的点位才参与提交
             let rotationDeg = 0;     // 当前旋转角度（0/90/180/270）
 
             // ── 坐标变换（含旋转矩阵）──────────────────────────────────────
@@ -1744,7 +1871,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             function syncCropState() {
-                if (!originalPts || !hasDragged) {
+                if (!originalPts || !hasConfirmedPoints) {
                     cropState[ip.pointsKey] = { displayPts: [], originalPts: [] };
                     return;
                 }
@@ -1849,7 +1976,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const stopDrag = () => {
                 if (dragging >= 0) {
                     userDragged = true;
-                    hasDragged  = true;
+                    hasConfirmedPoints = true;
                     syncCropState();
                     statusEl.style.color   = '#059669';
                     statusEl.textContent   = '✓ 已手动调整裁剪区域，点击「重新生成」确认';
@@ -1862,7 +1989,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             resetBtn.onclick = () => {
                 userDragged = false;
-                hasDragged  = false;
+                hasConfirmedPoints = false;
                 originalPts = null;
                 dispPts     = null;
                 initRect();
@@ -1875,7 +2002,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             wrap.applyServerPoints = (pts_orig) => {
                 if (userDragged) return; // 用户手动拖过，不覆盖
                 originalPts = pts_orig.map(p => [...p]);
-                hasDragged  = true;
+                hasConfirmedPoints = false;
                 refreshDispPts();
                 syncCropState();
                 redraw();
@@ -1898,6 +2025,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 redraw();
             };
 
+            wrap.clearMarkedPoints = (statusText = '已清空手动裁剪点位，将按当前模式自动处理') => {
+                userDragged = false;
+                hasConfirmedPoints = false;
+                originalPts = null;
+                dispPts = null;
+                initRect();
+                syncCropState();
+                redraw();
+                statusEl.textContent = statusText;
+                statusEl.style.color = '#6b7280';
+            };
+
             // 兼容旧接口（新设计不再使用 serverPoints 缓存）
             wrap.getServerPoints = () => null;
 
@@ -1905,7 +2044,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             function onImgReady() {
                 if (!img.complete || img.naturalWidth === 0) return;
                 if (cvs.clientWidth === 0) return;
-                if (!hasDragged && !originalPts) {
+                if (!hasConfirmedPoints && !originalPts) {
                     initRect();
                     statusEl.textContent = '拖动角点调整裁剪区域（不标记默认按左侧参数运行自动处理）';
                     statusEl.style.color = '#6b7280';
@@ -2048,6 +2187,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // 调用后端分析角点，更新未被用户手动拖动过的面板
         function reanalyzePoints(adjustments) {
+            if (adjustments.crop_mode === 'none') {
+                cfg.imagePanels.forEach(ip => {
+                    const el = panelEls[ip.pointsKey];
+                    if (el) el.clearMarkedPoints('「不裁剪」模式：将保留全图');
+                });
+                return;
+            }
             cfg.imagePanels.forEach(ip => {
                 const el = panelEls[ip.pointsKey];
                 if (el && !el.getHasDragged()) el.setStatus('⏳ 计算中...', '#9ca3af');
@@ -2105,12 +2251,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const panelKey = cfg.rotateKeyToPanel[group];
                 if (panelKey && panelEls[panelKey]) panelEls[panelKey].setRotation(deg);
             } else if (group === 'crop_mode' && pill.dataset.value === 'none') {
-                // 裁剪模式为「不裁剪」：重置为全图角点
                 cfg.imagePanels.forEach(ip => {
                     const el = panelEls[ip.pointsKey];
                     if (!el) return;
-                    // 通过调用 resetBtn 的逻辑（内存在 el 内）
-                    el.setStatus('「不裁剪」模式：将保留全图', '#9ca3af');
+                    el.clearMarkedPoints('「不裁剪」模式：将保留全图');
                 });
             } else {
                 // 裁剪参数变化：触发防抖重分析
@@ -2140,9 +2284,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (val) adjustments[f.key] = val;
             });
 
-            // 收集当前面板的角点：
-            // - 有 4 个角点（无论来自服务端分析还是手动拖动）→ manual_crop_material
-            // - cropState 为空（未交互）→ regenerate_material（expand_level 等参数完整生效）
+            // 只收集用户真正手动确认过的角点。
             const markedPoints = {};
             cfg.imagePanels.forEach(ip => {
                 const s = cropState[ip.pointsKey];
@@ -2169,10 +2311,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
                 }
                 const result = await res.json();
-                if (!res.ok) throw new Error(result.error || '重新生成失败');
+                const latestLog = storeMaterialLog(student, result);
+                showMaterialLogModal(latestLog);
+                if (reloadFn) reloadFn();
+                if (!res.ok) throw new Error(result.message || result.error || '重新生成失败');
                 showMessage('重新生成成功', 'success');
                 panel.remove();
-                if (reloadFn) reloadFn();
             } catch (e) {
                 showMessage(e.message, 'error');
                 submitBtn.textContent = '重新生成'; submitBtn.disabled = false;

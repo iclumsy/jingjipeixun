@@ -3,6 +3,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+from datetime import datetime
 
 import cv2
 import numpy as np
@@ -74,6 +75,158 @@ CROP_PROFILES = {
         "expand_ratio": 0.015,
     },
 }
+
+MATERIAL_OUTPUT_LABELS = {
+    "photo": "个人照片",
+    "diploma": "学历证书",
+    "id_card": "身份证",
+    "hukou": "户口本",
+    "training_form": "体检表",
+}
+
+MATERIAL_SCOPE_LABELS = {
+    "global": "全局流程",
+    "photo": "个人照片",
+    "diploma": "学历证书",
+    "id_card": "身份证",
+    "id_card_front": "身份证正面",
+    "id_card_back": "身份证反面",
+    "hukou": "户口本",
+    "hukou_home": "户口本首页",
+    "hukou_personal": "户口本人页",
+    "training_form": "体检表",
+}
+
+
+class MaterialGenerationLogger:
+    def __init__(self):
+        self.started_at = datetime.now().isoformat(timespec="seconds")
+        self.finished_at = None
+        self.events = []
+        self.output_files = []
+
+    def emit(self, level, scope, step, title, message, details=None, raw=None):
+        event = {
+            "level": level,
+            "scope": scope,
+            "scope_label": MATERIAL_SCOPE_LABELS.get(scope, scope),
+            "step": step,
+            "title": title,
+            "message": message,
+            "details": details or {},
+            "raw": raw,
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+        }
+        output_path = event["details"].get("output_path")
+        if output_path and output_path not in self.output_files:
+            self.output_files.append(output_path)
+        self.events.append(event)
+        return event
+
+    def build_summary(self):
+        if self.finished_at is None:
+            self.finished_at = datetime.now().isoformat(timespec="seconds")
+
+        success_count = sum(1 for event in self.events if event["level"] == "success")
+        warning_count = sum(1 for event in self.events if event["level"] == "warning")
+        error_count = sum(1 for event in self.events if event["level"] == "error")
+        material_scopes = {
+            event["scope"]
+            for event in self.events
+            if event["scope"] != "global"
+        }
+        return {
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
+            "material_count": len(material_scopes),
+            "success_count": success_count,
+            "warning_count": warning_count,
+            "error_count": error_count,
+            "output_files": list(self.output_files),
+        }
+
+
+def crop_image_with_points(image, points, mode="perspective"):
+    points_array = np.array(points, dtype=np.float32)
+    if mode == "rect_only":
+        x1 = int(np.floor(np.min(points_array[:, 0])))
+        y1 = int(np.floor(np.min(points_array[:, 1])))
+        x2 = int(np.ceil(np.max(points_array[:, 0])))
+        y2 = int(np.ceil(np.max(points_array[:, 1])))
+        h, w = image.shape[:2]
+        x1 = int(np.clip(x1, 0, w - 1))
+        y1 = int(np.clip(y1, 0, h - 1))
+        x2 = int(np.clip(x2, x1 + 1, w))
+        y2 = int(np.clip(y2, y1 + 1, h))
+        return image[y1:y2, x1:x2].copy()
+    return four_point_transform(image, points_array)
+
+
+def cleanup_generated_outputs(output_dir, name_prefix, material_type=None):
+    if not os.path.isdir(output_dir):
+        return []
+
+    target_names = {
+        "photo": [f"{name_prefix}-{MATERIAL_OUTPUT_LABELS['photo']}.jpg"],
+        "diploma": [f"{name_prefix}-{MATERIAL_OUTPUT_LABELS['diploma']}.jpg"],
+        "id_card": [f"{name_prefix}-{MATERIAL_OUTPUT_LABELS['id_card']}.jpg"],
+        "hukou": [f"{name_prefix}-{MATERIAL_OUTPUT_LABELS['hukou']}.jpg"],
+        "training_form": [f"{name_prefix}-{MATERIAL_OUTPUT_LABELS['training_form']}"],
+    }
+
+    removed = []
+    for filename in os.listdir(output_dir):
+        abs_path = os.path.join(output_dir, filename)
+        if not os.path.isfile(abs_path):
+            continue
+
+        should_remove = False
+        if material_type is None:
+            should_remove = filename.startswith(f"{name_prefix}-")
+        elif material_type == "training_form":
+            should_remove = filename.startswith(target_names["training_form"][0])
+        else:
+            should_remove = filename in target_names.get(material_type, [])
+
+        if should_remove:
+            os.remove(abs_path)
+            removed.append(abs_path)
+
+    return removed
+
+
+def _build_process_result(scope, success, output_path=None, error=None):
+    return {
+        "scope": scope,
+        "success": success,
+        "output_path": output_path,
+        "error": error,
+    }
+
+
+def build_generation_report(output_dir, logger, results):
+    logger.finished_at = datetime.now().isoformat(timespec="seconds")
+    errors = [result for result in results if not result.get("success")]
+    summary = logger.build_summary()
+    warning_scopes = {
+        event["scope"]
+        for event in logger.events
+        if event["level"] == "warning" and event["scope"] != "global"
+    }
+    summary.update({
+        "material_count": len(results),
+        "success_count": sum(1 for result in results if result.get("success")),
+        "warning_count": len(warning_scopes),
+        "error_count": len(errors),
+    })
+    return {
+        "success": not errors,
+        "output_dir": output_dir,
+        "results": results,
+        "errors": errors,
+        "log_events": list(logger.events),
+        "log_summary": summary,
+    }
 
 
 def order_points(pts):
@@ -756,13 +909,16 @@ def trim_hukou_home_page_margins(image):
     return image[top:bottom, left:right].copy()
 
 
-def prepare_hukou_output_page(image, page_kind, crop_mode="auto", expand_level=None, skip_ratio_trim=False, canny_scale=1.0):
+def prepare_hukou_output_page(image, page_kind, crop_mode="auto", expand_level=None, skip_ratio_trim=False, canny_scale=1.0, manual_crop_applied=False):
     kind_label = "首页" if page_kind == "home" else "本人页"
     tag = f"[hukou][{kind_label}]"
     h0, w0 = image.shape[:2]
     print(f"{tag} 原图尺寸: {w0}x{h0}")
 
-    if crop_mode == "none":
+    if manual_crop_applied:
+        page = image.copy()
+        meta = {"crop_mode": "manual", "selected_candidate": None}
+    elif crop_mode == "none":
         page = image.copy()
         meta = {"crop_mode": "original", "selected_candidate": None}
     else:
@@ -781,6 +937,8 @@ def prepare_hukou_output_page(image, page_kind, crop_mode="auto", expand_level=N
     )
 
     if (
+        not manual_crop_applied
+        and
         page_kind == "home"
         and selected.get("detector") == "foreground_mask"
         and selected.get("area_ratio", 0.0) < 0.85
@@ -801,6 +959,8 @@ def prepare_hukou_output_page(image, page_kind, crop_mode="auto", expand_level=N
         print(f"{tag} 方向校正后: {w3}x{h3}")
 
     if (
+        not manual_crop_applied
+        and
         page_kind == "home"
         and selected.get("detector") == "foreground_mask"
         and selected.get("area_ratio", 0.0) >= 0.82
@@ -1447,14 +1607,48 @@ def resize_document_to_width(image, target_width):
     return resized, target_height
 
 
-def process_personal_photo(input_path, output_dir, name_prefix):
+def resize_document_to_fit(image, max_width, max_height):
+    h, w = image.shape[:2]
+    max_width = max(MIN_CROP_DIM, int(max_width))
+    max_height = max(MIN_CROP_DIM, int(max_height))
+    scale = min(max_width / float(w), max_height / float(h))
+    target_width = max(MIN_CROP_DIM, int(round(w * scale)))
+    target_height = max(MIN_CROP_DIM, int(round(h * scale)))
+    resized = cv2.resize(image, (target_width, target_height), interpolation=cv2.INTER_AREA)
+    return resized, target_width, target_height
+
+
+def _size_details(image, key_prefix="size"):
+    h, w = image.shape[:2]
+    return {
+        f"{key_prefix}_width": int(w),
+        f"{key_prefix}_height": int(h),
+    }
+
+
+def process_personal_photo(input_path, output_dir, name_prefix, logger=None):
     """个人照片处理为 1MB 以下"""
+    scope = "photo"
     try:
+        if logger is not None:
+            logger.emit("info", scope, "start", "开始处理个人照片", os.path.basename(input_path))
         img = Image.open(input_path)
         if img.mode != "RGB":
             img = img.convert("RGB")
 
         output_path = os.path.join(output_dir, f"{name_prefix}-个人照片.jpg")
+        if logger is not None:
+            logger.emit(
+                "info",
+                scope,
+                "read_input",
+                "个人照片读取成功",
+                "已读取个人照片，准备压缩输出",
+                details={
+                    "input_width": int(img.width),
+                    "input_height": int(img.height),
+                },
+            )
 
         quality = 95
         while True:
@@ -1464,32 +1658,88 @@ def process_personal_photo(input_path, output_dir, name_prefix):
             if size_kb < 1000 or quality <= 30:
                 with open(output_path, "wb") as file_obj:
                     file_obj.write(buffer.getvalue())
+                if logger is not None:
+                    logger.emit(
+                        "success",
+                        scope,
+                        "write_output",
+                        "个人照片输出成功",
+                        "已生成符合大小要求的个人照片",
+                        details={
+                            "output_path": output_path,
+                            "jpeg_quality": quality,
+                            "output_kb": round(size_kb, 1),
+                        },
+                    )
                 break
             quality -= 10
-
+        return _build_process_result(scope, True, output_path=output_path)
     except Exception as exc:
         print("Error processing personal photo:", exc)
+        if logger is not None:
+            logger.emit(
+                "error",
+                scope,
+                "write_output",
+                "个人照片处理失败",
+                "压缩或写出个人照片时发生错误",
+                details={"input_path": input_path},
+            )
+        return _build_process_result(scope, False, error=str(exc))
 
 
-def process_diploma(input_path, output_dir, name_prefix, adjustments=None):
+def process_diploma(input_path, output_dir, name_prefix, adjustments=None, logger=None):
     """学历证书照片，裁边，A4白色底，水平居中，宽两边留 1cm，水平校正"""
     adjustments = adjustments or {}
     crop_mode = adjustments.get("crop_mode", "auto")
     extra_rotate = adjustments.get("rotate", 0)
     expand_level = adjustments.get("expand_level")
     skip_ratio_trim = adjustments.get("skip_ratio_trim", False)
+    manual_crop_applied = adjustments.get("manual_crop_applied", False)
     tag = "[diploma]"
+    scope = "diploma"
     try:
         print(f"{tag} 开始处理: {os.path.basename(input_path)}")
+        if logger is not None:
+            logger.emit("info", scope, "start", "开始处理学历证书", os.path.basename(input_path))
         img = read_cv_image(input_path)
         if img is None:
             print(f"{tag} 读图失败，终止")
-            return
+            if logger is not None:
+                logger.emit("error", scope, "read_input", "学历证书读取失败", "未能读取学历证书图片")
+            return _build_process_result(scope, False, error="read failed")
         h0, w0 = img.shape[:2]
         print(f"{tag} 原图尺寸: {w0}x{h0}")
+        if logger is not None:
+            logger.emit(
+                "info",
+                scope,
+                "read_input",
+                "学历证书读取成功",
+                "已读取学历证书原图",
+                details=_size_details(img, "input"),
+            )
 
-        if crop_mode == "none":
-            pass
+        if manual_crop_applied:
+            if logger is not None:
+                logger.emit(
+                    "info",
+                    scope,
+                    "auto_crop",
+                    "使用手动确认的裁剪区域",
+                    "该图片已按手动框选结果裁好，跳过自动裁剪",
+                    details={"crop_mode": crop_mode},
+                )
+        elif crop_mode == "none":
+            if logger is not None:
+                logger.emit(
+                    "info",
+                    scope,
+                    "auto_crop",
+                    "已按不裁剪模式处理",
+                    "本次保留学历证书原图，不执行自动裁剪",
+                    details={"crop_mode": crop_mode},
+                )
         else:
             _allow_persp = None if crop_mode == "auto" else False
             img, meta = auto_crop_diploma(img, return_meta=True, allow_perspective=_allow_persp, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim)
@@ -1504,24 +1754,52 @@ def process_diploma(input_path, output_dir, name_prefix, adjustments=None):
                 f"edge_density={sel.get('edge_density_on_border', 0):.3f}  "
                 f"analysis_enhanced={meta.get('analysis_enhancement_enabled', False)}"
             )
+            if logger is not None:
+                logger.emit(
+                    "success",
+                    scope,
+                    "auto_crop",
+                    "学历证书裁边完成",
+                    "已完成学历证书裁边并准备排版",
+                    details={
+                        "crop_mode": meta.get("crop_mode"),
+                        "detector": sel.get("detector", "N/A"),
+                        "confidence": sel.get("confidence", 0),
+                        "area_ratio": sel.get("area_ratio", 0),
+                        **_size_details(img, "cropped"),
+                    },
+                )
 
         if extra_rotate:
             img = rotate_image_by_degrees(img, extra_rotate)
             print(f"{tag} 额外旋转 {extra_rotate}°")
+            if logger is not None:
+                logger.emit(
+                    "info",
+                    scope,
+                    "normalize_orientation",
+                    f"学历证书额外旋转 {extra_rotate}°",
+                    "已按人工设置旋转学历证书方向",
+                    details={"rotation": int(extra_rotate)},
+                )
 
-        target_width = A4_WIDTH - 2 * CM_IN_PX
-        img_resized, target_height = resize_document_to_width(img, target_width)
-        print(f"{tag} 缩放腧50第 A4 画布: 宽={target_width}px  高={target_height}px")
+        max_width = A4_WIDTH - 2 * CM_IN_PX
+        max_height = A4_HEIGHT - 2 * CM_IN_PX
+        img_resized, target_width, target_height = resize_document_to_fit(img, max_width, max_height)
+        print(f"{tag} 缩放适配 A4 画布: 宽={target_width}px  高={target_height}px")
+        if logger is not None:
+            logger.emit(
+                "info",
+                scope,
+                "layout_a4",
+                "学历证书已适配 A4 版面",
+                "已按 A4 可用区域等比缩放学历证书，避免底部被截断",
+                details={"target_width": target_width, "target_height": target_height, "max_width": max_width, "max_height": max_height},
+            )
 
         canvas = create_a4_canvas()
-        x_offset = CM_IN_PX
+        x_offset = max(0, (A4_WIDTH - target_width) // 2)
         y_offset = max(0, (A4_HEIGHT - target_height) // 2)
-
-        canvas_h = canvas.shape[0]
-        if y_offset + target_height > canvas_h:
-            target_height = canvas_h - y_offset
-            img_resized = img_resized[:target_height, :]
-            print(f"{tag} 高度超出画布，功成截断到: {target_height}px")
 
         canvas[y_offset:y_offset + target_height, x_offset:x_offset + target_width] = img_resized
         print(f"{tag} 排版位置: x={x_offset}  y={y_offset}")
@@ -1529,22 +1807,44 @@ def process_diploma(input_path, output_dir, name_prefix, adjustments=None):
         output_path = os.path.join(output_dir, f"{name_prefix}-学历证书.jpg")
         write_cv_image(output_path, canvas)
         print(f"{tag} 已输出: {output_path}")
+        if logger is not None:
+            logger.emit(
+                "success",
+                scope,
+                "write_output",
+                "学历证书输出成功",
+                "已生成学历证书报名材料图片",
+                details={
+                    "output_path": output_path,
+                    "canvas_width": A4_WIDTH,
+                    "canvas_height": A4_HEIGHT,
+                },
+            )
+        return _build_process_result(scope, True, output_path=output_path)
     except Exception as exc:
         print(f"{tag} 处理失败:", exc)
+        if logger is not None:
+            logger.emit("error", scope, "write_output", "学历证书处理失败", "学历证书生成过程中发生错误")
+        return _build_process_result(scope, False, error=str(exc))
 
 
-def process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments=None):
+def process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments=None, logger=None):
     adjustments = adjustments or {}
     crop_mode = adjustments.get("crop_mode", "auto")
     front_rotate = adjustments.get("front_rotate", 0)
     back_rotate = adjustments.get("back_rotate", 0)
     expand_level = adjustments.get("expand_level")
     skip_ratio_trim = adjustments.get("skip_ratio_trim", False)
+    front_manual_crop_applied = adjustments.get("front_manual_crop_applied", False)
+    back_manual_crop_applied = adjustments.get("back_manual_crop_applied", False)
     # canny_scale < 1 提高边缘灵敏度（适合大面积纯黑背景 + 白色卡片），> 1 则降低噪声
     canny_scale = float(adjustments.get("canny_scale", 1.0))
     tag = "[id-card]"
+    scope = "id_card"
     try:
         canvas = create_a4_canvas()
+        if logger is not None:
+            logger.emit("info", scope, "start", "开始处理身份证", "准备生成身份证报名材料")
 
         target_width = A4_WIDTH // 2
         x_offset = (A4_WIDTH - target_width) // 2
@@ -1557,7 +1857,12 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments
             if front_img is not None:
                 h0, w0 = front_img.shape[:2]
                 print(f"{tag}[正面] 原图: {w0}x{h0}")
-                if crop_mode != "none":
+                if logger is not None:
+                    logger.emit("info", "id_card_front", "read_input", "身份证正面读取成功", "已读取身份证正面原图", details=_size_details(front_img, "input"))
+                if front_manual_crop_applied:
+                    if logger is not None:
+                        logger.emit("info", "id_card_front", "auto_crop", "使用手动确认裁剪区域", "身份证正面已按手动点位裁好，跳过自动裁剪", details={"crop_mode": crop_mode})
+                elif crop_mode != "none":
                     _allow_persp = None if crop_mode == "auto" else False
                     front_img, meta = auto_crop_id_card(front_img, return_meta=True, allow_perspective=_allow_persp, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim, canny_scale=canny_scale)
                     sel = meta.get("selected_candidate") or {}
@@ -1569,23 +1874,51 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments
                         f"area_ratio={sel.get('area_ratio', 0):.3f}  "
                         f"confidence={sel.get('confidence', 0):.3f}"
                     )
+                    if logger is not None:
+                        logger.emit(
+                            "success",
+                            "id_card_front",
+                            "auto_crop",
+                            "身份证正面裁边完成",
+                            "已完成身份证正面裁边",
+                            details={
+                                "crop_mode": meta.get("crop_mode"),
+                                "detector": sel.get("detector", "N/A"),
+                                "confidence": sel.get("confidence", 0),
+                                "area_ratio": sel.get("area_ratio", 0),
+                                **_size_details(front_img, "cropped"),
+                            },
+                        )
+                elif logger is not None:
+                    logger.emit("info", "id_card_front", "auto_crop", "已按不裁剪模式处理", "本次保留身份证正面原图", details={"crop_mode": crop_mode})
                 hc, wc = front_img.shape[:2]
                 front_img = normalize_id_card_side(front_img, "front")
                 if front_rotate:
                     front_img = rotate_image_by_degrees(front_img, front_rotate)
                     print(f"{tag}[正面] 额外旋转 {front_rotate}°")
+                    if logger is not None:
+                        logger.emit("info", "id_card_front", "normalize_orientation", f"身份证正面额外旋转 {front_rotate}°", "已按人工设置旋转身份证正面方向", details={"rotation": int(front_rotate)})
                 hn, wn = front_img.shape[:2]
                 if (hn, wn) != (hc, wc):
                     print(f"{tag}[正面] 方向正规化后: {wn}x{hn}")
+                    if logger is not None:
+                        logger.emit("info", "id_card_front", "normalize_orientation", "身份证正面方向已校正", "已根据内容特征校正身份证正面方向", details=_size_details(front_img, "normalized"))
                 front_img, front_h = resize_document_to_width(front_img, target_width)
                 print(f"{tag}[正面] 缩放后: {target_width}x{front_h}")
+                if logger is not None:
+                    logger.emit("info", "id_card_front", "layout_a4", "身份证正面已适配版式", "已缩放身份证正面以便排入 A4", details={"target_width": target_width, "target_height": front_h})
 
         if back_path and os.path.exists(back_path):
             back_img = read_cv_image(back_path)
             if back_img is not None:
                 h0, w0 = back_img.shape[:2]
                 print(f"{tag}[反面] 原图: {w0}x{h0}")
-                if crop_mode != "none":
+                if logger is not None:
+                    logger.emit("info", "id_card_back", "read_input", "身份证反面读取成功", "已读取身份证反面原图", details=_size_details(back_img, "input"))
+                if back_manual_crop_applied:
+                    if logger is not None:
+                        logger.emit("info", "id_card_back", "auto_crop", "使用手动确认裁剪区域", "身份证反面已按手动点位裁好，跳过自动裁剪", details={"crop_mode": crop_mode})
+                elif crop_mode != "none":
                     _allow_persp = None if crop_mode == "auto" else False
                     back_img, meta = auto_crop_id_card(back_img, return_meta=True, allow_perspective=_allow_persp, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim, canny_scale=canny_scale)
                     sel = meta.get("selected_candidate") or {}
@@ -1597,12 +1930,33 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments
                         f"area_ratio={sel.get('area_ratio', 0):.3f}  "
                         f"confidence={sel.get('confidence', 0):.3f}"
                     )
+                    if logger is not None:
+                        logger.emit(
+                            "success",
+                            "id_card_back",
+                            "auto_crop",
+                            "身份证反面裁边完成",
+                            "已完成身份证反面裁边",
+                            details={
+                                "crop_mode": meta.get("crop_mode"),
+                                "detector": sel.get("detector", "N/A"),
+                                "confidence": sel.get("confidence", 0),
+                                "area_ratio": sel.get("area_ratio", 0),
+                                **_size_details(back_img, "cropped"),
+                            },
+                        )
+                elif logger is not None:
+                    logger.emit("info", "id_card_back", "auto_crop", "已按不裁剪模式处理", "本次保留身份证反面原图", details={"crop_mode": crop_mode})
                 back_img = normalize_id_card_side(back_img, "back")
                 if back_rotate:
                     back_img = rotate_image_by_degrees(back_img, back_rotate)
                     print(f"{tag}[反面] 额外旋转 {back_rotate}°")
+                    if logger is not None:
+                        logger.emit("info", "id_card_back", "normalize_orientation", f"身份证反面额外旋转 {back_rotate}°", "已按人工设置旋转身份证反面方向", details={"rotation": int(back_rotate)})
                 back_img, back_h = resize_document_to_width(back_img, target_width)
                 print(f"{tag}[反面] 缩放后: {target_width}x{back_h}")
+                if logger is not None:
+                    logger.emit("info", "id_card_back", "layout_a4", "身份证反面已适配版式", "已缩放身份证反面以便排入 A4", details={"target_width": target_width, "target_height": back_h})
 
         gap = max(front_h, back_h) // 2 if max(front_h, back_h) > 0 else 0
         total_height = front_h + back_h + gap
@@ -1643,21 +1997,42 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments
             output_path = os.path.join(output_dir, f"{name_prefix}-身份证.jpg")
             write_cv_image(output_path, canvas)
             print(f"{tag} 已输出: {output_path}")
+            if logger is not None:
+                logger.emit(
+                    "success",
+                    scope,
+                    "write_output",
+                    "身份证输出成功",
+                    "已生成身份证报名材料图片",
+                    details={"output_path": output_path},
+                )
+            return _build_process_result(scope, True, output_path=output_path)
+        if logger is not None:
+            logger.emit("error", scope, "write_output", "身份证输出失败", "未读取到可用的身份证图片，无法生成输出")
+        return _build_process_result(scope, False, error="no readable id card images")
     except Exception as exc:
         print(f"{tag} 处理失败:", exc)
+        if logger is not None:
+            logger.emit("error", scope, "write_output", "身份证处理失败", "身份证生成过程中发生错误")
+        return _build_process_result(scope, False, error=str(exc))
 
 
-def process_hukou(residence_path, personal_path, output_dir, name_prefix, adjustments=None):
+def process_hukou(residence_path, personal_path, output_dir, name_prefix, adjustments=None, logger=None):
     adjustments = adjustments or {}
     crop_mode = adjustments.get("crop_mode", "auto")
     home_rotate = adjustments.get("home_rotate", 0)
     personal_rotate = adjustments.get("personal_rotate", 0)
     expand_level = adjustments.get("expand_level")
     skip_ratio_trim = adjustments.get("skip_ratio_trim", False)
+    home_manual_crop_applied = adjustments.get("home_manual_crop_applied", False)
+    personal_manual_crop_applied = adjustments.get("personal_manual_crop_applied", False)
     canny_scale = float(adjustments.get("canny_scale", 1.0))
     tag = "[hukou]"
+    scope = "hukou"
     try:
         canvas = create_a4_canvas()
+        if logger is not None:
+            logger.emit("info", scope, "start", "开始处理户口本", "准备生成户口本报名材料")
 
         target_width = A4_WIDTH - 4 * CM_IN_PX
         x_offset = 2 * CM_IN_PX
@@ -1669,23 +2044,59 @@ def process_hukou(residence_path, personal_path, output_dir, name_prefix, adjust
             print(f"{tag}[首页] 开始处理: {os.path.basename(residence_path)}")
             img1 = read_cv_image(residence_path)
             if img1 is not None:
-                img1 = prepare_hukou_output_page(img1, "home", crop_mode=crop_mode, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim, canny_scale=canny_scale)
+                if logger is not None:
+                    logger.emit("info", "hukou_home", "read_input", "户口本首页读取成功", "已读取户口本首页原图", details=_size_details(img1, "input"))
+                if logger is not None and home_manual_crop_applied:
+                    logger.emit("info", "hukou_home", "auto_crop", "使用手动确认裁剪区域", "户口本首页已按手动点位裁好，跳过自动裁边，但仍保留方向校正", details={"crop_mode": crop_mode})
+                img1 = prepare_hukou_output_page(
+                    img1,
+                    "home",
+                    crop_mode=crop_mode,
+                    expand_level=expand_level,
+                    skip_ratio_trim=skip_ratio_trim,
+                    canny_scale=canny_scale,
+                    manual_crop_applied=home_manual_crop_applied,
+                )
+                if logger is not None:
+                    logger.emit("success", "hukou_home", "auto_crop", "户口本首页处理完成", "已完成户口本首页裁边/方向校正准备排版", details={"crop_mode": crop_mode, **_size_details(img1, "processed")})
                 if home_rotate:
                     img1 = rotate_image_by_degrees(img1, home_rotate)
                     print(f"{tag}[首页] 额外旋转 {home_rotate}°")
+                    if logger is not None:
+                        logger.emit("info", "hukou_home", "normalize_orientation", f"户口本首页额外旋转 {home_rotate}°", "已按人工设置旋转户口本首页方向", details={"rotation": int(home_rotate)})
                 img1, h1 = resize_document_to_width(img1, target_width)
                 print(f"{tag}[首页] 缩放后: {target_width}x{h1}")
+                if logger is not None:
+                    logger.emit("info", "hukou_home", "layout_a4", "户口本首页已适配版式", "已缩放户口本首页以便排入 A4", details={"target_width": target_width, "target_height": h1})
 
         if personal_path and os.path.exists(personal_path):
             print(f"{tag}[本人页] 开始处理: {os.path.basename(personal_path)}")
             img2 = read_cv_image(personal_path)
             if img2 is not None:
-                img2 = prepare_hukou_output_page(img2, "personal", crop_mode=crop_mode, expand_level=expand_level, skip_ratio_trim=skip_ratio_trim, canny_scale=canny_scale)
+                if logger is not None:
+                    logger.emit("info", "hukou_personal", "read_input", "户口本人页读取成功", "已读取户口本人页原图", details=_size_details(img2, "input"))
+                if logger is not None and personal_manual_crop_applied:
+                    logger.emit("info", "hukou_personal", "auto_crop", "使用手动确认裁剪区域", "户口本人页已按手动点位裁好，跳过自动裁边，但仍保留方向校正", details={"crop_mode": crop_mode})
+                img2 = prepare_hukou_output_page(
+                    img2,
+                    "personal",
+                    crop_mode=crop_mode,
+                    expand_level=expand_level,
+                    skip_ratio_trim=skip_ratio_trim,
+                    canny_scale=canny_scale,
+                    manual_crop_applied=personal_manual_crop_applied,
+                )
+                if logger is not None:
+                    logger.emit("success", "hukou_personal", "auto_crop", "户口本人页处理完成", "已完成户口本人页裁边/方向校正准备排版", details={"crop_mode": crop_mode, **_size_details(img2, "processed")})
                 if personal_rotate:
                     img2 = rotate_image_by_degrees(img2, personal_rotate)
                     print(f"{tag}[本人页] 额外旋转 {personal_rotate}°")
+                    if logger is not None:
+                        logger.emit("info", "hukou_personal", "normalize_orientation", f"户口本人页额外旋转 {personal_rotate}°", "已按人工设置旋转户口本人页方向", details={"rotation": int(personal_rotate)})
                 img2, h2 = resize_document_to_width(img2, target_width)
                 print(f"{tag}[本人页] 缩放后: {target_width}x{h2}")
+                if logger is not None:
+                    logger.emit("info", "hukou_personal", "layout_a4", "户口本人页已适配版式", "已缩放户口本人页以便排入 A4", details={"target_width": target_width, "target_height": h2})
 
         gap = CM_IN_PX
         total_height = h1 + h2 + gap
@@ -1725,16 +2136,46 @@ def process_hukou(residence_path, personal_path, output_dir, name_prefix, adjust
             output_path = os.path.join(output_dir, f"{name_prefix}-户口本.jpg")
             write_cv_image(output_path, canvas)
             print(f"{tag} 已输出: {output_path}")
+            if logger is not None:
+                logger.emit(
+                    "success",
+                    scope,
+                    "write_output",
+                    "户口本输出成功",
+                    "已生成户口本报名材料图片",
+                    details={"output_path": output_path},
+                )
+            return _build_process_result(scope, True, output_path=output_path)
+        if logger is not None:
+            logger.emit("error", scope, "write_output", "户口本输出失败", "未读取到可用的户口本图片，无法生成输出")
+        return _build_process_result(scope, False, error="no readable hukou images")
     except Exception as exc:
         print(f"{tag} 处理失败:", exc)
+        if logger is not None:
+            logger.emit("error", scope, "write_output", "户口本处理失败", "户口本生成过程中发生错误")
+        return _build_process_result(scope, False, error=str(exc))
 
 
 
-def copy_health_form(form_path, output_dir, name_prefix):
+def copy_health_form(form_path, output_dir, name_prefix, logger=None):
+    scope = "training_form"
     if form_path and os.path.exists(form_path):
         ext = os.path.splitext(form_path)[1]
         output_path = os.path.join(output_dir, f"{name_prefix}-体检表{ext}")
         shutil.copy2(form_path, output_path)
+        if logger is not None:
+            logger.emit(
+                "success",
+                scope,
+                "write_output",
+                "体检表复制成功",
+                "已复制体检表到报名材料目录",
+                details={"output_path": output_path},
+            )
+        return _build_process_result(scope, True, output_path=output_path)
+    if logger is not None:
+        logger.emit("warning", scope, "write_output", "未找到体检表原文件", "本次没有可复制的体检表文件")
+    return _build_process_result(scope, False, error="health form missing")
 
 
 def generate_student_materials(student, base_dir, output_root):
@@ -1749,41 +2190,70 @@ def generate_student_materials(student, base_dir, output_root):
     output_dir = os.path.join(output_root, f"{name_prefix}-报名材料")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
+    logger = MaterialGenerationLogger()
+    logger.emit("info", "global", "start", "开始生成报名材料", f"开始为 {name_prefix} 生成报名材料")
+    removed_files = cleanup_generated_outputs(output_dir, name_prefix)
+    if removed_files:
+        logger.emit(
+            "info",
+            "global",
+            "cleanup",
+            "已清理旧的报名材料",
+            "生成前已移除旧的输出文件，避免混入历史结果",
+            details={"removed_count": len(removed_files)},
+        )
 
     def get_abs_path(key):
         rel = student.get(key)
         return os.path.join(base_dir, rel) if rel else None
 
+    results = []
     photo_path = get_abs_path("photo_path")
     if photo_path and os.path.exists(photo_path):
-        process_personal_photo(photo_path, output_dir, name_prefix)
+        results.append(process_personal_photo(photo_path, output_dir, name_prefix, logger=logger))
 
     diploma_path = get_abs_path("diploma_path")
     if diploma_path and os.path.exists(diploma_path):
-        process_diploma(diploma_path, output_dir, name_prefix)
+        results.append(process_diploma(diploma_path, output_dir, name_prefix, logger=logger))
 
     id_card_front_path = get_abs_path("id_card_front_path")
     id_card_back_path = get_abs_path("id_card_back_path")
     if (id_card_front_path and os.path.exists(id_card_front_path)) or (
         id_card_back_path and os.path.exists(id_card_back_path)
     ):
-        process_id_cards(id_card_front_path, id_card_back_path, output_dir, name_prefix)
+        results.append(process_id_cards(id_card_front_path, id_card_back_path, output_dir, name_prefix, logger=logger))
 
     hukou_residence_path = get_abs_path("hukou_residence_path")
     hukou_personal_path = get_abs_path("hukou_personal_path")
     if (hukou_residence_path and os.path.exists(hukou_residence_path)) or (
         hukou_personal_path and os.path.exists(hukou_personal_path)
     ):
-        process_hukou(hukou_residence_path, hukou_personal_path, output_dir, name_prefix)
+        results.append(process_hukou(hukou_residence_path, hukou_personal_path, output_dir, name_prefix, logger=logger))
 
     training_form_path = get_abs_path("training_form_path")
     if training_form_path and os.path.exists(training_form_path):
-        copy_health_form(training_form_path, output_dir, name_prefix)
+        results.append(copy_health_form(training_form_path, output_dir, name_prefix, logger=logger))
+
+    if not results:
+        logger.emit("error", "global", "finish", "没有找到可处理的原始材料", "当前学员没有可用于生成的原始材料文件")
+        results.append(_build_process_result("global", False, error="no source materials"))
 
     # 生成完成后，批量同步报名材料目录内所有文件至 COS
     _sync_output_dir_to_cos(output_dir, base_dir)
-
-    return output_dir
+    report = build_generation_report(output_dir, logger, results)
+    logger.emit(
+        "success" if report["success"] else "error",
+        "global",
+        "finish",
+        "报名材料生成完成" if report["success"] else "报名材料生成未完全成功",
+        "已完成本次报名材料生成流程" if report["success"] else "本次报名材料生成中有材料处理失败，请检查下方日志",
+        details={
+            "output_dir": output_dir,
+            "result_count": len(results),
+            "error_count": len(report["errors"]),
+        },
+    )
+    return build_generation_report(output_dir, logger, results)
 
 
 def regenerate_single_material(student, base_dir, output_root, material_type, adjustments=None):
@@ -1806,30 +2276,57 @@ def regenerate_single_material(student, base_dir, output_root, material_type, ad
 
     output_dir = os.path.join(output_root, student_folder_name, f"{name_prefix}-报名材料")
     os.makedirs(output_dir, exist_ok=True)
+    logger = MaterialGenerationLogger()
+    logger.emit("info", "global", "start", "开始重新生成材料", f"开始重新生成 {material_type}")
+    removed_files = cleanup_generated_outputs(output_dir, name_prefix, material_type=material_type)
+    if removed_files:
+        logger.emit(
+            "info",
+            "global",
+            "cleanup",
+            "已清理目标旧文件",
+            "重新生成前已移除该材料对应的旧输出文件",
+            details={"removed_count": len(removed_files), "material_type": material_type},
+        )
 
     def get_abs_path(key):
         rel = student.get(key)
         return os.path.join(base_dir, rel) if rel else None
 
+    results = []
     if material_type == "diploma":
         diploma_path = get_abs_path("diploma_path")
         if diploma_path and os.path.exists(diploma_path):
-            process_diploma(diploma_path, output_dir, name_prefix, adjustments=adjustments)
+            results.append(process_diploma(diploma_path, output_dir, name_prefix, adjustments=adjustments, logger=logger))
 
     elif material_type == "id_card":
         front_path = get_abs_path("id_card_front_path")
         back_path = get_abs_path("id_card_back_path")
         if (front_path and os.path.exists(front_path)) or (back_path and os.path.exists(back_path)):
-            process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments=adjustments)
+            results.append(process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments=adjustments, logger=logger))
 
     elif material_type == "hukou":
         residence_path = get_abs_path("hukou_residence_path")
         personal_path = get_abs_path("hukou_personal_path")
         if (residence_path and os.path.exists(residence_path)) or (personal_path and os.path.exists(personal_path)):
-            process_hukou(residence_path, personal_path, output_dir, name_prefix, adjustments=adjustments)
+            results.append(process_hukou(residence_path, personal_path, output_dir, name_prefix, adjustments=adjustments, logger=logger))
+
+    if not results:
+        logger.emit("error", "global", "finish", "未找到可重新生成的原始材料", f"没有找到 {material_type} 对应的原始附件")
+        return build_generation_report(output_dir, logger, [_build_process_result(material_type, False, error="source material missing")])
 
     # 生成完成后，同步该目录内所有文件至 COS
     _sync_output_dir_to_cos(output_dir, base_dir)
+    report = build_generation_report(output_dir, logger, results)
+    logger.emit(
+        "success" if report["success"] else "error",
+        "global",
+        "finish",
+        "单项材料重新生成完成" if report["success"] else "单项材料重新生成失败",
+        "已完成本次单项材料重新生成" if report["success"] else "单项材料重新生成过程中发生错误",
+        details={"material_type": material_type, "error_count": len(report["errors"])},
+    )
+    return build_generation_report(output_dir, logger, results)
 
 
 def _sync_output_dir_to_cos(output_dir, base_dir):

@@ -1130,7 +1130,7 @@ def generate_materials_route(id):
         # 捕获 print 输出
         log_buffer = _io.StringIO()
         with contextlib.redirect_stdout(log_buffer):
-            output_dir = generate_student_materials(student, base_dir, actual_output_root)
+            report = generate_student_materials(student, base_dir, actual_output_root)
         logs = log_buffer.getvalue()
         
         # 同时输出到服务器日志
@@ -1138,7 +1138,16 @@ def generate_materials_route(id):
             if line.strip():
                 current_app.logger.info(line)
         
-        return jsonify({'message': '生成成功', 'logs': logs})
+        payload = {
+            'message': '生成成功' if report.get('success') else '生成未完全成功',
+            'logs': logs,
+            'log_summary': report.get('log_summary', {}),
+            'log_events': report.get('log_events', []),
+        }
+        if not report.get('success'):
+            payload['error'] = 'material_generation_failed'
+            return jsonify(payload), 500
+        return jsonify(payload)
     except Exception as e:
         current_app.logger.exception('Error generating materials for student %s', id)
         return build_internal_error_response('生成报名材料失败，请稍后重试')
@@ -1178,6 +1187,11 @@ def analyze_material_points_route(id):
                 'expand_level': adjustments.get('expand_level'),
                 'skip_ratio_trim': adjustments.get('skip_ratio_trim', False)
             }
+            crop_mode = adjustments.get('crop_mode', 'auto')
+            if crop_mode == 'none':
+                return None
+            if crop_mode == 'rect_only':
+                crop_kwargs['allow_perspective'] = False
             # auto_crop_diploma 不接受 canny_scale
             if 'canny_scale' in adjustments and profile_func != auto_crop_diploma:
                 crop_kwargs['canny_scale'] = float(adjustments['canny_scale'])
@@ -1228,19 +1242,22 @@ def manual_crop_material_route(id):
         base_dir = current_app.config['BASE_DIR']
         output_root = current_app.config['STUDENTS_FOLDER']
 
-        def perspective_crop_to_temp(abs_path, points):
-            """对原图做透视变换，写入临时文件并返回路径。"""
+        def crop_points_to_temp(abs_path, points, crop_mode):
+            """对原图按给定模式裁剪，写入临时文件并返回路径。"""
             if not abs_path or not os.path.exists(abs_path):
                 return None
             import numpy as np
-            from services.material_service import read_cv_image, write_cv_image, four_point_transform
+            from services.material_service import read_cv_image, write_cv_image, crop_image_with_points
             img = read_cv_image(abs_path)
             if img is None:
                 return None
             current_app.logger.info(f"[manual_crop] Loaded image {abs_path} with shape {img.shape}")
             current_app.logger.info(f"[manual_crop] Received manual points: {points}")
             pts = np.array(points, dtype='float32')
-            cropped = four_point_transform(img, pts)
+            if crop_mode == 'none':
+                return None
+            actual_mode = 'rect_only' if crop_mode == 'rect_only' else 'perspective'
+            cropped = crop_image_with_points(img, pts, mode=actual_mode)
             suffix = os.path.splitext(abs_path)[1] or '.jpg'
             tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False,
                                               dir=os.path.dirname(abs_path))
@@ -1248,47 +1265,54 @@ def manual_crop_material_route(id):
             write_cv_image(tmp.name, cropped)
             return tmp.name
 
-        def resolve(key, pts_key):
+        def resolve(key, pts_key, crop_mode):
             """返回 (abs_path, is_temp)：有 4 点则透视裁剪成临时文件，否则用原始路径。"""
             rel = student.get(key)
             abs_p = os.path.join(base_dir, rel) if rel else None
             pts = data.get(pts_key)
             if pts and len(pts) == 4:
-                tmp_path = perspective_crop_to_temp(abs_p, pts)
+                tmp_path = crop_points_to_temp(abs_p, pts, crop_mode)
+                if tmp_path is None:
+                    return abs_p, False
                 return tmp_path, True
             return abs_p, False
 
         tmp_files = []
         adjustments = dict(data.get('adjustments', {}))
-        adjustments['crop_mode'] = 'none'   # 已手动裁剪，跳过自动识别，但保留方向校正
+        crop_mode = adjustments.get('crop_mode', 'auto')
 
         student_copy = dict(student)
 
         if material_type == 'id_card':
-            front_path, front_tmp = resolve('id_card_front_path', 'front_points')
-            back_path,  back_tmp  = resolve('id_card_back_path',  'back_points')
+            front_path, front_tmp = resolve('id_card_front_path', 'front_points', crop_mode)
+            back_path,  back_tmp  = resolve('id_card_back_path',  'back_points', crop_mode)
             if front_tmp and front_path:
                 tmp_files.append(front_path)
                 student_copy['id_card_front_path'] = os.path.relpath(front_path, base_dir)
+                adjustments['front_manual_crop_applied'] = True
             if back_tmp and back_path:
                 tmp_files.append(back_path)
                 student_copy['id_card_back_path'] = os.path.relpath(back_path, base_dir)
+                adjustments['back_manual_crop_applied'] = True
 
         elif material_type == 'diploma':
-            p, is_tmp = resolve('diploma_path', 'points')
+            p, is_tmp = resolve('diploma_path', 'points', crop_mode)
             if is_tmp and p:
                 tmp_files.append(p)
                 student_copy['diploma_path'] = os.path.relpath(p, base_dir)
+                adjustments['manual_crop_applied'] = True
 
         elif material_type == 'hukou':
-            hp, h_tmp = resolve('hukou_residence_path', 'home_points')
-            pp, p_tmp = resolve('hukou_personal_path',  'personal_points')
+            hp, h_tmp = resolve('hukou_residence_path', 'home_points', crop_mode)
+            pp, p_tmp = resolve('hukou_personal_path',  'personal_points', crop_mode)
             if h_tmp and hp:
                 tmp_files.append(hp)
                 student_copy['hukou_residence_path'] = os.path.relpath(hp, base_dir)
+                adjustments['home_manual_crop_applied'] = True
             if p_tmp and pp:
                 tmp_files.append(pp)
                 student_copy['hukou_personal_path'] = os.path.relpath(pp, base_dir)
+                adjustments['personal_manual_crop_applied'] = True
 
         import io as _io, contextlib
         from services.material_service import regenerate_single_material
@@ -1296,7 +1320,7 @@ def manual_crop_material_route(id):
         log_buffer = _io.StringIO()
         try:
             with contextlib.redirect_stdout(log_buffer):
-                regenerate_single_material(student_copy, base_dir, output_root, material_type, adjustments)
+                report = regenerate_single_material(student_copy, base_dir, output_root, material_type, adjustments)
         finally:
             for f in tmp_files:
                 try:
@@ -1309,7 +1333,16 @@ def manual_crop_material_route(id):
             if line.strip():
                 current_app.logger.info(line)
 
-        return jsonify({'message': '手动裁剪并重新生成成功', 'logs': logs})
+        payload = {
+            'message': '手动裁剪并重新生成成功' if report.get('success') else '手动裁剪后的重新生成失败',
+            'logs': logs,
+            'log_summary': report.get('log_summary', {}),
+            'log_events': report.get('log_events', []),
+        }
+        if not report.get('success'):
+            payload['error'] = 'material_generation_failed'
+            return jsonify(payload), 500
+        return jsonify(payload)
     except Exception as e:
         current_app.logger.exception('Error in manual_crop_material for student %s', id)
         return build_internal_error_response('手动裁剪失败，请稍后重试')
@@ -1341,14 +1374,23 @@ def regenerate_material_route(id):
 
         log_buffer = _io.StringIO()
         with contextlib.redirect_stdout(log_buffer):
-            regenerate_single_material(student, base_dir, output_root, material_type, adjustments)
+            report = regenerate_single_material(student, base_dir, output_root, material_type, adjustments)
         logs = log_buffer.getvalue()
 
         for line in logs.splitlines():
             if line.strip():
                 current_app.logger.info(line)
 
-        return jsonify({'message': '重新生成成功', 'logs': logs})
+        payload = {
+            'message': '重新生成成功' if report.get('success') else '重新生成失败',
+            'logs': logs,
+            'log_summary': report.get('log_summary', {}),
+            'log_events': report.get('log_events', []),
+        }
+        if not report.get('success'):
+            payload['error'] = 'material_generation_failed'
+            return jsonify(payload), 500
+        return jsonify(payload)
     except Exception as e:
         current_app.logger.exception('Error regenerating material for student %s', id)
         return build_internal_error_response('重新生成失败，请稍后重试')
