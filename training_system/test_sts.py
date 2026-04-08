@@ -1,44 +1,31 @@
-import json
-import os
-import tencentcloud
-from tencentcloud.common import credential
-from tencentcloud.sts.v20180813 import sts_client, models
-from dotenv import load_dotenv
+import json, requests
 
-load_dotenv()
+# Fetch the current materials points
+r = requests.post("http://127.0.0.1:5001/api/students/5/analyze_material_points")
+print("AI Points:", r.text)
 
-secret_id = os.getenv('COS_SECRET_ID', '')
-secret_key = os.getenv('COS_SECRET_KEY', '')
-bucket = os.getenv('COS_BUCKET', '')
-region = os.getenv('COS_REGION', '')
+# We will manipulate the points and send them to manual_crop_material
+pts = r.json()
 
-appid = bucket.split('-')[-1] if '-' in bucket else '*'
+# Make the home_points 100 pixels wider to simulate dragging
+home = pts.get("home_points")
+if home:
+    home[0][0] -= 100
+    home[0][1] -= 100
+    home[2][0] += 100
+    home[2][1] += 100
 
-cred = credential.Credential(secret_id, secret_key)
-client = sts_client.StsClient(cred, region)
-
-req = models.GetFederationTokenRequest()
-req.Name = "cos_direct_upload"
-policy = {
-    "version": "2.0",
-    "statement": [
-        {
-            "action": [
-                "name/cos:PutObject",
-                "name/cos:PostObject"
-            ],
-            "effect": "allow",
-            "resource": [
-                f"qcs::cos:{region}:uid/{appid}:{bucket}/students/tmp/*"
-            ]
-        }
-    ]
+payload = {
+    "material_type": "hukou",
+    "adjustments": {"crop_mode": "none"},
+    "home_points": home,
+    "personal_points": pts.get("personal_points")
 }
-req.Policy = json.dumps(policy)
-req.DurationSeconds = 1800
 
-try:
-    resp = client.GetFederationToken(req)
-    print(resp.to_json_string(indent=2))
-except Exception as e:
-    print(e)
+print("Sleeping 2 seconds...")
+import time
+time.sleep(2)
+
+print("\nHitting manual_crop...")
+res = requests.post("http://127.0.0.1:5001/api/students/5/manual_crop_material", json=payload)
+print("Result:", res.status_code, res.text)

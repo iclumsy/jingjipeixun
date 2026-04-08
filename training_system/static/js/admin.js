@@ -1716,6 +1716,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ];
             }
 
+            function origToDisp([ox, oy]) {
+                const o = getImgOffsets();
+                const ix = (ox * o.w) / img.naturalWidth;
+                const iy = (oy * o.h) / img.naturalHeight;
+                return [
+                    Math.round(o.left + ix),
+                    Math.round(o.top + iy)
+                ];
+            }
+
             function syncCropState() {
                 if (!dispPts || !hasDragged) {
                     // 未拖动 → 清空，提交时走自动裁剪
@@ -1830,14 +1840,50 @@ document.addEventListener('DOMContentLoaded', async () => {
                 statusEl.style.color = '#6b7280';
             };
 
-            img.onload = () => {
-                setTimeout(() => {
+            let serverPoints = null;
+            
+            function checkAndApply() {
+                if (!img.complete || img.naturalWidth === 0) return;
+                if (imgWrap.clientWidth === 0) return; // 当前处于隐藏状态(display:none)
+                
+                if (serverPoints) {
+                    try {
+                        dispPts = serverPoints.map(p => origToDisp(p));
+                        hasDragged = true;
+                        syncCropState();
+                        redraw();
+                        statusEl.style.color = '#059669';
+                        statusEl.textContent = '✓ 已加载预识别裁剪区域，可拖动角点微调';
+                    } catch(e) {
+                        console.error('Failed to apply server points', e);
+                    }
+                    serverPoints = null; // 应用过一次就清空
+                } else if (!dispPts && !hasDragged) {
                     initRect();
                     redraw();
-                    statusEl.textContent = '拖动角点调整裁剪区域（不需要手动裁剪可直接点击重新生成）';
+                    statusEl.textContent = '拖动角点调整裁剪区域（不标记默认按左侧参数运行自动处理）';
                     statusEl.style.color = '#6b7280';
-                }, 60);
+                }
+            }
+
+            wrap.getServerPoints = () => serverPoints;
+
+            wrap.applyServerPoints = (pts_orig) => {
+                if (hasDragged) return; // 如果用户已经拖过了，则不再覆盖
+                serverPoints = pts_orig;
+                checkAndApply();
             };
+
+            img.onload = () => {
+                setTimeout(checkAndApply, 60);
+            };
+
+            const ro = new ResizeObserver(() => {
+                if (imgWrap.clientWidth > 0) {
+                    checkAndApply();
+                }
+            });
+            ro.observe(imgWrap);
 
             if (!url) {
                 imgWrap.style.cursor = 'default';
@@ -1856,6 +1902,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // ── 构建右侧内容（Tab 或单面板）────────────────────────────────
         let rightContent;
+        const panelEls = {};
         const multiPanel = cfg.imagePanels.length > 1;
 
         if (multiPanel) {
@@ -1868,7 +1915,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const panelContainer = document.createElement('div');
             panelContainer.style.cssText = 'flex:1;min-height:0;overflow:hidden;';
 
-            const panelEls = {};
             cfg.imagePanels.forEach((ip, idx) => {
                 const activeStyle = 'padding:5px 14px;border:none;border-radius:7px;font-size:12px;cursor:pointer;background:#4F46E5;color:#fff;font-weight:600;';
                 const inactiveStyle = 'padding:5px 14px;border:1px solid #e5e7eb;border-radius:7px;font-size:12px;cursor:pointer;background:#fff;color:#475569;';
@@ -1896,7 +1942,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             rightContent.appendChild(tabBar);
             rightContent.appendChild(panelContainer);
         } else {
-            rightContent = buildImagePanel(cfg.imagePanels[0]);
+            const ip = cfg.imagePanels[0];
+            const el = buildImagePanel(ip);
+            panelEls[ip.pointsKey] = el;
+            rightContent = el;
         }
 
         // ── Modal 框架 ───────────────────────────────────────────────────
@@ -1940,6 +1989,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         panel.appendChild(modal);
         document.body.appendChild(panel);
 
+        // ── 获取服务端预处理点坐标 ─────────────────────────────────────────
+        function getGroupVal(name) {
+            const el = panel.querySelector(`.adj-pill[data-group="${name}"][data-active="1"]`);
+            return el ? el.dataset.value : null;
+        }
+
+        const initialAdjustments = {};
+        const cannyVal = getGroupVal('canny_scale');
+        if (cannyVal && parseFloat(cannyVal) !== 1.0) initialAdjustments.canny_scale = parseFloat(cannyVal);
+
+        fetch(`/api/students/${student.id}/analyze_material_points`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ material_type: matType, adjustments: initialAdjustments })
+        }).then(res => res.json()).then(data => {
+            if (data && !data.error) {
+                // 将点分配给对应的面板
+                cfg.imagePanels.forEach(ip => {
+                    const serverPts = data[ip.pointsKey] || data.points; // 兼容不同返回结构
+                    if (serverPts && serverPts.length === 4) {
+                        panelEls[ip.pointsKey].applyServerPoints(serverPts);
+                    }
+                });
+            }
+        }).catch(err => {
+            console.error('Failed to analyze material points:', err);
+        });
+
         // ── Pill 交互 ─────────────────────────────────────────────────────
         panel.addEventListener('click', e => {
             const pill = e.target.closest('.adj-pill');
@@ -1957,10 +2034,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         panel.addEventListener('click', e => { if (e.target === panel) close(); });
 
         // ── 提交 ─────────────────────────────────────────────────────────
-        function getGroupVal(name) {
-            const el = panel.querySelector(`.adj-pill[data-group="${name}"][data-active="1"]`);
-            return el ? el.dataset.value : null;
-        }
 
         panel.querySelector('#adj-submit').onclick = async () => {
             const adjustments = {};
@@ -1982,6 +2055,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const s = cropState[ip.pointsKey];
                 if (s && s.originalPts && s.originalPts.length === 4) {
                     markedPoints[ip.pointsKey] = s.originalPts;
+                } else if (panelEls[ip.pointsKey] && panelEls[ip.pointsKey].getServerPoints) {
+                    const sp = panelEls[ip.pointsKey].getServerPoints();
+                    if (sp && sp.length === 4) {
+                        markedPoints[ip.pointsKey] = sp;
+                    }
                 }
             });
 

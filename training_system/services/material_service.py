@@ -842,6 +842,7 @@ def summarize_candidate(candidate):
         "confidence": round(candidate["confidence"], 4),
         "detector": candidate.get("detector", "edge"),
         "source": candidate["source"],
+        "points_orig": candidate.get("points_orig").tolist() if "points_orig" in candidate else None
     }
 
 
@@ -1568,6 +1569,7 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments
                         f"area_ratio={sel.get('area_ratio', 0):.3f}  "
                         f"confidence={sel.get('confidence', 0):.3f}"
                     )
+                hc, wc = front_img.shape[:2]
                 front_img = normalize_id_card_side(front_img, "front")
                 if front_rotate:
                     front_img = rotate_image_by_degrees(front_img, front_rotate)
