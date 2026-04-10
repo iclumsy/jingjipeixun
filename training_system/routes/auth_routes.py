@@ -17,7 +17,7 @@
 - 表单提交 (application/x-www-form-urlencoded) : 传统登录页面使用
 - JSON 提交 (application/json) : 前端 AJAX 调用使用
 """
-from flask import Blueprint, jsonify, redirect, render_template, request, session
+from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session
 from utils.auth import sanitize_next_path, verify_admin_credentials
 
 
@@ -67,6 +67,8 @@ def login():
         session['auth_user'] = username   # 记录当前登录用户名
         session.permanent = True          # 使 session 遵循 PERMANENT_SESSION_LIFETIME 过期时间
 
+        current_app.logger.info(f"管理员登录成功: 用户名={username}, IP={request.remote_addr}")
+
         # 根据请求格式返回不同类型的响应
         if request.is_json:
             return jsonify({
@@ -76,6 +78,7 @@ def login():
         return redirect(next_path)
 
     # 验证失败：返回 401 错误
+    current_app.logger.warning(f"管理员登录失败: 尝试用户名={username}, IP={request.remote_addr}")
     if request.is_json:
         return jsonify({
             'success': False,
@@ -95,7 +98,9 @@ def logout():
     - POST: 前端 AJAX 调用（返回 JSON 响应）
     """
     # 清除所有 session 数据（包括认证标记和用户信息）
+    auth_user = session.get('auth_user', '未知用户')
     session.clear()
+    current_app.logger.info(f"管理员安全退出: 用户名={auth_user}, IP={request.remote_addr}")
     if request.is_json:
         return jsonify({'success': True})
     return redirect('/auth/login')

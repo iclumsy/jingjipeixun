@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>操作日志 - 学员信息管理</title>
+    <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .terminal-container {
+            background-color: #0f172a;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            height: calc(100vh - 180px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+        .terminal-header {
+            background-color: #1e293b;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #334155;
+        }
+        .terminal-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .terminal-btn {
+            background: #334155;
+            color: #f1f5f9;
+            border: 1px solid #475569;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            outline: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .terminal-btn:hover {
+            background: #475569;
+        }
+        .terminal-btn.active {
+            background: #2563eb;
+            border-color: #3b82f6;
+            font-weight: 600;
+        }
+        .terminal-body {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', 'Consolas', 'Menlo', 'Monaco', monospace;
+            font-size: 0.9rem;
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+        .log-line {
+            margin: 0;
+            padding: 2px 0;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        .log-timestamp {
+            color: #6ee7b7;
+        }
+        .log-level-info {
+            color: #93c5fd;
+        }
+        .log-level-warning {
+            color: #fde047;
+        }
+        .log-level-error {
+            color: #fca5a5;
+        }
+        .log-module {
+            color: #c4b5fd;
+        }
+        .auto-scroll-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #94a3b8;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="admin-page">
+    <div style="position: absolute; top: 15px; right: 20px; display: flex; gap: 12px; z-index: 1000; align-items: center;">
+        <a href="/admin" style="padding: 6px 16px; background-color: #f8fafc; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 6px; text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: all 0.2s ease;">⬅ 返回面板</a>
+        <a href="/admin/config" style="padding: 6px 16px; background-color: #f8fafc; color: #4f46e5; border: 1px solid #4f46e5; border-radius: 6px; text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: all 0.2s ease;">⚙️ 系统配置</a>
+        <a href="/auth/logout" class="admin-logout-btn" style="position: static; transform: none; margin: 0; right: auto; top: auto;">退出</a>
+    </div>
+
+    <div style="padding: 30px; max-width: 1400px; margin: 0 auto; height: 100vh; box-sizing: border-box;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+            <div>
+                <h1 style="margin: 0 0 10px 0; font-size: 1.8rem; color: #0f172a;">操作日志</h1>
+                <p style="margin: 0; color: #64748b; font-size: 0.95rem;">实时查看系统运行状态与管理员操作记录</p>
+            </div>
+        </div>
+
+        <div class="terminal-container">
+            <div class="terminal-header">
+                <div class="terminal-controls">
+                    <button class="terminal-btn active" id="btnAppLog">综合日志 (app.log)</button>
+                    <button class="terminal-btn" id="btnErrorLog">错误日志 (error.log)</button>
+                    <select id="linesSelect" style="background:#334155; color:#f1f5f9; border:1px solid #475569; border-radius:6px; padding:5px 10px; font-size:0.85rem; outline:none;">
+                        <option value="100">显示最近 100 行</option>
+                        <option value="500" selected>显示最近 500 行</option>
+                        <option value="1000">显示最近 1000 行</option>
+                    </select>
+                </div>
+                <div class="terminal-controls">
+                    <label class="auto-scroll-toggle">
+                        <input type="checkbox" id="autoScrollCheck" checked>
+                        自动滚动到底部
+                    </label>
+                    <button class="terminal-btn" id="btnRefresh">🔄 刷新</button>
+                    <button class="terminal-btn" id="btnClear">清屏</button>
+                </div>
+            </div>
+            <div class="terminal-body" id="logContent">
+                <div style="color: #64748b; text-align: center; margin-top: 50px;">正在加载日志数据...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/notifications.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const logContent = document.getElementById('logContent');
+            const btnAppLog = document.getElementById('btnAppLog');
+            const btnErrorLog = document.getElementById('btnErrorLog');
+            const btnRefresh = document.getElementById('btnRefresh');
+            const btnClear = document.getElementById('btnClear');
+            const autoScrollCheck = document.getElementById('autoScrollCheck');
+            const linesSelect = document.getElementById('linesSelect');
+
+            let currentType = 'app';
+            let autoRefreshInterval = null;
+
+            // 格式化日志行，为其添加高亮
+            function formatLogLine(line) {
+                // 逃逸 HTML
+                let safeLine = line.replace(/&/g, "&amp;")
+                                   .replace(/</g, "&lt;")
+                                   .replace(/>/g, "&gt;");
+
+                // 匹配格式: [2026-04-10 12:34:56] [INFO] [app] Message
+                const regex = /^(\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\])\s(\[[A-Z]+\])\s(\[[^\]]+\])\s(.*)$/;
+                const match = safeLine.match(regex);
+
+                if (match) {
+                    const [, timestamp, level, moduleName, message] = match;
+                    let levelClass = 'log-level-info';
+                    if (level.includes('WARNING')) levelClass = 'log-level-warning';
+                    if (level.includes('ERROR') || level.includes('CRITICAL')) levelClass = 'log-level-error';
+
+                    return `<p class="log-line"><span class="log-timestamp">${timestamp}</span> <span class="${levelClass}">${level}</span> <span class="log-module">${moduleName}</span> ${message}</p>`;
+                }
+                return `<p class="log-line">${safeLine}</p>`;
+            }
+
+            async function fetchLogs() {
+                try {
+                    const lines = linesSelect.value;
+                    const res = await fetch(`/api/logs/content?type=${currentType}&lines=${lines}`);
+                    const data = await res.json();
+
+                    if (!data.success) {
+                        logContent.innerHTML = `<p class="log-line log-level-error">加载失败: ${data.error || '未知错误'}</p>`;
+                        return;
+                    }
+
+                    if (data.lines.length === 0) {
+                        logContent.innerHTML = `<div style="color: #64748b; text-align: center; margin-top: 50px;">暂无日志内容</div>`;
+                        return;
+                    }
+
+                    const html = data.lines.map(formatLogLine).join('');
+                    
+                    // 检查是否需要自动滚动
+                    const shouldScroll = autoScrollCheck.checked;
+                    
+                    logContent.innerHTML = html;
+                    
+                    if (shouldScroll) {
+                        logContent.scrollTop = logContent.scrollHeight;
+                    }
+                } catch (err) {
+                    currentAppLog = `<p class="log-line log-level-error">网络请求失败: ${err.message}</p>`;
+                    logContent.innerHTML = currentAppLog;
+                }
+            }
+
+            // 初始加载
+            fetchLogs();
+            autoRefreshInterval = setInterval(fetchLogs, 5000); // 每 5 秒自动刷新
+
+            btnRefresh.addEventListener('click', () => {
+                fetchLogs();
+                showMessage('已刷新日志', 'success');
+            });
+
+            btnAppLog.addEventListener('click', () => {
+                currentType = 'app';
+                btnAppLog.classList.add('active');
+                btnErrorLog.classList.remove('active');
+                logContent.innerHTML = `<div style="color: #64748b; text-align: center; margin-top: 50px;">加载中...</div>`;
+                fetchLogs();
+            });
+
+            btnErrorLog.addEventListener('click', () => {
+                currentType = 'error';
+                btnErrorLog.classList.add('active');
+                btnAppLog.classList.remove('active');
+                logContent.innerHTML = `<div style="color: #64748b; text-align: center; margin-top: 50px;">加载中...</div>`;
+                fetchLogs();
+            });
+
+            linesSelect.addEventListener('change', fetchLogs);
+
+            btnClear.addEventListener('click', () => {
+                logContent.innerHTML = '';
+            });
+        });
+    </script>
+</body>
+</html>

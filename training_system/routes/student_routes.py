@@ -414,7 +414,7 @@ def create_student_route():
 
         # 创建数据库记录
         student_id = create_student(student_payload, file_paths)
-        current_app.logger.info(f'Student created: ID={student_id}')
+        current_app.logger.info(f'新增学员: ID={student_id}, 姓名={student_payload.get("name")}')
         
         # 异步/非阻塞方式发送给所有管理员（基于小程序订阅消息）
         broadcast_new_student_to_admins(student_name=student_payload.get('name', ''))
@@ -694,7 +694,7 @@ def update_student_route(id):
 
         # 执行数据库更新
         updated_student = update_student(id, updates)
-        current_app.logger.info(f'Student updated: ID={id}')
+        current_app.logger.info(f'修改学员资料: ID={id}, 姓名={updates.get("name", current_student.get("name"))}')
 
         # 成功更新数据库后，清理因改名导致路径变更产生的孤儿旧文件
         for db_key in FILE_MAP.values():
@@ -949,7 +949,7 @@ def reject_student_route(id):
             # 彻底删除：先删除数据库记录，再清理附件文件
             student = delete_student(id)
             delete_student_files(student, current_app.config['BASE_DIR'])
-            current_app.logger.info(f'Student rejected and deleted: ID={id}')
+            current_app.logger.warning(f'删除学员记录及附件: ID={id}')
             return jsonify({'message': 'Student rejected and deleted'})
         else:
             # 仅更新状态
@@ -962,7 +962,7 @@ def reject_student_route(id):
                 # 后台非阻塞发送防止拖慢响应，这里简单同步调用（已在服务内吃掉异常）
                 send_review_result_message(submitter_openid, student_name, '已驳回', remark="请点击前往小程序进行修改")
                 
-            current_app.logger.info(f'Student moved to {target_status}: ID={id}')
+            current_app.logger.info(f'修改学员状态为 {target_status}: ID={id}')
             return jsonify({'message': f'Student moved to {target_status}', 'student': student})
 
     except NotFoundError as e:
@@ -1017,7 +1017,7 @@ def approve_student_route(id):
         if health_check_path:
             current_app.logger.info(f'Health check form generated for student ID={id}')
         
-        current_app.logger.info(f'Student approved: ID={id}')
+        current_app.logger.info(f'审核通过学员: ID={id}')
         return jsonify(student)
 
     except NotFoundError as e:

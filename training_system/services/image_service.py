@@ -118,10 +118,10 @@ def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
 
         # 保存处理后的图片
         result.save(output_path, quality=95)
-        current_app.logger.info(f'Background replaced successfully: {output_path}')
+        current_app.logger.info(f'图片背景替换成功: {output_path}')
         return output_path
     except Exception as e:
-        current_app.logger.error(f'Background replacement failed: {str(e)}')
+        current_app.logger.error(f'图片背景替换失败: {str(e)}')
         return input_path
 
 
@@ -155,7 +155,7 @@ def save_temp_file(file_storage, file_type):
 
     # 通过存储服务保存（dual 模式同时写本地和 COS）
     storage_service.save_file(file_storage, tmp_key)
-    current_app.logger.info(f'Temp file saved: {tmp_key}')
+    current_app.logger.info(f'临时文件已保存: {tmp_key}')
 
     return tmp_key
 
@@ -199,7 +199,7 @@ def commit_temp_files(tmp_paths_by_input_name, id_card, name, company, training_
 
         # 检查临时文件是否存在（本地或 COS）
         if not storage_service.file_exists_local(tmp_rel):
-            current_app.logger.warning(f'Temp file not found: {tmp_rel}')
+            current_app.logger.warning(f'未找到临时文件: {tmp_rel}')
             result[db_key] = ''
             continue
 
@@ -211,12 +211,12 @@ def commit_temp_files(tmp_paths_by_input_name, id_card, name, company, training_
         # 通过存储服务移动（dual 模式本地 + COS 同步移动）
         ok = storage_service.move_temp_file(tmp_rel, formal_key)
         if ok:
-            current_app.logger.info(f'Committed temp file: {tmp_rel} -> {formal_key}')
+            current_app.logger.info(f'正式归档小程序的临时附件文件: {tmp_rel} -> {formal_key}')
             result[db_key] = formal_key
             # 记录临时目录用于后续清理
             tmp_dirs_to_clean.add(os.path.dirname(tmp_rel))
         else:
-            current_app.logger.error(f'Failed to commit temp file {tmp_rel}')
+            current_app.logger.error(f'归档临时文件失败: {tmp_rel}')
             result[db_key] = ''
 
     # 清理已搬空的本地临时文件夹
@@ -284,7 +284,7 @@ def process_and_save_file(file_storage, id_card, name, label_key, company='', tr
 
     # 通过存储服务保存（dual 模式同时写本地和 COS，原子写保证本地安全）
     storage_service.save_file(file_storage, key)
-    current_app.logger.info(f'File saved: {key}')
+    current_app.logger.info(f'文件已保存: {key}')
 
     return key
 

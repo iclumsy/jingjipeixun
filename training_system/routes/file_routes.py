@@ -307,12 +307,12 @@ def delete_local_file():
             parent = os.path.dirname(target)
             if os.path.isdir(parent) and not os.listdir(parent):
                 os.rmdir(parent)
-            current_app.logger.info(f'Admin deleted local file: {rel_path}')
+            current_app.logger.warning(f'管理员通过文件管理面板删除本地文件: {rel_path}')
             return jsonify({'success': True, 'message': '文件已删除'})
         elif os.path.isdir(target):
             import shutil
             shutil.rmtree(target)
-            current_app.logger.info(f'Admin deleted local folder: {rel_path}')
+            current_app.logger.warning(f'管理员通过文件管理面板删除本地文件夹: {rel_path}')
             return jsonify({'success': True, 'message': '文件夹已删除'})
         else:
             return jsonify({'error': '文件或文件夹不存在'}), 404
