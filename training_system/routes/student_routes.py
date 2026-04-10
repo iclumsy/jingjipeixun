@@ -641,16 +641,27 @@ def update_student_route(id):
             )
             allowed_attachments = set(REQUIRED_ATTACHMENTS.get(effective_training_type, REQUIRED_ATTACHMENTS['special_operation']))
 
+            from services.image_service import commit_temp_files
+            id_card_val = updates.get('id_card', current_student.get('id_card', ''))
+            name_val = updates.get('name', current_student.get('name', ''))
+            company_val = updates.get('company', current_student.get('company', ''))
+            # 提交临时目录的文件到正式目录，并获取其重命名后的路径
+            committed_files = commit_temp_files(files_payload, id_card_val, name_val, company_val, effective_training_type)
+
             for input_name, db_key in FILE_MAP.items():
                 if input_name not in files_payload:
                     continue
-                rel = ensure_safe_relative_student_path(files_payload.get(input_name, ''))
+                rel = files_payload.get(input_name, '')
                 if rel and input_name not in allowed_attachments:
                     # 忽略目标培训类型不需要的附件，避免历史遗留字段导致保存失败
                     continue
 
-                # 添加更新路径，文件替换处理在最后统一处理清理
-                updates[db_key] = rel
+                # 如果文件是新上传的临时文件，已经经过 commit_temp_files 处理重命名并在 committed_files 产生结果
+                if committed_files.get(db_key):
+                    updates[db_key] = committed_files[db_key]
+                else:
+                    # 添加原有的更新路径（即未修改过的已经命名好的旧文件路径），安全检验后保留
+                    updates[db_key] = ensure_safe_relative_student_path(rel)
 
         # 最终校验：确保更新后所有必传附件仍然齐全
         effective_training_type = normalize_training_type(
