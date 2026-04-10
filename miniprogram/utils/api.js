@@ -801,10 +801,10 @@ async function uploadAttachment(filePath, options = {}) {
 
   const cos = getCosInstance();
 
-  // 为了保证唯一性，生成一个临时 uuid 作为目录名称（兼容前后端结构）
+  // 为了保证唯一性，生成一个临时 uuid 用于文件命名前缀，避免重名冲突
   const uuid = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   const ext = filePath.includes('.') ? '.' + filePath.split('.').pop() : '.jpg';
-  const cosKey = `students/tmp/${uuid()}/${fileType}${ext}`;
+  const cosKey = `students/tmp/${uuid()}_${fileType}${ext}`;
 
   // 1. 直传至 COS
   return new Promise((resolve, reject) => {

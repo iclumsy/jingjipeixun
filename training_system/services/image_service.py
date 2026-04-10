@@ -150,8 +150,8 @@ def save_temp_file(file_storage, file_type):
     orig_ext = ext.lower() if ext else '.jpg'
 
     tmp_id = str(uuid.uuid4())
-    filename = f"{file_type}{orig_ext}"
-    tmp_key = f"students/tmp/{tmp_id}/{filename}"
+    filename = f"{tmp_id}_{file_type}{orig_ext}"
+    tmp_key = f"students/tmp/{filename}"
 
     # 通过存储服务保存（dual 模式同时写本地和 COS）
     storage_service.save_file(file_storage, tmp_key)
