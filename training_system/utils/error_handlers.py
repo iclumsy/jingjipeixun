@@ -89,7 +89,7 @@ def register_error_handlers(app):
     @app.errorhandler(AppError)
     def handle_app_error(error):
         """处理自定义应用错误（包括 ValidationError、NotFoundError 等子类）。"""
-        app.logger.error(f'{error.__class__.__name__}: {error.message}')
+        app.logger.error(f'应用业务错误 [{error.__class__.__name__}]: {error.message}')
         response = jsonify(error.to_dict())
         response.status_code = error.status_code
         return response
@@ -97,11 +97,28 @@ def register_error_handlers(app):
     @app.errorhandler(HTTPException)
     def handle_http_exception(error):
         """处理 Werkzeug HTTP 异常（如 404、405、413 等）。"""
-        app.logger.warning(f'HTTP {error.code}: {error.description}')
-        description = error.description
-        # 对 413 错误给出更友好的提示（默认提示信息太技术化）
-        if error.code == 413:
-            description = '请求体过大，请压缩附件或提高服务端上传上限'
+        from flask import request
+        
+        # 汉化常见错误描述
+        status_map = {
+            400: "请求参数错误",
+            401: "未授权或登录过期",
+            403: "权限不足，禁止访问",
+            404: "请求的地址不存在",
+            405: "请求方法不允许 (Method Not Allowed)",
+            408: "请求超时",
+            413: "上传文件过大",
+            500: "服务器内部错误",
+            502: "网关错误",
+            503: "服务不可用",
+            504: "网关超时"
+        }
+        
+        description = status_map.get(error.code, error.description)
+        
+        # 记录详细日志，包含路径和方法，方便排查提示中的 405/404 原因
+        app.logger.warning(f'HTTP {error.code} {description}: [{request.method}] {request.path}')
+        
         response = jsonify({
             'error': description
         })
@@ -111,12 +128,13 @@ def register_error_handlers(app):
     @app.errorhandler(Exception)
     def handle_unexpected_error(error):
         """捕获所有未预期的异常，避免泄露内部错误细节。"""
-        app.logger.error(f'Unexpected error: {str(error)}')
+        from flask import request
+        app.logger.error(f'系统未预期错误: {str(error)} | 路径: [{request.method}] {request.path}')
         app.logger.error(traceback.format_exc())
         response = jsonify({
-            'error': '服务器发生意外错误，请稍后重试'
+            'error': '服务器发生内部意外错误，请稍后重试'
         })
         response.status_code = 500
         return response
 
-    app.logger.info('Error handlers registered')
+    app.logger.info('统一错误处理器注册成功')

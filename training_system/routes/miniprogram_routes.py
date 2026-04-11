@@ -62,7 +62,7 @@ def miniprogram_login_route():
 
     # 检查服务端是否已配置微信小程序的 appid 和 secret
     if not has_mini_auth_config():
-        current_app.logger.error('Mini-program login failed: WECHAT_MINI_APPID/WECHAT_MINI_SECRET not configured')
+        current_app.logger.error('小程序登录失败：未配置 WECHAT_MINI_APPID 或 WECHAT_MINI_SECRET')
         return jsonify({
             'error': '配置错误',
             'message': '服务端未配置微信小程序登录参数'
@@ -86,8 +86,8 @@ def miniprogram_login_route():
             status_code = 401    # 认证失败
 
         current_app.logger.warning(
-            'Mini-program login rejected: type=%s errcode=%s message=%s',
-            err_type or 'unknown',
+            '小程序登录被拒绝：类型=%s 错误码=%s 信息=%s',
+            err_type or '未知',
             str(err_code) if err_code is not None else '-',
             err_message
         )
