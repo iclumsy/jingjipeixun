@@ -103,7 +103,7 @@
   </view>
 </view>
 
-<view class="section-card fade-enter">
+<view class="section-card fade-enter" wx:if="{{formData.job_category && formData.exam_project}}">
   <view class="card-header">
     <view class="card-title">附件上传</view>
   </view>
