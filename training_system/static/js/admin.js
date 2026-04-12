@@ -55,6 +55,14 @@ window.fetch = async (...args) => {
 let COS_BASE_URL = '';
 
 /**
+ * 页面加载时的固定时间戳。
+ * 用于附件图片 URL 的缓存破坏参数，驱逐浏览器缓存旧版本。
+ * 优势：同一会话内同一张图只下载一次（浏览器会缓存）；刺新页面时时间戳变更，强制重载最新图片。
+ * 上传新图后用 Date.now() 单独刷新那张图，不受此值影响。
+ */
+const PAGE_LOAD_TS = Date.now();
+
+/**
  * 将相对存储路径转换为可访问 URL。
  * 若已获取到 COS_BASE_URL，返回直接 COS 公网 URL；
  * 否则降级为 Flask 路由（/students/...）。
@@ -1284,8 +1292,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             img.style.height = '100%';
             img.style.objectFit = 'cover';
             if (existingPath) {
-                // 加时间戳防止浏览器或 COS CDN 缓存旧图（文件名相同但内容已更新的场景）
-                img.src = toFileUrl(existingPath) + '?t=' + Date.now();
+                // 用页面加载时的固定时间戳，同一会话内浏览器可缓存，刷新页面后时间戳变更则强制重下
+                img.src = toFileUrl(existingPath) + '?t=' + PAGE_LOAD_TS;
             }
 
             const input = document.createElement('input');
