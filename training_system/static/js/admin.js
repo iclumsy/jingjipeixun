@@ -1291,13 +1291,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     const reader = new FileReader();
                     reader.onload = function (ev) {
-                        img.src = ev.target.result;
+                        // 立即用本地 base64 更新小图预览，无需等待上传完成
+                        const localDataUrl = ev.target.result;
+                        img.src = localDataUrl;
                         img.style.display = 'block';
                         placeholder.style.display = 'none';
                         actionBtn.style.display = 'block';
                         actionBtn.textContent = '修改';
 
-                        uploadFile(student.id, attachment.fieldName, file, attachment.dbKey);
+                        uploadFile(student.id, attachment.fieldName, file, attachment.dbKey, img);
                     };
                     reader.readAsDataURL(file);
                 }
@@ -1313,7 +1315,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             actionBtn.style.background = '#fff';
             actionBtn.style.cursor = 'pointer';
             actionBtn.style.display = existingPath ? 'block' : 'none';
-            actionBtn.onclick = () => {
+            actionBtn.onclick = (e) => {
+                e.stopPropagation(); // 阻止冒泡到 uploadBox，防止触发预览
                 input.click();
             };
 
@@ -1596,7 +1599,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         mainContent.appendChild(clone);
     }
 
-    async function uploadFile(studentId, fieldName, file, dbKey) {
+    async function uploadFile(studentId, fieldName, file, dbKey, previewImg) {
         const formData = new FormData();
         formData.append(fieldName, file);
 
@@ -1613,15 +1616,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             const result = await res.json();
             showSaveStatus('文件上传成功', 'success');
 
+            // 仅静默更新内存中的 students 缓存，不重绘整个详情页
+            // 小图已在 FileReader.onload 里实时更新为本地 base64，无需重绘
             const idx = students.findIndex(s => s.id === studentId);
             if (idx >= 0) {
-                students[idx][dbKey || result.field] = result.path;
                 if (result.student) {
                     students[idx] = result.student;
+                } else if (dbKey || result.field) {
+                    students[idx][dbKey || result.field] = result.path;
                 }
             }
-            if (currentStudentId === studentId && idx >= 0) {
-                showDetail(students[idx]);
+
+            // 上传成功后，将小图从 base64 切换为带时间戳的正式 URL（避免浏览器缓存旧图）
+            if (previewImg && result.path) {
+                previewImg.src = toFileUrl(result.path) + '?t=' + Date.now();
             }
         } catch (e) {
             console.error('Upload error:', e);
