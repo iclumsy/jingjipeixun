@@ -1315,8 +1315,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             actionBtn.style.background = '#fff';
             actionBtn.style.cursor = 'pointer';
             actionBtn.style.display = existingPath ? 'block' : 'none';
-            actionBtn.onclick = (e) => {
-                e.stopPropagation(); // 阻止冒泡到 uploadBox，防止触发预览
+            actionBtn.onclick = () => {
                 input.click();
             };
 
@@ -1333,8 +1332,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             uploadBox.appendChild(placeholder);
             uploadBox.appendChild(img);
-            uploadBox.appendChild(input);
+            // input 放在 wrapper 而非 uploadBox 内，避免 input.click() 冒泡触发 uploadBox 的预览逻辑
             wrapper.appendChild(uploadBox);
+            wrapper.appendChild(input);
             wrapper.appendChild(caption);
             wrapper.appendChild(actionBtn);
             filesContainer.appendChild(wrapper);
