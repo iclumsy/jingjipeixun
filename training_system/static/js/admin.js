@@ -990,6 +990,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (statusBadge) {
             const statusMeta = getStatusMeta(student.status);
             statusBadge.innerHTML = `<span class="badge ${statusMeta.className}">${statusMeta.label}</span>`;
+
+            // 如果已驳回且有驳回原因，在徽章后插入提示块
+            if (student.status === 'rejected' && student.reject_reason) {
+                const reasonBox = document.createElement('div');
+                reasonBox.style.cssText = [
+                    'margin-top:10px', 'padding:10px 14px',
+                    'background:#FEF2F2', 'border:1px solid #FECACA',
+                    'border-radius:8px', 'font-size:0.85rem', 'line-height:1.6',
+                ].join(';');
+                reasonBox.innerHTML = `
+                    <span style="font-weight:600;color:#B91C1C;">驳回原因：</span>
+                    <span style="color:#7F1D1D;">${escapeHtml(student.reject_reason)}</span>
+                `;
+                statusBadge.after(reasonBox);
+            }
         }
 
         const grid = clone.querySelector('.detail-grid');
@@ -1269,7 +1284,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             img.style.height = '100%';
             img.style.objectFit = 'cover';
             if (existingPath) {
-                img.src = toFileUrl(existingPath);
+                // 加时间戳防止浏览器或 COS CDN 缓存旧图（文件名相同但内容已更新的场景）
+                img.src = toFileUrl(existingPath) + '?t=' + Date.now();
             }
 
             const input = document.createElement('input');
@@ -1526,9 +1542,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 deleteBtn.style.cssText = 'background: #FFF1F2; color: #BE123C;';
                 deleteBtn.textContent = '删除学员';
                 deleteBtn.onclick = () => {
-                    const confirmed = window.confirm('确认删除该学员吗？删除后不可恢复。');
-                    if (!confirmed) return;
-                    rejectStudent(true);
+                    showRejectDialog(null, true);
                 };
                 actionBar.appendChild(deleteBtn);
 
@@ -1590,7 +1604,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 rejectBtn.className = 'btn';
                 rejectBtn.style.cssText = 'background: #FEE2E2; color: #EF4444;';
                 rejectBtn.textContent = '驳回';
-                rejectBtn.onclick = () => rejectStudent(false, 'rejected');
+                rejectBtn.onclick = () => showRejectDialog();
                 actionBar.appendChild(rejectBtn);
             }
         }
@@ -1652,12 +1666,73 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    window.rejectStudent = async function (shouldDelete, targetStatus = 'rejected') {
+    /**
+     * 弹出自定义驳回对话框（填写原因）。
+     * @param {Event|null} _e - 事件对象（兼容用，不使用）
+     * @param {boolean} [isDelete=false] - true 表示删除操作
+     */
+    function showRejectDialog(isDelete = false) {
+        const existing = document.getElementById('_reject_dialog_overlay');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = '_reject_dialog_overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(15,23,42,0.45);display:flex;align-items:center;justify-content:center;';
+
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.25);padding:28px 28px 22px;width:min(420px,92vw);box-sizing:border-box;';
+
+        if (isDelete) {
+            box.innerHTML = `
+                <div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:10px;">⚠️ 确认删除学员</div>
+                <div style="font-size:14px;color:#6B7280;margin-bottom:22px;line-height:1.6;">删除后记录和附件文件将不可恢复，请谨慎操作。</div>
+                <div style="display:flex;justify-content:flex-end;gap:10px;">
+                    <button id="_reject_cancel" style="padding:8px 20px;border:1px solid #D1D5DB;border-radius:8px;background:#fff;color:#374151;font-size:14px;cursor:pointer;">取消</button>
+                    <button id="_reject_confirm" style="padding:8px 20px;border:none;border-radius:8px;background:#DC2626;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">确认删除</button>
+                </div>
+            `;
+        } else {
+            box.innerHTML = `
+                <div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:6px;">驳回学员</div>
+                <div style="font-size:13px;color:#6B7280;margin-bottom:14px;">请填写驳回原因，学员将在小程序中看到此原因。</div>
+                <textarea id="_reject_reason_input"
+                    placeholder="例如：个人照片不清晰，请重新上传正面免冠照..."
+                    style="width:100%;box-sizing:border-box;height:100px;padding:10px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:13px;color:#1F2937;resize:vertical;outline:none;line-height:1.6;"
+                ></textarea>
+                <div style="font-size:12px;color:#9CA3AF;margin-top:4px;margin-bottom:18px;">原因可留空，但建议填写以便学员修改。</div>
+                <div style="display:flex;justify-content:flex-end;gap:10px;">
+                    <button id="_reject_cancel" style="padding:8px 20px;border:1px solid #D1D5DB;border-radius:8px;background:#fff;color:#374151;font-size:14px;cursor:pointer;">取消</button>
+                    <button id="_reject_confirm" style="padding:8px 20px;border:none;border-radius:8px;background:#EF4444;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">确认驳回</button>
+                </div>
+            `;
+        }
+
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        const close = () => overlay.remove();
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        box.querySelector('#_reject_cancel').onclick = close;
+        box.querySelector('#_reject_confirm').onclick = () => {
+            close();
+            if (isDelete) {
+                rejectStudent(true, 'rejected', '');
+            } else {
+                const reason = (box.querySelector('#_reject_reason_input')?.value || '').trim();
+                rejectStudent(false, 'rejected', reason);
+            }
+        };
+
+        // 自动聚焦输入框
+        setTimeout(() => box.querySelector('#_reject_reason_input')?.focus(), 50);
+    }
+
+    window.rejectStudent = async function (shouldDelete, targetStatus = 'rejected', rejectReason = '') {
         if (!currentStudentId) return;
         try {
             const payload = shouldDelete
                 ? { delete: true }
-                : { delete: false, status: targetStatus || 'rejected' };
+                : { delete: false, status: targetStatus || 'rejected', reject_reason: rejectReason };
             const res = await fetch(`/api/students/${currentStudentId}/reject`, {
                 method: 'POST',
                 headers: {

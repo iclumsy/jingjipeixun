@@ -348,6 +348,7 @@ Page({
       agreementChecked: true,
       showPrivacyAgreement: false
     })
+    // 同意隐私弹窗后，直接进入审核请求流程（此时已经在 tap 链路中，授权由 onTapSubmit 早先处理）
     this.submitForm()
   },
 
@@ -383,6 +384,31 @@ Page({
       markAgreementAccepted()
     }
     return true
+  },
+
+  /**
+   * 提交按钒的入口函数（在用户 tap 事件内同步调用，保证授权在用户交互链路内）。
+   * 流程：先请求订阅授权 → 再调用真正的提交逻辑。
+   */
+  async onTapSubmit() {
+    // 1. 先尝试获取订阅授权（必须在 tap 链路内，否则微信会拦截）
+    try {
+      const configRes = await api.getWechatConfig()
+      if (configRes && configRes.success && configRes.template_id) {
+        await new Promise((resolve) => {
+          wx.requestSubscribeMessage({
+            tmplIds: [configRes.template_id],
+            success: resolve,
+            fail: resolve  // 用户拒绝或异常也继续提交
+          })
+        })
+      }
+    } catch (err) {
+      console.warn('订阅授权失败，继续提交:', err)
+    }
+
+    // 2. 进入真正的提交流程
+    this.submitForm()
   },
 
   async submitForm() {
@@ -455,22 +481,7 @@ Page({
         }
       }
 
-      // 尝试请求订阅消息权限
-      try {
-        const configRes = await api.getWechatConfig()
-        if (configRes && configRes.success && configRes.template_id) {
-          await new Promise((resolve, reject) => {
-            wx.requestSubscribeMessage({
-              tmplIds: [configRes.template_id],
-              success: resolve,
-              fail: reject
-            })
-          })
-        }
-      } catch (subErr) {
-        console.warn('请求订阅消息失败或用户取消:', subErr)
-      }
-
+      // 订阅授权已在点击提交时获取（onTapSubmit），这里不再重复请求
       wx.showModal({
         title: '提交成功',
         content: successContent,

@@ -952,17 +952,23 @@ def reject_student_route(id):
             current_app.logger.warning(f'删除学员记录及附件: ID={id}')
             return jsonify({'message': 'Student rejected and deleted'})
         else:
-            # 仅更新状态
-            student = update_student(id, {'status': target_status})
-            
+            # 保存状态和驳回原因
+            reject_reason = str(data.get('reject_reason', '') or '').strip()
+            updates = {'status': target_status}
+            if target_status == 'rejected':
+                updates['reject_reason'] = reject_reason
+            else:
+                updates['reject_reason'] = ''  # 恢复待审核时清空旧原因
+            student = update_student(id, updates)
+
             # 发送微信推送消息
             submitter_openid = student.get('submitter_openid')
             student_name = student.get('name')
             if submitter_openid and target_status == 'rejected':
-                # 后台非阻塞发送防止拖慢响应，这里简单同步调用（已在服务内吃掉异常）
-                send_review_result_message(submitter_openid, student_name, '已驳回', remark="请点击前往小程序进行修改")
-                
-            current_app.logger.info(f'修改学员状态为 {target_status}: ID={id}')
+                remark = f"驳回原因：{reject_reason}" if reject_reason else "请点击前往小程序进行修改"
+                send_review_result_message(submitter_openid, student_name, '已驳回', remark=remark)
+
+            current_app.logger.info(f'驳回学员 ID={id}，状态={target_status}，原因="{reject_reason}"')
             return jsonify({'message': f'Student moved to {target_status}', 'student': student})
 
     except NotFoundError as e:

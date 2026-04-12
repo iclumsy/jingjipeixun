@@ -47,7 +47,7 @@
       bind:agreementchange="onAgreementChange"
       bind:openagreement="openUserAgreement"
       bind:openprivacy="openPrivacyPolicy"
-      bind:submit="submitForm"
+      bind:submit="onTapSubmit"
     />
   </view>
 </view>

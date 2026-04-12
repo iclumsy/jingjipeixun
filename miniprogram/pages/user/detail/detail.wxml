@@ -93,6 +93,10 @@
 
     <view class="section-card action-card fade-enter" wx:if="{{student.status === 'rejected'}}">
       <view class="action-title">该记录已驳回，可修改后重新提交</view>
+      <view wx:if="{{student.reject_reason}}" class="reject-reason-box">
+        <text class="reject-reason-label">驳回原因：</text>
+        <text class="reject-reason-text">{{student.reject_reason}}</text>
+      </view>
       <button class="edit-btn" bindtap="editStudent">重新编辑</button>
     </view>
 
