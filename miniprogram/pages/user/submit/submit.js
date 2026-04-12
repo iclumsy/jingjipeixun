@@ -70,6 +70,12 @@ Page({
   onLoad() {
     this.loadJobCategories()
     this.loadAttachmentConfig()
+    // 预加载订阅消息 templateId，存到实例属性供 tap 时同步使用
+    api.getWechatConfig().then(res => {
+      if (res && res.success && res.template_id) {
+        this._subscribeTemplateId = res.template_id
+      }
+    }).catch(() => {})
   },
 
   // 拉取后台附件配置，失败时除默认徽常用的后备选项
@@ -387,24 +393,18 @@ Page({
   },
 
   /**
-   * 提交按钒的入口函数（在用户 tap 事件内同步调用，保证授权在用户交互链路内）。
-   * 流程：先请求订阅授权 → 再调用真正的提交逻辑。
+   * 提交按钒入口（在用户 tap 链路内，同步请求订阅授权再进入提交逻辑）。
    */
   async onTapSubmit() {
-    // 1. 先尝试获取订阅授权（必须在 tap 链路内，否则微信会拦截）
-    try {
-      const configRes = await api.getWechatConfig()
-      if (configRes && configRes.success && configRes.template_id) {
-        await new Promise((resolve) => {
-          wx.requestSubscribeMessage({
-            tmplIds: [configRes.template_id],
-            success: resolve,
-            fail: resolve  // 用户拒绝或异常也继续提交
-          })
+    // 1. 先尝试获取订阅授权（必须在 tap 链路内同步调用，不能 async/await）
+    if (this._subscribeTemplateId) {
+      await new Promise((resolve) => {
+        wx.requestSubscribeMessage({
+          tmplIds: [this._subscribeTemplateId],
+          success: resolve,
+          fail: resolve  // 用户拒绝或异常也继续提交
         })
-      }
-    } catch (err) {
-      console.warn('订阅授权失败，继续提交:', err)
+      })
     }
 
     // 2. 进入真正的提交流程

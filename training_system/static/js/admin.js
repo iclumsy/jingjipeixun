@@ -1313,6 +1313,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                         return;
                     }
 
+                    // 记录上传前的原始图片地址（用于上传失败时回滚）
+                    const originalSrc = img.style.display !== 'none' ? img.src : '';
+
                     const reader = new FileReader();
                     reader.onload = function (ev) {
                         // 立即用本地 base64 更新小图预览，无需等待上传完成
@@ -1323,7 +1326,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                         actionBtn.style.display = 'block';
                         actionBtn.textContent = '修改';
 
-                        uploadFile(student.id, attachment.fieldName, file, attachment.dbKey, img);
+                        uploadFile(student.id, attachment.fieldName, file, attachment.dbKey, img, originalSrc);
+                        // 清空 input，确保下次选同一文件时 change 事件仍能触发
+                        input.value = '';
                     };
                     reader.readAsDataURL(file);
                 }
@@ -1621,7 +1626,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         mainContent.appendChild(clone);
     }
 
-    async function uploadFile(studentId, fieldName, file, dbKey, previewImg) {
+    async function uploadFile(studentId, fieldName, file, dbKey, previewImg, originalSrc) {
         const formData = new FormData();
         formData.append(fieldName, file);
 
@@ -1656,6 +1661,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (e) {
             console.error('Upload error:', e);
             showSaveStatus('文件上传失败', 'error');
+            // 回滚预览图：恢复为上传前的原始图片（避免用户误以为已更新）
+            if (previewImg) {
+                if (originalSrc) {
+                    previewImg.src = originalSrc;
+                    previewImg.style.display = 'block';
+                } else {
+                    previewImg.style.display = 'none';
+                }
+            }
         }
     }
 
