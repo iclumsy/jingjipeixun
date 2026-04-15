@@ -36,48 +36,42 @@ def is_inside_materials_folder(file_abs_path):
 
 
 def cleanup_tmp_folder(students_folder, min_age_hours, dry_run):
-    """清理 students/tmp/ 目录中超过指定时间的孤立临时文件夹。"""
+    """清理 students/tmp/ 目录中超过指定时间的孤立临时文件（平铺结构）。"""
     tmp_root = os.path.join(students_folder, 'tmp')
     if not os.path.exists(tmp_root):
         return 0, 0.0
 
     now = time.time()
     min_age_seconds = min_age_hours * 3600
-    deleted_dirs = 0
+    deleted_files = 0
     freed_mb = 0.0
 
     for entry in os.listdir(tmp_root):
-        tmp_dir = os.path.join(tmp_root, entry)
-        if not os.path.isdir(tmp_dir):
+        fpath = os.path.join(tmp_root, entry)
+        if not os.path.isfile(fpath):
             continue
-        # 以目录修改时间判断年龄（文件夹创建后即写入文件，mtime 即上传时间）
         try:
-            mtime = os.path.getmtime(tmp_dir)
+            mtime = os.path.getmtime(fpath)
         except OSError:
             continue
         if (now - mtime) < min_age_seconds:
             continue
 
-        # 统计目录大小
-        for fname in os.listdir(tmp_dir):
-            fpath = os.path.join(tmp_dir, fname)
-            if os.path.isfile(fpath):
-                try:
-                    freed_mb += os.path.getsize(fpath) / (1024 * 1024)
-                except OSError:
-                    pass
+        try:
+            freed_mb += os.path.getsize(fpath) / (1024 * 1024)
+        except OSError:
+            pass
 
         if dry_run:
-            print(f"  [将删除临时文件夹] {tmp_dir}")
+            print(f"  [将删除临时文件] {fpath}")
         else:
             try:
-                import shutil as _shutil
-                _shutil.rmtree(tmp_dir)
-                deleted_dirs += 1
+                os.remove(fpath)
+                deleted_files += 1
             except Exception as e:
-                print(f"❌ 删除临时文件夹失败: {tmp_dir}，原因: {e}")
+                print(f"❌ 删除临时文件失败: {fpath}，原因: {e}")
 
-    return deleted_dirs, freed_mb
+    return deleted_files, freed_mb
 
 
 def cleanup_empty_dirs(students_folder, dry_run):
@@ -185,11 +179,11 @@ def cleanup_orphaned_images(dry_run=True, min_age_hours=MIN_AGE_HOURS):
 
     # 清理 tmp/ 目录中超时的临时文件夹
     print(f"\n🗂  清理 students/tmp/ 目录（超过 {min_age_hours} 小时的孤立上传）...")
-    tmp_dirs, tmp_mb = cleanup_tmp_folder(students_folder, min_age_hours, dry_run)
+    tmp_files, tmp_mb = cleanup_tmp_folder(students_folder, min_age_hours, dry_run)
     if dry_run:
-        print(f"   预计删除过期临时文件夹，释放约 {tmp_mb:.2f} MB")
+        print(f"   预计删除过期临时文件，释放约 {tmp_mb:.2f} MB")
     else:
-        print(f"   删除 {tmp_dirs} 个过期临时文件夹，释放 {tmp_mb:.2f} MB")
+        print(f"   删除 {tmp_files} 个过期临时文件，释放 {tmp_mb:.2f} MB")
 
     # 清理遗留的空文件夹
     print(f"\n📁 清理遗留空文件夹...")
