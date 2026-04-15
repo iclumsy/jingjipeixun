@@ -127,10 +127,10 @@ def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
 
 def save_temp_file(file_storage, file_type):
     """
-    小程序预上传时，将文件暂存到 students/tmp/<uuid>/ 下。
+    小程序预上传时，将文件暂存到 students/tmp/ 下（扁平结构，无子文件夹）。
 
     dual/local 模式：保存到本地并同步至 COS（如果配置了 COS）。
-    返回临时相对路径，格式：students/tmp/<uuid>/<file_type><ext>
+    返回临时相对路径，格式：students/tmp/<uuid>_<file_type><ext>
 
     提交学员表单时，调用 commit_temp_files() 将所有临时文件
     整体移动到正式目录，并返回正式相对路径。
@@ -218,16 +218,6 @@ def commit_temp_files(tmp_paths_by_input_name, id_card, name, company, training_
         else:
             current_app.logger.error(f'归档临时文件失败: {tmp_rel}')
             result[db_key] = ''
-
-    # 清理已搬空的本地临时文件夹
-    base_dir = current_app.config['BASE_DIR']
-    for tmp_rel_dir in tmp_dirs_to_clean:
-        tmp_abs_dir = os.path.join(base_dir, tmp_rel_dir)
-        try:
-            if os.path.isdir(tmp_abs_dir) and not os.listdir(tmp_abs_dir):
-                os.rmdir(tmp_abs_dir)
-        except Exception:
-            pass
 
     return result
 

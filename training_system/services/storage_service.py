@@ -247,7 +247,7 @@ def move_temp_file(src_key, dst_key):
     dual 模式 COS 操作失败时记警告不中断（本地已移动成功）。
 
     参数:
-        src_key: 源 key（如 'students/tmp/<uuid>/photo.jpg'）
+        src_key: 源 key（如 'students/tmp/<uuid>_photo.jpg'）
         dst_key: 目标 key（如 'students/特种设备-XX公司-张三/xxx-photo.jpg'）
 
     返回:
