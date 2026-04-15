@@ -193,6 +193,7 @@ def add_project():
             ''', (data['training_type'], data['job_category'], data['exam_project'], data.get('project_code', '')))
             conn.commit()
         sync_config_to_json()
+        current_app.logger.info(f"管理员新增培训项目: {data['job_category']} - {data['exam_project']} ({data['training_type']})")
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -217,6 +218,7 @@ def edit_project(id):
             ''', (data['training_type'], data['job_category'], data['exam_project'], data.get('project_code', ''), id))
             conn.commit()
         sync_config_to_json()
+        current_app.logger.info(f"管理员修改培训项目: ID={id}, {data['job_category']} - {data['exam_project']} ({data['training_type']})")
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -231,6 +233,7 @@ def toggle_project(id):
             conn.execute('UPDATE training_projects SET is_active = ? WHERE id = ?', (new_status, id))
             conn.commit()
         sync_config_to_json()
+        current_app.logger.info(f"管理员切换培训项目状态: ID={id}, 新状态={'已上架' if new_status == 1 else '已下架'}")
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -293,6 +296,7 @@ def toggle_attachment(training_type, attachment_key):
                 (new_status, training_type, attachment_key)
             )
             conn.commit()
+        current_app.logger.info(f"管理员切换附件状态: {training_type}的 {attachment_key}, 新状态={'启用' if new_status == 1 else '禁用'}")
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500

@@ -244,19 +244,19 @@ def create_app():
     # 记录 .env 文件加载结果
     if env_load.get('error'):
         app.logger.warning(
-            'Failed to load env file %s: %s',
+            '读取环境变量文件失败 %s: %s',
             env_load.get('path', ''),
             env_load.get('error', '')
         )
     elif env_load.get('exists'):
         app.logger.info(
-            'Loaded env config from %s (%s entries)',
+            '已从 %s 加载环境配置 (共 %s 项)',
             env_load.get('path', ''),
             env_load.get('loaded', 0)
         )
     else:
         app.logger.info(
-            'Env config file not found, skipped: %s',
+            '环境变量文件不存在，已跳过: %s',
             env_load.get('path', '')
         )
 
@@ -264,6 +264,8 @@ def create_app():
     # 注册统一的 HTTP 异常和应用异常处理器
     register_error_handlers(app)
 
+    from routes.log_routes import log_bp
+    
     # ======================== 路由蓝图注册 ========================
     app.register_blueprint(auth_bp)          # /auth/*       管理后台登录/登出
     app.register_blueprint(miniprogram_bp)   # /api/miniprogram/*  小程序认证
@@ -271,6 +273,7 @@ def create_app():
     app.register_blueprint(file_bp)          # /students/*         静态文件服务
     app.register_blueprint(export_bp)        # /api/export/*       数据导出
     app.register_blueprint(config_bp)        # /api/config/*       配置接口
+    app.register_blueprint(log_bp)           # /api/logs/content, /admin/logs 日志查看
 
     # ======================== 认证中间件 ========================
     @app.before_request
@@ -373,15 +376,15 @@ def create_app():
     # ======================== 启动警告 ========================
     # 检查是否使用默认密码并发出警告
     if using_default_admin_password():
-        app.logger.warning('Using default admin password, please set TRAINING_SYSTEM_ADMIN_PASSWORD or TRAINING_SYSTEM_ADMIN_PASSWORD_HASH')
+        app.logger.warning('警告：正在使用默认管理员密码，请通过环境变量设置 TRAINING_SYSTEM_ADMIN_PASSWORD 或 TRAINING_SYSTEM_ADMIN_PASSWORD_HASH')
     # 检查 API Key 是否已配置
     if not has_api_key():
-        app.logger.warning('TRAINING_SYSTEM_API_KEY is not configured, non-session API access will be blocked')
+        app.logger.warning('未配置 TRAINING_SYSTEM_API_KEY，非会话 API 访问将被拦截')
     # 检查小程序配置是否完整
     if not has_mini_auth_config():
-        app.logger.warning('WECHAT_MINI_APPID/WECHAT_MINI_SECRET not configured, mini-program direct login will fail')
+        app.logger.warning('未完整配置微信小程序 APPID/SECRET，直连登录将失败')
 
-    app.logger.info('Application initialized successfully')
+    app.logger.info('系统初始化成功')
 
     return app
 

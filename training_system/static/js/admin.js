@@ -55,6 +55,14 @@ window.fetch = async (...args) => {
 let COS_BASE_URL = '';
 
 /**
+ * 页面加载时的固定时间戳。
+ * 用于附件图片 URL 的缓存破坏参数，驱逐浏览器缓存旧版本。
+ * 优势：同一会话内同一张图只下载一次（浏览器会缓存）；刺新页面时时间戳变更，强制重载最新图片。
+ * 上传新图后用 Date.now() 单独刷新那张图，不受此值影响。
+ */
+const PAGE_LOAD_TS = Date.now();
+
+/**
  * 将相对存储路径转换为可访问 URL。
  * 若已获取到 COS_BASE_URL，返回直接 COS 公网 URL；
  * 否则降级为 Flask 路由（/students/...）。
@@ -1000,6 +1008,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (statusBadge) {
             const statusMeta = getStatusMeta(student.status);
             statusBadge.innerHTML = `<span class="badge ${statusMeta.className}">${statusMeta.label}</span>`;
+
+            // 如果已驳回且有驳回原因，在徽章后插入提示块
+            if (student.status === 'rejected' && student.reject_reason) {
+                const reasonBox = document.createElement('div');
+                reasonBox.style.cssText = [
+                    'margin-top:10px', 'padding:10px 14px',
+                    'background:#FEF2F2', 'border:1px solid #FECACA',
+                    'border-radius:8px', 'font-size:0.85rem', 'line-height:1.6',
+                ].join(';');
+                reasonBox.innerHTML = `
+                    <span style="font-weight:600;color:#B91C1C;">驳回原因：</span>
+                    <span style="color:#7F1D1D;">${escapeHtml(student.reject_reason)}</span>
+                `;
+                statusBadge.after(reasonBox);
+            }
         }
 
         const grid = clone.querySelector('.detail-grid');
@@ -1279,7 +1302,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             img.style.height = '100%';
             img.style.objectFit = 'cover';
             if (existingPath) {
-                img.src = toFileUrl(existingPath);
+                // 用页面加载时的固定时间戳，同一会话内浏览器可缓存，刷新页面后时间戳变更则强制重下
+                img.src = toFileUrl(existingPath) + '?t=' + PAGE_LOAD_TS;
             }
 
             const input = document.createElement('input');
@@ -1299,15 +1323,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                         return;
                     }
 
+                    // 记录上传前的原始图片地址（用于上传失败时回滚）
+                    const originalSrc = img.style.display !== 'none' ? img.src : '';
+
                     const reader = new FileReader();
                     reader.onload = function (ev) {
-                        img.src = ev.target.result;
+                        // 立即用本地 base64 更新小图预览，无需等待上传完成
+                        const localDataUrl = ev.target.result;
+                        img.src = localDataUrl;
                         img.style.display = 'block';
                         placeholder.style.display = 'none';
                         actionBtn.style.display = 'block';
                         actionBtn.textContent = '修改';
 
-                        uploadFile(student.id, attachment.fieldName, file, attachment.dbKey);
+                        uploadFile(student.id, attachment.fieldName, file, attachment.dbKey, img, originalSrc);
+                        // 清空 input，确保下次选同一文件时 change 事件仍能触发
+                        input.value = '';
                     };
                     reader.readAsDataURL(file);
                 }
@@ -1340,8 +1371,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             uploadBox.appendChild(placeholder);
             uploadBox.appendChild(img);
-            uploadBox.appendChild(input);
+            // input 放在 wrapper 而非 uploadBox 内，避免 input.click() 冒泡触发 uploadBox 的预览逻辑
             wrapper.appendChild(uploadBox);
+            wrapper.appendChild(input);
             wrapper.appendChild(caption);
             wrapper.appendChild(actionBtn);
             filesContainer.appendChild(wrapper);
@@ -1533,9 +1565,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 deleteBtn.style.cssText = 'background: #FFF1F2; color: #BE123C;';
                 deleteBtn.textContent = '删除学员';
                 deleteBtn.onclick = () => {
-                    const confirmed = window.confirm('确认删除该学员吗？删除后不可恢复。');
-                    if (!confirmed) return;
-                    rejectStudent(true);
+                    showRejectDialog(null, true);
                 };
                 actionBar.appendChild(deleteBtn);
 
@@ -1597,7 +1627,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 rejectBtn.className = 'btn';
                 rejectBtn.style.cssText = 'background: #FEE2E2; color: #EF4444;';
                 rejectBtn.textContent = '驳回';
-                rejectBtn.onclick = () => rejectStudent(false, 'rejected');
+                rejectBtn.onclick = () => showRejectDialog();
                 actionBar.appendChild(rejectBtn);
             }
         }
@@ -1606,7 +1636,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         mainContent.appendChild(clone);
     }
 
-    async function uploadFile(studentId, fieldName, file, dbKey) {
+    async function uploadFile(studentId, fieldName, file, dbKey, previewImg, originalSrc) {
         const formData = new FormData();
         formData.append(fieldName, file);
 
@@ -1623,19 +1653,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             const result = await res.json();
             showSaveStatus('文件上传成功', 'success');
 
+            // 仅静默更新内存中的 students 缓存，不重绘整个详情页
+            // 小图已在 FileReader.onload 里实时更新为本地 base64，无需重绘
             const idx = students.findIndex(s => s.id === studentId);
             if (idx >= 0) {
-                students[idx][dbKey || result.field] = result.path;
                 if (result.student) {
                     students[idx] = result.student;
+                } else if (dbKey || result.field) {
+                    students[idx][dbKey || result.field] = result.path;
                 }
             }
-            if (currentStudentId === studentId && idx >= 0) {
-                showDetail(students[idx]);
+
+            // 上传成功后，将小图从 base64 切换为带时间戳的正式 URL（避免浏览器缓存旧图）
+            if (previewImg && result.path) {
+                previewImg.src = toFileUrl(result.path) + '?t=' + Date.now();
             }
         } catch (e) {
             console.error('Upload error:', e);
             showSaveStatus('文件上传失败', 'error');
+            // 回滚预览图：恢复为上传前的原始图片（避免用户误以为已更新）
+            if (previewImg) {
+                if (originalSrc) {
+                    previewImg.src = originalSrc;
+                    previewImg.style.display = 'block';
+                } else {
+                    previewImg.style.display = 'none';
+                }
+            }
         }
     }
 
@@ -1654,12 +1698,73 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    window.rejectStudent = async function (shouldDelete, targetStatus = 'rejected') {
+    /**
+     * 弹出自定义驳回对话框（填写原因）。
+     * @param {Event|null} _e - 事件对象（兼容用，不使用）
+     * @param {boolean} [isDelete=false] - true 表示删除操作
+     */
+    function showRejectDialog(isDelete = false) {
+        const existing = document.getElementById('_reject_dialog_overlay');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = '_reject_dialog_overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(15,23,42,0.45);display:flex;align-items:center;justify-content:center;';
+
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.25);padding:28px 28px 22px;width:min(420px,92vw);box-sizing:border-box;';
+
+        if (isDelete) {
+            box.innerHTML = `
+                <div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:10px;">⚠️ 确认删除学员</div>
+                <div style="font-size:14px;color:#6B7280;margin-bottom:22px;line-height:1.6;">删除后记录和附件文件将不可恢复，请谨慎操作。</div>
+                <div style="display:flex;justify-content:flex-end;gap:10px;">
+                    <button id="_reject_cancel" style="padding:8px 20px;border:1px solid #D1D5DB;border-radius:8px;background:#fff;color:#374151;font-size:14px;cursor:pointer;">取消</button>
+                    <button id="_reject_confirm" style="padding:8px 20px;border:none;border-radius:8px;background:#DC2626;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">确认删除</button>
+                </div>
+            `;
+        } else {
+            box.innerHTML = `
+                <div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:6px;">驳回学员</div>
+                <div style="font-size:13px;color:#6B7280;margin-bottom:14px;">请填写驳回原因，学员将在小程序中看到此原因。</div>
+                <textarea id="_reject_reason_input"
+                    placeholder="例如：个人照片不清晰，请重新上传正面免冠照..."
+                    style="width:100%;box-sizing:border-box;height:100px;padding:10px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:13px;color:#1F2937;resize:vertical;outline:none;line-height:1.6;"
+                ></textarea>
+                <div style="font-size:12px;color:#9CA3AF;margin-top:4px;margin-bottom:18px;">原因可留空，但建议填写以便学员修改。</div>
+                <div style="display:flex;justify-content:flex-end;gap:10px;">
+                    <button id="_reject_cancel" style="padding:8px 20px;border:1px solid #D1D5DB;border-radius:8px;background:#fff;color:#374151;font-size:14px;cursor:pointer;">取消</button>
+                    <button id="_reject_confirm" style="padding:8px 20px;border:none;border-radius:8px;background:#EF4444;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">确认驳回</button>
+                </div>
+            `;
+        }
+
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        const close = () => overlay.remove();
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        box.querySelector('#_reject_cancel').onclick = close;
+        box.querySelector('#_reject_confirm').onclick = () => {
+            close();
+            if (isDelete) {
+                rejectStudent(true, 'rejected', '');
+            } else {
+                const reason = (box.querySelector('#_reject_reason_input')?.value || '').trim();
+                rejectStudent(false, 'rejected', reason);
+            }
+        };
+
+        // 自动聚焦输入框
+        setTimeout(() => box.querySelector('#_reject_reason_input')?.focus(), 50);
+    }
+
+    window.rejectStudent = async function (shouldDelete, targetStatus = 'rejected', rejectReason = '') {
         if (!currentStudentId) return;
         try {
             const payload = shouldDelete
                 ? { delete: true }
-                : { delete: false, status: targetStatus || 'rejected' };
+                : { delete: false, status: targetStatus || 'rejected', reject_reason: rejectReason };
             const res = await fetch(`/api/students/${currentStudentId}/reject`, {
                 method: 'POST',
                 headers: {

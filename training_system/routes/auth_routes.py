@@ -70,6 +70,8 @@ def login():
         client_ip = get_client_ip(request)
         current_app.logger.info(f'[管理员登录] 用户={username} IP={client_ip}')
 
+        current_app.logger.info(f"管理员登录成功: 用户名={username}, IP={request.remote_addr}")
+
         # 根据请求格式返回不同类型的响应
         if request.is_json:
             return jsonify({
@@ -81,6 +83,7 @@ def login():
     # 验证失败：返回 401 错误
     client_ip = get_client_ip(request)
     current_app.logger.warning(f'[管理员登录失败] 用户={username} IP={client_ip}')
+    current_app.logger.warning(f"管理员登录失败: 尝试用户名={username}, IP={request.remote_addr}")
     if request.is_json:
         return jsonify({
             'success': False,
@@ -100,7 +103,9 @@ def logout():
     - POST: 前端 AJAX 调用（返回 JSON 响应）
     """
     # 清除所有 session 数据（包括认证标记和用户信息）
+    auth_user = session.get('auth_user', '未知用户')
     session.clear()
+    current_app.logger.info(f"管理员安全退出: 用户名={auth_user}, IP={request.remote_addr}")
     if request.is_json:
         return jsonify({'success': True})
     return redirect('/auth/login')

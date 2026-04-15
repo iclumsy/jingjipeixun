@@ -129,7 +129,7 @@ def export_excel():
         wb.save(output)
         output.seek(0)
 
-        current_app.logger.info(f'Excel export generated with {len(students)} students')
+        current_app.logger.info(f'管理员导出学员 Excel: 共 {len(students)} 条数据 (条件: status={status}, company={company}, type={training_type})')
 
         # 返回 Excel 文件作为附件下载
         return send_file(

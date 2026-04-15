@@ -20,6 +20,7 @@
     - project_code    : 项目代号（可选）
     - training_type   : 培训类型，special_operation 或 special_equipment
     - status          : 审核状态，unreviewed / reviewed / rejected
+    - reject_reason   : 驳回原因（管理员填写，仅 rejected 状态有值）
     - created_at      : 创建时间（自动生成）
     - photo_path      : 个人照片文件相对路径
     - diploma_path    : 学历证书文件相对路径
@@ -191,6 +192,7 @@ def init_db(database_path):
                 project_code TEXT,
                 training_type TEXT DEFAULT 'special_operation',
                 status TEXT DEFAULT 'unreviewed',
+                reject_reason TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 photo_path TEXT,
                 diploma_path TEXT,
@@ -207,6 +209,7 @@ def init_db(database_path):
         _ensure_column_exists(conn, 'students', 'submitter_openid', 'submitter_openid TEXT')
         _ensure_column_exists(conn, 'students', 'training_project_id', 'training_project_id INTEGER')
         _ensure_column_exists(conn, 'students', 'hukou_residence_path', 'hukou_residence_path TEXT')
+        _ensure_column_exists(conn, 'students', 'reject_reason', 'reject_reason TEXT')
 
         # 创建高级字典表
         conn.execute('''

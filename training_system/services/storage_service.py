@@ -119,7 +119,7 @@ def _push_to_cos(data_bytes, key):
         # inline 使浏览器直接预览（图片/文档），而非弹出下载框
         ContentDisposition='inline',
     )
-    _log_info(f'COS upload: key={key} content_type={content_type}')
+    _log_info(f'COS上传: key={key} content_type={content_type}')
 
 
 # ======================== 基础目录 ========================
@@ -182,7 +182,7 @@ def save_file(data_or_fileobj, key):
             with open(tmp_path, 'wb') as f:
                 f.write(data)
             os.replace(tmp_path, abs_path)
-            _log_info(f'Local save: {abs_path}')
+            _log_info(f'本地保存: {abs_path}')
         except Exception:
             if os.path.exists(tmp_path):
                 try:
@@ -198,7 +198,7 @@ def save_file(data_or_fileobj, key):
         except Exception as e:
             # dual 模式下 COS 推送失败记警告但不影响业务（本地已有备份）
             if backend == 'dual':
-                _log_warning(f'COS sync failed for key={key} (local saved): {e}')
+                _log_warning(f'COS同步失败 key={key} (local saved): {e}')
             else:
                 raise
 
@@ -230,7 +230,7 @@ def save_from_local(local_abs_path, key):
             _push_to_cos(data, key)
         except Exception as e:
             if backend == 'dual':
-                _log_warning(f'COS sync failed for local={local_abs_path}: {e}')
+                _log_warning(f'COS同步失败 local={local_abs_path}: {e}')
             else:
                 raise
 
@@ -264,11 +264,11 @@ def move_temp_file(src_key, dst_key):
         src_abs = os.path.join(base_dir, src_key)
         dst_abs = os.path.join(base_dir, dst_key)
         if not os.path.exists(src_abs):
-            _log_warning(f'move_temp_file: src not found {src_abs}')
+            _log_warning(f'移动临时文件: 找不到源文件 {src_abs}')
             return False
         os.makedirs(os.path.dirname(dst_abs), exist_ok=True)
         shutil.move(src_abs, dst_abs)
-        _log_info(f'Local move: {src_key} -> {dst_key}')
+        _log_info(f'本地移动: {src_key} -> {dst_key}')
 
         if backend == 'dual':
             # dual 模式：在 COS 端也做移动（复制+删除）
@@ -283,11 +283,11 @@ def move_temp_file(src_key, dst_key):
                     CopySource={'Bucket': bucket, 'Key': src_full, 'Region': config['region']}
                 )
                 client.delete_object(Bucket=bucket, Key=src_full)
-                _log_info(f'COS move: {src_key} -> {dst_key}')
+                _log_info(f'COS移动: {src_key} -> {dst_key}')
             except Exception as e:
                 # 本地已移动成功，COS 操作失败仅记警告
                 # 后续可通过 sync_to_cos 补偿
-                _log_warning(f'COS move failed {src_key}->{dst_key}: {e}')
+                _log_warning(f'COS移动失败 {src_key}->{dst_key}: {e}')
 
         return True
 
@@ -306,7 +306,7 @@ def move_temp_file(src_key, dst_key):
             client.delete_object(Bucket=bucket, Key=src_full)
             return True
         except Exception as e:
-            _log_warning(f'COS move failed {src_key}->{dst_key}: {e}')
+            _log_warning(f'COS移动失败 {src_key}->{dst_key}: {e}')
             return False
 
 
@@ -335,14 +335,14 @@ def delete_file(key):
         try:
             if os.path.exists(abs_path):
                 os.remove(abs_path)
-                _log_info(f'Local delete: {abs_path}')
+                _log_info(f'本地删除: {abs_path}')
                 # 清理空文件夹
                 if key.startswith('students/'):
                     folder = os.path.dirname(abs_path)
                     if os.path.isdir(folder) and not os.listdir(folder):
                         os.rmdir(folder)
         except Exception as e:
-            _log_warning(f'Local delete failed {abs_path}: {e}')
+            _log_warning(f'本地删除失败 {abs_path}: {e}')
             local_ok = False
 
     if backend in ('cos', 'dual'):
@@ -350,9 +350,9 @@ def delete_file(key):
             client, config = _get_cos_client()
             full = _full_cos_key(key, config)
             client.delete_object(Bucket=config['bucket'], Key=full)
-            _log_info(f'COS delete: {key}')
+            _log_info(f'COS删除: {key}')
         except Exception as e:
-            _log_warning(f'COS delete failed key={key}: {e}')
+            _log_warning(f'COS删除失败 key={key}: {e}')
             # COS 删除失败不中断，返回本地删除结果
 
     return local_ok
@@ -423,10 +423,10 @@ def pull_from_cos(key):
         os.makedirs(os.path.dirname(abs_path), exist_ok=True)
         with open(abs_path, 'wb') as f:
             f.write(data)
-        _log_info(f'Pulled from COS and saved locally: {key}')
+        _log_info(f'从COS拉取并保存到本地: {key}')
         return True
     except Exception as e:
-        _log_warning(f'Failed to pull from COS {key}: {str(e)}')
+        _log_warning(f'从COS拉取失败 {key}: {str(e)}')
         return False
 
 
