@@ -850,6 +850,51 @@ async function uploadAttachment(filePath, options = {}) {
 }
 
 
+
+// ======================== 文件下载 ========================
+
+/**
+ * 下载并打开学员体棆表。
+ *
+ * 通过 wx.downloadFile 把体棆表文件拉到本地临时路径，
+ * 再用 wx.openDocument 展示给用户。
+ *
+ * @param {number|string} studentId - 学员 ID
+ * @returns {Promise<void>}
+ */
+async function downloadTrainingForm(studentId) {
+  const id = encodeURIComponent(String(studentId || '').trim())
+  if (!id) throw new Error('学员ID不能为空')
+
+  const baseUrl = ensureBaseUrl()
+  const token = getToken()
+  const url = `${baseUrl}/api/students/${id}/training_form`
+    + (token ? `?mini_token=${encodeURIComponent(token)}` : '')
+
+  return new Promise((resolve, reject) => {
+    wx.downloadFile({
+      url,
+      header: token ? { Authorization: `Bearer ${token}`, 'X-Mini-Token': token } : {},
+      success(res) {
+        if (res.statusCode !== 200) {
+          reject(new Error(`下载失败（${res.statusCode}）`))
+          return
+        }
+        wx.openDocument({
+          filePath: res.tempFilePath,
+          showMenu: true,
+          success() { resolve() },
+          fail(err) { reject(new Error(err.errMsg || '打开文档失败')) }
+        })
+      },
+      fail(err) {
+        reject(new Error(err.errMsg || '下载失败'))
+      }
+    })
+  })
+}
+
+
 // ======================== 导出接口 ========================
 module.exports = {
   login,               // 登录
@@ -865,6 +910,7 @@ module.exports = {
   getWechatConfig,      // 获取微信配置
   getAttachmentConfig,  // 获取附件启用配置
   uploadAttachment,     // 上传附件
+  downloadTrainingForm, // 下载体棆表
   toAbsoluteFileUrl,    // 文件路径转 URL
   getBaseUrl,           // 获取 API 地址
   setBaseUrl,           // 设置 API 地址

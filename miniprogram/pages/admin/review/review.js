@@ -24,7 +24,12 @@ function mapRecord(item) {
     ...item,
     statusText: STATUS_TEXT_MAP[item.status] || item.status || '-',
     trainingTypeText: TRAINING_TYPE_LABELS[item.training_type] || item.training_type || '-',
-    submitTimeText: formatDateTime(item.created_at)
+    submitTimeText: formatDateTime(item.created_at),
+    // 已审核且存在体检表时，拼接完整下载 URL（和网页端 toFileUrl 逻辑一致）
+    trainingFormUrl: (item.status === 'reviewed' && item.training_form_path)
+      ? api.toAbsoluteFileUrl(item.training_form_path)
+      : '',
+    hasTrainingForm: item.status === 'reviewed' && !!item.training_form_path
   }
 }
 
@@ -348,5 +353,33 @@ Page({
   async onTabReselect() {
     if (this.data.loading) return
     await this.refreshAll(true)
+  },
+
+  async onDownloadTrainingFormTap(e) {
+    const { id, url } = e.currentTarget.dataset
+    if (!url) {
+      wx.showToast({ title: '无体棆表', icon: 'none' })
+      return
+    }
+    wx.showLoading({ title: '下载中...' })
+    wx.downloadFile({
+      url,
+      success(res) {
+        wx.hideLoading()
+        if (res.statusCode !== 200) {
+          wx.showToast({ title: '下载失败', icon: 'none' })
+          return
+        }
+        wx.openDocument({
+          filePath: res.tempFilePath,
+          showMenu: true,
+          fail() { wx.showToast({ title: '打开文档失败', icon: 'none' }) }
+        })
+      },
+      fail() {
+        wx.hideLoading()
+        wx.showToast({ title: '下载失败', icon: 'none' })
+      }
+    })
   }
 })

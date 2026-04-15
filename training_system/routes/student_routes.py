@@ -28,7 +28,7 @@ API 端点列表:
     - 特种作业 (special_operation)  : 必传学历证书、身份证正反面
     - 特种设备 (special_equipment)  : 必传个人照片、学历证书、身份证正反面、户口本户籍页和个人页
 """
-from flask import Blueprint, request, jsonify, current_app, g
+from flask import Blueprint, request, jsonify, current_app, g, session
 from models.student import (
     create_student, get_students, get_student_by_id, update_student,
     delete_student, get_companies
@@ -39,6 +39,7 @@ from services.document_service import generate_health_check_form
 from services import storage_service
 from utils.validators import validate_student_data, validate_file_upload
 from utils.error_handlers import AppError, ValidationError, NotFoundError
+from utils.auth import get_client_ip, resolve_openid_name
 import os
 import io
 import zipfile
@@ -938,7 +939,13 @@ def reject_student_route(id):
             # 彻底删除：先删除数据库记录，再清理附件文件
             student = delete_student(id)
             delete_student_files(student, current_app.config['BASE_DIR'])
-            current_app.logger.info(f'Student rejected and deleted: ID={id}')
+            operator = session.get('auth_user', 'unknown')
+            client_ip = get_client_ip(request)
+            submitter = resolve_openid_name(student.get('submitter_openid', ''))
+            current_app.logger.info(
+                f'[驱回并删除] 操作人={operator} IP={client_ip} '
+                f'学员ID={id} 姓名={student.get("name","")} 提交人={submitter}'
+            )
             return jsonify({'message': 'Student rejected and deleted'})
         else:
             # 仅更新状态
@@ -951,7 +958,13 @@ def reject_student_route(id):
                 # 后台非阻塞发送防止拖慢响应，这里简单同步调用（已在服务内吃掉异常）
                 send_review_result_message(submitter_openid, student_name, '已驳回', remark="请点击前往小程序进行修改")
                 
-            current_app.logger.info(f'Student moved to {target_status}: ID={id}')
+            operator = session.get('auth_user', 'unknown')
+            client_ip = get_client_ip(request)
+            submitter = resolve_openid_name(student.get('submitter_openid', ''))
+            current_app.logger.info(
+                f'[驱回] 操作人={operator} IP={client_ip} 目标状态={target_status} '
+                f'学员ID={id} 姓名={student_name} 提交人={submitter}'
+            )
             return jsonify({'message': f'Student moved to {target_status}', 'student': student})
 
     except NotFoundError as e:
@@ -1005,8 +1018,15 @@ def approve_student_route(id):
 
         if health_check_path:
             current_app.logger.info(f'Health check form generated for student ID={id}')
-        
-        current_app.logger.info(f'Student approved: ID={id}')
+
+        # 记录操作者信息：管理员账号 + 客户端 IP + 提交人 openid 映射
+        operator = session.get('auth_user', 'unknown')
+        client_ip = get_client_ip(request)
+        submitter = resolve_openid_name(submitter_openid or '')
+        current_app.logger.info(
+            f'[审核通过] 操作人={operator} IP={client_ip} '
+            f'学员ID={id} 姓名={student_name} 提交人={submitter}'
+        )
         return jsonify(student)
 
     except NotFoundError as e:
@@ -1097,6 +1117,65 @@ def download_attachments_zip_route(id):
     except Exception as e:
         current_app.logger.exception('Error generating ZIP for student %s', id)
         return build_internal_error_response('打包附件失败，请稍后重试')
+
+
+@student_bp.route('/api/students/<int:id>/training_form', methods=['GET'])
+def download_training_form_route(id):
+    """
+    下载学员体检表文件。
+
+    供小程序管理员和 Web 管理员直接下载体检表（.docx），
+    不依赖静态文件服务，通过 Flask send_file 返回文件流，
+    小程序端可通过 wx.downloadFile 接收。
+
+    权限:
+        - Web 管理员（session 认证）：允许
+        - 小程序管理员（JWT is_admin）：允许
+        - 小程序普通用户：403
+
+    参数:
+        id: 学员 ID
+
+    返回:
+        200: 体检表文件流（application/octet-stream）
+        400: 学员未审核或无体检表
+        403: 无权限（小程序普通用户）
+        404: 学员不存在
+    """
+    from flask import send_file
+    try:
+        student = get_student_by_id(id)
+
+        # 小程序普通用户不允许访问
+        ensure_mini_admin()
+
+        if student.get('status') != 'reviewed':
+            return jsonify({'error': '仅支持已审核学员下载体检表'}), 400
+
+        rel = student.get('training_form_path', '')
+        if not rel:
+            return jsonify({'error': '该学员暂无体检表'}), 400
+
+        abs_path = os.path.join(current_app.config['BASE_DIR'], rel)
+        if not os.path.exists(abs_path) or not os.path.isfile(abs_path):
+            return jsonify({'error': '体检表文件不存在，请重新审核生成'}), 400
+
+        filename = os.path.basename(abs_path)
+        current_app.logger.info(f'[体检表下载] 学员ID={id} 姓名={student.get("name","")} 文件={filename}')
+        return send_file(
+            abs_path,
+            mimetype='application/octet-stream',
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except NotFoundError as e:
+        return jsonify(e.to_dict()), e.status_code
+    except AppError as e:
+        return jsonify(e.to_dict()), e.status_code
+    except Exception as e:
+        current_app.logger.exception('Error downloading training form for student %s', id)
+        return build_internal_error_response('下载体检表失败，请稍后重试')
 
 
 @student_bp.route('/api/students/<int:id>/generate_materials', methods=['POST'])

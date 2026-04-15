@@ -984,7 +984,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         clone.querySelector('.student-id').textContent = student.id_card;
         const submitterOpenidNode = clone.querySelector('.submitter-openid');
         if (submitterOpenidNode) {
-            submitterOpenidNode.textContent = `提交人 OpenID：${student.submitter_openid || '-'}`;
+            // 已知小程序用户 openid → 姓名映射表
+            const OPENID_NAME_MAP = {
+                'oQRQz3VglMF63fWRtTCX8gbl21jo': '程超',
+                'oQRQz3amHUiSlU5RYNqu-r4GBJlk': '单利亚',
+                'oQRQz3SPn9tEiMy74NxfrzV1ZzJE': '霍玉萍',
+            };
+            const openid = student.submitter_openid || '';
+            const knownName = openid && OPENID_NAME_MAP[openid];
+            submitterOpenidNode.textContent = knownName
+                ? `提交人：${knownName}（${openid}）`
+                : `提交人 OpenID：${openid || '-'}`;
         }
         const statusBadge = clone.querySelector('.status-badge');
         if (statusBadge) {

@@ -71,18 +71,30 @@
           <text wx:if="{{item.exam_project}}" class="meta-chip">{{item.exam_project}}</text>
         </view>
 
-        <view class="detail-list">
-          <view class="detail-line">
-            <text class="detail-label">单位</text>
-            <text class="detail-value">{{item.company || '-'}}</text>
+        <view class="detail-with-form">
+          <view class="detail-list">
+            <view class="detail-line">
+              <text class="detail-label">单位</text>
+              <text class="detail-value">{{item.company || '-'}}</text>
+            </view>
+            <view class="detail-line">
+              <text class="detail-label">证件</text>
+              <text class="detail-value">{{item.id_card || '-'}}</text>
+            </view>
+            <view class="detail-line">
+              <text class="detail-label">手机</text>
+              <text class="detail-value">{{item.phone || '-'}}</text>
+            </view>
           </view>
-          <view class="detail-line">
-            <text class="detail-label">证件</text>
-            <text class="detail-value">{{item.id_card || '-'}}</text>
-          </view>
-          <view class="detail-line">
-            <text class="detail-label">手机</text>
-            <text class="detail-value">{{item.phone || '-'}}</text>
+          <view
+            wx:if="{{item.trainingFormUrl}}"
+            class="form-side-btn"
+            catchtap="onDownloadTrainingFormTap"
+            data-id="{{item._id}}"
+            data-url="{{item.trainingFormUrl}}"
+          >
+            <text class="form-side-emoji">📄</text>
+            <text class="form-side-label">体检表</text>
           </view>
         </view>
 

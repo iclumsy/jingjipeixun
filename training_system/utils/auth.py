@@ -162,3 +162,57 @@ def build_login_redirect_target(path, query_string):
     if query_string:
         target = f'{target}?{query_string}'
     return f"/auth/login?next={quote(target, safe='/?=&')}"
+
+
+# ======================== 日志辅助工具 ========================
+
+# 已知小程序用户 openid → 真实姓名映射表
+# 新增用户时直接在此处追加一行即可
+OPENID_NAME_MAP = {
+    'oQRQz3VglMF63fWRtTCX8gbl21jo': '程超',
+    'oQRQz3amHUiSlU5RYNqu-r4GBJlk': '单利亚',
+    'oQRQz3SPn9tEiMy74NxfrzV1ZzJE': '霍玉萍',
+}
+
+
+def resolve_openid_name(openid: str) -> str:
+    """
+    将小程序用户 openid 解析为可读姓名。
+
+    命中映射表时返回 "姓名(openid)"，未命中时原样返回 openid。
+    openid 为空时返回 "-"。
+
+    参数:
+        openid: 小程序用户 openid 字符串
+
+    返回:
+        str: 可读标识字符串
+    """
+    if not openid:
+        return '-'
+    name = OPENID_NAME_MAP.get(openid)
+    if name:
+        return f'{name}({openid})'
+    return openid
+
+
+def get_client_ip(request) -> str:
+    """
+    获取客户端真实 IP，兼容 Nginx 等反向代理。
+
+    优先读取 X-Forwarded-For 头的第一个地址，
+    其次读取 X-Real-IP，最后回退到 remote_addr。
+
+    参数:
+        request: Flask request 对象
+
+    返回:
+        str: IP 地址字符串，无法获取时返回 "unknown"
+    """
+    forwarded = (request.headers.get('X-Forwarded-For', '') or '').strip()
+    if forwarded:
+        return forwarded.split(',')[0].strip()
+    real_ip = (request.headers.get('X-Real-IP', '') or '').strip()
+    if real_ip:
+        return real_ip
+    return request.remote_addr or 'unknown'

@@ -223,14 +223,56 @@
   white-space: nowrap;
 }
 
+/* 单位/证件/手机 信息区 + 右侧体检表按钮 */
+.detail-with-form {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.detail-with-form .detail-list {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0;
+}
+
+/* 体检表侧边按钮（view 实现，flex 居中完全生效） */
+.form-side-btn {
+  flex-shrink: 0;
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 16rpx;
+  background: #f0ebff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+}
+
+.form-side-emoji {
+  font-size: 42rpx;
+  line-height: 1;
+}
+
+.form-side-label {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #6d28d9;
+  line-height: 1;
+}
+
+
 .record-actions {
   margin-top: 14rpx;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: nowrap;
   gap: 10rpx;
 }
 
 .action-btn {
+  flex: 1 1 0;
   margin: 0;
   border: none;
   border-radius: 12rpx;
@@ -239,6 +281,7 @@
   font-size: 22rpx;
   font-weight: 600;
   padding: 0;
+  min-width: 0;
 }
 
 .action-btn::after {
