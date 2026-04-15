@@ -604,9 +604,10 @@ async function getStudentDetail(studentId) {
  *
  * @param {number|string} studentId - 学员 ID
  * @param {string} action - 操作类型: 'approve' 或 'reject'
+ * @param {string} rejectReason - 驳回原因（可选）
  * @returns {Promise<Object>} 操作结果
  */
-async function reviewStudent(studentId, action) {
+async function reviewStudent(studentId, action, rejectReason = '') {
   const id = encodeURIComponent(String(studentId || '').trim())
   if (!id || !action) {
     throw new Error('学员ID和操作类型不能为空')
@@ -628,7 +629,8 @@ async function reviewStudent(studentId, action) {
       method: 'POST',
       data: {
         delete: false,
-        status: 'rejected'
+        status: 'rejected',
+        reject_reason: rejectReason
       }
     })
     return {

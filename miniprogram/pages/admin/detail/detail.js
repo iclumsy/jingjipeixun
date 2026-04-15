@@ -532,8 +532,18 @@ Page({
       return
     }
 
-    const confirmed = await this.confirmAction('驳回记录', '确认驳回该记录吗？')
-    if (!confirmed) return
+    const { confirm, content } = await new Promise(resolve => {
+      wx.showModal({
+        title: '驳回记录',
+        content: '照片不清晰', // 默认提示或初始值
+        placeholderText: '请输入驳回原因',
+        editable: true,
+        success: res => resolve({ confirm: !!res.confirm, content: res.content || '' }),
+        fail: () => resolve({ confirm: false, content: '' })
+      })
+    })
+
+    if (!confirm) return
 
     this.setData({
       actionLoading: true,
@@ -541,7 +551,7 @@ Page({
     })
     wx.showLoading({ title: '处理中...' })
     try {
-      await api.reviewStudent(this.data.studentId, 'reject')
+      await api.reviewStudent(this.data.studentId, 'reject', content.trim())
       wx.hideLoading()
       wx.showToast({ title: '已驳回', icon: 'success' })
       await this.loadDetail()

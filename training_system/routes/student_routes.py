@@ -972,8 +972,9 @@ def reject_student_route(id):
             submitter_openid = student.get('submitter_openid')
             student_name = student.get('name')
             if submitter_openid and target_status == 'rejected':
-                # 后台非阻塞发送防止拖慢响应，这里简单同步调用（已在服务内吃掉异常）
-                send_review_result_message(submitter_openid, student_name, '已驳回', remark="请点击前往小程序进行修改")
+                # 微信模板 thing11 通常有字数限制（一般 20 个字符）
+                remark = reject_reason[:20] if reject_reason else "请点击前往小程序进行修改"
+                send_review_result_message(submitter_openid, student_name, '已驳回', remark=remark)
                 
             operator = session.get('auth_user', 'unknown')
             client_ip = get_client_ip(request)
