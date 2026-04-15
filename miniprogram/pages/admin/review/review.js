@@ -356,30 +356,20 @@ Page({
   },
 
   async onDownloadTrainingFormTap(e) {
-    const { id, url } = e.currentTarget.dataset
-    if (!url) {
-      wx.showToast({ title: '无体棆表', icon: 'none' })
+    const { id, name, idCard } = e.currentTarget.dataset
+    if (!id) {
+      wx.showToast({ title: '参数错误', icon: 'none' })
       return
     }
     wx.showLoading({ title: '下载中...' })
-    wx.downloadFile({
-      url,
-      success(res) {
-        wx.hideLoading()
-        if (res.statusCode !== 200) {
-          wx.showToast({ title: '下载失败', icon: 'none' })
-          return
-        }
-        wx.openDocument({
-          filePath: res.tempFilePath,
-          showMenu: true,
-          fail() { wx.showToast({ title: '打开文档失败', icon: 'none' }) }
-        })
-      },
-      fail() {
-        wx.hideLoading()
-        wx.showToast({ title: '下载失败', icon: 'none' })
-      }
-    })
+    try {
+      // 使用 api.js 中的封装方法，传递姓名和身份证号用于构建文件名
+      await api.downloadTrainingForm(id, name, idCard)
+      wx.hideLoading()
+    } catch (err) {
+      wx.hideLoading()
+      console.error('下载体检表失败:', err)
+      wx.showToast({ title: err.message || '下载失败', icon: 'none' })
+    }
   }
 })

@@ -91,7 +91,8 @@
             class="form-side-btn"
             catchtap="onDownloadTrainingFormTap"
             data-id="{{item._id}}"
-            data-url="{{item.trainingFormUrl}}"
+            data-name="{{item.name}}"
+            data-id-card="{{item.id_card}}"
           >
             <text class="form-side-emoji">📄</text>
             <text class="form-side-label">体检表</text>

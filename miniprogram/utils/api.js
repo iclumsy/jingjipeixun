@@ -854,15 +854,17 @@ async function uploadAttachment(filePath, options = {}) {
 // ======================== 文件下载 ========================
 
 /**
- * 下载并打开学员体棆表。
+ * 下载并打开学员体检表。
  *
- * 通过 wx.downloadFile 把体棆表文件拉到本地临时路径，
+ * 通过 wx.downloadFile 把体检表文件拉到本地临时路径，
  * 再用 wx.openDocument 展示给用户。
  *
  * @param {number|string} studentId - 学员 ID
+ * @param {string} name - 学员姓名（用于构建文件名）
+ * @param {string} idCard - 学员身份证号（用于构建文件名）
  * @returns {Promise<void>}
  */
-async function downloadTrainingForm(studentId) {
+async function downloadTrainingForm(studentId, name = '', idCard = '') {
   const id = encodeURIComponent(String(studentId || '').trim())
   if (!id) throw new Error('学员ID不能为空')
 
@@ -871,17 +873,28 @@ async function downloadTrainingForm(studentId) {
   const url = `${baseUrl}/api/students/${id}/training_form`
     + (token ? `?mini_token=${encodeURIComponent(token)}` : '')
 
+  // 构建一个友好的文件名，避免转发时出现乱码或 generic 名称
+  // 微信转发时通常会显示文件的实际名称，如果路径是临时路径且无扩展名，会显示为“未命名”
+  const cleanName = (name || '').trim()
+  const cleanIdCard = (idCard || '').trim()
+  const filename = `${cleanIdCard || 'id'}-${cleanName || '学员'}-体检表.docx`
+  // 必须下载到 wx.env.USER_DATA_PATH 才能自定义文件名，且路径不能包含非法字符
+  const filePath = `${wx.env.USER_DATA_PATH}/${filename}`
+
   return new Promise((resolve, reject) => {
     wx.downloadFile({
       url,
+      filePath, // 指定本地路径以保留正确的文件名
       header: token ? { Authorization: `Bearer ${token}`, 'X-Mini-Token': token } : {},
       success(res) {
-        if (res.statusCode !== 200) {
+        // 如果使用了 filePath，res.tempFilePath 可能为空，应当使用传入的 filePath
+        const finalPath = res.filePath || res.tempFilePath
+        if (res.statusCode !== 200 && !finalPath) {
           reject(new Error(`下载失败（${res.statusCode}）`))
           return
         }
         wx.openDocument({
-          filePath: res.tempFilePath,
+          filePath: finalPath,
           showMenu: true,
           success() { resolve() },
           fail(err) { reject(new Error(err.errMsg || '打开文档失败')) }
@@ -910,7 +923,7 @@ module.exports = {
   getWechatConfig,      // 获取微信配置
   getAttachmentConfig,  // 获取附件启用配置
   uploadAttachment,     // 上传附件
-  downloadTrainingForm, // 下载体棆表
+  downloadTrainingForm, // 下载体检表
   toAbsoluteFileUrl,    // 文件路径转 URL
   getBaseUrl,           // 获取 API 地址
   setBaseUrl,           // 设置 API 地址
