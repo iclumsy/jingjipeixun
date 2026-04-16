@@ -69,8 +69,7 @@ class JunruiService:
 
     def get_category_id(self, job_category):
         """匹配行业大类 / 作业种类"""
-        # category=10 对应 场(厂)内专用机动车辆作业
-        # 接口: /api/trainmanager/common/categories?industry=02&projectType=0&planType=0
+        logger.info(f"开始在外部系统匹配行业种类 (job_category): {job_category}")
         if not job_category:
             raise JunruiServiceError("学员作业种类(job_category)为空，无法匹配")
         categories = self._get_api('/api/trainmanager/common/categories', {
@@ -78,16 +77,20 @@ class JunruiService:
         })
         for c in categories:
             if c.get("text") == job_category:
-                return c.get("value")
+                matched_id = c.get("value")
+                logger.info(f"匹配行业种类精确成功: {job_category} -> category_id: {matched_id}")
+                return matched_id
         # 降级模糊匹配
         for c in categories:
             if c.get("text") and c.get("text") in job_category:
-                return c.get("value")
+                matched_id = c.get("value")
+                logger.info(f"匹配行业种类模糊成功: {job_category} -> 接近于 {c.get('text')} (category_id: {matched_id})")
+                return matched_id
         raise JunruiServiceError(f"无法在外部系统中匹配到行业类别: {job_category}")
 
     def get_project_id(self, category_id, exam_project):
         """匹配具体的作业项目 (如叉车司机 -> 1095)"""
-        # 接口: /api/trainmanager/common/projects?category=10&projectType=0&planType=0
+        logger.info(f"开始在外部系统匹配考试项目 (exam_project): {exam_project} (基于分类 {category_id})")
         if not exam_project:
             raise JunruiServiceError("学员考试项目(exam_project)为空，无法匹配")
         projects = self._get_api('/api/trainmanager/common/projects', {
@@ -95,23 +98,28 @@ class JunruiService:
         })
         for p in projects:
             if p.get("text") == exam_project:
-                return p.get("value")
+                matched_id = p.get("value")
+                logger.info(f"匹配考试项目成功: {exam_project} -> project_id: {matched_id}")
+                return matched_id
         raise JunruiServiceError(f"无法在外部系统中找到对应的考试项目: {exam_project}")
 
     def get_plan_id(self, project_id, card_type="50"):
         """获取方案 planId (如价格 50)"""
-        # 接口: /api/trainmanager/common/prices?project=1095&projectType=0&planType=0
+        logger.info(f"开始匹配系统套餐/价格方案 (card_type): {card_type} (基于项目 {project_id})")
         prices = self._get_api('/api/trainmanager/common/prices', {
             'project': project_id, 'projectType': '0', 'planType': '0'
         })
         # 找对应的 text 为 "50" 的 value 作为 planId
         for p in prices:
             if p.get("text") == card_type:
-                return p.get("value")
+                matched_id = p.get("value")
+                logger.info(f"匹配套餐方案精确成功: {card_type} -> planId: {matched_id}")
+                return matched_id
         # 如果找不到 "50"，默认取第一个
         if prices:
-            logger.warning(f"未能精确匹配价格为 {card_type} 的方案，采用第一个可用方案: {prices[0].get('text')}")
-            return prices[0].get("value")
+            matched_id = prices[0].get("value")
+            logger.warning(f"未能精确匹配价格为 {card_type} 的方案，采用第一个可用方案: {prices[0].get('text')} -> planId: {matched_id}")
+            return matched_id
         raise JunruiServiceError(f"在外部系统中找不到该项目对应的价格/套餐方案 (project_id: {project_id})")
 
     def register_user(self, plan_id, student_info):
@@ -140,13 +148,20 @@ class JunruiService:
             "projectType": "0",
             "payState": "0"
         }
+        logger.info(f"即将发送装配完毕的开卡 payload 至外部系统: {payload}")
         try:
             res = self.session.post(url, json=payload, timeout=15)
             res.raise_for_status()
             data = res.json()
+            logger.info(f"外部系统开卡接口原始返回: {data}")
             if data.get("code") != 200:
-                raise JunruiServiceError(data.get("message", "提交开卡申请到外部系统失败"))
-            return data.get("message", "外部系统开卡请求已成功受理")
+                err_msg = data.get("message", "提交开卡申请到外部系统失败")
+                logger.error(f"外部系统拒绝了开卡请求，原因: {err_msg}")
+                raise JunruiServiceError(err_msg)
+            
+            success_msg = data.get("message", "外部系统开卡请求已成功受理")
+            logger.info(f"开卡成功落地完毕，返回消息: {success_msg}")
+            return success_msg
         except requests.RequestException as e:
             logger.error(f"注册开卡接口网络异常: {e}")
             raise JunruiServiceError("网络异常：开卡请求超时或被拒绝")
@@ -157,8 +172,11 @@ def activate_card_for_student(student_dict):
     提供给路由层的上层调用封装：
     从登录到完整流程开卡，最后返回外部系统的 message 提示
     """
+    student_id = student_dict.get("_id")
     job_cat = student_dict.get("job_category")
     exam_proj = student_dict.get("exam_project")
+    
+    logger.info(f"======== 开始执行外系统开卡流程 | 学员ID: {student_id} ========")
 
     service = JunruiService()
     try:
