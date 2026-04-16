@@ -445,6 +445,7 @@ input.error, select.error {
     cursor: pointer;
     transition: transform 0.15s ease, box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease;
     font-size: 1rem;
+    white-space: nowrap;
 }
 
 .btn.primary {
@@ -921,6 +922,7 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
     gap: 16px;
     padding-top: 24px;
     border-top: 1px solid #eee;
+    flex-wrap: wrap;
 }
 
 .empty-state {
