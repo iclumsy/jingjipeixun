@@ -1585,10 +1585,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             saveFormBtn.id = '_save_student_btn';
             saveFormBtn.className = 'btn primary';
             saveFormBtn.style.background = '#10B981';
-            saveFormBtn.style.marginRight = '8px';
-            saveFormBtn.textContent = '💾 保存资料';
+            saveFormBtn.textContent = '💾 保存';
             saveFormBtn.onclick = () => window.saveStudent();
-            actionBar.appendChild(saveFormBtn);
+            // 先不 append，放到最后 append 就可以在居右布局中占最右边
 
             if (currentStatus === 'unreviewed') {
                 const deleteBtn = document.createElement('button');
@@ -1646,7 +1645,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const downloadZipBtn = document.createElement('button');
                 downloadZipBtn.className = 'btn secondary';
-                downloadZipBtn.textContent = '⬇️ 打包下载';
+                downloadZipBtn.textContent = '⬇️ 打包';
                 downloadZipBtn.title = '仅下载原附件(剔除报名材料)';
                 downloadZipBtn.style.marginRight = '8px';
                 downloadZipBtn.onclick = () => {
@@ -1667,11 +1666,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const rejectBtn = document.createElement('button');
                 rejectBtn.className = 'btn';
-                rejectBtn.style.cssText = 'background: #FEE2E2; color: #EF4444;';
+                rejectBtn.style.cssText = 'background: #FEE2E2; color: #EF4444; margin-right: 8px;';
                 rejectBtn.textContent = '↩️ 驳回';
                 rejectBtn.onclick = () => showRejectDialog();
                 actionBar.appendChild(rejectBtn);
             }
+            
+            // 最后将保存追加进去，使其在最右侧
+            actionBar.appendChild(saveFormBtn);
         }
 
         mainContent.innerHTML = '';
