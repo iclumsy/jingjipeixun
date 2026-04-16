@@ -1803,7 +1803,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const data = await res.json();
                 close();
                 if (!res.ok) throw new Error(data.error || data.message || '开卡失败');
-                showMessage('开卡成功！学员已在培训考试系统创建学习卡', 'success');
+                showMessage(data.message || '开卡成功！学员已在培训考试系统创建学习卡', 'success');
             } catch (e) {
                 confirmBtn.disabled = false;
                 confirmBtn.textContent = '确认开卡';

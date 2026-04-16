@@ -418,8 +418,8 @@ Page({
 
     this.setData({ activating: true })
     try {
-      await api.activateCard(id)
-      wx.showToast({ title: '开卡成功', icon: 'success' })
+      const result = await api.activateCard(id)
+      wx.showToast({ title: result.message || '开卡成功', icon: 'success' })
       this.closeActivateModal()
     } catch (err) {
       wx.showToast({ title: err.message || '开卡失败', icon: 'none' })
