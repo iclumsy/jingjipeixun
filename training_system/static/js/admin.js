@@ -1586,7 +1586,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             saveFormBtn.className = 'btn primary';
             saveFormBtn.style.background = '#10B981';
             saveFormBtn.style.marginRight = '8px';
-            saveFormBtn.textContent = '保存资料';
+            saveFormBtn.textContent = '💾 保存资料';
             saveFormBtn.onclick = () => window.saveStudent();
             actionBar.appendChild(saveFormBtn);
 
@@ -1594,7 +1594,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'btn';
                 deleteBtn.style.cssText = 'background: #FFF1F2; color: #BE123C;';
-                deleteBtn.textContent = '删除学员';
+                deleteBtn.textContent = '🗑️ 删除学员';
                 deleteBtn.onclick = () => {
                     showRejectDialog(null, true);
                 };
@@ -1602,18 +1602,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const approveBtn = document.createElement('button');
                 approveBtn.className = 'btn primary';
-                approveBtn.textContent = '审核通过';
+                approveBtn.textContent = '✅ 审核通过';
                 approveBtn.onclick = () => approveStudent();
                 actionBar.appendChild(approveBtn);
             } else {
                 const generateMaterialsBtn = document.createElement('button');
                 generateMaterialsBtn.className = 'btn primary';
-                generateMaterialsBtn.textContent = '生成报名材料';
+                generateMaterialsBtn.textContent = '📋 生成报名材料';
                 generateMaterialsBtn.style.marginRight = '8px';
                 generateMaterialsBtn.style.background = '#4F46E5';
                 generateMaterialsBtn.onclick = async () => {
                     const originalText = generateMaterialsBtn.textContent;
-                    generateMaterialsBtn.textContent = '生成中...';
+                    generateMaterialsBtn.textContent = '⏳ 生成中...';
                     generateMaterialsBtn.disabled = true;
 
                     try {
@@ -1637,7 +1637,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const downloadMaterialsBtn = document.createElement('button');
                 downloadMaterialsBtn.className = 'btn secondary';
-                downloadMaterialsBtn.textContent = '报名材料下载';
+                downloadMaterialsBtn.textContent = '📦 报名材料下载';
                 downloadMaterialsBtn.style.marginRight = '8px';
                 downloadMaterialsBtn.onclick = () => {
                     window.open(`/api/students/${student.id}/download_materials.zip`, '_blank');
@@ -1646,7 +1646,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const downloadZipBtn = document.createElement('button');
                 downloadZipBtn.className = 'btn secondary';
-                downloadZipBtn.textContent = '打包下载';
+                downloadZipBtn.textContent = '⬇️ 打包下载';
                 downloadZipBtn.title = '仅下载原附件(剔除报名材料)';
                 downloadZipBtn.style.marginRight = '8px';
                 downloadZipBtn.onclick = () => {
@@ -1654,10 +1654,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 };
                 actionBar.appendChild(downloadZipBtn);
 
+                // 仅特种设备学员显示「开卡」按钮
+                if (student.training_type === 'special_equipment') {
+                    const activateCardBtn = document.createElement('button');
+                    activateCardBtn.className = 'btn';
+                    activateCardBtn.style.cssText = 'background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; margin-right: 8px; font-weight: 600;';
+                    activateCardBtn.textContent = '🎓 开卡';
+                    activateCardBtn.title = '为学员在培训考试系统开学习卡';
+                    activateCardBtn.onclick = () => showActivateCardDialog(student);
+                    actionBar.appendChild(activateCardBtn);
+                }
+
                 const rejectBtn = document.createElement('button');
                 rejectBtn.className = 'btn';
                 rejectBtn.style.cssText = 'background: #FEE2E2; color: #EF4444;';
-                rejectBtn.textContent = '驳回';
+                rejectBtn.textContent = '↩️ 驳回';
                 rejectBtn.onclick = () => showRejectDialog();
                 actionBar.appendChild(rejectBtn);
             }
@@ -1728,6 +1739,78 @@ document.addEventListener('DOMContentLoaded', async () => {
             showMessage('操作失败: ' + e.message, 'error');
         }
     };
+
+    /**
+     * 弹出开卡确认对话框，展示学员信息供管理员核对后提交。
+     * @param {Object} student - 学员对象
+     */
+    function showActivateCardDialog(student) {
+        const existing = document.getElementById('_activate_card_overlay');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = '_activate_card_overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(15,23,42,0.5);display:flex;align-items:center;justify-content:center;';
+
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#fff;border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,0.28);padding:0;width:min(460px,94vw);box-sizing:border-box;overflow:hidden;';
+
+        box.innerHTML = `
+            <div style="background:linear-gradient(135deg,#0ea5e9,#0284c7);padding:20px 24px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:3px;">🎓 开学习卡确认</div>
+                    <div style="font-size:12px;color:rgba(255,255,255,0.8);">请仔细核对以下学员信息，确认无误后点击确认开卡</div>
+                </div>
+                <button id="_acd_close" style="background:rgba(255,255,255,0.2);border:none;width:32px;height:32px;border-radius:50%;color:#fff;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;">×</button>
+            </div>
+            <div style="padding:24px;">
+                <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:16px 18px;margin-bottom:20px;">
+                    <div style="display:grid;grid-template-columns:80px 1fr;gap:10px 8px;font-size:14px;">
+                        <span style="color:#64748b;font-weight:500;">姓&emsp;&emsp;名</span>
+                        <span style="color:#0f172a;font-weight:700;font-size:15px;">${student.name || '-'}</span>
+                        <span style="color:#64748b;font-weight:500;">手&ensp;机&ensp;号</span>
+                        <span style="color:#0369a1;font-weight:600;letter-spacing:1px;">${student.phone || '-'}</span>
+                        <span style="color:#64748b;font-weight:500;">身份证号</span>
+                        <span style="color:#0f172a;font-weight:600;letter-spacing:0.5px;">${student.id_card || '-'}</span>
+                        <span style="color:#64748b;font-weight:500;">培训项目</span>
+                        <span style="color:#0369a1;font-weight:600;">${student.exam_project || student.job_category || '-'}</span>
+                    </div>
+                </div>
+                <div style="color:#f59e0b;font-size:13px;margin-bottom:20px;display:flex;align-items:flex-start;gap:6px;">
+                    <span style="flex-shrink:0;margin-top:1px;">⚠️</span>
+                    <span>开卡操作将把该学员信息提交至培训考试系统，请确认以上信息正确无误。</span>
+                </div>
+                <div style="display:flex;justify-content:flex-end;gap:10px;">
+                    <button id="_acd_cancel" style="padding:9px 22px;border:1px solid #d1d5db;border-radius:8px;background:#fff;color:#374151;font-size:14px;cursor:pointer;font-weight:500;">取消</button>
+                    <button id="_acd_confirm" style="padding:9px 22px;border:none;border-radius:8px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 3px 8px rgba(14,165,233,0.35);">确认开卡</button>
+                </div>
+            </div>
+        `;
+
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        const close = () => overlay.remove();
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        box.querySelector('#_acd_close').onclick = close;
+        box.querySelector('#_acd_cancel').onclick = close;
+        box.querySelector('#_acd_confirm').onclick = async () => {
+            const confirmBtn = box.querySelector('#_acd_confirm');
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = '开卡中...';
+            try {
+                const res = await fetch(`/api/students/${student.id}/activate_card`, { method: 'POST' });
+                const data = await res.json();
+                close();
+                if (!res.ok) throw new Error(data.error || data.message || '开卡失败');
+                showMessage('开卡成功！学员已在培训考试系统创建学习卡', 'success');
+            } catch (e) {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = '确认开卡';
+                showMessage('开卡失败：' + e.message, 'error');
+            }
+        };
+    }
 
     /**
      * 弹出自定义驳回对话框（填写原因）。

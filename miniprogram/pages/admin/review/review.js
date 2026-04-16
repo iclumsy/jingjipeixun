@@ -50,7 +50,11 @@ Page({
     hasMore: true,
     loading: false,
     refreshing: false,
-    initialized: false
+    initialized: false,
+    
+    showActivateModal: false,
+    activateStudent: {},
+    activating: false
   },
 
   async onLoad() {
@@ -380,6 +384,47 @@ Page({
       wx.hideLoading()
       console.error('下载体检表失败:', err)
       wx.showToast({ title: err.message || '下载失败', icon: 'none' })
+    }
+  },
+
+  onActivateCardTap(e) {
+    const { id, name, phone, idCard, examProject } = e.currentTarget.dataset
+    if (!id) {
+      wx.showToast({ title: '参数错误', icon: 'none' })
+      return
+    }
+
+    this.setData({
+      showActivateModal: true,
+      activateStudent: { id, name, phone, idCard, examProject }
+    })
+  },
+
+  closeActivateModal() {
+    if (this.data.activating) return
+    this.setData({
+      showActivateModal: false,
+      activateStudent: {}
+    })
+  },
+
+  preventD() {
+    // 阻止事件冒泡即可
+  },
+
+  async confirmActivateCard() {
+    const { id } = this.data.activateStudent
+    if (!id || this.data.activating) return
+
+    this.setData({ activating: true })
+    try {
+      await api.activateCard(id)
+      wx.showToast({ title: '开卡成功', icon: 'success' })
+      this.closeActivateModal()
+    } catch (err) {
+      wx.showToast({ title: err.message || '开卡失败', icon: 'none' })
+    } finally {
+      this.setData({ activating: false })
     }
   }
 })

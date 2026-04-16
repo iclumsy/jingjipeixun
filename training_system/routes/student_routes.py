@@ -1057,6 +1057,55 @@ def approve_student_route(id):
 
 
 
+@student_bp.route('/api/students/<int:id>/activate_card', methods=['POST'])
+def activate_card_route(id):
+    """
+    为特种设备审核通过学员开学习卡。
+
+    仅限特种设备（special_equipment）且状态为已审核（reviewed）的学员。
+    管理员需在前端核对学员信息后确认提交，本接口当前直接返回成功占位，
+    后续将对接外部培训考试系统的开卡接口。
+
+    参数:
+        id: 学员 ID
+
+    返回:
+        200: {\"message\": \"开卡成功\", \"student\": {...}}
+        400: 不符合开卡条件
+        404: 学员不存在
+    """
+    try:
+        student = get_student_by_id(id)
+
+        # 仅特种设备且已审核的学员可以开卡
+        if student.get('training_type') != 'special_equipment':
+            return jsonify({'error': '仅特种设备学员可以开卡'}), 400
+        if student.get('status') != 'reviewed':
+            return jsonify({'error': '仅审核通过的学员可以开卡'}), 400
+
+        # TODO: 后续在此处对接外部培训考试系统开卡接口
+        # 例如：call_exam_system_activate(student)
+
+        operator = session.get('auth_user', 'unknown')
+        client_ip = get_client_ip(request)
+        current_app.logger.info(
+            f'[开卡] 操作人={operator} IP={client_ip} '
+            f'学员ID={id} 姓名={student.get("name","")} '
+            f'身份证={student.get("id_card","")} 手机={student.get("phone","")} '
+            f'项目={student.get("exam_project","")}'
+        )
+
+        return jsonify({'message': '开卡成功', 'student': student})
+
+    except NotFoundError as e:
+        return jsonify(e.to_dict()), e.status_code
+    except AppError as e:
+        return jsonify(e.to_dict()), e.status_code
+    except Exception as e:
+        current_app.logger.exception('Error activating card for student %s', id)
+        return build_internal_error_response('开卡失败，请稍后重试')
+
+
 @student_bp.route('/api/students/<int:id>/attachments.zip', methods=['GET'])
 def download_attachments_zip_route(id):
     """

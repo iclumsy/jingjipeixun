@@ -63,6 +63,16 @@
             <view class="time-text">{{item.submitTimeText}}</view>
           </view>
           <view class="status-badge badge-{{item.status}}">{{item.statusText}}</view>
+          <view
+            wx:if="{{item.status === 'reviewed' && item.training_type === 'special_equipment'}}"
+            class="card-head-activate-btn"
+            catchtap="onActivateCardTap"
+            data-id="{{item._id}}"
+            data-name="{{item.name}}"
+            data-phone="{{item.phone}}"
+            data-id-card="{{item.id_card}}"
+            data-exam-project="{{item.exam_project || item.job_category}}"
+          >🎓 开卡</view>
         </view>
 
         <view class="meta-row">
@@ -107,7 +117,7 @@
             data-id="{{item._id}}"
             data-status="{{item.status}}"
             disabled="{{item.status !== 'unreviewed'}}"
-          >审核通过</button>
+          >✅ 审核通过</button>
           <button
             class="action-btn btn-reject {{item.status !== 'unreviewed' ? 'disabled' : ''}}"
             size="mini"
@@ -115,13 +125,13 @@
             data-id="{{item._id}}"
             data-status="{{item.status}}"
             disabled="{{item.status !== 'unreviewed'}}"
-          >驳回</button>
+          >↩️ 驳回</button>
           <button
             class="action-btn btn-delete"
             size="mini"
             catchtap="onDeleteTap"
             data-id="{{item._id}}"
-          >删除</button>
+          >🗑️ 删除</button>
         </view>
       </view>
 
@@ -132,6 +142,36 @@
         <view class="state-dot"></view>
         <view class="state-title">暂无符合条件的记录</view>
         <view class="state-desc">可切换筛选项或下拉刷新后重试</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 自定义开卡确认弹窗 -->
+  <view class="custom-modal-mask fade-enter" wx:if="{{showActivateModal}}" catchtap="closeActivateModal">
+    <view class="custom-modal-box" catchtap="preventD">
+      <view class="activate-modal-header">
+        <view class="activate-modal-title">🎓 开学习卡确认</view>
+        <view class="activate-modal-sub">请核对以下学员信息后操作</view>
+      </view>
+      <view class="activate-modal-body">
+        <view class="activate-info-grid">
+          <text class="grid-label">姓名</text>
+          <text class="grid-value grid-name">{{activateStudent.name || '-'}}</text>
+          <text class="grid-label">手机号</text>
+          <text class="grid-value grid-phone">{{activateStudent.phone || '-'}}</text>
+          <text class="grid-label">身份证</text>
+          <text class="grid-value grid-id">{{activateStudent.idCard || '-'}}</text>
+          <text class="grid-label">培训项目</text>
+          <text class="grid-value grid-project">{{activateStudent.examProject || '-'}}</text>
+        </view>
+        <view class="activate-warning">
+          <text class="warning-icon">⚠️</text>
+          <text class="warning-text">确认后该学员信息将被提交至培训考试系统，请确保信息无误。</text>
+        </view>
+      </view>
+      <view class="activate-modal-footer">
+        <button class="activate-btn-cancel" catchtap="closeActivateModal">取消</button>
+        <button class="activate-btn-confirm" catchtap="confirmActivateCard" disabled="{{activating}}">{{activating ? '开卡中...' : '确认开卡'}}</button>
       </view>
     </view>
   </view>

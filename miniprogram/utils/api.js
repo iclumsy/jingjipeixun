@@ -910,6 +910,28 @@ async function downloadTrainingForm(studentId, name = '', idCard = '') {
 }
 
 
+/**
+ * 为已审核的特种设备学员开学习卡。
+ *
+ * @param {number|string} studentId - 学员 ID
+ * @returns {Promise<Object>} 操作结果
+ */
+async function activateCard(studentId) {
+  const id = encodeURIComponent(String(studentId || '').trim())
+  if (!id) throw new Error('学员ID不能为空')
+
+  const result = await requestApi(`/api/students/${id}/activate_card`, {
+    method: 'POST',
+    data: {}
+  })
+  return {
+    success: true,
+    message: result.message || '开卡成功',
+    student: withClientId(result.student || {})
+  }
+}
+
+
 // ======================== 导出接口 ========================
 module.exports = {
   login,               // 登录
@@ -926,6 +948,7 @@ module.exports = {
   getAttachmentConfig,  // 获取附件启用配置
   uploadAttachment,     // 上传附件
   downloadTrainingForm, // 下载体检表
+  activateCard,         // 开学习卡
   toAbsoluteFileUrl,    // 文件路径转 URL
   getBaseUrl,           // 获取 API 地址
   setBaseUrl,           // 设置 API 地址

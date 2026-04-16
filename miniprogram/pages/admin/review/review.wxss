@@ -303,8 +303,157 @@
   color: #c2410c;
 }
 
+.btn-activate-card {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  color: #ffffff;
+}
+
+/* 卡片头部「已通过」标签旁的开卡按钮 */
+.card-head-activate-btn {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 24rpx;
+  height: 52rpx;
+  border-radius: 29rpx;
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 700;
+  box-shadow: 0 4rpx 10rpx rgba(14, 165, 233, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .action-btn.disabled {
   opacity: 0.45;
+}
+
+/* ================================== */
+/* 自定义开卡确认弹窗样式 */
+/* ================================== */
+.custom-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.custom-modal-box {
+  width: min(600rpx, 92vw);
+  background: #ffffff;
+  border-radius: 24rpx;
+  overflow: hidden;
+  box-shadow: 0 40rpx 80rpx rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+}
+
+.activate-modal-header {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  padding: 30rpx 32rpx;
+}
+
+.activate-modal-title {
+  color: #ffffff;
+  font-size: 34rpx;
+  font-weight: 700;
+  margin-bottom: 6rpx;
+}
+
+.activate-modal-sub {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 24rpx;
+}
+
+.activate-modal-body {
+  padding: 40rpx 32rpx;
+}
+
+.activate-info-grid {
+  background: #f0f9ff;
+  border: 2rpx solid #bae6fd;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  display: grid;
+  grid-template-columns: 110rpx 1fr;
+  gap: 16rpx 12rpx;
+  margin-bottom: 30rpx;
+}
+
+.grid-label {
+  color: #64748b;
+  font-size: 26rpx;
+  font-weight: 500;
+}
+
+.grid-value {
+  color: #0f172a;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.grid-name { font-size: 30rpx; font-weight: 700; }
+.grid-phone { color: #0369a1; letter-spacing: 1rpx; }
+.grid-id { letter-spacing: 0.5rpx; }
+.grid-project { color: #0369a1; }
+
+.activate-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10rpx;
+  color: #d97706;
+  font-size: 24rpx;
+  line-height: 1.5;
+  background: #fffbeb;
+  padding: 16rpx 20rpx;
+  border-radius: 12rpx;
+}
+
+.warning-icon { margin-top: 2rpx; }
+.warning-text { flex: 1; }
+
+.activate-modal-footer {
+  display: flex;
+  padding: 0 32rpx 40rpx;
+  gap: 20rpx;
+}
+
+.activate-btn-cancel,
+.activate-btn-confirm {
+  flex: 1;
+  margin: 0;
+  height: 80rpx;
+  line-height: 80rpx;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  padding: 0;
+}
+
+.activate-btn-cancel {
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+}
+
+.activate-btn-confirm {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 6rpx 16rpx rgba(14, 165, 233, 0.35);
+}
+
+.activate-btn-confirm[disabled] {
+  opacity: 0.6;
+}
+
+.activate-btn-cancel::after,
+.activate-btn-confirm::after {
+  border: none;
 }
 
 .loading,
