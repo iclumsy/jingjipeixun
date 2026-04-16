@@ -1083,19 +1083,25 @@ def activate_card_route(id):
         if student.get('status') != 'reviewed':
             return jsonify({'error': '仅审核通过的学员可以开卡'}), 400
 
-        # TODO: 后续在此处对接外部培训考试系统开卡接口
-        # 例如：call_exam_system_activate(student)
-
+        # 调用外部系统接口实际办理开卡
+        from services.junrui_service import activate_card_for_student
+        
         operator = session.get('auth_user', 'unknown')
         client_ip = get_client_ip(request)
         current_app.logger.info(
-            f'[开卡] 操作人={operator} IP={client_ip} '
+            f'[开卡请求] 操作人={operator} IP={client_ip} '
             f'学员ID={id} 姓名={student.get("name","")} '
             f'身份证={student.get("id_card","")} 手机={student.get("phone","")} '
             f'项目={student.get("exam_project","")}'
         )
 
-        return jsonify({'message': '开卡成功', 'student': student})
+        result = activate_card_for_student(student)
+        if not result.get("success"):
+            # 开卡失败，此时直接抛异常让外层捕获或者在此处直接返回
+            return jsonify({'error': result.get("message", "办理失败，请重试")}), 400
+
+        current_app.logger.info(f'[开卡完成] 学员ID={id} 成功')
+        return jsonify({'message': result.get("message", "开卡成功"), 'student': student})
 
     except NotFoundError as e:
         return jsonify(e.to_dict()), e.status_code
