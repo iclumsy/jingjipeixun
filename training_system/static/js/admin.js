@@ -1042,6 +1042,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (statusBadge) {
             const statusMeta = getStatusMeta(student.status);
             statusBadge.innerHTML = `<span class="badge ${statusMeta.className}">${statusMeta.label}</span>`;
+            statusBadge.style.display = 'flex';
+            statusBadge.style.alignItems = 'center';
+
+            // 仅特种设备且已审核学员在顶部显示「开卡」按钮
+            if (student.status === 'reviewed' && student.training_type === 'special_equipment') {
+                const activateCardBtn = document.createElement('button');
+                activateCardBtn.style.cssText = 'background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; font-weight: 600; font-size: 0.8rem; padding: 4px 12px; border-radius: 6px; border: none; cursor: pointer; margin-left: 12px; box-shadow: 0 2px 6px rgba(14,165,233,0.25); white-space: nowrap;';
+                activateCardBtn.textContent = '🎓 开卡';
+                activateCardBtn.title = '为学员在培训考试系统开学习卡';
+                activateCardBtn.onclick = () => showActivateCardDialog(student);
+                statusBadge.appendChild(activateCardBtn);
+            }
 
             // 如果已驳回且有驳回原因，在徽章后插入提示块
             if (student.status === 'rejected' && student.reject_reason) {
@@ -1653,16 +1665,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 };
                 actionBar.appendChild(downloadZipBtn);
 
-                // 仅特种设备学员显示「开卡」按钮
-                if (student.training_type === 'special_equipment') {
-                    const activateCardBtn = document.createElement('button');
-                    activateCardBtn.className = 'btn';
-                    activateCardBtn.style.cssText = 'background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; margin-right: 8px; font-weight: 600;';
-                    activateCardBtn.textContent = '🎓 开卡';
-                    activateCardBtn.title = '为学员在培训考试系统开学习卡';
-                    activateCardBtn.onclick = () => showActivateCardDialog(student);
-                    actionBar.appendChild(activateCardBtn);
-                }
 
                 const rejectBtn = document.createElement('button');
                 rejectBtn.className = 'btn';
