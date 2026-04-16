@@ -805,20 +805,41 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     function debounce(func, wait) {
         let timeout;
-        return function executedFunction(...args) {
+        let lastArgs;
+        function executedFunction(...args) {
+            lastArgs = args;
             const later = () => {
-                clearTimeout(timeout);
-                func(...args);
+                timeout = null;
+                func(...lastArgs);
             };
             clearTimeout(timeout);
             timeout = setTimeout(later, wait);
+        }
+        executedFunction.cancel = () => {
+            if (timeout) {
+                clearTimeout(timeout);
+                timeout = null;
+            }
         };
+        executedFunction.flush = () => {
+            if (timeout) {
+                clearTimeout(timeout);
+                timeout = null;
+                func(...lastArgs);
+            }
+        };
+        return executedFunction;
     }
 
-    const autoSave = debounce(async (studentId) => {
-        if (!studentId) return;
+    window.saveStudent = async function () {
+        if (!currentStudentId) return;
 
         showSaveStatus('保存中...', 'info');
+        const saveBtn = document.getElementById('_save_student_btn');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = '保存中...';
+        }
 
         try {
             const formData = new FormData();
@@ -837,7 +858,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 formData.set('training_type', inferredTrainingType);
             }
 
-            const res = await fetch(`/api/students/${studentId}`, { method: 'PUT', body: formData });
+            const res = await fetch(`/api/students/${currentStudentId}`, { method: 'PUT', body: formData });
 
             if (!res.ok) {
                 throw new Error('保存失败');
@@ -847,20 +868,33 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             showSaveStatus('保存成功', 'success');
 
-            const idx = students.findIndex(s => s.id === studentId);
+            const idx = students.findIndex(s => s.id === currentStudentId);
             if (idx >= 0) {
                 const previousTrainingType = students[idx].training_type;
                 students[idx] = updated;
-                if (currentStudentId === studentId && previousTrainingType !== updated.training_type) {
+                
+                renderList(students);
+                const listItems = document.querySelectorAll('.list-item');
+                const viewIdx = students.filter(s => currentStatus === 'all' || s.status === currentStatus).findIndex(s => s.id === currentStudentId);
+                if (viewIdx >= 0 && listItems[viewIdx]) {
+                    listItems[viewIdx].classList.add('active');
+                }
+
+                if (currentStudentId === currentStudentId && previousTrainingType !== updated.training_type) {
                     showDetail(updated);
                 }
             }
 
         } catch (e) {
-            console.error('Auto-save error:', e);
+            console.error('Save error:', e);
             showSaveStatus('保存失败', 'error');
+        } finally {
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = '保存资料';
+            }
         }
-    }, 1000);
+    };
 
     /**
      * 显示保存状态提示（在详情页面右上角显示保存成功/失败的提示）。
@@ -1151,19 +1185,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (!f.readonly) {
                 if (f.type === 'select') {
-                    input.addEventListener('change', () => {
-                        showError();
-                        if (input.checkValidity()) {
-                            autoSave(student.id);
-                        }
-                    });
-                } else {
-                    input.addEventListener('blur', () => {
-                        showError();
-                        if (input.checkValidity()) {
-                            autoSave(student.id);
-                        }
-                    });
+                    input.addEventListener('change', showError);
                 }
             }
         });
@@ -1559,6 +1581,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const actionBar = clone.querySelector('.action-bar');
         if (actionBar) {
+            const saveFormBtn = document.createElement('button');
+            saveFormBtn.id = '_save_student_btn';
+            saveFormBtn.className = 'btn primary';
+            saveFormBtn.style.background = '#10B981';
+            saveFormBtn.style.marginRight = '8px';
+            saveFormBtn.textContent = '保存资料';
+            saveFormBtn.onclick = () => window.saveStudent();
+            actionBar.appendChild(saveFormBtn);
+
             if (currentStatus === 'unreviewed') {
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'btn';

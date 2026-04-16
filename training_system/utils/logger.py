@@ -21,6 +21,21 @@ import os
 from logging.handlers import RotatingFileHandler
 
 
+from flask import has_request_context, session, g, request
+
+class SourceContextFilter(logging.Filter):
+    def filter(self, record):
+        if has_request_context():
+            if getattr(g, 'mini_user', None) or request.path.startswith('/api/miniprogram/'):
+                record.sys_source = '小程序'
+            elif session.get('auth_verified') is True or session.get('auth_user'):
+                record.sys_source = '网页端'
+            else:
+                record.sys_source = '系统'
+        else:
+            record.sys_source = '系统'
+        return True
+
 def setup_logger(app):
     """
     设置应用日志系统。
@@ -36,11 +51,13 @@ def setup_logger(app):
     log_dir = os.path.join(app.config.get('BASE_DIR', os.path.dirname(os.path.abspath(__file__))), 'logs')
     os.makedirs(log_dir, exist_ok=True)
 
-    # 统一日志格式：[时间] [级别] [模块] 内容
+    # 统一日志格式：[时间] [级别] [来源] 内容
     formatter = logging.Formatter(
-        '[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s',
+        '[%(asctime)s] [%(levelname)s] [%(sys_source)s] %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
+    
+    source_filter = SourceContextFilter()
 
     # ---- 综合日志文件 ----
     # 记录所有级别的日志，单文件最大 5MB，保留 5 个历史备份
@@ -51,6 +68,7 @@ def setup_logger(app):
         encoding='utf-8'
     )
     file_handler.setFormatter(formatter)
+    file_handler.addFilter(source_filter)
     file_handler.setLevel(logging.DEBUG if app.debug else logging.INFO)  # 调试模式记录 DEBUG
 
     # ---- 错误专用日志文件 ----
@@ -62,12 +80,14 @@ def setup_logger(app):
         encoding='utf-8'
     )
     error_handler.setFormatter(formatter)
+    error_handler.addFilter(source_filter)
     error_handler.setLevel(logging.ERROR)  # 仅 ERROR 和 CRITICAL
 
     # ---- 控制台输出 ----
     # 开发时在终端查看实时日志
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
+    console_handler.addFilter(source_filter)
     console_handler.setLevel(logging.DEBUG if app.debug else logging.INFO)
 
     # 移除已有处理器以避免重复
