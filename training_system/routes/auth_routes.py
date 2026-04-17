@@ -18,7 +18,7 @@
 - JSON 提交 (application/json) : 前端 AJAX 调用使用
 """
 from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session
-from utils.auth import get_client_ip, sanitize_next_path, verify_admin_credentials
+from utils.auth import get_client_ip, resolve_ip_location, sanitize_next_path, verify_admin_credentials
 
 
 # 创建认证蓝图，前缀为空（路径在路由装饰器中指定）
@@ -68,9 +68,10 @@ def login():
         session.permanent = True          # 使 session 遵循 PERMANENT_SESSION_LIFETIME 过期时间
 
         client_ip = get_client_ip(request)
-        current_app.logger.info(f'[管理员登录] 用户={username} IP={client_ip}')
+        ip_loc = resolve_ip_location(client_ip)
+        current_app.logger.info(f'[管理员登录] 用户={username} IP={client_ip} {ip_loc}')
 
-        current_app.logger.info(f"管理员登录成功: 用户名={username}, IP={request.remote_addr}")
+        current_app.logger.info(f"管理员登录成功: 用户名={username}, IP={client_ip} {ip_loc}")
 
         # 根据请求格式返回不同类型的响应
         if request.is_json:
@@ -82,8 +83,9 @@ def login():
 
     # 验证失败：返回 401 错误
     client_ip = get_client_ip(request)
-    current_app.logger.warning(f'[管理员登录失败] 用户={username} IP={client_ip}')
-    current_app.logger.warning(f"管理员登录失败: 尝试用户名={username}, IP={request.remote_addr}")
+    ip_loc = resolve_ip_location(client_ip)
+    current_app.logger.warning(f'[管理员登录失败] 用户={username} IP={client_ip} {ip_loc}')
+    current_app.logger.warning(f"管理员登录失败: 尝试用户名={username}, IP={client_ip} {ip_loc}")
     if request.is_json:
         return jsonify({
             'success': False,
@@ -105,7 +107,10 @@ def logout():
     # 清除所有 session 数据（包括认证标记和用户信息）
     auth_user = session.get('auth_user', '未知用户')
     session.clear()
-    current_app.logger.info(f"管理员安全退出: 用户名={auth_user}, IP={request.remote_addr}")
+    
+    client_ip = get_client_ip(request)
+    ip_loc = resolve_ip_location(client_ip)
+    current_app.logger.info(f"管理员安全退出: 用户名={auth_user}, IP={client_ip} {ip_loc}")
     if request.is_json:
         return jsonify({'success': True})
     return redirect('/auth/login')

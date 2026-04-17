@@ -216,3 +216,51 @@ def get_client_ip(request) -> str:
     if real_ip:
         return real_ip
     return request.remote_addr or 'unknown'
+
+
+def resolve_ip_location(ip: str) -> str:
+    """
+    查询 IP 的物理地址信息。
+    
+    使用 ip-api.com 的免费接口进行查询。
+    为避免阻塞主线程，设置了极短的超时时间，查询失败则静默衰退。
+    
+    参数:
+        ip: IP 地址字符串
+        
+    返回:
+        str: 位置信息字符串（如 "(中国 广东 深圳)"），无效或失败则返回空字符串。
+    """
+    if not ip or ip == 'unknown' or ip == '127.0.0.1' or ip == '::1':
+        return ''
+    
+    # 简单过滤常见局域网 IPv4
+    if ip.startswith(('192.168.', '10.', '172.16.', '172.17.', '172.18.', '172.19.', '172.2', '172.30.', '172.31.')):
+        return '(局域网)'
+        
+    try:
+        import urllib.request
+        import json
+        url = f"http://ip-api.com/json/{ip}?lang=zh-CN"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=1.5) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            if data and data.get('status') == 'success':
+                parts = []
+                country = data.get('country', '')
+                region = data.get('regionName', '')
+                city = data.get('city', '')
+                
+                if country and country != '中国':
+                    parts.append(country)
+                if region:
+                    parts.append(region)
+                if city and city != region:
+                    parts.append(city)
+                    
+                loc = " ".join(parts).strip()
+                if loc:
+                    return f"({loc})"
+    except Exception:
+        pass
+    return ""
