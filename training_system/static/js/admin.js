@@ -1261,17 +1261,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const createSwapBtnForWrapper = (pairType, label) => {
             const btn = document.createElement('button');
+            btn.className = 'btn';
             btn.textContent = label;
             btn.title = pairType === 'id_card' ? '身份证正反面互换' : '户口本首页和本人页互换';
-            btn.style.marginTop = '4px';
+            
+            // 设定专属的浅紫蓝次级操作色，区别于普通白底，高度紧凑
+            btn.style.background = '#eef2ff';
+            btn.style.color = '#4f46e5';
+            btn.style.border = '1px solid #c7d2fe';
+            btn.style.padding = '4px 14px'; 
             btn.style.fontSize = '12px';
-            btn.style.padding = '3px 0';
-            btn.style.border = '1px dashed #d1d5db';
-            btn.style.borderRadius = '4px';
-            btn.style.background = '#f9fafb';
-            btn.style.cursor = 'pointer';
-            btn.style.color = '#4b5563';
-            btn.style.width = '100px';
+            
+            btn.onmouseover = () => {
+                btn.style.background = '#e0e7ff';
+            };
+            btn.onmouseout = () => {
+                btn.style.background = '#eef2ff';
+            };
             
             btn.onclick = async (e) => {
                 e.stopPropagation();
@@ -1298,6 +1304,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
             return btn;
         };
+
+        let idCardGroup = null;
+        let hukouGroup = null;
 
         attachments.forEach(attachment => {
             const existingPath = student[attachment.dbKey] || '';
@@ -1451,17 +1460,68 @@ document.addEventListener('DOMContentLoaded', async () => {
             wrapper.appendChild(caption);
             wrapper.appendChild(actionBtn);
 
-            // 插入互换按钮
-            if ((attachment.dbKey === 'id_card_front_path' || attachment.dbKey === 'id_card_back_path') 
-                && student.id_card_front_path && student.id_card_back_path) {
-                wrapper.appendChild(createSwapBtnForWrapper('id_card', '🔁 互换正反'));
-            }
-            if ((attachment.dbKey === 'hukou_residence_path' || attachment.dbKey === 'hukou_personal_path') 
-                && student.hukou_residence_path && student.hukou_personal_path) {
-                wrapper.appendChild(createSwapBtnForWrapper('hukou', '🔁 互换页面'));
-            }
+            // 分组逻辑
+            if (attachment.dbKey === 'id_card_front_path' || attachment.dbKey === 'id_card_back_path') {
+                if (!idCardGroup) {
+                    idCardGroup = document.createElement('div');
+                    idCardGroup.style.display = 'flex';
+                    idCardGroup.style.flexDirection = 'column';
+                    idCardGroup.style.alignItems = 'center';
+                    
+                    const row = document.createElement('div');
+                    row.className = 'pair-row';
+                    row.style.display = 'flex';
+                    row.style.gap = '15px';
+                    idCardGroup.appendChild(row);
+                    
+                    filesContainer.appendChild(idCardGroup);
+                }
+                idCardGroup.querySelector('.pair-row').appendChild(wrapper);
 
-            filesContainer.appendChild(wrapper);
+                if (attachment.dbKey === 'id_card_back_path' && student.id_card_front_path && student.id_card_back_path) {
+                    const btnWrap = document.createElement('div');
+                    btnWrap.style.width = '100%';
+                    btnWrap.style.display = 'flex';
+                    btnWrap.style.justifyContent = 'center';
+                    btnWrap.style.marginTop = '10px'; 
+                    btnWrap.style.marginBottom = '-10px';
+                    const btn = createSwapBtnForWrapper('id_card', '🔁 互换身份证');
+                    btnWrap.appendChild(btn);
+                    idCardGroup.appendChild(btnWrap);
+                }
+            } 
+            else if (attachment.dbKey === 'hukou_residence_path' || attachment.dbKey === 'hukou_personal_path') {
+                if (!hukouGroup) {
+                    hukouGroup = document.createElement('div');
+                    hukouGroup.style.display = 'flex';
+                    hukouGroup.style.flexDirection = 'column';
+                    hukouGroup.style.alignItems = 'center';
+                    
+                    const row = document.createElement('div');
+                    row.className = 'pair-row';
+                    row.style.display = 'flex';
+                    row.style.gap = '15px';
+                    hukouGroup.appendChild(row);
+                    
+                    filesContainer.appendChild(hukouGroup);
+                }
+                hukouGroup.querySelector('.pair-row').appendChild(wrapper);
+
+                if (attachment.dbKey === 'hukou_personal_path' && student.hukou_residence_path && student.hukou_personal_path) {
+                    const btnWrap = document.createElement('div');
+                    btnWrap.style.width = '100%';
+                    btnWrap.style.display = 'flex';
+                    btnWrap.style.justifyContent = 'center';
+                    btnWrap.style.marginTop = '10px'; 
+                    btnWrap.style.marginBottom = '-10px';
+                    const btn = createSwapBtnForWrapper('hukou', '🔁 互换户口页');
+                    btnWrap.appendChild(btn);
+                    hukouGroup.appendChild(btnWrap);
+                }
+            } 
+            else {
+                filesContainer.appendChild(wrapper);
+            }
         });
 
         if (student.status === 'reviewed' && student.training_form_path) {

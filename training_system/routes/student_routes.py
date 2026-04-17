@@ -1085,7 +1085,19 @@ def swap_materials_route(id):
             update_student(id, {'hukou_residence_path': val2, 'hukou_personal_path': val1})
 
         updated = get_student_by_id(id)
-        current_app.logger.info(f'[图片互换] 学员ID={id} 类型={pair}')
+        
+        # 记录操作者信息：管理员账号 + 客户端 IP + 提交人 openid 映射
+        operator = session.get('auth_user', 'unknown')
+        client_ip = get_client_ip(request)
+        submitter = resolve_openid_name(student.get('submitter_openid', ''))
+        student_name = student.get('name', '未知')
+        pair_name = '身份证正反面' if pair == 'id_card' else '户口本首页/本人页'
+        
+        current_app.logger.info(
+            f'[图片互换] 操作人={operator} IP={client_ip} 互换目标={pair_name} '
+            f'学员ID={id} 姓名={student_name} 提交人={submitter}'
+        )
+        
         return jsonify({'message': '互换成功', 'student': updated})
 
     except NotFoundError as e:
