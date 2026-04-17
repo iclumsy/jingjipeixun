@@ -162,11 +162,17 @@
                 exportCompany.value = '';
                 await refreshExportCompanies(false);
                 exportModal.style.display = 'flex';
+                // 触发重绘以呈现过渡动画
+                exportModal.offsetHeight;
+                exportModal.classList.add('active');
             });
             
             // 关闭导出模态框
             function closeModal() {
-                exportModal.style.display = 'none';
+                exportModal.classList.remove('active');
+                setTimeout(() => {
+                    exportModal.style.display = 'none';
+                }, 300); // 预留过渡结束时间
             }
             
             closeExportModal.addEventListener('click', closeModal);
