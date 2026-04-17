@@ -20,7 +20,7 @@
     502: 微信接口请求超时或网络错误
 """
 from flask import Blueprint, current_app, jsonify, request
-from utils.auth import get_client_ip, resolve_openid_name
+from utils.auth import get_client_ip, resolve_ip_location, resolve_openid_name
 from utils.miniprogram_auth import (
     exchange_code_for_openid,
     get_mini_token_hours,
@@ -102,8 +102,9 @@ def miniprogram_login_route():
     # 登录成功：签发 JWT 令牌
     openid = wx_result.get('openid', '')
     client_ip = get_client_ip(request)
+    ip_loc = resolve_ip_location(client_ip)
     user_label = resolve_openid_name(openid)
-    current_app.logger.info(f'[小程序登录] 用户={user_label} IP={client_ip}')
+    current_app.logger.info(f'[小程序登录] 用户={user_label} IP={client_ip} {ip_loc}')
     # 检查当前用户是否在管理员 openid 列表中
     is_admin = is_admin_openid(openid)
     # 使用应用密钥签名令牌，包含 openid 和管理员标识
