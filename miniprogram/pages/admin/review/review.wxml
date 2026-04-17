@@ -109,6 +109,11 @@
           </view>
         </view>
 
+        <view wx:if="{{item.status === 'rejected' && item.reject_reason}}" class="reject-reason-row">
+          <text class="reject-label">驳回原因</text>
+          <text class="reject-text">{{item.reject_reason}}</text>
+        </view>
+
         <view class="record-actions">
           <button
             class="action-btn btn-approve {{item.status !== 'unreviewed' ? 'disabled' : ''}}"
