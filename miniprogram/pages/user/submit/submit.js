@@ -393,22 +393,19 @@ Page({
   },
 
   /**
-   * 提交按钒入口（在用户 tap 链路内，同步请求订阅授权再进入提交逻辑）。
+   * 提交按钮入口（在用户 tap 链路内，同步请求订阅授权再进入提交逻辑）
    */
-  async onTapSubmit() {
-    // 1. 先尝试获取订阅授权（必须在 tap 链路内同步调用，不能 async/await）
+  onTapSubmit() {
+    // 订阅授权必须在 tap 链路内同步调用，不能 async/await
     if (this._subscribeTemplateId) {
-      await new Promise((resolve) => {
-        wx.requestSubscribeMessage({
-          tmplIds: [this._subscribeTemplateId],
-          success: resolve,
-          fail: resolve  // 用户拒绝或异常也继续提交
-        })
+      wx.requestSubscribeMessage({
+        tmplIds: [this._subscribeTemplateId],
+        success: () => this.submitForm(),
+        fail: () => this.submitForm()  // 用户拒绝或失败也继续提交
       })
+    } else {
+      this.submitForm()
     }
-
-    // 2. 进入真正的提交流程
-    this.submitForm()
   },
 
   async submitForm() {

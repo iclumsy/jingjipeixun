@@ -134,6 +134,34 @@
   font-weight: 600;
 }
 
+.reject-reason-row {
+  margin-top: 14rpx;
+  padding: 12rpx 14rpx;
+  background: #fff5f5;
+  border: 1rpx solid #fed7d7;
+  border-radius: 10rpx;
+  display: flex;
+  align-items: flex-start;
+  gap: 8rpx;
+}
+
+.reject-label {
+  flex: 0 0 auto;
+  font-size: 22rpx;
+  color: #c53030;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.reject-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 22rpx;
+  color: #9b2c2c;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
 @keyframes fadeEnter {
   from {
     opacity: 0;

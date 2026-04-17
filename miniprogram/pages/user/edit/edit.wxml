@@ -28,6 +28,7 @@
       jobCategoryNames="{{jobCategoryNames}}"
       enabledAttachments="{{enabledAttachments}}"
       fieldErrors="{{fieldErrors}}"
+      disableTrainingType="{{status === 'rejected'}}"
       showAgreement="{{true}}"
       agreementChecked="{{agreementChecked}}"
       showSubmit="{{true}}"

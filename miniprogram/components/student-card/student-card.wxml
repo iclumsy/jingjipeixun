@@ -25,6 +25,11 @@
     </view>
   </view>
 
+  <view wx:if="{{student.status === 'rejected' && student.reject_reason}}" class="reject-reason-row">
+    <text class="reject-label">驳回原因</text>
+    <text class="reject-text">{{student.reject_reason}}</text>
+  </view>
+
   <view class="card-foot">
     <text class="time-text">{{createTime || '-'}}</text>
     <text class="entry-text">查看详情</text>

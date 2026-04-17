@@ -2050,7 +2050,7 @@ def process_hukou(residence_path, personal_path, output_dir, name_prefix, adjust
                 if logger is not None:
                     logger.emit("info", "hukou_home", "read_input", "户口本首页读取成功", "已读取户口本首页原图", details=_size_details(img1, "input"))
                 if logger is not None and home_manual_crop_applied:
-                    logger.emit("info", "hukou_home", "auto_crop", "使用手动确认裁剪区域", "户口本首页已按手动点位裁好，跳过自动裁边，但仍保留方向校正", details={"crop_mode": crop_mode})
+                    logger.emit("info", "hukou_home", "auto_crop", "使用手动确认裁剪区域", "户口本首页已按手动点位裁好，跳过自动裁边和方向校正，以用户手动结果为准", details={"crop_mode": crop_mode})
                 img1 = prepare_hukou_output_page(
                     img1,
                     "home",
@@ -2079,7 +2079,7 @@ def process_hukou(residence_path, personal_path, output_dir, name_prefix, adjust
                 if logger is not None:
                     logger.emit("info", "hukou_personal", "read_input", "户口本人页读取成功", "已读取户口本人页原图", details=_size_details(img2, "input"))
                 if logger is not None and personal_manual_crop_applied:
-                    logger.emit("info", "hukou_personal", "auto_crop", "使用手动确认裁剪区域", "户口本人页已按手动点位裁好，跳过自动裁边，但仍保留方向校正", details={"crop_mode": crop_mode})
+                    logger.emit("info", "hukou_personal", "auto_crop", "使用手动确认裁剪区域", "户口本人页已按手动点位裁好，跳过自动裁边和方向校正，以用户手动结果为准", details={"crop_mode": crop_mode})
                 img2 = prepare_hukou_output_page(
                     img2,
                     "personal",

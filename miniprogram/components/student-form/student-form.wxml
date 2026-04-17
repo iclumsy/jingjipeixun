@@ -1,6 +1,7 @@
-<view class="section-card type-selector fade-enter">
+<view class="section-card type-selector fade-enter" style="{{disableTrainingType ? 'opacity:0.6;pointer-events:none;' : ''}}">
   <view class="card-header">
     <view class="card-title">{{trainingCardTitle}}</view>
+    <text wx:if="{{disableTrainingType}}" style="font-size:22rpx;color:#e53e3e;">驳回记录不可更换项目</text>
   </view>
   <view class="type-options">
     <view class="type-option {{trainingType === 'special_equipment' ? 'active' : ''}}" bindtap="onSelectTrainingType" data-type="special_equipment">
@@ -13,7 +14,7 @@
 
   <view class="form-item mt-24">
     <view class="label required">作业类别</view>
-    <picker mode="selector" range="{{jobCategoryNames}}" value="{{formData.jobCategoryIndex}}" bindchange="onJobCategoryChange">
+    <picker mode="selector" range="{{jobCategoryNames}}" value="{{formData.jobCategoryIndex}}" bindchange="onJobCategoryChange" disabled="{{disableTrainingType}}">
       <view class="picker-input">
         <text class="{{formData.job_category ? '' : 'placeholder'}}">{{formData.job_category || '请选择作业类别'}}</text>
         <text class="arrow">›</text>
@@ -23,7 +24,7 @@
 
   <view class="form-item" wx:if="{{formData.examProjects && formData.examProjects.length > 0}}">
     <view class="label">操作项目</view>
-    <picker mode="selector" range="{{formData.examProjects}}" range-key="name" value="{{formData.examProjectIndex}}" bindchange="onExamProjectChange">
+    <picker mode="selector" range="{{formData.examProjects}}" range-key="name" value="{{formData.examProjectIndex}}" bindchange="onExamProjectChange" disabled="{{disableTrainingType}}">
       <view class="picker-input">
         <text class="{{formData.exam_project ? '' : 'placeholder'}}">{{formData.exam_project || '请选择操作项目'}}</text>
         <text class="arrow">›</text>

@@ -169,20 +169,6 @@ def get_mini_openid():
     return str(user.get('openid', '') or '').strip()
 
 
-def ensure_mini_admin():
-    """
-    拒绝非管理员小程序用户的管理操作。
-
-    用于审核、驳回、删除等管理员专属操作的权限检查。
-    如果请求来自小程序但调用者不是管理员，抛出 403 错误。
-    如果请求来自管理后台（非小程序），则不做限制（已通过 session 认证）。
-
-    异常:
-        AppError: 非管理员时抛出 403 错误
-    """
-    user = get_mini_user()
-    if user and not is_mini_admin():
-        raise AppError('无权限执行该操作', status_code=403)
 
 
 def ensure_mini_owner_or_admin(student):
@@ -707,6 +693,7 @@ def update_student_route(id):
                 
             # 3. 强制降维：既然他确实重新编辑并提交了图片或文字，强制恢复为待审核状态
             updates['status'] = 'unreviewed'
+            updates['reject_reason'] = ''  # 清空旧的驳回原因
         # =========================================================
 
         # 执行数据库更新
@@ -945,7 +932,7 @@ def reject_student_route(id):
         200: {"message": "Student rejected and deleted"} 或 {"message": "...", "student": {...}}
     """
     try:
-        # ensure_mini_admin()
+
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
             data = {}
@@ -1028,7 +1015,7 @@ def approve_student_route(id):
         200: 更新后的学员记录
     """
     try:
-        # ensure_mini_admin()
+
         current_student = get_student_by_id(id)
         
         # 尝试为特定项目的学员生成体检表
@@ -1038,8 +1025,8 @@ def approve_student_route(id):
             current_app.config['STUDENTS_FOLDER']
         )
 
-        # 构建更新字段：状态 + 可选的体检表路径
-        updates = {'status': 'reviewed'}
+        # 构建更新字段：状态 + 可选的体检表路径 + 清空驳回原因
+        updates = {'status': 'reviewed', 'reject_reason': ''}
         if health_check_path:
             updates['training_form_path'] = health_check_path
         student = update_student(id, updates)
@@ -1196,7 +1183,7 @@ def download_attachments_zip_route(id):
         400: 学员未审核或无可打包文件
     """
     try:
-        # ensure_mini_admin()
+
         student = get_student_by_id(id)
 
         # 仅允许下载已审核学员的附件
@@ -1285,8 +1272,6 @@ def download_training_form_route(id):
     try:
         student = get_student_by_id(id)
 
-        # 小程序普通用户不允许访问
-        ensure_mini_admin()
 
         if student.get('status') != 'reviewed':
             return jsonify({'error': '仅支持已审核学员下载体检表'}), 400
@@ -1323,7 +1308,7 @@ def generate_materials_route(id):
     生成报名材料。
     """
     try:
-        # ensure_mini_admin()
+
         student = get_student_by_id(id)
         if student.get('status') != 'reviewed':
             return jsonify({'error': '仅支持已审核学员生成报名材料'}), 400
@@ -1377,7 +1362,7 @@ def analyze_material_points_route(id):
     预分析材料裁剪点坐标。用于前端裁图调整时默认展示 AI 自动裁剪的识别区域。
     """
     try:
-        # ensure_mini_admin()
+
         student = get_student_by_id(id)
         if not student:
             return jsonify({'error': '未找到学员'}), 404
@@ -1447,7 +1432,7 @@ def manual_crop_material_route(id):
     """
     import tempfile
     try:
-        # ensure_mini_admin()
+
         student = get_student_by_id(id)
         if not student:
             return jsonify({'error': '未找到学员'}), 404
@@ -1572,7 +1557,7 @@ def regenerate_material_route(id):
     重新生成单个报名材料（带调整参数）。
     """
     try:
-        # ensure_mini_admin()
+
         student = get_student_by_id(id)
         if student.get('status') != 'reviewed':
             return jsonify({'error': '仅支持已审核学员'}), 400
@@ -1620,7 +1605,7 @@ def get_generated_materials_route(id):
     获取已生成的报名材料预览列表。
     """
     try:
-        # ensure_mini_admin()
+
         student = get_student_by_id(id)
         
         id_card = student.get('id_card', '')
@@ -1675,7 +1660,7 @@ def download_materials_zip_route(id):
     下载生成的报名材料（ZIP）。
     """
     try:
-        # ensure_mini_admin()
+
         student = get_student_by_id(id)
         if student.get('status') != 'reviewed':
             return jsonify({'error': '仅支持已审核学员打包下载'}), 400

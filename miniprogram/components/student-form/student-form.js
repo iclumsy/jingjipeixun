@@ -57,11 +57,17 @@ Component({
     enabledAttachments: {
       type: Array,
       value: []
+    },
+    // 是否禁止切换培训类型（驳回记录编辑时使用）
+    disableTrainingType: {
+      type: Boolean,
+      value: false
     }
   },
 
   methods: {
     onSelectTrainingType(e) {
+      if (this.data.disableTrainingType) return
       const type = e.currentTarget?.dataset?.type || ''
       this.triggerEvent('trainingtypechange', { type })
     },
@@ -91,11 +97,13 @@ Component({
     },
 
     onJobCategoryChange(e) {
+      if (this.data.disableTrainingType) return
       const index = Number(e.detail?.value)
       this.triggerEvent('jobcategorychange', { index })
     },
 
     onExamProjectChange(e) {
+      if (this.data.disableTrainingType) return
       const index = Number(e.detail?.value)
       this.triggerEvent('examprojectchange', { index })
     },
