@@ -953,7 +953,8 @@ def prepare_hukou_output_page(image, page_kind, crop_mode="auto", expand_level=N
         else:
             print(f"{tag} 二次精细裁剪未生效（面积没有明显缩小），保持第一次结果")
 
-    page = normalize_hukou_page_orientation(page, original_image=image, page_kind=page_kind)
+    if not manual_crop_applied:
+        page = normalize_hukou_page_orientation(page, original_image=image, page_kind=page_kind)
     h3, w3 = page.shape[:2]
     if (h3, w3) != (h1, w1):
         print(f"{tag} 方向校正后: {w3}x{h3}")
@@ -1897,7 +1898,8 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments
                     print(f"{tag}[正面] 额外旋转 {front_rotate}°")
                     if logger is not None:
                         logger.emit("info", "id_card_front", "normalize_orientation", f"身份证正面额外旋转 {front_rotate}°", "已按人工设置旋转身份证正面方向", details={"rotation": int(front_rotate)})
-                front_img = normalize_id_card_side(front_img, "front")
+                if not front_manual_crop_applied and not front_rotate:
+                    front_img = normalize_id_card_side(front_img, "front")
                 hn, wn = front_img.shape[:2]
                 if (hn, wn) != (hc, wc):
                     print(f"{tag}[正面] 方向正规化后: {wn}x{hn}")
@@ -1952,7 +1954,8 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments
                     print(f"{tag}[反面] 额外旋转 {back_rotate}°")
                     if logger is not None:
                         logger.emit("info", "id_card_back", "normalize_orientation", f"身份证反面额外旋转 {back_rotate}°", "已按人工设置旋转身份证反面方向", details={"rotation": int(back_rotate)})
-                back_img = normalize_id_card_side(back_img, "back")
+                if not back_manual_crop_applied and not back_rotate:
+                    back_img = normalize_id_card_side(back_img, "back")
                 back_img, back_h = resize_document_to_width(back_img, target_width)
                 print(f"{tag}[反面] 缩放后: {target_width}x{back_h}")
                 if logger is not None:
