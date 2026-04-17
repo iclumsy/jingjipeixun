@@ -734,7 +734,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * 根据当前筛选条件（状态、培训类型、公司）查询。
      */
     async function loadStudents() {
-        listContainer.innerHTML = '<div style="padding:20px;text-align:center;">加载中...</div>';
+        showListSkeleton();
         try {
             const queryParams = new URLSearchParams({
                 status: buildStatusQueryParam(currentStatus),
@@ -750,8 +750,28 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderList(students);
         } catch (err) {
             console.error(err);
-            listContainer.innerHTML = `<div style="padding:20px;text-align:center;color:red">加载失败: ${err.message}</div>`;
+            listContainer.innerHTML = `
+                <div style="text-align:center;padding:30px 16px;color:#9ca3af;">
+                    <div style="font-size:1.5rem;margin-bottom:10px;">⚠️</div>
+                    <div style="font-weight:600;color:#ef4444;margin-bottom:6px;">加载失败</div>
+                    <div style="font-size:0.78rem;margin-bottom:12px;">${err.message}</div>
+                    <button onclick="loadStudents()" style="padding:6px 16px;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:0.8rem;cursor:pointer;">重试</button>
+                </div>`;
         }
+    }
+
+    /**
+     * 在列表容器中显示骨架屏加载占位。
+     * @param {number} count - 骨架卡片数量
+     */
+    function showListSkeleton(count = 4) {
+        listContainer.innerHTML = Array(count).fill(`
+            <div class="list-item skeleton">
+                <div class="sk-line sk-w60"></div>
+                <div class="sk-line sk-w80"></div>
+                <div class="sk-line sk-w40"></div>
+            </div>
+        `).join('');
     }
 
     /**
@@ -763,7 +783,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderList(list) {
         listContainer.innerHTML = '';
         if (!list || list.length === 0) {
-            listContainer.innerHTML = `<div style="padding:20px;text-align:center;color:#999">暂无数据 (${currentStatus === 'unreviewed' ? '未审核/已驳回' : '已审核'})</div>`;
+            listContainer.innerHTML = `
+                <div style="text-align:center;padding:40px 20px;color:#9ca3af;">
+                    <div style="font-size:2rem;margin-bottom:12px;">📭</div>
+                    <div style="font-weight:600;color:#6b7280;margin-bottom:8px;">暂无符合条件的记录</div>
+                    <div style="font-size:0.78rem;">当前筛选：${currentStatus === 'unreviewed' ? '未审核/已驳回' : '已审核'}，尝试切换条件或清除搜索</div>
+                </div>`;
             return;
         }
 
@@ -774,14 +799,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             const el = document.createElement('div');
             el.className = `list-item ${currentStudentId === student.id ? 'active' : ''}`;
             el.innerHTML = `
-                <div style="flex: 1;">
-                    <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: baseline;">
-                        <span style="display:flex; align-items:center; gap:8px;">${student.name}${rejectedMark}</span>
-                        <span style="font-size: 0.8rem; color: #666; margin-left: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${student.company || ''}</span>
-                    </h4>
-                    <div style="font-size: 0.75rem; color: #666; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-                        <span style="flex: 1; min-width: 100px;">${student.exam_project || student.job_category || ''}</span>
-                        <span>ID: ${student.id_card.slice(-4)}</span>
+                <div style="flex: 1; min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                        <span style="font-size: 1rem; font-weight: 600; white-space: nowrap;">${student.name}</span>
+                        ${rejectedMark}
+                    </div>
+                    <div style="font-size: 0.78rem; color: #555; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${student.company || ''}</div>
+                    <div style="font-size: 0.72rem; color: #888; display: flex; justify-content: space-between; gap: 8px;">
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${student.exam_project || student.job_category || ''}</span>
+                        <span style="white-space: nowrap; flex-shrink: 0;">ID: ${student.id_card.slice(-4)}</span>
                     </div>
                 </div>
             `;
