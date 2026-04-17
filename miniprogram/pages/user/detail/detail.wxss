@@ -16,7 +16,8 @@
 
 .container {
   position: relative;
-  padding: 24rpx;
+  padding: 24rpx 24rpx calc(60rpx + env(safe-area-inset-bottom));
+  padding: 24rpx 24rpx calc(60rpx + constant(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 
@@ -140,7 +141,8 @@
 }
 
 .action-card {
-  background: linear-gradient(180deg, #f7fbff 0%, #ffffff 100%);
+  background: linear-gradient(180deg, #fff5f5 0%, #ffffff 100%);
+  border-color: #fecaca;
 }
 
 .action-title {
@@ -213,7 +215,7 @@
 .reject-reason-box {
   margin-top: 12rpx;
   margin-bottom: 4rpx;
-  background: #fff5f5;
+  background: #ffffff;
   border: 1rpx solid #fecaca;
   border-radius: 12rpx;
   padding: 16rpx 18rpx;
