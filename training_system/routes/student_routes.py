@@ -396,13 +396,17 @@ def create_student_route():
 
         # 防重拦截：检查是否有正在处理的同项目报名
         from models.student import get_db_connection
+        rejected_id = None
         with get_db_connection() as conn:
             existing = conn.execute(
-                "SELECT id FROM students WHERE id_card = ? AND training_project_id = ? AND status IN ('unreviewed', 'reviewed')",
+                "SELECT id, status FROM students WHERE id_card = ? AND training_project_id = ?",
                 (student_payload.get('id_card', ''), student_payload.get('training_project_id'))
             ).fetchone()
             if existing:
-                raise AppError('该项目您已有正在处理的报名，请勿重复提交', status_code=400)
+                if existing['status'] in ('unreviewed', 'reviewed'):
+                    raise AppError('该项目您已有正在处理或已通过的报名，请勿重复提交', status_code=400)
+                elif existing['status'] == 'rejected':
+                    rejected_id = existing['id']
 
         # 绑定提交人 openid
         mini_user = get_mini_user()
@@ -413,9 +417,21 @@ def create_student_route():
             # 管理后台提交时，保留前端传入的 openid（如有）
             student_payload['submitter_openid'] = (student_payload.get('submitter_openid', '') or '').strip()
 
-        # 创建数据库记录
-        student_id = create_student(student_payload, file_paths)
-        current_app.logger.info(f'新增学员: ID={student_id}, 姓名={student_payload.get("name")}')
+        from models.student import create_student, update_student
+        if rejected_id:
+            # 覆盖修改已被驳回的老记录
+            updates = dict(student_payload)
+            updates.update(file_paths)
+            updates['status'] = 'unreviewed'
+            updates['reject_reason'] = '' # 清空驳回理由
+            
+            update_student(rejected_id, updates)
+            student_id = rejected_id
+            current_app.logger.info(f'重新提交学员(覆盖被驳回记录): ID={student_id}, 姓名={student_payload.get("name")}')
+        else:
+            # 创建数据库记录
+            student_id = create_student(student_payload, file_paths)
+            current_app.logger.info(f'新增学员: ID={student_id}, 姓名={student_payload.get("name")}')
         
         # 异步/非阻塞方式发送给所有管理员（基于小程序订阅消息）
         broadcast_new_student_to_admins(student_name=student_payload.get('name', ''))

@@ -211,6 +211,8 @@ Page({
 
       this.setData({
         trainingType,
+        status: student.status,
+        rejectReason: student.reject_reason,
         jobCategoryNames: this.getJobCategoryNames(trainingType),
         enabledAttachments: this.data.attachmentConfig[trainingType] || [],
         fieldErrors: {
