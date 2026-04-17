@@ -48,6 +48,7 @@ Page({
     page: 1,
     limit: 20,
     hasMore: true,
+    actionLoadingId: '',
     loading: false,
     refreshing: false,
     initialized: false,
@@ -297,7 +298,7 @@ Page({
 
   async onApproveTap(e) {
     const { id, status } = e.currentTarget.dataset
-    if (!id) return
+    if (!id || this.data.actionLoadingId) return
 
     if (status !== 'unreviewed') {
       wx.showToast({ title: '仅待审核记录可操作', icon: 'none' })
@@ -307,6 +308,7 @@ Page({
     const confirmed = await this.confirmAction('审核通过', '确认通过该记录吗？')
     if (!confirmed) return
 
+    this.setData({ actionLoadingId: id })
     wx.showLoading({ title: '审核中...' })
     try {
       await api.reviewStudent(id, 'approve')
@@ -316,12 +318,14 @@ Page({
     } catch (err) {
       wx.hideLoading()
       wx.showToast({ title: err.message || '操作失败', icon: 'none' })
+    } finally {
+      this.setData({ actionLoadingId: '' })
     }
   },
 
   async onRejectTap(e) {
     const { id, status } = e.currentTarget.dataset
-    if (!id) return
+    if (!id || this.data.actionLoadingId) return
 
     if (status !== 'unreviewed') {
       wx.showToast({ title: '仅待审核记录可操作', icon: 'none' })
@@ -331,7 +335,7 @@ Page({
     const { confirm, content } = await new Promise(resolve => {
       wx.showModal({
         title: '驳回记录',
-        content: '照片不清晰', // 默认提示或初始值
+        content: '照片不清晰',
         placeholderText: '请输入驳回原因',
         editable: true,
         success: res => resolve({ confirm: !!res.confirm, content: res.content || '' }),
@@ -341,6 +345,7 @@ Page({
 
     if (!confirm) return
 
+    this.setData({ actionLoadingId: id })
     wx.showLoading({ title: '处理中...' })
     try {
       await api.reviewStudent(id, 'reject', content.trim())
@@ -350,6 +355,8 @@ Page({
     } catch (err) {
       wx.hideLoading()
       wx.showToast({ title: err.message || '操作失败', icon: 'none' })
+    } finally {
+      this.setData({ actionLoadingId: '' })
     }
   },
 

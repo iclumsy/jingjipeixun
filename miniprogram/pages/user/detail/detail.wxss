@@ -16,7 +16,8 @@
 
 .container {
   position: relative;
-  padding: 24rpx;
+  padding: 24rpx 24rpx calc(60rpx + env(safe-area-inset-bottom));
+  padding: 24rpx 24rpx calc(60rpx + constant(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 
