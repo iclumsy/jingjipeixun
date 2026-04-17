@@ -1056,6 +1056,44 @@ def approve_student_route(id):
         return build_internal_error_response('审核学员失败，请稍后重试')
 
 
+@student_bp.route('/api/students/<int:id>/swap_materials', methods=['POST'])
+def swap_materials_route(id):
+    """
+    互换两张图片的路径，例如身份证正反面、户口本首页和本人页等。
+    参数: {"pair": "id_card" | "hukou"}
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        pair = data.get('pair')
+        if pair not in ('id_card', 'hukou'):
+            return jsonify({'error': '无效的互换类型'}), 400
+
+        student = get_student_by_id(id)
+        
+        if pair == 'id_card':
+            val1 = student.get('id_card_front_path')
+            val2 = student.get('id_card_back_path')
+            if not val1 or not val2:
+                return jsonify({'error': '缺少照片，无法互换'}), 400
+            update_student(id, {'id_card_front_path': val2, 'id_card_back_path': val1})
+            
+        elif pair == 'hukou':
+            val1 = student.get('hukou_residence_path')
+            val2 = student.get('hukou_personal_path')
+            if not val1 or not val2:
+                return jsonify({'error': '缺少照片，无法互换'}), 400
+            update_student(id, {'hukou_residence_path': val2, 'hukou_personal_path': val1})
+
+        updated = get_student_by_id(id)
+        current_app.logger.info(f'[图片互换] 学员ID={id} 类型={pair}')
+        return jsonify({'message': '互换成功', 'student': updated})
+
+    except NotFoundError as e:
+        return jsonify(e.to_dict()), e.status_code
+    except Exception as e:
+        current_app.logger.exception('Error swapping materials for student %s', id)
+        return build_internal_error_response('互换失败，请稍后重试')
+
 
 @student_bp.route('/api/students/<int:id>/activate_card', methods=['POST'])
 def activate_card_route(id):

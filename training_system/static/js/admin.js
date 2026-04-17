@@ -1674,6 +1674,53 @@ document.addEventListener('DOMContentLoaded', async () => {
                 actionBar.appendChild(rejectBtn);
             }
             
+            // 追加互换图片按钮（如果相关的两张图同时存在）
+            const hasIdCardFront = !!student.id_card_front_path;
+            const hasIdCardBack = !!student.id_card_back_path;
+            const hasHukouResidence = !!student.hukou_residence_path;
+            const hasHukouPersonal = !!student.hukou_personal_path;
+
+            const createSwapBtn = (label, pair) => {
+                const btn = document.createElement('button');
+                btn.className = 'btn secondary';
+                btn.textContent = label;
+                btn.style.marginRight = '8px';
+                btn.style.background = '#f3f4f6';
+                btn.style.color = '#374151';
+                btn.style.border = '1px solid #d1d5db';
+                btn.onclick = async () => {
+                    const originalText = btn.textContent;
+                    btn.textContent = '⏳ 互换中...';
+                    btn.disabled = true;
+                    try {
+                        const res = await fetch(`/api/students/${student.id}/swap_materials`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ pair })
+                        });
+                        if (!res.ok) throw new Error('互换失败');
+                        const data = await res.json();
+                        const idx = students.findIndex(s => s.id === student.id);
+                        if (idx >= 0) students[idx] = data.student;
+                        showMessage('图片互换成功', 'success');
+                        showDetail(data.student);
+                    } catch (err) {
+                        showMessage(err.message, 'error');
+                    } finally {
+                        btn.textContent = originalText;
+                        btn.disabled = false;
+                    }
+                };
+                return btn;
+            };
+
+            if (hasIdCardFront && hasIdCardBack) {
+                actionBar.appendChild(createSwapBtn('🔁 互换身份证', 'id_card'));
+            }
+            if (hasHukouResidence && hasHukouPersonal) {
+                actionBar.appendChild(createSwapBtn('🔁 互换户口本', 'hukou'));
+            }
+            
             // 最后将保存追加进去，使其在最右侧
             actionBar.appendChild(saveFormBtn);
         }
