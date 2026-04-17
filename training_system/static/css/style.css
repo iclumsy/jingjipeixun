@@ -742,7 +742,7 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
 .main-content {
     flex: 1;
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    padding: 0 30px 30px 30px;
+    padding: 56px 30px 30px 30px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -951,19 +951,18 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
 
 /* ======================== 顶部导航栏 ======================== */
 .top-nav-bar {
-    position: sticky;
+    position: fixed;
     top: 0;
-    z-index: 100;
+    right: 0;
+    z-index: 1000;
     display: flex;
     justify-content: flex-end;
     gap: 10px;
-    padding: 12px 4px;
-    background: rgba(245, 247, 250, 0.88);
+    padding: 12px 20px;
+    background: rgba(245, 247, 250, 0.92);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid #e5e7eb;
-    margin: 0 -30px 20px;
-    padding-left: 30px;
-    padding-right: 30px;
+    left: 300px;
     flex-wrap: wrap;
 }
 
@@ -1366,13 +1365,13 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
     .main-content {
         flex: 1;
         width: 100%;
-        padding: 0 12px 16px;
+        padding: 56px 12px 16px;
         min-height: 100vh;
         height: auto;
     }
 
     .top-nav-bar {
-        margin: 0 -12px 12px;
+        left: 0;
         padding: 8px 12px;
         gap: 8px;
     }
