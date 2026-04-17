@@ -116,40 +116,31 @@
 
         <view class="record-actions">
           <button
-            class="action-btn btn-approve {{item.status !== 'unreviewed' || actionLoadingId ? 'disabled' : ''}}"
+            class="action-btn btn-approve {{item.status !== 'unreviewed' ? 'disabled' : ''}}"
             size="mini"
-            loading="{{actionLoadingId === item._id}}"
             catchtap="onApproveTap"
             data-id="{{item._id}}"
             data-status="{{item.status}}"
-            disabled="{{item.status !== 'unreviewed' || !!actionLoadingId}}"
+            disabled="{{item.status !== 'unreviewed'}}"
           >✅ 审核通过</button>
           <button
-            class="action-btn btn-reject {{item.status !== 'unreviewed' || actionLoadingId ? 'disabled' : ''}}"
+            class="action-btn btn-reject {{item.status !== 'unreviewed' ? 'disabled' : ''}}"
             size="mini"
-            loading="{{actionLoadingId === item._id}}"
             catchtap="onRejectTap"
             data-id="{{item._id}}"
             data-status="{{item.status}}"
-            disabled="{{item.status !== 'unreviewed' || !!actionLoadingId}}"
+            disabled="{{item.status !== 'unreviewed'}}"
           >↩️ 驳回</button>
           <button
-            class="action-btn btn-delete {{actionLoadingId ? 'disabled' : ''}}"
+            class="action-btn btn-delete"
             size="mini"
             catchtap="onDeleteTap"
             data-id="{{item._id}}"
-            disabled="{{!!actionLoadingId}}"
           >🗑️ 删除</button>
         </view>
       </view>
 
-      <view wx:if="{{loading && !refreshing}}" class="skeleton-list">
-        <view wx:for="{{[1,2,3]}}" wx:key="*this" class="skeleton-card">
-          <view class="sk-line sk-w60"></view>
-          <view class="sk-line sk-w80"></view>
-          <view class="sk-line sk-w40"></view>
-        </view>
-      </view>
+      <view class="loading" wx:if="{{loading && !refreshing}}">加载中...</view>
       <view class="no-more" wx:if="{{!loading && !hasMore && records.length > 0}}">已显示全部记录</view>
 
       <view class="state-wrap" wx:if="{{!loading && records.length === 0}}">
