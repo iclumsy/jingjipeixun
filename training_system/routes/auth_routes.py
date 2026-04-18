@@ -68,10 +68,13 @@ def login():
         session.permanent = True          # 使 session 遵循 PERMANENT_SESSION_LIFETIME 过期时间
 
         client_ip = get_client_ip(request)
-        ip_loc = resolve_ip_location(client_ip)
-        current_app.logger.info(f'[管理员登录] 用户={username} IP={client_ip} {ip_loc}')
-
-        current_app.logger.info(f"管理员登录成功: 用户名={username}, IP={client_ip} {ip_loc}")
+        
+        def _async_log_login(logger, ip, user):
+            loc = resolve_ip_location(ip)
+            logger.info(f'[管理员登录] 用户={user} IP={ip} {loc}')
+            logger.info(f"管理员登录成功: 用户名={user}, IP={ip} {loc}")
+        import threading
+        threading.Thread(target=_async_log_login, args=(current_app.logger, client_ip, username), daemon=True).start()
 
         # 根据请求格式返回不同类型的响应
         if request.is_json:
@@ -83,9 +86,13 @@ def login():
 
     # 验证失败：返回 401 错误
     client_ip = get_client_ip(request)
-    ip_loc = resolve_ip_location(client_ip)
-    current_app.logger.warning(f'[管理员登录失败] 用户={username} IP={client_ip} {ip_loc}')
-    current_app.logger.warning(f"管理员登录失败: 尝试用户名={username}, IP={client_ip} {ip_loc}")
+    
+    def _async_log_fail(logger, ip, user):
+        loc = resolve_ip_location(ip)
+        logger.warning(f'[管理员登录失败] 用户={user} IP={ip} {loc}')
+        logger.warning(f"管理员登录失败: 尝试用户名={user}, IP={ip} {loc}")
+    import threading
+    threading.Thread(target=_async_log_fail, args=(current_app.logger, client_ip, username), daemon=True).start()
     if request.is_json:
         return jsonify({
             'success': False,
@@ -109,8 +116,12 @@ def logout():
     session.clear()
     
     client_ip = get_client_ip(request)
-    ip_loc = resolve_ip_location(client_ip)
-    current_app.logger.info(f"管理员安全退出: 用户名={auth_user}, IP={client_ip} {ip_loc}")
+    
+    def _async_log_logout(logger, ip, user):
+        loc = resolve_ip_location(ip)
+        logger.info(f"管理员安全退出: 用户名={user}, IP={ip} {loc}")
+    import threading
+    threading.Thread(target=_async_log_logout, args=(current_app.logger, client_ip, auth_user), daemon=True).start()
     if request.is_json:
         return jsonify({'success': True})
     return redirect('/auth/login')

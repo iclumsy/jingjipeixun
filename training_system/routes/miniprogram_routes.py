@@ -102,9 +102,14 @@ def miniprogram_login_route():
     # 登录成功：签发 JWT 令牌
     openid = wx_result.get('openid', '')
     client_ip = get_client_ip(request)
-    ip_loc = resolve_ip_location(client_ip)
     user_label = resolve_openid_name(openid)
-    current_app.logger.info(f'[小程序登录] 用户={user_label} IP={client_ip} {ip_loc}')
+    
+    # 异步查询 IP 归属地以避免阻塞登录请求
+    def _async_log_login(logger, ip, label):
+        loc = resolve_ip_location(ip)
+        logger.info(f'[小程序登录] 用户={label} IP={ip} {loc}')
+    import threading
+    threading.Thread(target=_async_log_login, args=(current_app.logger, client_ip, user_label), daemon=True).start()
     # 检查当前用户是否在管理员 openid 列表中
     is_admin = is_admin_openid(openid)
     # 使用应用密钥签名令牌，包含 openid 和管理员标识
