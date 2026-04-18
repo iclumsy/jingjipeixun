@@ -9,6 +9,42 @@ logger = logging.getLogger(__name__)
 class JunruiServiceError(Exception):
     pass
 
+
+# ======================== 本地系统 → 君瑞系统 名称映射 ========================
+# 当本地系统的名称和君瑞系统不一致时，在此处添加映射。
+# 匹配优先级：映射转换 → 精确匹配 → 模糊匹配（包含关系）
+
+# job_category（作业种类）映射：本地名 → 君瑞 category text
+CATEGORY_NAME_MAP = {
+    '特种设备安全管理': '特种设备安全管理',          # category_id=01
+    '锅炉作业': '锅炉作业',                         # category_id=02
+    '压力容器作业': '压力容器作业',                   # category_id=03
+    '起重机作业': '起重机作业',                       # category_id=07
+    '场(厂)内专用机动车辆作业': '场(厂)内专用机动车辆作业',  # category_id=10
+}
+
+# exam_project（考试项目）映射：本地名 → 君瑞 project text
+PROJECT_NAME_MAP = {
+    # 安全管理类：本地拆分了多个子项目，君瑞只有一个统一的"特种设备安全管理"
+    '电梯安全管理': '特种设备安全管理',               # project_id=0195
+    '起重机械安全管理': '特种设备安全管理',           # project_id=0195
+    '锅炉压力容器压力管道安全管理': '特种设备安全管理', # project_id=0195
+    '场内机动车安全管理': '特种设备安全管理',         # project_id=0195
+    # 锅炉类
+    '工业锅炉司炉': '工业锅炉司炉',                 # project_id=0295
+    '锅炉水处理': '锅炉水处理',                      # project_id=0297
+    # 压力容器类
+    '快开门式压力容器操作': '快开门式压力容器操作',   # project_id=0395
+    # 起重机类：本地简称 vs 君瑞全称
+    '起重机指挥': '起重机指挥',                       # project_id=0791
+    '桥式起重机司机': '起重机司机(限桥式起重机)',     # project_id=0798
+    '门式起重机司机': '起重机司机(限门式起重机)',     # project_id=0799
+    # 场内车辆类
+    '叉车司机': '叉车司机',                           # project_id=1095
+    '观光车和观光列车司机': '观光车和观光列车司机',   # project_id=1096
+}
+
+
 class JunruiService:
     BASE_URL = "http://www.junruizx.com"
 
@@ -69,39 +105,70 @@ class JunruiService:
 
     def get_category_id(self, job_category):
         """匹配行业大类 / 作业种类"""
-        logger.info(f"开始在外部系统匹配行业种类 (job_category): {job_category}")
-        if not job_category:
+        # 先尝试名称映射
+        mapped = CATEGORY_NAME_MAP.get(job_category, job_category)
+        if mapped != job_category:
+            logger.info(f"作业种类名称映射: {job_category} -> {mapped}")
+
+        logger.info(f"开始在外部系统匹配行业种类: {mapped}")
+        if not mapped:
             raise JunruiServiceError("学员作业种类(job_category)为空，无法匹配")
         categories = self._get_api('/api/trainmanager/common/categories', {
             'industry': '02', 'projectType': '0', 'planType': '0'
         })
+        available_names = [c.get("text", "") for c in categories]
+        logger.info(f"外部系统返回的所有行业种类: {available_names}")
+
+        # 精确匹配
         for c in categories:
-            if c.get("text") == job_category:
+            if c.get("text") == mapped:
                 matched_id = c.get("value")
-                logger.info(f"匹配行业种类精确成功: {job_category} -> category_id: {matched_id}")
+                logger.info(f"匹配行业种类精确成功: {mapped} -> category_id: {matched_id}")
                 return matched_id
-        # 降级模糊匹配
+        # 降级：外部名称 包含在 本地名称中
         for c in categories:
-            if c.get("text") and c.get("text") in job_category:
+            if c.get("text") and c.get("text") in mapped:
                 matched_id = c.get("value")
-                logger.info(f"匹配行业种类模糊成功: {job_category} -> 接近于 {c.get('text')} (category_id: {matched_id})")
+                logger.info(f"匹配行业种类模糊成功: {mapped} -> 接近于 {c.get('text')} (category_id: {matched_id})")
                 return matched_id
-        raise JunruiServiceError(f"无法在外部系统中匹配到行业类别: {job_category}")
+        # 降级：本地名称 包含在 外部名称中
+        for c in categories:
+            if c.get("text") and mapped in c.get("text"):
+                matched_id = c.get("value")
+                logger.info(f"匹配行业种类反向模糊成功: {mapped} -> {c.get('text')} (category_id: {matched_id})")
+                return matched_id
+        raise JunruiServiceError(f"无法在外部系统中匹配到行业类别: {job_category}（外部系统可用: {available_names}）")
 
     def get_project_id(self, category_id, exam_project):
         """匹配具体的作业项目 (如叉车司机 -> 1095)"""
-        logger.info(f"开始在外部系统匹配考试项目 (exam_project): {exam_project} (基于分类 {category_id})")
-        if not exam_project:
+        # 先尝试名称映射
+        mapped = PROJECT_NAME_MAP.get(exam_project, exam_project)
+        if mapped != exam_project:
+            logger.info(f"考试项目名称映射: {exam_project} -> {mapped}")
+
+        logger.info(f"开始在外部系统匹配考试项目: {mapped} (基于分类 {category_id})")
+        if not mapped:
             raise JunruiServiceError("学员考试项目(exam_project)为空，无法匹配")
         projects = self._get_api('/api/trainmanager/common/projects', {
             'category': category_id, 'projectType': '0', 'planType': '0'
         })
+        available_names = [p.get("text", "") for p in projects]
+        logger.info(f"外部系统返回的所有考试项目: {available_names}")
+
+        # 精确匹配
         for p in projects:
-            if p.get("text") == exam_project:
+            if p.get("text") == mapped:
                 matched_id = p.get("value")
-                logger.info(f"匹配考试项目成功: {exam_project} -> project_id: {matched_id}")
+                logger.info(f"匹配考试项目成功: {mapped} -> project_id: {matched_id}")
                 return matched_id
-        raise JunruiServiceError(f"无法在外部系统中找到对应的考试项目: {exam_project}")
+        # 降级：包含关系匹配
+        for p in projects:
+            text = p.get("text", "")
+            if text and (text in mapped or mapped in text):
+                matched_id = p.get("value")
+                logger.info(f"匹配考试项目模糊成功: {mapped} -> {text} (project_id: {matched_id})")
+                return matched_id
+        raise JunruiServiceError(f"无法在外部系统中找到对应的考试项目: {exam_project}（外部系统可用: {available_names}）")
 
     def get_plan_id(self, project_id, card_type="50"):
         """获取方案 planId (如价格 50)"""
