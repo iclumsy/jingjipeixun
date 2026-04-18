@@ -268,11 +268,15 @@ class JunruiService:
             for r in records:
                 if r.get("id_card") == id_card:
                     card_info = {
+                        "name": r.get("name", ""),
+                        "sex": r.get("sex", ""),
+                        "id_card": r.get("id_card", ""),
+                        "phone": r.get("telephone", ""),
+                        "project_name": r.get("xmmc", ""),
+                        "card_time": r.get("create_time", ""),
+                        "state": r.get("state", ""),
                         "card_id": r.get("pay_card_id", ""),
                         "card_pwd": r.get("pay_card_pwd", ""),
-                        "state": r.get("state", ""),
-                        "junrui_id": r.get("id"),
-                        "project_name": r.get("xmmc", ""),
                     }
                     logger.info(f"查询到学习卡: 卡号={card_info['card_id']} 状态={card_info['state']}")
                     return card_info

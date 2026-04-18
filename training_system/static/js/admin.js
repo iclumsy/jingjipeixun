@@ -1213,7 +1213,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                             const res = await fetch(`/api/students/${student.id}/query_card`, { method: 'POST' });
                             const data = await res.json();
                             if (res.ok && data.card_id) {
-                                showMessage(`卡号: ${data.card_id}  密码: ${data.card_pwd || '-'}  状态: ${data.state || '-'}`, 'success', 8000);
+                                // 弹窗展示完整信息
+                                const rows = [
+                                    ['姓名', data.name || '-'],
+                                    ['性别', data.sex || '-'],
+                                    ['身份证', data.id_card || '-'],
+                                    ['手机号', data.phone || '-'],
+                                    ['项目', data.project_name || '-'],
+                                    ['开卡时间', data.card_time || '-'],
+                                    ['状态', data.state || '-'],
+                                    ['卡号', data.card_id || '-'],
+                                    ['密码', data.card_pwd || '-'],
+                                ];
+                                const tableHtml = rows.map(([k, v]) =>
+                                    `<div style="display:flex;padding:6px 0;border-bottom:1px solid #F1F5F9;"><span style="width:70px;color:#64748B;font-size:0.82rem;flex-shrink:0;">${k}</span><span style="font-size:0.82rem;color:#0F172A;font-weight:500;">${v}</span></div>`
+                                ).join('');
+                                const overlay = document.createElement('div');
+                                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:10000;display:flex;justify-content:center;align-items:center;';
+                                overlay.innerHTML = `<div style="background:#fff;border-radius:14px;padding:20px 24px;max-width:380px;width:90%;box-shadow:0 20px 40px rgba(0,0,0,0.2);">
+                                    <div style="font-size:1rem;font-weight:700;color:#0F172A;margin-bottom:14px;">📋 学习卡信息</div>
+                                    ${tableHtml}
+                                    <button onclick="this.closest('div[style*=fixed]').remove()" style="margin-top:16px;width:100%;padding:8px;border:none;border-radius:8px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-size:0.88rem;font-weight:600;cursor:pointer;">关闭</button>
+                                </div>`;
+                                document.body.appendChild(overlay);
+                                overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
                             } else {
                                 showMessage(data.message || data.error || '未查到卡号信息', 'error');
                             }

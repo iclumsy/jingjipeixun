@@ -584,9 +584,20 @@ Page({
     try {
       const result = await api.queryCard(this.data.studentId)
       if (result && result.card_id) {
+        const lines = [
+          `姓名: ${result.name || '-'}`,
+          `性别: ${result.sex || '-'}`,
+          `身份证: ${result.id_card || '-'}`,
+          `手机号: ${result.phone || '-'}`,
+          `项目: ${result.project_name || '-'}`,
+          `开卡时间: ${result.card_time || '-'}`,
+          `状态: ${result.state || '-'}`,
+          `卡号: ${result.card_id || '-'}`,
+          `密码: ${result.card_pwd || '-'}`
+        ]
         wx.showModal({
           title: '学习卡信息',
-          content: `卡号: ${result.card_id}\n密码: ${result.card_pwd || '-'}\n状态: ${result.state || '-'}`,
+          content: lines.join('\n'),
           showCancel: false,
           confirmText: '知道了'
         })
