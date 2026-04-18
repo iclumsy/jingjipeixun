@@ -83,6 +83,14 @@
   white-space: nowrap;
 }
 
+.card-activated-chip {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #bbf7d0;
+  font-weight: 600;
+  margin-left: auto;
+}
+
 .detail-list {
   display: flex;
   flex-direction: column;

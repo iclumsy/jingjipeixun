@@ -932,6 +932,23 @@ async function activateCard(studentId) {
 }
 
 
+/**
+ * 查询学员的君瑞学习卡信息（纯查询，不存储）。
+ *
+ * @param {number|string} studentId - 学员 ID
+ * @returns {Promise<Object>} { card_id, card_pwd, state, ... }
+ */
+async function queryCard(studentId) {
+  const id = encodeURIComponent(String(studentId || '').trim())
+  if (!id) throw new Error('学员ID不能为空')
+
+  return await requestApi(`/api/students/${id}/query_card`, {
+    method: 'POST',
+    data: {}
+  })
+}
+
+
 // ======================== 导出接口 ========================
 module.exports = {
   login,               // 登录
@@ -949,6 +966,7 @@ module.exports = {
   uploadAttachment,     // 上传附件
   downloadTrainingForm, // 下载体检表
   activateCard,         // 开学习卡
+  queryCard,            // 查询学习卡信息
   toAbsoluteFileUrl,    // 文件路径转 URL
   getBaseUrl,           // 获取 API 地址
   setBaseUrl,           // 设置 API 地址

@@ -8,6 +8,7 @@
     <text class="meta-chip">{{trainingTypeText || '-'}}</text>
     <text class="meta-chip">{{student.job_category || '-'}}</text>
     <text wx:if="{{student.exam_project}}" class="meta-chip">{{student.exam_project}}</text>
+    <text wx:if="{{student.card_activated}}" class="meta-chip card-activated-chip">学习卡已开</text>
   </view>
 
   <view class="detail-list">

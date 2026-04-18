@@ -1193,7 +1193,6 @@ def activate_card_route(id):
 
         result = activate_card_for_student(student)
         if not result.get("success"):
-            # 开卡失败，此时直接抛异常让外层捕获或者在此处直接返回
             return jsonify({'error': result.get("message", "办理失败，请重试")}), 400
 
         # 开卡成功，记录状态到数据库
@@ -1212,6 +1211,34 @@ def activate_card_route(id):
     except Exception as e:
         current_app.logger.exception('Error activating card for student %s', id)
         return build_internal_error_response('开卡失败，请稍后重试')
+
+
+@student_bp.route('/api/students/<int:id>/query_card', methods=['POST'])
+def query_card_route(id):
+    """
+    查询学员的君瑞学习卡信息（纯查询，不写库）。
+
+    通过身份证号到君瑞系统查询卡号和密码，直接返回给前端展示。
+    """
+    try:
+        student = get_student_by_id(id)
+
+        from services.junrui_service import query_card_for_student
+        result = query_card_for_student(student)
+
+        if result.get("success"):
+            current_app.logger.info(
+                f'[查询学习卡] 学员ID={id} 卡号={result.get("card_id", "")} 成功'
+            )
+            return jsonify(result)
+        else:
+            return jsonify(result), 400
+
+    except NotFoundError as e:
+        return jsonify(e.to_dict()), e.status_code
+    except Exception as e:
+        current_app.logger.exception('Error querying card for student %s', id)
+        return build_internal_error_response('查询学习卡失败')
 
 
 @student_bp.route('/api/students/<int:id>/attachments.zip', methods=['GET'])

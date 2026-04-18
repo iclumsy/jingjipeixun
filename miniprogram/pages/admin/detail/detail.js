@@ -577,6 +577,29 @@ Page({
     })
   },
 
+  async onQueryCard() {
+    if (this.data.queryingCard) return
+    this.setData({ queryingCard: true })
+
+    try {
+      const result = await api.queryCard(this.data.studentId)
+      if (result && result.card_id) {
+        wx.showModal({
+          title: '学习卡信息',
+          content: `卡号: ${result.card_id}\n密码: ${result.card_pwd || '-'}\n状态: ${result.state || '-'}`,
+          showCancel: false,
+          confirmText: '知道了'
+        })
+      } else {
+        wx.showToast({ title: result.message || '未查到卡号', icon: 'none' })
+      }
+    } catch (err) {
+      wx.showToast({ title: err.message || '查询失败', icon: 'none' })
+    } finally {
+      this.setData({ queryingCard: false })
+    }
+  },
+
   ensureAdminAccess() {
     if (hasAdminAccess()) return true
 

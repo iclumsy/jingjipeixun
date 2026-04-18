@@ -1098,7 +1098,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @param {string} message - 显示的消息
      * @param {string} type - 类型 ('info'/'success'/'error')
      */
-    function showMessage(message, type = 'info') {
+    function showMessage(message, type = 'info', duration = 4000) {
         const existingMessage = document.querySelector('.custom-message');
         if (existingMessage) {
             existingMessage.remove();
@@ -1143,7 +1143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     messageElement.remove();
                 }, 300);
             }
-        }, 4000);
+        }, duration);
     }
 
     /**
@@ -1191,19 +1191,48 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // 仅特种设备且已审核学员在顶部显示「开卡」按钮
             if (student.status === 'reviewed' && student.training_type === 'special_equipment') {
-                const activateCardBtn = document.createElement('button');
                 const isActivated = !!student.card_activated;
+
                 if (isActivated) {
-                    activateCardBtn.style.cssText = 'background: #e2e8f0; color: #64748b; font-weight: 600; font-size: 0.8rem; padding: 4px 12px; border-radius: 6px; border: none; cursor: default; margin-left: 12px; white-space: nowrap;';
-                    activateCardBtn.textContent = '✅ 已开卡';
-                    activateCardBtn.disabled = true;
+                    const cardWrap = document.createElement('div');
+                    cardWrap.style.cssText = 'display:flex;align-items:center;gap:8px;margin-left:12px;flex-wrap:wrap;';
+
+                    const badge = document.createElement('span');
+                    badge.style.cssText = 'background:#e2e8f0;color:#64748b;font-weight:600;font-size:0.8rem;padding:4px 12px;border-radius:6px;white-space:nowrap;';
+                    badge.textContent = '✅ 已开卡';
+                    cardWrap.appendChild(badge);
+
+                    // 开卡查询按钮
+                    const queryBtn = document.createElement('button');
+                    queryBtn.style.cssText = 'background:#F0F9FF;color:#0369A1;font-weight:500;font-size:0.78rem;padding:3px 10px;border-radius:6px;border:1px solid #BAE6FD;cursor:pointer;white-space:nowrap;';
+                    queryBtn.textContent = '🔍 开卡查询';
+                    queryBtn.onclick = async () => {
+                        queryBtn.disabled = true;
+                        queryBtn.textContent = '查询中...';
+                        try {
+                            const res = await fetch(`/api/students/${student.id}/query_card`, { method: 'POST' });
+                            const data = await res.json();
+                            if (res.ok && data.card_id) {
+                                showMessage(`卡号: ${data.card_id}  密码: ${data.card_pwd || '-'}  状态: ${data.state || '-'}`, 'success', 8000);
+                            } else {
+                                showMessage(data.message || data.error || '未查到卡号信息', 'error');
+                            }
+                        } catch (e) {
+                            showMessage('查询失败: ' + e.message, 'error');
+                        }
+                        queryBtn.textContent = '🔍 开卡查询';
+                        queryBtn.disabled = false;
+                    };
+                    cardWrap.appendChild(queryBtn);
+                    statusBadge.appendChild(cardWrap);
                 } else {
+                    const activateCardBtn = document.createElement('button');
                     activateCardBtn.style.cssText = 'background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; font-weight: 600; font-size: 0.8rem; padding: 4px 12px; border-radius: 6px; border: none; cursor: pointer; margin-left: 12px; box-shadow: 0 2px 6px rgba(14,165,233,0.25); white-space: nowrap;';
                     activateCardBtn.textContent = '🎓 开卡';
                     activateCardBtn.title = '为学员在培训考试系统开学习卡';
                     activateCardBtn.onclick = () => showActivateCardDialog(student);
+                    statusBadge.appendChild(activateCardBtn);
                 }
-                statusBadge.appendChild(activateCardBtn);
             }
 
             // 如果已驳回且有驳回原因，在徽章后插入提示块

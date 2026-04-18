@@ -233,11 +233,61 @@ class JunruiService:
             logger.error(f"注册开卡接口网络异常: {e}")
             raise JunruiServiceError("网络异常：开卡请求超时或被拒绝")
 
+    def query_card_info(self, id_card):
+        """
+        通过身份证号查询君瑞系统中的学习卡信息。
+
+        调用 /api/trainmanager/register/grid 接口，
+        遍历结果用身份证号匹配，返回卡号和密码。
+
+        返回:
+            dict: {'card_id': '...', 'card_pwd': '...', 'state': '...'} 或 None
+        """
+        logger.info(f"查询君瑞学习卡信息: 身份证={id_card[:6]}****{id_card[-4:]}")
+        url = f"{self.BASE_URL}/api/trainmanager/register/grid"
+
+        # 查最近一年的记录，分页取前 100 条
+        from datetime import datetime, timedelta
+        begin = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+        payload = {
+            "beginTime": begin,
+            "state": "0",
+            "offset": 0,
+            "limit": 100
+        }
+
+        try:
+            res = self.session.post(url, json=payload, timeout=15)
+            res.raise_for_status()
+            data = res.json()
+            if data.get("code") != 200:
+                logger.warning(f"查询学习卡列表失败: {data.get('message')}")
+                return None
+
+            records = data.get("entity", [])
+            for r in records:
+                if r.get("id_card") == id_card:
+                    card_info = {
+                        "card_id": r.get("pay_card_id", ""),
+                        "card_pwd": r.get("pay_card_pwd", ""),
+                        "state": r.get("state", ""),
+                        "junrui_id": r.get("id"),
+                        "project_name": r.get("xmmc", ""),
+                    }
+                    logger.info(f"查询到学习卡: 卡号={card_info['card_id']} 状态={card_info['state']}")
+                    return card_info
+
+            logger.info(f"未在君瑞系统中查到该身份证的学习卡记录")
+            return None
+        except requests.RequestException as e:
+            logger.error(f"查询学习卡接口异常: {e}")
+            return None
+
 
 def activate_card_for_student(student_dict):
     """
     提供给路由层的上层调用封装：
-    从登录到完整流程开卡，最后返回外部系统的 message 提示
+    从登录到完整流程开卡，返回外部系统的 message 提示。
     """
     student_id = student_dict.get("_id")
     job_cat = student_dict.get("job_category")
@@ -267,3 +317,26 @@ def activate_card_for_student(student_dict):
     except Exception as e:
         logger.exception(f"君瑞平台开卡发生意外错误(学员ID {student_dict.get('_id')}): {e}")
         return {"success": False, "message": "跨系统对接未知错误，请查看后台日志"}
+
+
+def query_card_for_student(student_dict):
+    """
+    单独查询学习卡信息（用于已开卡学员补查卡号）。
+    """
+    id_card = student_dict.get("id_card", "")
+    if not id_card:
+        return {"success": False, "message": "学员身份证号为空"}
+
+    service = JunruiService()
+    try:
+        service.login()
+        card_info = service.query_card_info(id_card)
+        if card_info:
+            return {"success": True, **card_info}
+        return {"success": False, "message": "未在君瑞系统中查到该学员的学习卡信息"}
+    except JunruiServiceError as e:
+        return {"success": False, "message": str(e)}
+    except Exception as e:
+        logger.exception(f"查询学习卡异常: {e}")
+        return {"success": False, "message": "查询异常，请查看后台日志"}
+

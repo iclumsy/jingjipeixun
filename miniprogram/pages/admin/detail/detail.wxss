@@ -140,6 +140,35 @@
   font-size: 24rpx;
 }
 
+.card-activated-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 12rpx;
+  flex-wrap: wrap;
+}
+
+.card-activated-tag {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #15803d;
+  background: #dcfce7;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+}
+
+.card-query-btn {
+  font-size: 22rpx !important;
+  color: #0369a1 !important;
+  background: #f0f9ff !important;
+  border: 1rpx solid #bae6fd !important;
+  padding: 4rpx 16rpx !important;
+  border-radius: 12rpx !important;
+  line-height: 1.6 !important;
+  min-height: 0 !important;
+  height: auto !important;
+}
+
 .reject-reason-row {
   margin-top: 12rpx;
   padding: 12rpx 14rpx;
