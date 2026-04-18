@@ -93,13 +93,13 @@
     </style>
 </head>
 <body class="admin-page">
-    <div style="position: absolute; top: 15px; right: 20px; display: flex; gap: 12px; z-index: 1000; align-items: center;">
+    <div style="position: fixed; top: 0; right: 0; left: 0; display: flex; justify-content: flex-end; gap: 12px; z-index: 1000; align-items: center; padding: 12px 20px; background: rgba(245, 247, 250, 0.92); backdrop-filter: blur(8px); border-bottom: 1px solid #e5e7eb; box-sizing: border-box;">
         <a href="/admin" style="padding: 6px 16px; background-color: #f8fafc; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 6px; text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: all 0.2s ease;">⬅ 返回面板</a>
         <a href="/admin/config" style="padding: 6px 16px; background-color: #f8fafc; color: #4f46e5; border: 1px solid #4f46e5; border-radius: 6px; text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: all 0.2s ease;">⚙️ 系统配置</a>
         <a href="/auth/logout" class="admin-logout-btn" style="position: static; transform: none; margin: 0; right: auto; top: auto;">退出</a>
     </div>
 
-    <div style="padding: 30px; max-width: 1400px; margin: 0 auto; height: 100vh; box-sizing: border-box;">
+    <div style="padding: 30px; max-width: 1400px; margin: 0 auto; height: 100vh; box-sizing: border-box; padding-top: 72px;">
         <div style="display: flex; justify-content: space-between; align-items: flex-end;">
             <div>
                 <h1 style="margin: 0 0 10px 0; font-size: 1.8rem; color: #0f172a;">操作日志</h1>
