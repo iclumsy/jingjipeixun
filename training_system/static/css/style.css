@@ -747,6 +747,7 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
     display: flex;
     flex-direction: column;
     height: 100vh;
+    box-sizing: border-box;
 }
 
 .detail-card {
