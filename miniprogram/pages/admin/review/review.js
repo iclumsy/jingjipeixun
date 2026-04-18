@@ -387,6 +387,31 @@ Page({
     }
   },
 
+  async onQueryCardTap(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    wx.showLoading({ title: '查询中...' })
+    try {
+      const result = await api.queryCard(id)
+      wx.hideLoading()
+      if (result && result.card_id) {
+        this.setData({
+          showCardInfoModal: true,
+          cardInfo: result
+        })
+      } else {
+        wx.showToast({ title: result.message || '未查到信息', icon: 'none' })
+      }
+    } catch (err) {
+      wx.hideLoading()
+      wx.showToast({ title: err.message || '查询失败', icon: 'none' })
+    }
+  },
+
+  closeCardInfoModal() {
+    this.setData({ showCardInfoModal: false, cardInfo: {} })
+  },
+
   onActivateCardTap(e) {
     const { id, name, phone, idCard, examProject } = e.currentTarget.dataset
     if (!id) {

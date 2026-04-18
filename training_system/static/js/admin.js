@@ -1194,18 +1194,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const isActivated = !!student.card_activated;
 
                 if (isActivated) {
-                    const cardWrap = document.createElement('div');
-                    cardWrap.style.cssText = 'display:flex;align-items:center;gap:8px;margin-left:12px;flex-wrap:wrap;';
-
-                    const badge = document.createElement('span');
-                    badge.style.cssText = 'background:#e2e8f0;color:#64748b;font-weight:600;font-size:0.8rem;padding:4px 12px;border-radius:6px;white-space:nowrap;';
-                    badge.textContent = '✅ 已开卡';
-                    cardWrap.appendChild(badge);
-
-                    // 开卡查询按钮
                     const queryBtn = document.createElement('button');
-                    queryBtn.style.cssText = 'background:#F0F9FF;color:#0369A1;font-weight:500;font-size:0.78rem;padding:3px 10px;border-radius:6px;border:1px solid #BAE6FD;cursor:pointer;white-space:nowrap;';
-                    queryBtn.textContent = '🔍 开卡查询';
+                    queryBtn.style.cssText = 'background:linear-gradient(135deg,#0EA5E9,#6366F1);color:#fff;font-weight:600;font-size:0.8rem;padding:4px 14px;border-radius:6px;border:none;cursor:pointer;margin-left:12px;box-shadow:0 2px 6px rgba(99,102,241,0.25);white-space:nowrap;';
+                    queryBtn.textContent = '🔍 学习卡信息';
                     queryBtn.onclick = async () => {
                         queryBtn.disabled = true;
                         queryBtn.textContent = '查询中...';
@@ -1213,27 +1204,46 @@ document.addEventListener('DOMContentLoaded', async () => {
                             const res = await fetch(`/api/students/${student.id}/query_card`, { method: 'POST' });
                             const data = await res.json();
                             if (res.ok && data.card_id) {
-                                // 弹窗展示完整信息
-                                const rows = [
-                                    ['姓名', data.name || '-'],
-                                    ['性别', data.sex || '-'],
-                                    ['身份证', data.id_card || '-'],
-                                    ['手机号', data.phone || '-'],
-                                    ['项目', data.project_name || '-'],
-                                    ['开卡时间', data.card_time || '-'],
-                                    ['状态', data.state || '-'],
-                                    ['卡号', data.card_id || '-'],
-                                    ['密码', data.card_pwd || '-'],
-                                ];
-                                const tableHtml = rows.map(([k, v]) =>
-                                    `<div style="display:flex;padding:6px 0;border-bottom:1px solid #F1F5F9;"><span style="width:70px;color:#64748B;font-size:0.82rem;flex-shrink:0;">${k}</span><span style="font-size:0.82rem;color:#0F172A;font-weight:500;">${v}</span></div>`
-                                ).join('');
+                                const stateBadge = data.state === '有效'
+                                    ? '<span style="background:#DCFCE7;color:#15803D;padding:2px 10px;border-radius:99px;font-size:0.75rem;font-weight:600;">✅ 有效</span>'
+                                    : `<span style="background:#FEF3C7;color:#92400E;padding:2px 10px;border-radius:99px;font-size:0.75rem;font-weight:600;">${data.state || '-'}</span>`;
                                 const overlay = document.createElement('div');
-                                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:10000;display:flex;justify-content:center;align-items:center;';
-                                overlay.innerHTML = `<div style="background:#fff;border-radius:14px;padding:20px 24px;max-width:380px;width:90%;box-shadow:0 20px 40px rgba(0,0,0,0.2);">
-                                    <div style="font-size:1rem;font-weight:700;color:#0F172A;margin-bottom:14px;">📋 学习卡信息</div>
-                                    ${tableHtml}
-                                    <button onclick="this.closest('div[style*=fixed]').remove()" style="margin-top:16px;width:100%;padding:8px;border:none;border-radius:8px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-size:0.88rem;font-weight:600;cursor:pointer;">关闭</button>
+                                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.5);backdrop-filter:blur(4px);z-index:10000;display:flex;justify-content:center;align-items:center;animation:fadeIn .2s ease;';
+                                overlay.innerHTML = `
+                                <div style="background:#fff;border-radius:16px;max-width:400px;width:92%;box-shadow:0 25px 50px rgba(0,0,0,0.25);overflow:hidden;animation:slideUp .25s ease;">
+                                    <div style="background:linear-gradient(135deg,#0EA5E9,#6366F1);padding:18px 22px;display:flex;align-items:center;gap:10px;">
+                                        <span style="font-size:1.5rem;">🎓</span>
+                                        <div>
+                                            <div style="color:#fff;font-size:1rem;font-weight:700;">学习卡信息</div>
+                                            <div style="color:rgba(255,255,255,0.8);font-size:0.72rem;margin-top:2px;">君瑞培训系统查询结果</div>
+                                        </div>
+                                        <div style="margin-left:auto;">${stateBadge}</div>
+                                    </div>
+                                    <div style="padding:16px 22px;">
+                                        <div style="font-size:0.7rem;color:#94A3B8;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">个人信息</div>
+                                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;">
+                                            <div><span style="font-size:0.72rem;color:#94A3B8;">姓名</span><div style="font-size:0.85rem;color:#0F172A;font-weight:600;margin-top:1px;">${data.name || '-'}</div></div>
+                                            <div><span style="font-size:0.72rem;color:#94A3B8;">性别</span><div style="font-size:0.85rem;color:#0F172A;font-weight:600;margin-top:1px;">${data.sex || '-'}</div></div>
+                                            <div style="grid-column:span 2;"><span style="font-size:0.72rem;color:#94A3B8;">身份证号</span><div style="font-size:0.85rem;color:#0F172A;font-weight:500;margin-top:1px;font-variant-numeric:tabular-nums;">${data.id_card || '-'}</div></div>
+                                            <div style="grid-column:span 2;"><span style="font-size:0.72rem;color:#94A3B8;">手机号</span><div style="font-size:0.85rem;color:#0F172A;font-weight:500;margin-top:1px;">${data.phone || '-'}</div></div>
+                                        </div>
+                                        <div style="height:1px;background:linear-gradient(90deg,transparent,#E2E8F0,transparent);margin:14px 0;"></div>
+                                        <div style="font-size:0.7rem;color:#94A3B8;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">培训信息</div>
+                                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;">
+                                            <div style="grid-column:span 2;"><span style="font-size:0.72rem;color:#94A3B8;">考试项目</span><div style="font-size:0.85rem;color:#0F172A;font-weight:500;margin-top:1px;">${data.project_name || '-'}</div></div>
+                                            <div><span style="font-size:0.72rem;color:#94A3B8;">开卡时间</span><div style="font-size:0.85rem;color:#0F172A;font-weight:500;margin-top:1px;">${data.card_time || '-'}</div></div>
+                                        </div>
+                                        <div style="height:1px;background:linear-gradient(90deg,transparent,#E2E8F0,transparent);margin:14px 0;"></div>
+                                        <div style="font-size:0.7rem;color:#94A3B8;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">学习卡</div>
+                                        <div style="background:linear-gradient(135deg,#F0F9FF,#EEF2FF);border:1px solid #BAE6FD;border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+                                            <div><span style="font-size:0.7rem;color:#0369A1;">卡号</span><div style="font-size:0.95rem;color:#0C4A6E;font-weight:700;margin-top:2px;letter-spacing:0.5px;">${data.card_id || '-'}</div></div>
+                                            <div style="width:1px;height:32px;background:#BAE6FD;"></div>
+                                            <div style="text-align:right;"><span style="font-size:0.7rem;color:#0369A1;">密码</span><div style="font-size:0.95rem;color:#0C4A6E;font-weight:700;margin-top:2px;letter-spacing:1px;">${data.card_pwd || '-'}</div></div>
+                                        </div>
+                                    </div>
+                                    <div style="padding:0 22px 18px;">
+                                        <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;padding:10px;border:none;border-radius:10px;background:linear-gradient(135deg,#6366F1,#8B5CF6);color:#fff;font-size:0.88rem;font-weight:600;cursor:pointer;transition:opacity .15s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">关 闭</button>
+                                    </div>
                                 </div>`;
                                 document.body.appendChild(overlay);
                                 overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
@@ -1243,11 +1253,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         } catch (e) {
                             showMessage('查询失败: ' + e.message, 'error');
                         }
-                        queryBtn.textContent = '🔍 开卡查询';
+                        queryBtn.textContent = '🔍 学习卡信息';
                         queryBtn.disabled = false;
                     };
-                    cardWrap.appendChild(queryBtn);
-                    statusBadge.appendChild(cardWrap);
+                    statusBadge.appendChild(queryBtn);
                 } else {
                     const activateCardBtn = document.createElement('button');
                     activateCardBtn.style.cssText = 'background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; font-weight: 600; font-size: 0.8rem; padding: 4px 12px; border-radius: 6px; border: none; cursor: pointer; margin-left: 12px; box-shadow: 0 2px 6px rgba(14,165,233,0.25); white-space: nowrap;';

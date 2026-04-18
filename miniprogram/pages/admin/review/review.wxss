@@ -240,24 +240,24 @@
 /* 体检表侧边按钮（view 实现，flex 居中完全生效） */
 .form-side-btn {
   flex-shrink: 0;
-  width: 112rpx;
-  height: 112rpx;
-  border-radius: 16rpx;
+  width: 90rpx;
+  height: 90rpx;
+  border-radius: 14rpx;
   background: #f0ebff;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6rpx;
+  gap: 4rpx;
 }
 
 .form-side-emoji {
-  font-size: 42rpx;
+  font-size: 36rpx;
   line-height: 1;
 }
 
 .form-side-label {
-  font-size: 26rpx;
+  font-size: 22rpx;
   font-weight: 700;
   color: #6d28d9;
   line-height: 1;
@@ -274,14 +274,15 @@
 .action-btn {
   flex: 1 1 0;
   margin: 0;
-  border: none;
-  border-radius: 12rpx;
-  height: 58rpx;
+  border-radius: 14rpx;
+  height: 60rpx;
   line-height: 58rpx;
-  font-size: 22rpx;
+  font-size: 24rpx;
   font-weight: 600;
   padding: 0;
   min-width: 0;
+  box-shadow: 0 4rpx 10rpx rgba(0, 0, 0, 0.04);
+  box-sizing: border-box;
 }
 
 .action-btn::after {
@@ -289,18 +290,45 @@
 }
 
 .btn-approve {
-  background: #eaf9ef;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
   color: #15803d;
+  border: 1rpx solid #bbf7d0;
 }
 
 .btn-reject {
-  background: #ffeceb;
-  color: #b42318;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  color: #b45309;
+  border: 1rpx solid #fde68a;
 }
 
 .btn-delete {
-  background: #fff2eb;
-  color: #c2410c;
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  color: #b91c1c;
+  border: 1rpx solid #fecaca;
+}
+
+.card-query-chip {
+  margin-left: auto;
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #bbf7d0;
+  font-weight: 600;
+  padding: 6rpx 14rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-activate-chip {
+  margin-left: auto;
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  color: #ffffff;
+  border: none;
+  font-weight: 600;
+  padding: 6rpx 14rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-activate-card {
@@ -497,4 +525,187 @@
   color: #9b2c2c;
   line-height: 1.5;
   word-break: break-all;
+}
+
+
+/* --- 学习卡信息展示弹窗 --- */
+.card-info-modal {
+  position: relative;
+  width: 90%;
+  max-width: 680rpx;
+  max-height: 85vh;
+  background: #ffffff;
+  border-radius: 28rpx;
+  overflow: hidden;
+  box-shadow: 0 40rpx 80rpx rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+}
+
+.card-info-header {
+  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+  padding: 36rpx 40rpx;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  flex-shrink: 0;
+}
+
+.card-info-icon {
+  font-size: 56rpx;
+  line-height: 1;
+}
+
+.card-info-header-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-info-title {
+  color: #ffffff;
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.card-info-sub {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 22rpx;
+  margin-top: 4rpx;
+}
+
+.card-info-state {
+  padding: 6rpx 18rpx;
+  border-radius: 99rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.state-valid {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.state-other {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.card-info-body {
+  padding: 32rpx 40rpx;
+  background: #ffffff;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.card-info-section-title {
+  font-size: 22rpx;
+  color: #94a3b8;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2rpx;
+  margin-bottom: 16rpx;
+}
+
+.card-info-grid {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.card-info-item {
+  width: 48%;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-info-full {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12rpx;
+}
+
+.card-info-label {
+  font-size: 24rpx;
+  color: #94a3b8;
+  margin-bottom: 2rpx;
+}
+
+.card-info-value {
+  font-size: 28rpx;
+  color: #0f172a;
+  font-weight: 500;
+}
+
+.card-info-value.bold {
+  font-weight: 600;
+}
+
+.card-info-value.mono {
+  font-variant-numeric: tabular-nums;
+}
+
+.card-info-divider {
+  height: 2rpx;
+  background: linear-gradient(90deg, transparent, #e2e8f0, transparent);
+  margin: 28rpx 0;
+}
+
+.card-info-card-box {
+  background: linear-gradient(135deg, #f0f9ff, #eef2ff);
+  border: 2rpx solid #bae6fd;
+  border-radius: 20rpx;
+  padding: 24rpx 32rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-info-card-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.card-info-card-item.right {
+  text-align: right;
+}
+
+.card-info-card-label {
+  font-size: 22rpx;
+  color: #0369a1;
+}
+
+.card-info-card-value {
+  font-size: 32rpx;
+  color: #0c4a6e;
+  font-weight: 700;
+  margin-top: 4rpx;
+  letter-spacing: 2rpx;
+}
+
+.card-info-card-sep {
+  width: 2rpx;
+  height: 64rpx;
+  background: #bae6fd;
+}
+
+.card-info-footer {
+  padding: 0 40rpx 40rpx;
+}
+
+.card-info-close-btn {
+  width: 100%;
+  padding: 20rpx 0;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #ffffff;
+  border-radius: 18rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  box-shadow: 0 8rpx 20rpx rgba(139, 92, 246, 0.25);
+  border: none;
+}
+
+.card-info-close-btn::after {
+  border: none;
 }

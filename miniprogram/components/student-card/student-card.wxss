@@ -89,6 +89,9 @@
   border-color: #bbf7d0;
   font-weight: 600;
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .detail-list {
@@ -181,3 +184,5 @@
     transform: translateY(0);
   }
 }
+
+

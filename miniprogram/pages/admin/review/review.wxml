@@ -63,22 +63,28 @@
             <view class="time-text">{{item.submitTimeText}}</view>
           </view>
           <view class="status-badge badge-{{item.status}}">{{item.statusText}}</view>
-          <view
-            wx:if="{{item.status === 'reviewed' && item.training_type === 'special_equipment'}}"
-            class="card-head-activate-btn {{item.card_activated ? 'activated' : ''}}"
-            catchtap="{{item.card_activated ? '' : 'onActivateCardTap'}}"
-            data-id="{{item._id}}"
-            data-name="{{item.name}}"
-            data-phone="{{item.phone}}"
-            data-id-card="{{item.id_card}}"
-            data-exam-project="{{item.exam_project || item.job_category}}"
-          >{{item.card_activated ? '✅ 已开卡' : '🎓 开卡'}}</view>
         </view>
 
         <view class="meta-row">
           <text class="meta-chip">{{item.trainingTypeText || '-'}}</text>
           <text class="meta-chip">{{item.job_category || '-'}}</text>
           <text wx:if="{{item.exam_project}}" class="meta-chip">{{item.exam_project}}</text>
+          <text
+            wx:if="{{item.status === 'reviewed' && item.training_type === 'special_equipment' && item.card_activated}}"
+            class="meta-chip card-query-chip"
+            catchtap="onQueryCardTap"
+            data-id="{{item._id}}"
+          >🔍 学习卡信息</text>
+          <text
+            wx:if="{{item.status === 'reviewed' && item.training_type === 'special_equipment' && !item.card_activated}}"
+            class="meta-chip card-activate-chip"
+            catchtap="onActivateCardTap"
+            data-id="{{item._id}}"
+            data-name="{{item.name}}"
+            data-phone="{{item.phone}}"
+            data-id-card="{{item.id_card}}"
+            data-exam-project="{{item.exam_project || item.job_category}}"
+          >🎓 开学习卡</text>
         </view>
 
         <view class="detail-with-form">
@@ -180,4 +186,66 @@
       </view>
     </view>
   </view>
+
+  <!-- 学习卡信息查询弹窗 -->
+  <view class="custom-modal-mask fade-enter" wx:if="{{showCardInfoModal}}" catchtap="closeCardInfoModal">
+    <view class="card-info-modal" catchtap="preventD">
+      <view class="card-info-header">
+        <text class="card-info-icon">🎓</text>
+        <view class="card-info-header-text">
+          <text class="card-info-title">学习卡信息</text>
+          <text class="card-info-sub">君瑞培训系统查询结果</text>
+        </view>
+        <text class="card-info-state {{cardInfo.state === '有效' ? 'state-valid' : 'state-other'}}">{{cardInfo.state || '-'}}</text>
+      </view>
+      <view class="card-info-body">
+        <view class="card-info-section-title">个人信息</view>
+        <view class="card-info-grid">
+          <view class="card-info-item">
+            <text class="card-info-label">姓名</text>
+            <text class="card-info-value bold">{{cardInfo.name || '-'}}</text>
+          </view>
+          <view class="card-info-item">
+            <text class="card-info-label">性别</text>
+            <text class="card-info-value bold">{{cardInfo.sex || '-'}}</text>
+          </view>
+        </view>
+        <view class="card-info-full">
+          <text class="card-info-label">身份证号</text>
+          <text class="card-info-value mono">{{cardInfo.id_card || '-'}}</text>
+        </view>
+        <view class="card-info-full">
+          <text class="card-info-label">手机号</text>
+          <text class="card-info-value">{{cardInfo.phone || '-'}}</text>
+        </view>
+        <view class="card-info-divider"></view>
+        <view class="card-info-section-title">培训信息</view>
+        <view class="card-info-full">
+          <text class="card-info-label">考试项目</text>
+          <text class="card-info-value">{{cardInfo.project_name || '-'}}</text>
+        </view>
+        <view class="card-info-full">
+          <text class="card-info-label">开卡时间</text>
+          <text class="card-info-value">{{cardInfo.card_time || '-'}}</text>
+        </view>
+        <view class="card-info-divider"></view>
+        <view class="card-info-section-title">学习卡</view>
+        <view class="card-info-card-box">
+          <view class="card-info-card-item">
+            <text class="card-info-card-label">卡号</text>
+            <text class="card-info-card-value">{{cardInfo.card_id || '-'}}</text>
+          </view>
+          <view class="card-info-card-sep"></view>
+          <view class="card-info-card-item right">
+            <text class="card-info-card-label">密码</text>
+            <text class="card-info-card-value">{{cardInfo.card_pwd || '-'}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="card-info-footer">
+        <button class="card-info-close-btn" catchtap="closeCardInfoModal">关 闭</button>
+      </view>
+    </view>
+  </view>
+
 </view>

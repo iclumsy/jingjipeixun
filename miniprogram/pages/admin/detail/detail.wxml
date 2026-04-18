@@ -12,10 +12,6 @@
       <view class="summary-meta">公司：{{student.company || '-'}}</view>
       <view class="summary-meta">提交时间：{{submitTimeText}}</view>
       <view class="summary-meta" wx:if="{{student.reviewed_at}}">审核时间：{{reviewTimeText}}</view>
-      <view wx:if="{{student.card_activated}}" class="card-activated-row">
-        <text class="card-activated-tag">✅ 学习卡已开</text>
-        <button class="card-query-btn" size="mini" bindtap="onQueryCard" loading="{{queryingCard}}" disabled="{{queryingCard}}">🔍 开卡查询</button>
-      </view>
       <view wx:if="{{student.status === 'rejected' && student.reject_reason}}" class="reject-reason-row">
         <text class="reject-label">驳回原因</text>
         <text class="reject-text">{{student.reject_reason}}</text>
