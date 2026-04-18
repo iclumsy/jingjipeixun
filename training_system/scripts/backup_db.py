@@ -2,24 +2,24 @@
 """
 数据库定时备份脚本。
 
+支持两种运行方式：
+  1. 命令行手动执行: python scripts/backup_db.py
+  2. 被 Flask 应用内置调度器自动调用（无需 cron）
+
 功能：
-  1. 将 SQLite 数据库安全复制到本地备份目录（带时间戳）
-  2. 如果配置了 COS，自动上传到腾讯云 COS
-  3. 自动清理超过保留天数的本地旧备份
-
-用法：
-  python backup_db.py               # 手动执行
-  配合 cron 定时执行（见下方说明）
-
-cron 配置示例（每天凌晨 3 点执行）：
-  0 3 * * * cd /path/to/training_system && python scripts/backup_db.py >> logs/backup.log 2>&1
+  - 使用 SQLite backup API 安全复制数据库（不锁定正在运行的数据库）
+  - 如果配置了 COS，自动上传到腾讯云 COS
+  - 自动清理超过保留天数的本地旧备份
 
 环境变量（可选，配置后自动上传到 COS）：
   COS_SECRET_ID, COS_SECRET_KEY, COS_REGION, COS_BUCKET
+
+环境变量（备份调度，在 .env 中配置）：
+  DB_BACKUP_HOUR=3        备份执行小时（0-23，默认 3 即凌晨 3 点）
+  DB_BACKUP_KEEP_DAYS=30  本地备份保留天数（默认 30）
 """
 import os
 import sys
-import shutil
 import sqlite3
 from datetime import datetime, timedelta
 
@@ -27,17 +27,24 @@ from datetime import datetime, timedelta
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, 'database', 'students.db')
 BACKUP_DIR = os.path.join(BASE_DIR, 'database', 'backups')
-RETENTION_DAYS = 30  # 本地备份保留天数
+
+
+def _get_retention_days():
+    try:
+        return max(1, int(os.getenv('DB_BACKUP_KEEP_DAYS', '30')))
+    except (TypeError, ValueError):
+        return 30
 
 
 def log(msg):
-    print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {msg}')
+    print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] [backup] {msg}')
 
 
-def backup_local():
-    """使用 SQLite 在线备份 API 安全复制数据库（不会锁定正在使用的数据库）。"""
-    if not os.path.exists(DB_PATH):
-        log(f'❌ 数据库文件不存在: {DB_PATH}')
+def backup_local(db_path=None):
+    """使用 SQLite 在线备份 API 安全复制数据库。"""
+    db_path = db_path or DB_PATH
+    if not os.path.exists(db_path):
+        log(f'❌ 数据库文件不存在: {db_path}')
         return None
 
     os.makedirs(BACKUP_DIR, exist_ok=True)
@@ -45,13 +52,12 @@ def backup_local():
     backup_filename = f'students_{timestamp}.db'
     backup_path = os.path.join(BACKUP_DIR, backup_filename)
 
-    # 使用 SQLite backup API（安全，即使数据库正在使用也不会损坏）
-    src = sqlite3.connect(DB_PATH)
+    src = sqlite3.connect(db_path)
     dst = sqlite3.connect(backup_path)
     try:
         src.backup(dst)
-        log(f'✅ 本地备份完成: {backup_path}')
-        log(f'   大小: {os.path.getsize(backup_path) / 1024:.1f} KB')
+        size_kb = os.path.getsize(backup_path) / 1024
+        log(f'✅ 本地备份完成: {backup_filename} ({size_kb:.1f} KB)')
         return backup_path
     finally:
         dst.close()
@@ -60,23 +66,6 @@ def backup_local():
 
 def upload_to_cos(backup_path):
     """上传备份到 COS（如果配置了 COS 环境变量）。"""
-    # 加载 .env
-    env_file = os.path.join(BASE_DIR, '.env')
-    if os.path.isfile(env_file):
-        with open(env_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith('#'):
-                    continue
-                if line.startswith('export '):
-                    line = line[7:].strip()
-                if '=' not in line:
-                    continue
-                k, v = line.split('=', 1)
-                k = k.strip()
-                v = v.strip().strip('\'"')
-                os.environ.setdefault(k, v)
-
     secret_id = os.getenv('COS_SECRET_ID', '')
     secret_key = os.getenv('COS_SECRET_KEY', '')
     region = os.getenv('COS_REGION', '')
@@ -111,7 +100,8 @@ def cleanup_old_backups():
     if not os.path.isdir(BACKUP_DIR):
         return
 
-    cutoff = datetime.now() - timedelta(days=RETENTION_DAYS)
+    retention_days = _get_retention_days()
+    cutoff = datetime.now() - timedelta(days=retention_days)
     removed = 0
     for f in os.listdir(BACKUP_DIR):
         if not f.startswith('students_') or not f.endswith('.db'):
@@ -123,26 +113,103 @@ def cleanup_old_backups():
             removed += 1
 
     if removed:
-        log(f'🗑️  已清理 {removed} 个超过 {RETENTION_DAYS} 天的旧备份')
+        log(f'🗑️  已清理 {removed} 个超过 {retention_days} 天的旧备份')
 
 
-def main():
+def run_backup(db_path=None):
+    """执行完整备份流程（本地 + COS + 清理），供内部调度器和命令行共用。"""
     log('===== 数据库备份开始 =====')
 
-    # 1. 本地备份
-    backup_path = backup_local()
+    backup_path = backup_local(db_path)
     if not backup_path:
-        log('❌ 备份失败，退出')
-        sys.exit(1)
+        log('❌ 备份失败')
+        return False
 
-    # 2. 上传 COS
     upload_to_cos(backup_path)
-
-    # 3. 清理旧备份
     cleanup_old_backups()
 
-    log('===== 备份任务完成 =====\n')
+    log('===== 备份任务完成 =====')
+    return True
 
+
+# ======================== 内置调度器 ========================
+
+_scheduler_started = False
+
+
+def start_backup_scheduler(app):
+    """
+    在 Flask 应用内启动后台备份调度线程。
+
+    使用 daemon 线程 + threading.Event 实现，
+    无需任何第三方依赖，应用退出时线程自动销毁。
+    """
+    global _scheduler_started
+    if _scheduler_started:
+        return
+    _scheduler_started = True
+
+    import threading
+
+    backup_hour = 3
+    try:
+        backup_hour = max(0, min(23, int(os.getenv('DB_BACKUP_HOUR', '3'))))
+    except (TypeError, ValueError):
+        pass
+
+    db_path = app.config.get('DATABASE', DB_PATH)
+    stop_event = threading.Event()
+
+    def _scheduler_loop():
+        while not stop_event.is_set():
+            now = datetime.now()
+            # 计算下一个备份时间点
+            target = now.replace(hour=backup_hour, minute=0, second=0, microsecond=0)
+            if target <= now:
+                target += timedelta(days=1)
+
+            wait_seconds = (target - now).total_seconds()
+            app.logger.info(
+                f'[backup] 下次备份时间: {target.strftime("%Y-%m-%d %H:%M")} '
+                f'(约 {wait_seconds / 3600:.1f} 小时后)'
+            )
+
+            # 等待到目标时间，或被 stop_event 中断
+            if stop_event.wait(timeout=wait_seconds):
+                break  # 收到停止信号
+
+            # 执行备份
+            try:
+                app.logger.info('[backup] 定时备份开始执行')
+                run_backup(db_path)
+                app.logger.info('[backup] 定时备份执行完成')
+            except Exception as e:
+                app.logger.error(f'[backup] 定时备份异常: {e}')
+
+    t = threading.Thread(target=_scheduler_loop, name='db-backup-scheduler', daemon=True)
+    t.start()
+    app.logger.info(f'[backup] 内置备份调度器已启动，每天 {backup_hour}:00 自动备份')
+
+
+# ======================== 命令行入口 ========================
 
 if __name__ == '__main__':
-    main()
+    # 命令行手动执行时加载 .env
+    env_file = os.path.join(BASE_DIR, '.env')
+    if os.path.isfile(env_file):
+        with open(env_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if line.startswith('export '):
+                    line = line[7:].strip()
+                if '=' not in line:
+                    continue
+                k, v = line.split('=', 1)
+                k = k.strip()
+                v = v.strip().strip('\'"')
+                os.environ.setdefault(k, v)
+
+    success = run_backup()
+    sys.exit(0 if success else 1)

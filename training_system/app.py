@@ -386,6 +386,19 @@ def create_app():
 
     app.logger.info('系统初始化成功')
 
+    # ======================== 内置定时备份调度 ========================
+    # 仅在主进程中启动（避免 debug 模式 reloader 子进程重复启动）
+    backup_enabled = os.getenv('DB_BACKUP_ENABLED', 'true').lower() in ('true', '1', 'yes')
+    is_reloader_child = os.getenv('WERKZEUG_RUN_MAIN') == 'true'
+    is_debug = os.getenv('FLASK_DEBUG', 'True').lower() == 'true'
+
+    if backup_enabled and (not is_debug or is_reloader_child):
+        try:
+            from scripts.backup_db import start_backup_scheduler
+            start_backup_scheduler(app)
+        except Exception as e:
+            app.logger.warning(f'备份调度器启动失败（不影响系统运行）: {e}')
+
     return app
 
 # ======================== 应用启动 ========================
