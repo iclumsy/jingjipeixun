@@ -1200,9 +1200,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             input.style.width = '100%';
-            input.style.padding = '8px';
+            input.style.padding = '5px 8px';
             input.style.border = '1px solid #ddd';
             input.style.borderRadius = '4px';
+            input.style.fontSize = '0.88rem';
 
             item.innerHTML = `<label>${f.label}</label>`;
             item.style.position = 'relative';
