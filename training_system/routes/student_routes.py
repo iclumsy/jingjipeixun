@@ -1040,6 +1040,41 @@ def approve_student_route(id):
         if health_check_path:
             current_app.logger.info(f'Health check form generated for student ID={id}')
 
+        # ---- 自动生成报名材料 ----
+        materials_ok = False
+        try:
+            from services.material_service import generate_student_materials
+            import io as _io
+            import contextlib
+
+            base_dir = current_app.config['BASE_DIR']
+            output_root = current_app.config['STUDENTS_FOLDER']
+            training_type = student.get('training_type', 'special_operation')
+            company = student.get('company', '')
+            training_type_map = {
+                'special_operation': '特种作业',
+                'special_equipment': '特种设备'
+            }
+            training_type_name = training_type_map.get(training_type, '特种作业')
+            student_folder_name = f"{training_type_name}-{company}-{student_name}"
+            actual_output_root = os.path.join(output_root, student_folder_name)
+
+            log_buffer = _io.StringIO()
+            with contextlib.redirect_stdout(log_buffer):
+                report = generate_student_materials(student, base_dir, actual_output_root)
+
+            for line in log_buffer.getvalue().splitlines():
+                if line.strip():
+                    current_app.logger.info(line)
+
+            materials_ok = bool(report.get('success'))
+            if materials_ok:
+                current_app.logger.info(f'[自动生成材料] 学员ID={id} 姓名={student_name} 成功')
+            else:
+                current_app.logger.warning(f'[自动生成材料] 学员ID={id} 姓名={student_name} 未完全成功')
+        except Exception as mat_err:
+            current_app.logger.warning(f'[自动生成材料] 学员ID={id} 异常(不影响审核): {mat_err}')
+
         # 记录操作者信息：管理员账号 + 客户端 IP + 提交人 openid 映射
         operator = session.get('auth_user', 'unknown')
         client_ip = get_client_ip(request)
@@ -1048,7 +1083,10 @@ def approve_student_route(id):
             f'[审核通过] 操作人={operator} IP={client_ip} '
             f'学员ID={id} 姓名={student_name} 提交人={submitter}'
         )
-        return jsonify(student)
+
+        result = dict(student)
+        result['materials_auto_generated'] = materials_ok
+        return jsonify(result)
 
     except NotFoundError as e:
         return jsonify(e.to_dict()), e.status_code
@@ -1758,3 +1796,85 @@ def get_companies_route():
     except Exception as e:
         current_app.logger.exception('Error getting companies')
         return build_internal_error_response('加载公司列表失败，请稍后重试')
+
+
+@student_bp.route('/api/stats/dashboard', methods=['GET'])
+def dashboard_stats_route():
+    """
+    数据看板统计 API。
+
+    返回:
+        - total: 学员总数
+        - by_status: 各状态数量
+        - this_month: 本月新增数量
+        - by_training_type: 按培训类型分布
+        - monthly_trend: 近 6 个月新增趋势
+        - recent_students: 最近 5 名学员摘要
+    """
+    try:
+        from models.student import get_db_connection
+        from datetime import datetime, timedelta
+
+        with get_db_connection() as conn:
+            # 总数
+            total = conn.execute('SELECT COUNT(*) FROM students').fetchone()[0]
+
+            # 各状态数量
+            rows = conn.execute(
+                'SELECT status, COUNT(*) as cnt FROM students GROUP BY status'
+            ).fetchall()
+            by_status = {r['status']: r['cnt'] for r in rows}
+
+            # 本月新增
+            now = datetime.now()
+            month_start = now.strftime('%Y-%m-01')
+            this_month = conn.execute(
+                'SELECT COUNT(*) FROM students WHERE created_at >= ?',
+                (month_start,)
+            ).fetchone()[0]
+
+            # 按培训类型分布
+            rows = conn.execute(
+                'SELECT training_type, COUNT(*) as cnt FROM students GROUP BY training_type'
+            ).fetchall()
+            type_map = {'special_operation': '特种作业', 'special_equipment': '特种设备'}
+            by_training_type = {type_map.get(r['training_type'], r['training_type']): r['cnt'] for r in rows}
+
+            # 近 6 个月趋势
+            monthly_trend = []
+            for i in range(5, -1, -1):
+                d = now - timedelta(days=i * 30)
+                m_start = d.strftime('%Y-%m-01')
+                # 计算下个月第一天
+                if d.month == 12:
+                    m_end = f'{d.year + 1}-01-01'
+                else:
+                    m_end = f'{d.year}-{d.month + 1:02d}-01'
+                cnt = conn.execute(
+                    'SELECT COUNT(*) FROM students WHERE created_at >= ? AND created_at < ?',
+                    (m_start, m_end)
+                ).fetchone()[0]
+                monthly_trend.append({
+                    'month': d.strftime('%Y-%m'),
+                    'count': cnt
+                })
+
+            # 最近 5 名学员
+            recent = conn.execute(
+                'SELECT id, name, company, status, training_type, created_at '
+                'FROM students ORDER BY id DESC LIMIT 5'
+            ).fetchall()
+            recent_students = [dict(r) for r in recent]
+
+        return jsonify({
+            'total': total,
+            'by_status': by_status,
+            'this_month': this_month,
+            'by_training_type': by_training_type,
+            'monthly_trend': monthly_trend,
+            'recent_students': recent_students,
+        })
+
+    except Exception as e:
+        current_app.logger.exception('Error getting dashboard stats')
+        return build_internal_error_response('获取统计数据失败')

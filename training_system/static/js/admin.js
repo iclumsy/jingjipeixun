@@ -547,7 +547,125 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadJobCategories().then(() => {
         loadStudents();
         loadCompanies();
+        showDashboard();
     });
+
+    /**
+     * 数据看板：在主内容区显示统计概览。
+     */
+    async function showDashboard() {
+        try {
+            const res = await fetch('/api/stats/dashboard');
+            if (!res.ok) return;
+            const d = await res.json();
+
+            const statusLabels = {
+                unreviewed: '待审核',
+                reviewed: '已审核',
+                rejected: '已驳回'
+            };
+            const statusColors = {
+                unreviewed: { bg: '#FEF3C7', color: '#92400E', icon: '⏳' },
+                reviewed:   { bg: '#D1FAE5', color: '#065F46', icon: '✅' },
+                rejected:   { bg: '#FEE2E2', color: '#991B1B', icon: '↩️' }
+            };
+
+            // 状态卡片
+            let statusCards = '';
+            for (const [key, label] of Object.entries(statusLabels)) {
+                const count = d.by_status[key] || 0;
+                const c = statusColors[key];
+                statusCards += `
+                    <div style="flex:1;min-width:120px;background:${c.bg};border-radius:12px;padding:16px 18px;text-align:center;">
+                        <div style="font-size:1.6rem;">${c.icon}</div>
+                        <div style="font-size:1.5rem;font-weight:800;color:${c.color};margin:4px 0;">${count}</div>
+                        <div style="font-size:0.82rem;color:${c.color};font-weight:500;">${label}</div>
+                    </div>`;
+            }
+
+            // 培训类型分布
+            let typeCards = '';
+            for (const [typeName, count] of Object.entries(d.by_training_type)) {
+                const isEquip = typeName === '特种设备';
+                typeCards += `
+                    <div style="flex:1;min-width:140px;background:${isEquip ? '#EDE9FE' : '#FCE7F3'};border-radius:12px;padding:16px 18px;text-align:center;">
+                        <div style="font-size:1.3rem;">${isEquip ? '📦' : '⚡️'}</div>
+                        <div style="font-size:1.4rem;font-weight:800;color:${isEquip ? '#5B21B6' : '#BE185D'};margin:4px 0;">${count}</div>
+                        <div style="font-size:0.82rem;color:${isEquip ? '#5B21B6' : '#BE185D'};font-weight:500;">${typeName}</div>
+                    </div>`;
+            }
+
+            // 月度趋势柱状图
+            const maxCount = Math.max(...d.monthly_trend.map(m => m.count), 1);
+            let trendBars = '';
+            d.monthly_trend.forEach(m => {
+                const pct = Math.max((m.count / maxCount) * 100, 4);
+                const monthLabel = m.month.slice(5); // "04" from "2026-04"
+                trendBars += `
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                        <div style="font-size:0.78rem;font-weight:700;color:#4F46E5;">${m.count}</div>
+                        <div style="width:100%;max-width:36px;background:linear-gradient(180deg,#818CF8,#4F46E5);border-radius:6px 6px 2px 2px;height:${pct}px;min-height:4px;transition:height 0.5s ease;"></div>
+                        <div style="font-size:0.72rem;color:#64748B;">${monthLabel}月</div>
+                    </div>`;
+            });
+
+            // 最近学员
+            const typeMap = { special_equipment: '特种设备', special_operation: '特种作业' };
+            let recentRows = '';
+            d.recent_students.forEach(s => {
+                const statusMeta = statusColors[s.status] || statusColors.unreviewed;
+                const sLabel = statusLabels[s.status] || s.status;
+                recentRows += `
+                    <div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #F1F5F9;gap:10px;">
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-weight:600;font-size:0.88rem;color:#0F172A;">${s.name || '-'}</div>
+                            <div style="font-size:0.76rem;color:#94A3B8;">${s.company || '-'} · ${typeMap[s.training_type] || ''}</div>
+                        </div>
+                        <span style="font-size:0.75rem;padding:3px 10px;border-radius:20px;background:${statusMeta.bg};color:${statusMeta.color};font-weight:600;white-space:nowrap;">${sLabel}</span>
+                    </div>`;
+            });
+
+            mainContent.innerHTML = `
+                <div style="max-width:800px;margin:0 auto;padding:10px 0;">
+                    <h2 style="margin:0 0 20px;font-size:1.3rem;font-weight:700;color:#0F172A;">📊 数据看板</h2>
+
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;">
+                        <div style="flex:1;min-width:140px;background:linear-gradient(135deg,#4F46E5,#7C3AED);border-radius:14px;padding:18px 20px;color:#fff;">
+                            <div style="font-size:0.82rem;opacity:0.85;">学员总数</div>
+                            <div style="font-size:2rem;font-weight:800;margin:4px 0;">${d.total}</div>
+                        </div>
+                        <div style="flex:1;min-width:140px;background:linear-gradient(135deg,#0EA5E9,#0284C7);border-radius:14px;padding:18px 20px;color:#fff;">
+                            <div style="font-size:0.82rem;opacity:0.85;">本月新增</div>
+                            <div style="font-size:2rem;font-weight:800;margin:4px 0;">${d.this_month}</div>
+                        </div>
+                        ${statusCards}
+                    </div>
+
+                    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px;">
+                        <div style="flex:2;min-width:280px;background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:18px 20px;">
+                            <div style="font-size:0.88rem;font-weight:700;color:#0F172A;margin-bottom:14px;">📈 近 6 个月趋势</div>
+                            <div style="display:flex;align-items:flex-end;gap:8px;height:110px;">
+                                ${trendBars}
+                            </div>
+                        </div>
+                        <div style="flex:1;min-width:180px;background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:18px 20px;">
+                            <div style="font-size:0.88rem;font-weight:700;color:#0F172A;margin-bottom:12px;">📋 培训类型</div>
+                            <div style="display:flex;flex-direction:column;gap:10px;">
+                                ${typeCards}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:18px 20px;">
+                        <div style="font-size:0.88rem;font-weight:700;color:#0F172A;margin-bottom:10px;">🕐 最近提交</div>
+                        ${recentRows || '<div style="color:#94A3B8;font-size:0.88rem;text-align:center;padding:16px 0;">暂无数据</div>'}
+                    </div>
+                </div>`;
+        } catch (e) {
+            // 看板加载失败不影响正常使用
+            console.warn('Dashboard load failed:', e);
+        }
+    }
 
     /**
      * 从服务器加载公司名称列表（用于公司筛选下拉框）。
@@ -1879,7 +1997,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const res = await fetch(`/api/students/${currentStudentId}/approve`, { method: 'POST' });
             if (!res.ok) throw new Error('操作失败');
-            showMessage('审核通过', 'success');
+            const data = await res.json();
+            if (data.materials_auto_generated) {
+                showMessage('审核通过，报名材料已自动生成 ✅', 'success');
+            } else {
+                showMessage('审核通过（材料自动生成未完成，可手动重试）', 'success');
+            }
             loadStudents();
             loadCompanies(currentStatus);
             mainContent.innerHTML = '<div class="empty-state">请选择左侧学员查看详情</div>';
