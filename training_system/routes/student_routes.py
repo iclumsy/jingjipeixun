@@ -1136,8 +1136,13 @@ def activate_card_route(id):
         if student.get('status') != 'reviewed':
             return jsonify({'error': '仅审核通过的学员可以开卡'}), 400
 
+        # 防止重复开卡
+        if student.get('card_activated'):
+            return jsonify({'error': '该学员已开卡，请勿重复操作'}), 400
+
         # 调用外部系统接口实际办理开卡
         from services.junrui_service import activate_card_for_student
+        from datetime import datetime
         
         operator = session.get('auth_user', 'unknown')
         client_ip = get_client_ip(request)
@@ -1153,8 +1158,14 @@ def activate_card_route(id):
             # 开卡失败，此时直接抛异常让外层捕获或者在此处直接返回
             return jsonify({'error': result.get("message", "办理失败，请重试")}), 400
 
+        # 开卡成功，记录状态到数据库
+        updated_student = update_student(id, {
+            'card_activated': 1,
+            'card_activated_at': datetime.now().isoformat()
+        })
+
         current_app.logger.info(f'[开卡完成] 学员ID={id} 成功')
-        return jsonify({'message': result.get("message", "开卡成功"), 'student': student})
+        return jsonify({'message': result.get("message", "开卡成功"), 'student': updated_student})
 
     except NotFoundError as e:
         return jsonify(e.to_dict()), e.status_code

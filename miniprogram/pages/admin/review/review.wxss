@@ -325,6 +325,13 @@
   justify-content: center;
 }
 
+.card-head-activate-btn.activated {
+  background: #e2e8f0;
+  color: #64748b;
+  box-shadow: none;
+  font-weight: 600;
+}
+
 .action-btn.disabled {
   opacity: 0.45;
 }

@@ -1074,10 +1074,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             // 仅特种设备且已审核学员在顶部显示「开卡」按钮
             if (student.status === 'reviewed' && student.training_type === 'special_equipment') {
                 const activateCardBtn = document.createElement('button');
-                activateCardBtn.style.cssText = 'background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; font-weight: 600; font-size: 0.8rem; padding: 4px 12px; border-radius: 6px; border: none; cursor: pointer; margin-left: 12px; box-shadow: 0 2px 6px rgba(14,165,233,0.25); white-space: nowrap;';
-                activateCardBtn.textContent = '🎓 开卡';
-                activateCardBtn.title = '为学员在培训考试系统开学习卡';
-                activateCardBtn.onclick = () => showActivateCardDialog(student);
+                const isActivated = !!student.card_activated;
+                if (isActivated) {
+                    activateCardBtn.style.cssText = 'background: #e2e8f0; color: #64748b; font-weight: 600; font-size: 0.8rem; padding: 4px 12px; border-radius: 6px; border: none; cursor: default; margin-left: 12px; white-space: nowrap;';
+                    activateCardBtn.textContent = '✅ 已开卡';
+                    activateCardBtn.disabled = true;
+                } else {
+                    activateCardBtn.style.cssText = 'background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; font-weight: 600; font-size: 0.8rem; padding: 4px 12px; border-radius: 6px; border: none; cursor: pointer; margin-left: 12px; box-shadow: 0 2px 6px rgba(14,165,233,0.25); white-space: nowrap;';
+                    activateCardBtn.textContent = '🎓 开卡';
+                    activateCardBtn.title = '为学员在培训考试系统开学习卡';
+                    activateCardBtn.onclick = () => showActivateCardDialog(student);
+                }
                 statusBadge.appendChild(activateCardBtn);
             }
 
@@ -1945,6 +1952,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 close();
                 if (!res.ok) throw new Error(data.error || data.message || '开卡失败');
                 showMessage(data.message || '开卡成功！学员已在培训考试系统创建学习卡', 'success');
+                // 更新内存中的学员数据并刷新详情页
+                if (data.student) {
+                    const idx = students.findIndex(s => s.id === student.id);
+                    if (idx >= 0) students[idx] = data.student;
+                    showDetail(data.student);
+                }
             } catch (e) {
                 confirmBtn.disabled = false;
                 confirmBtn.textContent = '确认开卡';

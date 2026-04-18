@@ -210,6 +210,8 @@ def init_db(database_path):
         _ensure_column_exists(conn, 'students', 'training_project_id', 'training_project_id INTEGER')
         _ensure_column_exists(conn, 'students', 'hukou_residence_path', 'hukou_residence_path TEXT')
         _ensure_column_exists(conn, 'students', 'reject_reason', 'reject_reason TEXT')
+        _ensure_column_exists(conn, 'students', 'card_activated', 'card_activated INTEGER DEFAULT 0')
+        _ensure_column_exists(conn, 'students', 'card_activated_at', 'card_activated_at TEXT')
 
         # 创建高级字典表
         conn.execute('''

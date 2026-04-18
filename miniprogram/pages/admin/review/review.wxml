@@ -65,14 +65,14 @@
           <view class="status-badge badge-{{item.status}}">{{item.statusText}}</view>
           <view
             wx:if="{{item.status === 'reviewed' && item.training_type === 'special_equipment'}}"
-            class="card-head-activate-btn"
-            catchtap="onActivateCardTap"
+            class="card-head-activate-btn {{item.card_activated ? 'activated' : ''}}"
+            catchtap="{{item.card_activated ? '' : 'onActivateCardTap'}}"
             data-id="{{item._id}}"
             data-name="{{item.name}}"
             data-phone="{{item.phone}}"
             data-id-card="{{item.id_card}}"
             data-exam-project="{{item.exam_project || item.job_category}}"
-          >🎓 开卡</view>
+          >{{item.card_activated ? '✅ 已开卡' : '🎓 开卡'}}</view>
         </view>
 
         <view class="meta-row">

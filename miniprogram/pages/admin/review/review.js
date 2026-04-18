@@ -421,6 +421,8 @@ Page({
       const result = await api.activateCard(id)
       wx.showToast({ title: result.message || '开卡成功', icon: 'success' })
       this.closeActivateModal()
+      // 刷新列表以更新开卡状态
+      await this.loadRecords(true)
     } catch (err) {
       wx.showToast({ title: err.message || '开卡失败', icon: 'none' })
     } finally {
