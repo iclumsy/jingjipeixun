@@ -9,7 +9,7 @@
 import sqlite3
 from datetime import datetime
 
-DB_PATH = 'instance/students.db'  # 根据实际路径修改
+DB_PATH = 'database/students.db'  # 根据实际路径修改
 
 # ========== 在此填写已开卡学员的 ID ==========
 # 可以用身份证号查找：先运行
