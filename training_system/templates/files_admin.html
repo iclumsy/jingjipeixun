@@ -349,6 +349,15 @@
                 const res = await fetch('/api/files/browse/' + encodeURIComponent(folderPath));
                 if (!res.ok) throw new Error('加载失败');
                 const items = await res.json();
+                
+                // 默认按修改时间倒序排序，同时保持文件夹在前面
+                items.sort((a, b) => {
+                    if (a.type !== b.type) {
+                        return a.type === 'directory' ? -1 : 1;
+                    }
+                    return (b.modified || 0) - (a.modified || 0);
+                });
+                
                 renderContents(folderPath, items);
             } catch (err) {
                 filesMain.innerHTML = '<div class="files-empty" style="color:#ef4444;">加载失败</div>';
