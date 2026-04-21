@@ -1693,7 +1693,7 @@ def process_diploma(input_path, output_dir, name_prefix, adjustments=None, logge
     """学历证书照片，裁边，A4白色底，水平居中，宽两边留 1cm，水平校正"""
     adjustments = adjustments or {}
     crop_mode = adjustments.get("crop_mode", "auto")
-    extra_rotate = adjustments.get("rotate", 0)
+    extra_rotate = int(adjustments.get("rotate", 0) or 0)
     expand_level = adjustments.get("expand_level")
     skip_ratio_trim = adjustments.get("skip_ratio_trim", False)
     manual_crop_applied = adjustments.get("manual_crop_applied", False)
@@ -1832,8 +1832,8 @@ def process_diploma(input_path, output_dir, name_prefix, adjustments=None, logge
 def process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments=None, logger=None):
     adjustments = adjustments or {}
     crop_mode = adjustments.get("crop_mode", "auto")
-    front_rotate = adjustments.get("front_rotate", 0)
-    back_rotate = adjustments.get("back_rotate", 0)
+    front_rotate = int(adjustments.get("front_rotate", 0) or 0)
+    back_rotate = int(adjustments.get("back_rotate", 0) or 0)
     expand_level = adjustments.get("expand_level")
     skip_ratio_trim = adjustments.get("skip_ratio_trim", False)
     front_manual_crop_applied = adjustments.get("front_manual_crop_applied", False)
@@ -2023,8 +2023,8 @@ def process_id_cards(front_path, back_path, output_dir, name_prefix, adjustments
 def process_hukou(residence_path, personal_path, output_dir, name_prefix, adjustments=None, logger=None):
     adjustments = adjustments or {}
     crop_mode = adjustments.get("crop_mode", "auto")
-    home_rotate = adjustments.get("home_rotate", 0)
-    personal_rotate = adjustments.get("personal_rotate", 0)
+    home_rotate = int(adjustments.get("home_rotate", 0) or 0)
+    personal_rotate = int(adjustments.get("personal_rotate", 0) or 0)
     expand_level = adjustments.get("expand_level")
     skip_ratio_trim = adjustments.get("skip_ratio_trim", False)
     home_manual_crop_applied = adjustments.get("home_manual_crop_applied", False)

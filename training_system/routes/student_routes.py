@@ -28,6 +28,7 @@ API 端点列表:
     - 特种作业 (special_operation)  : 必传学历证书、身份证正反面
     - 特种设备 (special_equipment)  : 必传个人照片、学历证书、身份证正反面、户口本户籍页和个人页
 """
+from functools import wraps
 from flask import Blueprint, request, jsonify, current_app, g, session
 from models.student import (
     create_student, get_students, get_student_by_id, update_student,
@@ -167,6 +168,27 @@ def get_mini_openid():
     if not user:
         return ''
     return str(user.get('openid', '') or '').strip()
+
+
+def mini_admin_required(f):
+    """
+    装饰器：限制小程序普通用户访问管理员接口。
+
+    判断逻辑：
+    - Web 管理后台请求（g.mini_user 为 None）：已通过 session 认证，直接放行
+    - 小程序管理员（is_admin=True）：放行
+    - 小程序普通用户（is_admin=False）：返回 403
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        user = getattr(g, 'mini_user', None)
+        if user and not user.get('is_admin'):
+            return jsonify({
+                'error': 'forbidden',
+                'message': '无权限执行此操作'
+            }), 403
+        return f(*args, **kwargs)
+    return decorated
 
 
 
@@ -543,9 +565,11 @@ def update_student_route(id):
     """
     try:
         # 可更新的文本字段白名单（防止恶意修改其他字段）
+        # 注意：status 不在此白名单中，状态变更必须通过 /approve 或 /reject 专用端点，
+        # 以确保体检表生成、通知推送、报名材料自动生成等审核附加流程不被绕过。
         allowed_text = [
             'name', 'gender', 'education', 'school', 'major', 'id_card', 'phone',
-            'company', 'company_address', 'training_project_id', 'status'
+            'company', 'company_address', 'training_project_id'
         ]
 
         # 获取当前学员记录并检查权限
@@ -913,6 +937,7 @@ def miniprogram_sync_cos_route():
 
 
 @student_bp.route('/api/students/<int:id>/reject', methods=['POST'])
+@mini_admin_required
 def reject_student_route(id):
     """
     驳回学员：默认更新状态，仅在明确请求时删除记录。
@@ -998,6 +1023,7 @@ def reject_student_route(id):
 
 
 @student_bp.route('/api/students/<int:id>/approve', methods=['POST'])
+@mini_admin_required
 def approve_student_route(id):
     """
     审核通过学员。
@@ -1098,6 +1124,7 @@ def approve_student_route(id):
 
 
 @student_bp.route('/api/students/<int:id>/swap_materials', methods=['POST'])
+@mini_admin_required
 def swap_materials_route(id):
     """
     互换两张图片的路径，例如身份证正反面、户口本首页和本人页等。
@@ -1149,6 +1176,7 @@ def swap_materials_route(id):
 
 
 @student_bp.route('/api/students/<int:id>/activate_card', methods=['POST'])
+@mini_admin_required
 def activate_card_route(id):
     """
     为特种设备审核通过学员开学习卡。
@@ -1214,6 +1242,7 @@ def activate_card_route(id):
 
 
 @student_bp.route('/api/students/<int:id>/query_card', methods=['POST'])
+@mini_admin_required
 def query_card_route(id):
     """
     查询学员的君瑞学习卡信息（纯查询，不写库）。
@@ -1242,6 +1271,7 @@ def query_card_route(id):
 
 
 @student_bp.route('/api/students/<int:id>/attachments.zip', methods=['GET'])
+@mini_admin_required
 def download_attachments_zip_route(id):
     """
     将学员所有附件打包为 ZIP 下载。
@@ -1322,6 +1352,7 @@ def download_attachments_zip_route(id):
 
 
 @student_bp.route('/api/students/<int:id>/training_form', methods=['GET'])
+@mini_admin_required
 def download_training_form_route(id):
     """
     下载学员体检表文件。
@@ -1379,6 +1410,7 @@ def download_training_form_route(id):
 
 
 @student_bp.route('/api/students/<int:id>/generate_materials', methods=['POST'])
+@mini_admin_required
 def generate_materials_route(id):
     """
     生成报名材料。
@@ -1433,6 +1465,7 @@ def generate_materials_route(id):
 
 
 @student_bp.route('/api/students/<int:id>/analyze_material_points', methods=['POST'])
+@mini_admin_required
 def analyze_material_points_route(id):
     """
     预分析材料裁剪点坐标。用于前端裁图调整时默认展示 AI 自动裁剪的识别区域。
@@ -1501,6 +1534,7 @@ def analyze_material_points_route(id):
 
 
 @student_bp.route('/api/students/<int:id>/manual_crop_material', methods=['POST'])
+@mini_admin_required
 def manual_crop_material_route(id):
     """
     手动画框裁剪：接收用户在原图上标记的 4 个角点，对原始附件图像做透视变换，
@@ -1628,6 +1662,7 @@ def manual_crop_material_route(id):
 
 
 @student_bp.route('/api/students/<int:id>/regenerate_material', methods=['POST'])
+@mini_admin_required
 def regenerate_material_route(id):
     """
     重新生成单个报名材料（带调整参数）。
@@ -1676,6 +1711,7 @@ def regenerate_material_route(id):
 
 
 @student_bp.route('/api/students/<int:id>/generated_materials', methods=['GET'])
+@mini_admin_required
 def get_generated_materials_route(id):
     """
     获取已生成的报名材料预览列表。
@@ -1731,6 +1767,7 @@ def get_generated_materials_route(id):
 
 
 @student_bp.route('/api/students/<int:id>/download_materials.zip', methods=['GET'])
+@mini_admin_required
 def download_materials_zip_route(id):
     """
     下载生成的报名材料（ZIP）。
@@ -1796,6 +1833,7 @@ def download_materials_zip_route(id):
 
 
 @student_bp.route('/api/companies', methods=['GET'])
+@mini_admin_required
 def get_companies_route():
     """
     获取去重后的公司名称列表。
@@ -1826,6 +1864,7 @@ def get_companies_route():
 
 
 @student_bp.route('/api/stats/dashboard', methods=['GET'])
+@mini_admin_required
 def dashboard_stats_route():
     """
     数据看板统计 API。

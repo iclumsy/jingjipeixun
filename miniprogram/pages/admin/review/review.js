@@ -63,48 +63,54 @@ Page({
     this._skipRefreshOnShow = true
     this.setData({ initialized: true })
 
-    // 延迟一点弹出提示，确保页面已经渲染且不打断操作
-    setTimeout(() => {
-      this.checkAdminSubscription()
-    }, 1000)
+    // 预加载订阅消息 templateId，供审核操作后静默请求授权
+    api.getWechatConfig().then(res => {
+      if (res && res.success && res.template_id) {
+        this._subscribeTemplateId = res.template_id
+      }
+    }).catch(() => {})
   },
 
-  async checkAdminSubscription() {
-    // 检查是否已经提示过
-    if (wx.getStorageSync('admin_nots_prompted')) return
-    
-    try {
-      const configRes = await api.getWechatConfig()
-      if (configRes && configRes.success && configRes.template_id) {
-        wx.showModal({
-          title: '接收新提醒',
-          content: '为了能及时收到新学员报名的通知，请点击授权订阅消息',
-          confirmText: '去授权',
-          cancelText: '暂不需要',
-          success: (res) => {
-            // 只要弹过一次就不再强制弹
-            wx.setStorageSync('admin_nots_prompted', true)
-            if (res.confirm) {
-              wx.requestSubscribeMessage({
-                tmplIds: [configRes.template_id],
-                success: (subRes) => {
-                  if (subRes[configRes.template_id] === 'accept') {
-                    wx.showToast({ title: '授权成功', icon: 'success' })
-                  } else {
-                    wx.showToast({ title: '已取消授权', icon: 'none' })
-                  }
-                },
-                fail: (err) => {
-                  console.warn('请求订阅消息失败:', err)
-                }
-              })
-            }
-          }
-        })
+  /**
+   * 静默请求一次订阅授权（不弹自定义提示，直接调用系统授权弹窗）。
+   * 在审核操作完成后调用，每审核一个学员积累一次发送配额。
+   */
+  silentRequestSubscription() {
+    if (!this._subscribeTemplateId) return
+    wx.requestSubscribeMessage({
+      tmplIds: [this._subscribeTemplateId],
+      success: () => {},
+      fail: () => {}
+    })
+  },
+
+  /**
+   * 定期提醒管理员授权订阅（每 3 天一次）。
+   * 确保所有管理员（包括不常审核的）都能积累发送配额。
+   */
+  promptAdminSubscription() {
+    if (!this._subscribeTemplateId) return
+
+    const PROMPT_INTERVAL_MS = 1 * 24 * 60 * 60 * 1000  // 1 天
+    const lastPrompt = wx.getStorageSync('admin_sub_last_prompt') || 0
+    if (Date.now() - lastPrompt < PROMPT_INTERVAL_MS) return
+
+    wx.showModal({
+      title: '接收新学员通知',
+      content: '授权后可收到新学员报名提醒，每次授权可收到一条通知。',
+      confirmText: '去授权',
+      cancelText: '下次再说',
+      success: (res) => {
+        wx.setStorageSync('admin_sub_last_prompt', Date.now())
+        if (res.confirm) {
+          wx.requestSubscribeMessage({
+            tmplIds: [this._subscribeTemplateId],
+            success: () => {},
+            fail: () => {}
+          })
+        }
       }
-    } catch (err) {
-      console.warn('获取配置或请求订阅失败:', err)
-    }
+    })
   },
 
   async onShow() {
@@ -115,9 +121,11 @@ Page({
     if (this.data.initialized) {
       if (this._skipRefreshOnShow) {
         this._skipRefreshOnShow = false
-        return
+      } else {
+        await this.refreshAll(true)
       }
-      await this.refreshAll(true)
+      // 定期提醒管理员授权订阅（所有管理员打开此页都会触发检查）
+      setTimeout(() => this.promptAdminSubscription(), 800)
     }
   },
 
@@ -312,6 +320,7 @@ Page({
       await api.reviewStudent(id, 'approve')
       wx.hideLoading()
       wx.showToast({ title: '已通过', icon: 'success' })
+      this.silentRequestSubscription()
       await this.loadRecords(true)
     } catch (err) {
       wx.hideLoading()
@@ -346,6 +355,7 @@ Page({
       await api.reviewStudent(id, 'reject', content.trim())
       wx.hideLoading()
       wx.showToast({ title: '已驳回', icon: 'success' })
+      this.silentRequestSubscription()
       await this.loadRecords(true)
     } catch (err) {
       wx.hideLoading()

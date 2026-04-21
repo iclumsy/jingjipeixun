@@ -100,6 +100,13 @@ Page({
     if (!options.id) return
     this.setData({ studentId: String(options.id) })
     await this.initPage()
+
+    // 预加载订阅消息 templateId，供审核操作后积累配额
+    api.getWechatConfig().then(res => {
+      if (res && res.success && res.template_id) {
+        this._subscribeTemplateId = res.template_id
+      }
+    }).catch(() => {})
   },
 
   async initPage() {
@@ -508,6 +515,7 @@ Page({
       await api.reviewStudent(this.data.studentId, 'approve')
       wx.hideLoading()
       wx.showToast({ title: '已通过', icon: 'success' })
+      this.silentRequestSubscription()
       await this.loadDetail()
     } catch (err) {
       wx.hideLoading()
@@ -554,6 +562,7 @@ Page({
       await api.reviewStudent(this.data.studentId, 'reject', content.trim())
       wx.hideLoading()
       wx.showToast({ title: '已驳回', icon: 'success' })
+      this.silentRequestSubscription()
       await this.loadDetail()
     } catch (err) {
       wx.hideLoading()
@@ -629,5 +638,14 @@ Page({
       url: '/pages/user/submit/submit'
     })
     return false
+  },
+
+  silentRequestSubscription() {
+    if (!this._subscribeTemplateId) return
+    wx.requestSubscribeMessage({
+      tmplIds: [this._subscribeTemplateId],
+      success: () => {},
+      fail: () => {}
+    })
   }
 })

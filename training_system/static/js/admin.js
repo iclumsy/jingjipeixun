@@ -1002,6 +1002,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 formData.set('training_type', inferredTrainingType);
             }
 
+            // Bug 8/10 fix: 提交 training_project_id 外键，保证后端能通过外键重新推导 job_category/exam_project/project_code
+            const detailGrid = mainContent.querySelector('.detail-grid');
+            const trackedProjectId = detailGrid && detailGrid._trackedProjectId;
+            if (trackedProjectId) {
+                formData.set('training_project_id', trackedProjectId);
+            }
+
             const res = await fetch(`/api/students/${currentStudentId}`, { method: 'PUT', body: formData });
 
             if (!res.ok) {
@@ -1311,6 +1318,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         ];
 
         const originalData = { ...student };
+        // 初始化 training_project_id 跟踪（后续 updateExamProjectOptions 会更新）
+        grid._trackedProjectId = student.training_project_id || '';
 
         editable.forEach(f => {
             const item = document.createElement('div');
@@ -1443,9 +1452,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         option.value = project.name;
                         option.textContent = project.code ? `${project.name} (${project.code})` : project.name;
                         option.dataset.code = project.code || '';
+                        option.dataset.projectId = project.id || '';
                         if (originalValue && project.name === originalValue) {
                             option.selected = true;
                             if (projectCodeInput) projectCodeInput.value = project.code || '';
+                            grid._trackedProjectId = project.id || '';
                         }
                         projectSelect.appendChild(option);
                     });
@@ -1459,6 +1470,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else if (projectCodeInput) {
                     projectCodeInput.value = '';
                 }
+                grid._trackedProjectId = (selectedProjectOption && selectedProjectOption.dataset.projectId) || '';
             };
         }
 
