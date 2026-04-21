@@ -107,7 +107,11 @@ Page({
         if (res.confirm) {
           wx.requestSubscribeMessage({
             tmplIds: [this._subscribeTemplateId],
-            success: () => {},
+            success: (subRes) => {
+              if (subRes[this._subscribeTemplateId] === 'accept') {
+                wx.showToast({ title: '已开启通知', icon: 'success' })
+              }
+            },
             fail: () => {}
           })
         }
