@@ -67,6 +67,8 @@ Page({
     api.getWechatConfig().then(res => {
       if (res && res.success && res.template_id) {
         this._subscribeTemplateId = res.template_id
+        // 首次进入时也检查是否需要提醒授权（onShow 在 initialized 之前已执行，不会触发）
+        setTimeout(() => this.promptAdminSubscription(), 800)
       }
     }).catch(() => {})
   },
