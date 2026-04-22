@@ -67,6 +67,7 @@ Page({
     api.getWechatConfig().then(res => {
       if (res && res.success && res.template_id) {
         this._subscribeTemplateId = res.template_id
+        this._lastBroadcastTs = (res.last_broadcast_ts || 0) * 1000  // 转毫秒
         // 首次进入时也检查是否需要提醒授权（onShow 在 initialized 之前已执行，不会触发）
         setTimeout(() => this.promptAdminSubscription(), 800)
       }
@@ -87,15 +88,19 @@ Page({
   },
 
   /**
-   * 定期提醒管理员授权订阅（每 3 天一次）。
-   * 确保所有管理员（包括不常审核的）都能积累发送配额。
+   * 定期提醒管理员授权订阅。
+   * 触发条件（满足其一即弹窗）：
+   * 1. 距上次提醒超过 1 天
+   * 2. 服务端在上次提醒之后又发送过通知（配额已被消耗）
    */
   promptAdminSubscription() {
     if (!this._subscribeTemplateId) return
 
     const PROMPT_INTERVAL_MS = 1 * 24 * 60 * 60 * 1000  // 1 天
     const lastPrompt = wx.getStorageSync('admin_sub_last_prompt') || 0
-    if (Date.now() - lastPrompt < PROMPT_INTERVAL_MS) return
+    const broadcastAfterPrompt = this._lastBroadcastTs && this._lastBroadcastTs > lastPrompt
+
+    if (!broadcastAfterPrompt && Date.now() - lastPrompt < PROMPT_INTERVAL_MS) return
 
     wx.showModal({
       title: '接收新学员通知',

@@ -158,11 +158,12 @@ def get_wechat_config():
         200: 微信配置 JSON 对象
     """
     try:
-        from services.wechat_service import get_wechat_template_id
+        from services.wechat_service import get_wechat_template_id, get_last_broadcast_ts
         template_id = get_wechat_template_id()
         return jsonify({
             'success': True,
-            'template_id': template_id
+            'template_id': template_id,
+            'last_broadcast_ts': get_last_broadcast_ts()
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

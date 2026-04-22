@@ -24,6 +24,13 @@ _access_token_cache = {
     'expires_at': 0
 }
 
+# 最近一次管理员广播通知的时间戳（秒），供前端判断是否需要立即请求订阅授权
+_last_broadcast_ts = 0
+
+def get_last_broadcast_ts():
+    """获取最近一次管理员广播通知的 Unix 时间戳（秒）"""
+    return _last_broadcast_ts
+
 def get_wechat_template_id():
     """获取审核结果订阅消息的模板 ID"""
     return (os.getenv('WECHAT_MINI_TEMPLATE_ID', '') or '').strip()
@@ -220,3 +227,8 @@ def broadcast_new_student_to_admins(student_name):
             fail_count += 1
             
     current_app.logger.info(f"管理员推送结束：成功 {success_count}，失败 {fail_count}。如果失败，可能是管理员未在小程序端授权接收该提醒。")
+
+    # 记录广播时间戳，供前端判断是否需要立即弹出订阅授权
+    if success_count > 0 or fail_count > 0:
+        global _last_broadcast_ts
+        _last_broadcast_ts = int(time.time())
