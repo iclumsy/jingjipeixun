@@ -25,7 +25,8 @@ _access_token_cache = {
 }
 
 # 最近一次管理员广播通知的时间戳（秒），供前端判断是否需要立即请求订阅授权
-_last_broadcast_ts = 0
+# 初始化为当前时间：服务重启后默认触发一次授权提醒，确保配额不断档
+_last_broadcast_ts = int(time.time())
 
 def get_last_broadcast_ts():
     """获取最近一次管理员广播通知的 Unix 时间戳（秒）"""
