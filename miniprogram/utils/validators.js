@@ -151,7 +151,7 @@ function validateStudent(student, trainingType, enabledAttachments) {
   // 附件验证：优先使用动态配置的启用列表，未传时回退到默认规则
   const requiredFiles = Array.isArray(enabledAttachments) && enabledAttachments.length > 0
     ? enabledAttachments
-    : getRequiredFiles(trainingType)
+    : getRequiredFiles(trainingType, student.application_type)
   requiredFiles.forEach(fileType => {
     if (!student.files || !student.files[fileType]) {
       errors[fileType] = `请上传${getFileLabel(fileType)}`
@@ -169,13 +169,20 @@ function validateStudent(student, trainingType, enabledAttachments) {
  * @param {string} trainingType - 培训类型
  * @returns {array}
  */
-function getRequiredFiles(trainingType) {
+function getRequiredFiles(trainingType, applicationType = 'new_exam') {
   if (trainingType === 'special_operation') {
     return ['diploma', 'id_card_front', 'id_card_back']
   } else if (trainingType === 'special_equipment') {
+    if (studentApplicationType(applicationType) === 'renewal') {
+      return ['photo', 'certificate_info_page', 'certificate_records_page']
+    }
     return ['photo', 'diploma', 'id_card_front', 'id_card_back', 'hukou_residence', 'hukou_personal']
   }
   return []
+}
+
+function studentApplicationType(value) {
+  return value === 'renewal' ? 'renewal' : 'new_exam'
 }
 
 /**
@@ -190,7 +197,9 @@ function getFileLabel(fileType) {
     id_card_front: '身份证正面',
     id_card_back: '身份证反面',
     hukou_residence: '户口本户籍页',
-    hukou_personal: '户口本个人页'
+    hukou_personal: '户口本个人页',
+    certificate_info_page: '原证件说明和个人信息页',
+    certificate_records_page: '原证件作业项目和聘用记录页'
   }
   return labels[fileType] || fileType
 }

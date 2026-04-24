@@ -20,6 +20,7 @@
 
     <student-form
       trainingType="{{trainingType}}"
+      applicationType="{{editStudent.application_type}}"
       formData="{{editStudent}}"
       educationOptions="{{educationOptions}}"
       jobCategoryNames="{{jobCategoryNames}}"
@@ -30,6 +31,7 @@
       trainingCardTitle="培训信息"
       attachmentsTip="可直接替换附件，未替换的附件会保留原记录。"
       bind:trainingtypechange="selectTrainingType"
+      bind:applicationtypechange="selectApplicationType"
       bind:genderchange="selectGender"
       bind:inputchange="onInputChange"
       bind:idcardblur="onIdCardBlur"

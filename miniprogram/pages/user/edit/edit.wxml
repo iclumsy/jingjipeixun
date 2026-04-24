@@ -23,6 +23,7 @@
 
     <student-form
       trainingType="{{trainingType}}"
+      applicationType="{{student.application_type}}"
       formData="{{student}}"
       educationOptions="{{educationOptions}}"
       jobCategoryNames="{{jobCategoryNames}}"
@@ -36,6 +37,7 @@
       trainingCardTitle="培训类型"
       attachmentsTip="请上传清晰、完整的原件照片，避免反光和裁切。"
       bind:trainingtypechange="selectTrainingType"
+      bind:applicationtypechange="selectApplicationType"
       bind:genderchange="selectGender"
       bind:inputchange="onInputChange"
       bind:idcardblur="onIdCardBlur"

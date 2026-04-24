@@ -4,6 +4,7 @@ import tempfile
 import unittest
 
 import numpy as np
+from PIL import Image
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(TEST_DIR)
@@ -120,6 +121,56 @@ class MaterialServiceTests(unittest.TestCase):
 
         self.assertEqual((width, height), (75, 300))
         self.assertEqual(resized.shape[:2], (300, 75))
+
+    def test_process_renewal_certificate_pages_stitches_two_pages_on_a4(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            info_page = os.path.join(tmp_dir, "info.jpg")
+            records_page = os.path.join(tmp_dir, "records.jpg")
+            Image.new("RGB", (1200, 800), "white").save(info_page)
+            Image.new("RGB", (1200, 800), "white").save(records_page)
+
+            result = material_service.process_renewal_certificate_pages(
+                info_page,
+                records_page,
+                tmp_dir,
+                "123-张三",
+            )
+
+            self.assertTrue(result["success"])
+            self.assertTrue(os.path.exists(result["output_path"]))
+            with Image.open(result["output_path"]) as output:
+                self.assertEqual(output.size, (material_service.A4_WIDTH, material_service.A4_HEIGHT))
+
+    def test_generate_student_materials_outputs_renewal_certificate_material(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_root = os.path.join(tmp_dir, "students", "特种设备-测试单位-张三")
+            os.makedirs(output_root, exist_ok=True)
+            source_dir = os.path.join(tmp_dir, "source")
+            os.makedirs(source_dir, exist_ok=True)
+
+            photo = os.path.join(source_dir, "photo.jpg")
+            info_page = os.path.join(source_dir, "info.jpg")
+            records_page = os.path.join(source_dir, "records.jpg")
+            Image.new("RGB", (300, 400), "white").save(photo)
+            Image.new("RGB", (1200, 800), "white").save(info_page)
+            Image.new("RGB", (1200, 800), "white").save(records_page)
+
+            student = {
+                "id_card": "110101199001011234",
+                "name": "张三",
+                "training_type": "special_equipment",
+                "application_type": "renewal",
+                "photo_path": os.path.relpath(photo, tmp_dir),
+                "certificate_info_page_path": os.path.relpath(info_page, tmp_dir),
+                "certificate_records_page_path": os.path.relpath(records_page, tmp_dir),
+            }
+
+            report = material_service.generate_student_materials(student, tmp_dir, output_root)
+
+            self.assertTrue(report["success"])
+            output_files = [os.path.basename(path) for path in report["log_summary"]["output_files"]]
+            self.assertIn("110101199001011234-张三-个人照片.jpg", output_files)
+            self.assertIn("110101199001011234-张三-复审材料.jpg", output_files)
 
 
 if __name__ == "__main__":

@@ -263,6 +263,11 @@ def get_attachments_public():
             if tt not in result:
                 result[tt] = []
             result[tt].append(row['attachment_key'])
+        result['special_equipment_renewal'] = [
+            'photo',
+            'certificate_info_page',
+            'certificate_records_page'
+        ]
         return jsonify(result)
     except Exception as e:
         current_app.logger.error(f'get_attachments_public error: {e}')

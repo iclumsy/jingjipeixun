@@ -60,14 +60,23 @@ FILE_MAP = {
     'id_card_front': 'id_card_front_path',   # 身份证正面
     'id_card_back': 'id_card_back_path',     # 身份证反面
     'hukou_residence': 'hukou_residence_path', # 户口本户籍页
-    'hukou_personal': 'hukou_personal_path'  # 户口本个人页
+    'hukou_personal': 'hukou_personal_path',  # 户口本个人页
+    'certificate_info_page': 'certificate_info_page_path',  # 原证件说明和个人信息页
+    'certificate_records_page': 'certificate_records_page_path'  # 原证件作业项目和聘用记录页
 }
 
-# 各培训类型的必传附件清单
-# 特种作业不要求照片和户口本；特种设备要求全部附件
+# 各培训类型的默认必传附件清单
+# 特种设备默认按新考证处理；复审通过 application_type 使用单独清单。
 REQUIRED_ATTACHMENTS = {
     'special_operation': ['diploma', 'id_card_front', 'id_card_back'],
     'special_equipment': ['photo', 'diploma', 'id_card_front', 'id_card_back', 'hukou_residence', 'hukou_personal']
+}
+
+APPLICATION_TYPES = {'new_exam', 'renewal'}
+
+REQUIRED_ATTACHMENTS_BY_APPLICATION = {
+    ('special_equipment', 'new_exam'): REQUIRED_ATTACHMENTS['special_equipment'],
+    ('special_equipment', 'renewal'): ['photo', 'certificate_info_page', 'certificate_records_page'],
 }
 
 # ======================== 辅助函数 ========================
@@ -90,6 +99,40 @@ def normalize_training_type(training_type):
     if value in REQUIRED_ATTACHMENTS:
         return value
     return 'special_operation'
+
+
+def normalize_application_type(training_type, application_type):
+    """
+    标准化报名类型。
+
+    仅特种设备区分新考证和复审，其他培训类型统一按新考证处理。
+    """
+    if normalize_training_type(training_type) != 'special_equipment':
+        return 'new_exam'
+    value = (application_type or '').strip()
+    if value in APPLICATION_TYPES:
+        return value
+    return 'new_exam'
+
+
+def get_required_attachments(training_type, application_type='new_exam'):
+    """
+    获取当前培训类型和报名类型下的必传附件。
+    """
+    normalized_training_type = normalize_training_type(training_type)
+    normalized_application_type = normalize_application_type(
+        normalized_training_type,
+        application_type
+    )
+    by_application = REQUIRED_ATTACHMENTS_BY_APPLICATION.get(
+        (normalized_training_type, normalized_application_type)
+    )
+    if by_application is not None:
+        return list(by_application)
+    return list(REQUIRED_ATTACHMENTS.get(
+        normalized_training_type,
+        REQUIRED_ATTACHMENTS['special_operation']
+    ))
 
 
 def parse_bool(value):
@@ -304,8 +347,13 @@ def create_student_route():
             data_dict['project_code'] = proj['project_code']
             data_dict['training_type'] = proj['training_type']
             training_type = proj['training_type']
+            application_type = normalize_application_type(
+                training_type,
+                data_dict.get('application_type')
+            )
+            data_dict['application_type'] = application_type
             
-            required_attachments = REQUIRED_ATTACHMENTS.get(training_type, REQUIRED_ATTACHMENTS['special_operation'])
+            required_attachments = get_required_attachments(training_type, application_type)
 
             # 检查必传附件是否齐全
             missing_files = [
@@ -362,12 +410,17 @@ def create_student_route():
             payload['project_code'] = proj['project_code']
             payload['training_type'] = proj['training_type']
             training_type = proj['training_type']
+            application_type = normalize_application_type(
+                training_type,
+                payload.get('application_type')
+            )
+            payload['application_type'] = application_type
 
             # 从 JSON 的 files 字段中提取并校验文件路径
             files_payload = payload.get('files', {}) if isinstance(payload.get('files', {}), dict) else {}
 
             # 检查必传附件路径是否齐全（提交时校验）
-            required_attachments = REQUIRED_ATTACHMENTS.get(training_type, REQUIRED_ATTACHMENTS['special_operation'])
+            required_attachments = get_required_attachments(training_type, application_type)
             missing_files = [
                 field for field in required_attachments
                 if not files_payload.get(field, '')
@@ -407,8 +460,13 @@ def create_student_route():
         rejected_id = None
         with get_db_connection() as conn:
             existing = conn.execute(
-                "SELECT id, status FROM students WHERE id_card = ? AND training_project_id = ?",
-                (student_payload.get('id_card', ''), student_payload.get('training_project_id'))
+                "SELECT id, status FROM students "
+                "WHERE id_card = ? AND training_project_id = ? AND application_type = ?",
+                (
+                    student_payload.get('id_card', ''),
+                    student_payload.get('training_project_id'),
+                    student_payload.get('application_type', 'new_exam')
+                )
             ).fetchone()
             if existing:
                 if existing['status'] in ('unreviewed', 'reviewed'):
@@ -569,7 +627,7 @@ def update_student_route(id):
         # 以确保体检表生成、通知推送、报名材料自动生成等审核附加流程不被绕过。
         allowed_text = [
             'name', 'gender', 'education', 'school', 'major', 'id_card', 'phone',
-            'company', 'company_address', 'training_project_id'
+            'company', 'company_address', 'training_project_id', 'application_type'
         ]
 
         # 获取当前学员记录并检查权限
@@ -603,13 +661,20 @@ def update_student_route(id):
                         updates['exam_project'] = proj['exam_project']
                         updates['project_code'] = proj['project_code']
                         updates['training_type'] = proj['training_type']
+            effective_training_type = normalize_training_type(
+                updates.get('training_type', current_student.get('training_type', 'special_operation'))
+            )
+            updates['application_type'] = normalize_application_type(
+                effective_training_type,
+                updates.get('application_type', current_student.get('application_type', 'new_exam'))
+            )
 
             # 处理附件上传
-            effective_training_type = normalize_training_type(
-                data.get('training_type', updates.get('training_type', current_student.get('training_type', 'special_operation')))
-            )
             # 仅允许上传当前培训类型需要的附件
-            allowed_attachments = set(REQUIRED_ATTACHMENTS.get(effective_training_type, REQUIRED_ATTACHMENTS['special_operation']))
+            allowed_attachments = set(get_required_attachments(
+                effective_training_type,
+                updates.get('application_type')
+            ))
 
             for input_name, db_key in FILE_MAP.items():
                 f = request.files.get(input_name)
@@ -625,11 +690,8 @@ def update_student_route(id):
 
                     # 保存新文件（底层会自动安全原子覆盖同名文件）
                     try:
-                        training_type = normalize_training_type(
-                            data.get('training_type', current_student.get('training_type', 'special_operation'))
-                        )
                         rel = process_and_save_file(
-                                f, id_card_for_name, name_for_save, input_name, company_for_name, training_type
+                                f, id_card_for_name, name_for_save, input_name, company_for_name, effective_training_type
                             )
                         updates[db_key] = rel
                     except Exception as e:
@@ -660,13 +722,20 @@ def update_student_route(id):
                         updates['exam_project'] = proj['exam_project']
                         updates['project_code'] = proj['project_code']
                         updates['training_type'] = proj['training_type']
-
-            # 处理 JSON 中的文件路径更新
-            files_payload = payload.get('files', {}) if isinstance(payload.get('files', {}), dict) else {}
             effective_training_type = normalize_training_type(
                 updates.get('training_type', current_student.get('training_type', 'special_operation'))
             )
-            allowed_attachments = set(REQUIRED_ATTACHMENTS.get(effective_training_type, REQUIRED_ATTACHMENTS['special_operation']))
+            updates['application_type'] = normalize_application_type(
+                effective_training_type,
+                updates.get('application_type', current_student.get('application_type', 'new_exam'))
+            )
+
+            # 处理 JSON 中的文件路径更新
+            files_payload = payload.get('files', {}) if isinstance(payload.get('files', {}), dict) else {}
+            allowed_attachments = set(get_required_attachments(
+                effective_training_type,
+                updates.get('application_type')
+            ))
 
             from services.image_service import commit_temp_files
             id_card_val = updates.get('id_card', current_student.get('id_card', ''))
@@ -694,7 +763,14 @@ def update_student_route(id):
         effective_training_type = normalize_training_type(
             updates.get('training_type', current_student.get('training_type', 'special_operation'))
         )
-        required_attachments = REQUIRED_ATTACHMENTS.get(effective_training_type, REQUIRED_ATTACHMENTS['special_operation'])
+        effective_application_type = normalize_application_type(
+            effective_training_type,
+            updates.get('application_type', current_student.get('application_type', 'new_exam'))
+        )
+        required_attachments = get_required_attachments(
+            effective_training_type,
+            effective_application_type
+        )
         for attachment_field in required_attachments:
             db_key = FILE_MAP[attachment_field]
             # 优先取更新值，否则取当前数据库中的值
@@ -775,7 +851,11 @@ def upload_student_attachment_route(id):
             raise AppError('当前状态不允许修改', status_code=403)
 
         training_type = normalize_training_type(student.get('training_type', 'special_operation'))
-        allowed_attachments = set(REQUIRED_ATTACHMENTS.get(training_type, REQUIRED_ATTACHMENTS['special_operation']))
+        application_type = normalize_application_type(
+            training_type,
+            student.get('application_type', 'new_exam')
+        )
+        allowed_attachments = set(get_required_attachments(training_type, application_type))
 
         # 从请求的文件列表中找到第一个有效的上传文件
         upload_field = ''
@@ -1300,7 +1380,9 @@ def download_attachments_zip_route(id):
         attachment_keys = [
             'photo_path', 'diploma_path',
             'id_card_front_path', 'id_card_back_path',
-            'hukou_residence_path', 'hukou_personal_path', 'training_form_path'
+            'hukou_residence_path', 'hukou_personal_path',
+            'certificate_info_page_path', 'certificate_records_page_path',
+            'training_form_path'
         ]
 
         # 收集实际存在的附件文件

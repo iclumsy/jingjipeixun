@@ -28,6 +28,21 @@ import numpy as np
 from flask import current_app
 from services import storage_service
 
+ATTACHMENT_LABELS = {
+    'photo': '个人照片',
+    'diploma': '学历证书',
+    'id_card_front': '身份证正面',
+    'id_card_back': '身份证反面',
+    'hukou_residence': '户口本户籍页',
+    'hukou_personal': '户口本个人页',
+    'certificate_info_page': '原证件说明和个人信息页',
+    'certificate_records_page': '原证件作业项目和聘用记录页',
+}
+
+
+def get_attachment_label(label_key):
+    return ATTACHMENT_LABELS.get(label_key, label_key)
+
 # ======================== 可选依赖加载 ========================
 # rembg 和 cv2 是可选依赖，未安装时背景替换功能自动降级（返回原图）
 CV2_IMPORT_ERROR = ''
@@ -172,14 +187,6 @@ def commit_temp_files(tmp_paths_by_input_name, id_card, name, company, training_
     返回:
         {db_key -> formal relative path}
     """
-    label_name_map = {
-        'photo': '个人照片',
-        'diploma': '学历证书',
-        'id_card_front': '身份证正面',
-        'id_card_back': '身份证反面',
-        'hukou_residence': '户口本户籍页',
-        'hukou_personal': '户口本个人页',
-    }
     training_type_map = {
         'special_operation': '特种作业',
         'special_equipment': '特种设备',
@@ -204,7 +211,7 @@ def commit_temp_files(tmp_paths_by_input_name, id_card, name, company, training_
             continue
 
         _, ext = os.path.splitext(tmp_rel)
-        label_name = label_name_map.get(input_name, input_name)
+        label_name = get_attachment_label(input_name)
         safe_name = f"{id_card}-{name}-{label_name}{ext}"
         formal_key = f"students/{student_folder_name}/{safe_name}"
 
@@ -247,16 +254,7 @@ def process_and_save_file(file_storage, id_card, name, label_key, company='', tr
         return ''
 
     # 前端字段名 -> 中文附件标签映射（用于生成可读的文件名）
-    label_name_map = {
-        'photo': '个人照片',
-        'diploma': '学历证书',
-        'id_card_front': '身份证正面',
-        'id_card_back': '身份证反面',
-        'hukou_residence': '户口本户籍页',
-        'hukou_personal': '户口本个人页'
-    }
-
-    label_name = label_name_map.get(label_key, label_key)
+    label_name = get_attachment_label(label_key)
     _, ext = os.path.splitext(file_storage.filename)
     orig_ext = ext.lower() if ext else '.jpg'  # 无扩展名时默认为 .jpg
 
@@ -307,7 +305,9 @@ def delete_student_files(student_record, base_dir):
     file_keys = [
         'photo_path', 'diploma_path',
         'id_card_front_path', 'id_card_back_path',
-        'hukou_residence_path', 'hukou_personal_path', 'training_form_path'
+        'hukou_residence_path', 'hukou_personal_path',
+        'certificate_info_page_path', 'certificate_records_page_path',
+        'training_form_path'
     ]
 
     # 逐个删除关联文件

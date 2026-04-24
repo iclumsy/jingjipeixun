@@ -19,6 +19,7 @@
     - exam_project    : 操作项目（可选）
     - project_code    : 项目代号（可选）
     - training_type   : 培训类型，special_operation 或 special_equipment
+    - application_type: 报名类型，new_exam 或 renewal（特种设备使用）
     - status          : 审核状态，unreviewed / reviewed / rejected
     - reject_reason   : 驳回原因（管理员填写，仅 rejected 状态有值）
     - created_at      : 创建时间（自动生成）
@@ -28,6 +29,8 @@
     - id_card_back_path    : 身份证反面照片相对路径
     - hukou_residence_path : 户口本户籍页相对路径
     - hukou_personal_path  : 户口本个人页相对路径
+    - certificate_info_page_path    : 原证件说明和个人信息页相对路径
+    - certificate_records_page_path : 原证件作业项目和聘用记录页相对路径
     - training_form_path   : 体检表/培训表文档相对路径
     - submitter_openid     : 小程序提交人 openid（用于数据归属）
 
@@ -191,6 +194,7 @@ def init_db(database_path):
                 exam_project TEXT,
                 project_code TEXT,
                 training_type TEXT DEFAULT 'special_operation',
+                application_type TEXT DEFAULT 'new_exam',
                 status TEXT DEFAULT 'unreviewed',
                 reject_reason TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -200,6 +204,8 @@ def init_db(database_path):
                 id_card_back_path TEXT,
                 hukou_residence_path TEXT,
                 hukou_personal_path TEXT,
+                certificate_info_page_path TEXT,
+                certificate_records_page_path TEXT,
                 training_form_path TEXT,
                 submitter_openid TEXT,
                 training_project_id INTEGER
@@ -209,6 +215,9 @@ def init_db(database_path):
         _ensure_column_exists(conn, 'students', 'submitter_openid', 'submitter_openid TEXT')
         _ensure_column_exists(conn, 'students', 'training_project_id', 'training_project_id INTEGER')
         _ensure_column_exists(conn, 'students', 'hukou_residence_path', 'hukou_residence_path TEXT')
+        _ensure_column_exists(conn, 'students', 'application_type', "application_type TEXT DEFAULT 'new_exam'")
+        _ensure_column_exists(conn, 'students', 'certificate_info_page_path', 'certificate_info_page_path TEXT')
+        _ensure_column_exists(conn, 'students', 'certificate_records_page_path', 'certificate_records_page_path TEXT')
         _ensure_column_exists(conn, 'students', 'reject_reason', 'reject_reason TEXT')
         _ensure_column_exists(conn, 'students', 'card_activated', 'card_activated INTEGER DEFAULT 0')
         _ensure_column_exists(conn, 'students', 'card_activated_at', 'card_activated_at TEXT')
@@ -335,10 +344,11 @@ def create_student(data, file_paths):
         data: 包含学员个人信息的字典，必须包含以下键:
             - name, gender, education, id_card, phone, job_category
             - 可选: school, major, company, company_address, exam_project,
-              project_code, training_type, submitter_openid
+              project_code, training_type, application_type, submitter_openid
         file_paths: 包含附件文件相对路径的字典:
             - photo_path, diploma_path, id_card_front_path, id_card_back_path,
-              hukou_residence_path, hukou_personal_path, training_form_path
+              hukou_residence_path, hukou_personal_path, certificate_info_page_path,
+              certificate_records_page_path, training_form_path
 
     返回:
         int: 新创建的学员记录 ID（自增主键值）
@@ -349,20 +359,23 @@ def create_student(data, file_paths):
             INSERT INTO students (
                 name, gender, education, school, major, id_card, phone,
                 company, company_address, job_category, exam_project, project_code,
-                training_type, photo_path, diploma_path,
+                training_type, application_type, photo_path, diploma_path,
                 id_card_front_path, id_card_back_path,
-                hukou_residence_path, hukou_personal_path, training_form_path, submitter_openid,
+                hukou_residence_path, hukou_personal_path,
+                certificate_info_page_path, certificate_records_page_path,
+                training_form_path, submitter_openid,
                 training_project_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data['name'], data['gender'], data['education'], data.get('school', ''),
             data.get('major', ''), data['id_card'], data['phone'], data.get('company', ''),
             data.get('company_address', ''), data['job_category'], data.get('exam_project', ''),
             data.get('project_code', ''),
-            data.get('training_type', 'special_operation'),
+            data.get('training_type', 'special_operation'), data.get('application_type', 'new_exam'),
             file_paths.get('photo_path', ''), file_paths.get('diploma_path', ''),
             file_paths.get('id_card_front_path', ''), file_paths.get('id_card_back_path', ''),
             file_paths.get('hukou_residence_path', ''), file_paths.get('hukou_personal_path', ''),
+            file_paths.get('certificate_info_page_path', ''), file_paths.get('certificate_records_page_path', ''),
             file_paths.get('training_form_path', ''), data.get('submitter_openid', ''),
             data.get('training_project_id')
         ))

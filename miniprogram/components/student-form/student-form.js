@@ -8,6 +8,10 @@ Component({
       type: String,
       value: 'special_equipment'
     },
+    applicationType: {
+      type: String,
+      value: 'new_exam'
+    },
     formData: {
       type: Object,
       value: {}
@@ -70,6 +74,12 @@ Component({
       if (this.data.disableTrainingType) return
       const type = e.currentTarget?.dataset?.type || ''
       this.triggerEvent('trainingtypechange', { type })
+    },
+
+    onSelectApplicationType(e) {
+      if (this.data.disableTrainingType) return
+      const type = e.currentTarget?.dataset?.type || 'new_exam'
+      this.triggerEvent('applicationtypechange', { type })
     },
 
     onSelectGender(e) {

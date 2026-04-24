@@ -20,6 +20,24 @@ const STATUS_TEXT_MAP = {
   rejected: '已驳回'
 }
 
+const DEFAULT_ATTACHMENTS = {
+  special_equipment: ['photo', 'diploma', 'id_card_front', 'id_card_back', 'hukou_residence', 'hukou_personal'],
+  special_equipment_renewal: ['photo', 'certificate_info_page', 'certificate_records_page'],
+  special_operation: ['diploma', 'id_card_front', 'id_card_back']
+}
+
+function normalizeApplicationType(trainingType, applicationType) {
+  if (trainingType !== 'special_equipment') return 'new_exam'
+  return applicationType === 'renewal' ? 'renewal' : 'new_exam'
+}
+
+function getAttachmentProfileKey(trainingType, applicationType) {
+  if (trainingType === 'special_equipment' && normalizeApplicationType(trainingType, applicationType) === 'renewal') {
+    return 'special_equipment_renewal'
+  }
+  return trainingType
+}
+
 function createEmptyEditStudent() {
   return {
     name: '',
@@ -40,13 +58,16 @@ function createEmptyEditStudent() {
     training_project_id: '',
     examProjects: [],
     training_type: 'special_equipment',
+    application_type: 'new_exam',
     files: {
       photo: '',
       diploma: '',
       id_card_front: '',
       id_card_back: '',
       hukou_residence: '',
-      hukou_personal: ''
+      hukou_personal: '',
+      certificate_info_page: '',
+      certificate_records_page: ''
     }
   }
 }
@@ -117,28 +138,30 @@ Page({
   },
 
   async loadAttachmentConfig() {
-    const DEFAULTS = {
-      special_equipment: ['photo', 'diploma', 'id_card_front', 'id_card_back', 'hukou_residence', 'hukou_personal'],
-      special_operation: ['diploma', 'id_card_front', 'id_card_back']
-    }
     const toList = (keys) => keys.map(key => ({ key, label: getFileLabel(key) }))
 
     try {
       const raw = await api.getAttachmentConfig()
       const attachmentConfig = {}
-      Object.keys(DEFAULTS).forEach(type => {
-        const keys = Array.isArray(raw[type]) && raw[type].length > 0 ? raw[type] : DEFAULTS[type]
+      Object.keys(DEFAULT_ATTACHMENTS).forEach(type => {
+        const keys = Array.isArray(raw[type]) && raw[type].length > 0 ? raw[type] : DEFAULT_ATTACHMENTS[type]
         attachmentConfig[type] = toList(keys)
       })
+      const profileKey = getAttachmentProfileKey(this.data.trainingType, this.data.editStudent.application_type)
       this.setData({
         attachmentConfig,
-        enabledAttachments: attachmentConfig[this.data.trainingType] || []
+        enabledAttachments: attachmentConfig[profileKey] || []
       })
     } catch (err) {
       console.warn('加载附件配置失败，使用默认列表', err)
-      const type = this.data.trainingType
+      const type = getAttachmentProfileKey(this.data.trainingType, this.data.editStudent.application_type)
+      const attachmentConfig = {}
+      Object.keys(DEFAULT_ATTACHMENTS).forEach(key => {
+        attachmentConfig[key] = toList(DEFAULT_ATTACHMENTS[key])
+      })
       this.setData({
-        enabledAttachments: toList(DEFAULTS[type] || [])
+        attachmentConfig,
+        enabledAttachments: toList(DEFAULT_ATTACHMENTS[type] || [])
       })
     }
   },
@@ -193,6 +216,7 @@ Page({
 
       const downloadUrls = result.downloadUrls || {}
       const trainingType = student.training_type || 'special_equipment'
+      const applicationType = normalizeApplicationType(trainingType, student.application_type)
       const categories = this.data.jobCategories[trainingType]
       let jobCategoryIndex = -1
       let examProjects = []
@@ -214,7 +238,7 @@ Page({
         student,
         downloadUrls,
         trainingType,
-        enabledAttachments: this.data.attachmentConfig[trainingType] || [],
+        enabledAttachments: this.data.attachmentConfig[getAttachmentProfileKey(trainingType, applicationType)] || [],
         jobCategoryNames: this.getJobCategoryNames(trainingType),
         trainingTypeText: TRAINING_TYPE_LABELS[trainingType] || trainingType,
         statusText: STATUS_TEXT_MAP[student.status] || student.status || '-',
@@ -244,13 +268,16 @@ Page({
           training_project_id: student.training_project_id || '',
           examProjects,
           training_type: trainingType,
+          application_type: applicationType,
           files: {
             photo: pickAttachmentValue(student.files?.photo, student.photo_path, downloadUrls.photo_path),
             diploma: pickAttachmentValue(student.files?.diploma, student.diploma_path, downloadUrls.diploma_path),
             id_card_front: pickAttachmentValue(student.files?.id_card_front, student.id_card_front_path, downloadUrls.id_card_front_path),
             id_card_back: pickAttachmentValue(student.files?.id_card_back, student.id_card_back_path, downloadUrls.id_card_back_path),
             hukou_residence: pickAttachmentValue(student.files?.hukou_residence, student.hukou_residence_path, downloadUrls.hukou_residence_path),
-            hukou_personal: pickAttachmentValue(student.files?.hukou_personal, student.hukou_personal_path, downloadUrls.hukou_personal_path)
+            hukou_personal: pickAttachmentValue(student.files?.hukou_personal, student.hukou_personal_path, downloadUrls.hukou_personal_path),
+            certificate_info_page: pickAttachmentValue(student.files?.certificate_info_page, student.certificate_info_page_path, downloadUrls.certificate_info_page_path),
+            certificate_records_page: pickAttachmentValue(student.files?.certificate_records_page, student.certificate_records_page_path, downloadUrls.certificate_records_page_path)
           }
         },
         loading: false
@@ -268,12 +295,14 @@ Page({
     if (!type || type === this.data.trainingType) return
 
     const nextJobCategoryNames = this.getJobCategoryNames(type)
+    const applicationType = normalizeApplicationType(type, this.data.editStudent.application_type)
     this.setData({
       trainingType: type,
-      enabledAttachments: this.data.attachmentConfig[type] || [],
+      enabledAttachments: this.data.attachmentConfig[getAttachmentProfileKey(type, applicationType)] || [],
       jobCategoryNames: nextJobCategoryNames,
       trainingTypeText: TRAINING_TYPE_LABELS[type] || type,
       'editStudent.training_type': type,
+      'editStudent.application_type': applicationType,
       'editStudent.job_category': '',
       'editStudent.jobCategoryIndex': -1,
       'editStudent.exam_project': '',
@@ -281,6 +310,27 @@ Page({
       'editStudent.project_code': '',
       'editStudent.training_project_id': '',
       'editStudent.examProjects': []
+    })
+  },
+
+  selectApplicationType(e) {
+    const detail = e.detail || {}
+    const applicationType = normalizeApplicationType(
+      this.data.trainingType,
+      detail.type || (e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.type)
+    )
+    if (applicationType === this.data.editStudent.application_type) return
+    const profileKey = getAttachmentProfileKey(this.data.trainingType, applicationType)
+    const nextAttachments = this.data.attachmentConfig[profileKey] || []
+    const nextKeys = new Set(nextAttachments.map(a => a.key))
+    const clearUpdates = {}
+    Object.keys(this.data.editStudent.files || {}).forEach(key => {
+      if (!nextKeys.has(key)) clearUpdates[`editStudent.files.${key}`] = ''
+    })
+    this.setData({
+      'editStudent.application_type': applicationType,
+      enabledAttachments: nextAttachments,
+      ...clearUpdates
     })
   },
 

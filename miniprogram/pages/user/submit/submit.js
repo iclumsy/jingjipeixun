@@ -19,6 +19,23 @@ const {
 } = require('../../../utils/legal')
 
 const FORCE_CREATE_SUBMIT_KEY = 'submit_force_create_mode'
+const DEFAULT_ATTACHMENTS = {
+  special_equipment: ['photo', 'diploma', 'id_card_front', 'id_card_back', 'hukou_residence', 'hukou_personal'],
+  special_equipment_renewal: ['photo', 'certificate_info_page', 'certificate_records_page'],
+  special_operation: ['diploma', 'id_card_front', 'id_card_back']
+}
+
+function normalizeApplicationType(trainingType, applicationType) {
+  if (trainingType !== 'special_equipment') return 'new_exam'
+  return applicationType === 'renewal' ? 'renewal' : 'new_exam'
+}
+
+function getAttachmentProfileKey(trainingType, applicationType) {
+  if (trainingType === 'special_equipment' && normalizeApplicationType(trainingType, applicationType) === 'renewal') {
+    return 'special_equipment_renewal'
+  }
+  return trainingType
+}
 
 function createEmptyStudent() {
   return {
@@ -38,6 +55,7 @@ function createEmptyStudent() {
     examProjectIndex: -1,
     project_code: '',
     training_project_id: '',
+    application_type: 'new_exam',
     examProjects: [],
     files: {
       photo: '',
@@ -45,7 +63,9 @@ function createEmptyStudent() {
       id_card_front: '',
       id_card_back: '',
       hukou_residence: '',
-      hukou_personal: ''
+      hukou_personal: '',
+      certificate_info_page: '',
+      certificate_records_page: ''
     }
   }
 }
@@ -80,31 +100,32 @@ Page({
 
   // 拉取后台附件配置，失败时除默认徽常用的后备选项
   async loadAttachmentConfig() {
-    // 默认附件列表（接口失败时的备用）
-    const DEFAULTS = {
-      special_equipment: ['photo', 'diploma', 'id_card_front', 'id_card_back', 'hukou_residence', 'hukou_personal'],
-      special_operation: ['diploma', 'id_card_front', 'id_card_back']
-    }
     const toList = (keys) => keys.map(key => ({ key, label: getFileLabel(key) }))
 
     try {
       const raw = await api.getAttachmentConfig()
       const attachmentConfig = {}
-      Object.keys(DEFAULTS).forEach(type => {
+      Object.keys(DEFAULT_ATTACHMENTS).forEach(type => {
         const keys = Array.isArray(raw[type]) && raw[type].length > 0
           ? raw[type]
-          : DEFAULTS[type]
+          : DEFAULT_ATTACHMENTS[type]
         attachmentConfig[type] = toList(keys)
       })
+      const profileKey = getAttachmentProfileKey(this.data.trainingType, this.data.student.application_type)
       this.setData({
         attachmentConfig,
-        enabledAttachments: attachmentConfig[this.data.trainingType] || []
+        enabledAttachments: attachmentConfig[profileKey] || []
       })
     } catch (err) {
       console.warn('加载附件配置失败，使用默认列表', err)
-      const type = this.data.trainingType
+      const type = getAttachmentProfileKey(this.data.trainingType, this.data.student.application_type)
+      const attachmentConfig = {}
+      Object.keys(DEFAULT_ATTACHMENTS).forEach(key => {
+        attachmentConfig[key] = toList(DEFAULT_ATTACHMENTS[key])
+      })
       this.setData({
-        enabledAttachments: toList(DEFAULTS[type] || [])
+        attachmentConfig,
+        enabledAttachments: toList(DEFAULT_ATTACHMENTS[type] || [])
       })
     }
   },
@@ -133,6 +154,7 @@ Page({
     this.setData({
       trainingType: nextType,
       jobCategoryNames: this.getJobCategoryNames(nextType),
+      enabledAttachments: this.data.attachmentConfig[nextType] || [],
       fieldErrors: {
         id_card: '',
         phone: ''
@@ -194,10 +216,13 @@ Page({
     if (!type || type === this.data.trainingType) return
 
     const nextJobCategoryNames = this.getJobCategoryNames(type)
+    const applicationType = normalizeApplicationType(type, this.data.student.application_type)
+    const profileKey = getAttachmentProfileKey(type, applicationType)
     this.setData({
       trainingType: type,
       jobCategoryNames: nextJobCategoryNames,
-      enabledAttachments: this.data.attachmentConfig[type] || [],
+      enabledAttachments: this.data.attachmentConfig[profileKey] || [],
+      'student.application_type': applicationType,
       'student.job_category': '',
       'student.jobCategoryIndex': -1,
       'student.examProjects': [],
@@ -205,6 +230,27 @@ Page({
       'student.examProjectIndex': -1,
       'student.project_code': '',
       'student.training_project_id': ''
+    })
+  },
+
+  selectApplicationType(e) {
+    const detail = e.detail || {}
+    const applicationType = normalizeApplicationType(
+      this.data.trainingType,
+      detail.type || (e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.type)
+    )
+    if (applicationType === this.data.student.application_type) return
+    const profileKey = getAttachmentProfileKey(this.data.trainingType, applicationType)
+    const nextAttachments = this.data.attachmentConfig[profileKey] || []
+    const nextKeys = new Set(nextAttachments.map(a => a.key))
+    const clearUpdates = {}
+    Object.keys(this.data.student.files || {}).forEach(key => {
+      if (!nextKeys.has(key)) clearUpdates[`student.files.${key}`] = ''
+    })
+    this.setData({
+      'student.application_type': applicationType,
+      enabledAttachments: nextAttachments,
+      ...clearUpdates
     })
   },
 

@@ -81,6 +81,7 @@ MATERIAL_OUTPUT_LABELS = {
     "diploma": "学历证书",
     "id_card": "身份证",
     "hukou": "户口本",
+    "renewal_certificate": "复审材料",
     "training_form": "体检表",
 }
 
@@ -94,6 +95,9 @@ MATERIAL_SCOPE_LABELS = {
     "hukou": "户口本",
     "hukou_home": "户口本首页",
     "hukou_personal": "户口本人页",
+    "renewal_certificate": "复审材料",
+    "certificate_info_page": "原证件说明和个人信息页",
+    "certificate_records_page": "原证件作业项目和聘用记录页",
     "training_form": "体检表",
 }
 
@@ -171,6 +175,7 @@ def cleanup_generated_outputs(output_dir, name_prefix, material_type=None):
         "diploma": [f"{name_prefix}-{MATERIAL_OUTPUT_LABELS['diploma']}.jpg"],
         "id_card": [f"{name_prefix}-{MATERIAL_OUTPUT_LABELS['id_card']}.jpg"],
         "hukou": [f"{name_prefix}-{MATERIAL_OUTPUT_LABELS['hukou']}.jpg"],
+        "renewal_certificate": [f"{name_prefix}-{MATERIAL_OUTPUT_LABELS['renewal_certificate']}.jpg"],
         "training_form": [f"{name_prefix}-{MATERIAL_OUTPUT_LABELS['training_form']}"],
     }
 
@@ -1628,12 +1633,34 @@ def _size_details(image, key_prefix="size"):
 
 
 def process_personal_photo(input_path, output_dir, name_prefix, logger=None):
-    """个人照片处理为 1MB 以下"""
+    """个人照片处理为白底并压缩到 1MB 以下"""
     scope = "photo"
+    temp_bg_path = None
     try:
         if logger is not None:
             logger.emit("info", scope, "start", "开始处理个人照片", os.path.basename(input_path))
-        img = Image.open(input_path)
+
+        # 先用 rembg 将背景替换为白色
+        effective_path = input_path
+        try:
+            from services.image_service import change_id_photo_bg
+            import tempfile as _tf
+            temp_fd, temp_bg_path = _tf.mkstemp(suffix='.jpg')
+            os.close(temp_fd)
+            result_path = change_id_photo_bg(input_path, temp_bg_path)
+            if result_path == temp_bg_path and os.path.exists(temp_bg_path):
+                effective_path = temp_bg_path
+                if logger is not None:
+                    logger.emit("info", scope, "bg_remove", "个人照片已替换为白底", "使用 rembg 完成背景白色替换")
+            else:
+                if logger is not None:
+                    logger.emit("warning", scope, "bg_remove", "白底替换跳过", "rembg 依赖不可用，使用原图")
+        except Exception as bg_exc:
+            print(f"[photo] 白底处理失败，使用原图: {bg_exc}")
+            if logger is not None:
+                logger.emit("warning", scope, "bg_remove", "白底替换失败", f"降级使用原图: {bg_exc}")
+
+        img = Image.open(effective_path)
         if img.mode != "RGB":
             img = img.convert("RGB")
 
@@ -1687,6 +1714,12 @@ def process_personal_photo(input_path, output_dir, name_prefix, logger=None):
                 details={"input_path": input_path},
             )
         return _build_process_result(scope, False, error=str(exc))
+    finally:
+        if temp_bg_path and os.path.exists(temp_bg_path):
+            try:
+                os.remove(temp_bg_path)
+            except Exception:
+                pass
 
 
 def process_diploma(input_path, output_dir, name_prefix, adjustments=None, logger=None):
@@ -2159,6 +2192,88 @@ def process_hukou(residence_path, personal_path, output_dir, name_prefix, adjust
         return _build_process_result(scope, False, error=str(exc))
 
 
+def process_renewal_certificate_pages(info_page_path, records_page_path, output_dir, name_prefix, logger=None):
+    scope = "renewal_certificate"
+    tag = "[renewal-certificate]"
+    try:
+        canvas = create_a4_canvas()
+        if logger is not None:
+            logger.emit("info", scope, "start", "开始处理复审材料", "准备拼接原证件两页照片")
+
+        page_specs = [
+            (info_page_path, "certificate_info_page", "原证件说明和个人信息页"),
+            (records_page_path, "certificate_records_page", "原证件作业项目和聘用记录页"),
+        ]
+        readable_pages = []
+        for path, page_scope, label in page_specs:
+            if not path or not os.path.exists(path):
+                continue
+            image = read_cv_image(path)
+            if image is None:
+                if logger is not None:
+                    logger.emit("warning", page_scope, "read_input", f"{label}读取失败", "未能读取该原证件照片")
+                continue
+            if logger is not None:
+                logger.emit("info", page_scope, "read_input", f"{label}读取成功", "已读取原证件照片", details=_size_details(image, "input"))
+            readable_pages.append((image, page_scope, label))
+
+        if not readable_pages:
+            if logger is not None:
+                logger.emit("error", scope, "write_output", "复审材料输出失败", "未读取到可用的原证件照片")
+            return _build_process_result(scope, False, error="no readable renewal certificate images")
+
+        gap = CM_IN_PX // 2 if len(readable_pages) > 1 else 0
+        max_width = A4_WIDTH - 2 * CM_IN_PX
+        max_total_height = A4_HEIGHT - 2 * CM_IN_PX
+        max_page_height = (max_total_height - gap) // len(readable_pages)
+
+        resized_pages = []
+        total_height = gap * (len(readable_pages) - 1)
+        for image, page_scope, label in readable_pages:
+            resized, width, height = resize_document_to_fit(image, max_width, max_page_height)
+            resized_pages.append((resized, width, height, page_scope, label))
+            total_height += height
+            if logger is not None:
+                logger.emit(
+                    "info",
+                    page_scope,
+                    "layout_a4",
+                    f"{label}已适配版式",
+                    "已缩放原证件照片以便排入 A4",
+                    details={"target_width": width, "target_height": height},
+                )
+
+        y = max(0, (A4_HEIGHT - total_height) // 2)
+        for image, width, height, page_scope, label in resized_pages:
+            x = max(0, (A4_WIDTH - width) // 2)
+            canvas[y:y + height, x:x + width] = image
+            print(f"{tag} 排版: {label} x={x} y={y} w={width} h={height}")
+            y += height + gap
+
+        output_path = os.path.join(output_dir, f"{name_prefix}-复审材料.jpg")
+        write_cv_image(output_path, canvas)
+        if logger is not None:
+            logger.emit(
+                "success",
+                scope,
+                "write_output",
+                "复审材料输出成功",
+                "已生成原证件两页拼接报名材料图片",
+                details={
+                    "output_path": output_path,
+                    "canvas_width": A4_WIDTH,
+                    "canvas_height": A4_HEIGHT,
+                    "page_count": len(readable_pages),
+                },
+            )
+        return _build_process_result(scope, True, output_path=output_path)
+    except Exception as exc:
+        print(f"{tag} 处理失败:", exc)
+        if logger is not None:
+            logger.emit("error", scope, "write_output", "复审材料处理失败", "复审材料生成过程中发生错误")
+        return _build_process_result(scope, False, error=str(exc))
+
+
 
 def copy_health_form(form_path, output_dir, name_prefix, logger=None):
     scope = "training_form"
@@ -2214,6 +2329,48 @@ def generate_student_materials(student, base_dir, output_root):
     photo_path = get_abs_path("photo_path")
     if photo_path and os.path.exists(photo_path):
         results.append(process_personal_photo(photo_path, output_dir, name_prefix, logger=logger))
+
+    is_renewal = (
+        student.get("training_type") == "special_equipment"
+        and student.get("application_type", "new_exam") == "renewal"
+    )
+    if is_renewal:
+        info_page_path = get_abs_path("certificate_info_page_path")
+        records_page_path = get_abs_path("certificate_records_page_path")
+        if (info_page_path and os.path.exists(info_page_path)) or (
+            records_page_path and os.path.exists(records_page_path)
+        ):
+            results.append(process_renewal_certificate_pages(
+                info_page_path,
+                records_page_path,
+                output_dir,
+                name_prefix,
+                logger=logger,
+            ))
+
+        training_form_path = get_abs_path("training_form_path")
+        if training_form_path and os.path.exists(training_form_path):
+            results.append(copy_health_form(training_form_path, output_dir, name_prefix, logger=logger))
+
+        if not results:
+            logger.emit("error", "global", "finish", "没有找到可处理的原始材料", "当前学员没有可用于生成的原始材料文件")
+            results.append(_build_process_result("global", False, error="no source materials"))
+
+        _sync_output_dir_to_cos(output_dir, base_dir)
+        report = build_generation_report(output_dir, logger, results)
+        logger.emit(
+            "success" if report["success"] else "error",
+            "global",
+            "finish",
+            "报名材料生成完成" if report["success"] else "报名材料生成未完全成功",
+            "已完成本次报名材料生成流程" if report["success"] else "本次报名材料生成中有材料处理失败，请检查下方日志",
+            details={
+                "output_dir": output_dir,
+                "result_count": len(results),
+                "error_count": len(report["errors"]),
+            },
+        )
+        return build_generation_report(output_dir, logger, results)
 
     diploma_path = get_abs_path("diploma_path")
     if diploma_path and os.path.exists(diploma_path):
@@ -2313,6 +2470,12 @@ def regenerate_single_material(student, base_dir, output_root, material_type, ad
         personal_path = get_abs_path("hukou_personal_path")
         if (residence_path and os.path.exists(residence_path)) or (personal_path and os.path.exists(personal_path)):
             results.append(process_hukou(residence_path, personal_path, output_dir, name_prefix, adjustments=adjustments, logger=logger))
+
+    elif material_type == "renewal_certificate":
+        info_page_path = get_abs_path("certificate_info_page_path")
+        records_page_path = get_abs_path("certificate_records_page_path")
+        if (info_page_path and os.path.exists(info_page_path)) or (records_page_path and os.path.exists(records_page_path)):
+            results.append(process_renewal_certificate_pages(info_page_path, records_page_path, output_dir, name_prefix, logger=logger))
 
     if not results:
         logger.emit("error", "global", "finish", "未找到可重新生成的原始材料", f"没有找到 {material_type} 对应的原始附件")

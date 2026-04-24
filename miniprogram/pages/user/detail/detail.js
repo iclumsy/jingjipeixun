@@ -15,7 +15,9 @@ const ATTACHMENT_FIELDS = [
   'id_card_front_path',
   'id_card_back_path',
   'hukou_residence_path',
-  'hukou_personal_path'
+  'hukou_personal_path',
+  'certificate_info_page_path',
+  'certificate_records_page_path'
 ]
 
 function isSafePreviewUrl(value = '') {

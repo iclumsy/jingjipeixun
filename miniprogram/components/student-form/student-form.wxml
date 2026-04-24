@@ -12,6 +12,18 @@
     </view>
   </view>
 
+  <view class="form-item mt-24" wx:if="{{trainingType === 'special_equipment'}}">
+    <view class="label required">报名类型</view>
+    <view class="type-options application-options">
+      <view class="type-option {{applicationType === 'new_exam' ? 'active' : ''}}" bindtap="onSelectApplicationType" data-type="new_exam">
+        <text class="type-name">新考证</text>
+      </view>
+      <view class="type-option {{applicationType === 'renewal' ? 'active' : ''}}" bindtap="onSelectApplicationType" data-type="renewal">
+        <text class="type-name">复审</text>
+      </view>
+    </view>
+  </view>
+
   <view class="form-item mt-24">
     <view class="label required">作业类别</view>
     <picker mode="selector" range="{{jobCategoryNames}}" value="{{formData.jobCategoryIndex}}" bindchange="onJobCategoryChange" disabled="{{disableTrainingType}}">

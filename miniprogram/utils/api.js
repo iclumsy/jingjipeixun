@@ -39,13 +39,19 @@ const FILE_FIELD_TO_PATH_KEY = {
   id_card_front: 'id_card_front_path',
   id_card_back: 'id_card_back_path',
   hukou_residence: 'hukou_residence_path',
-  hukou_personal: 'hukou_personal_path'
+  hukou_personal: 'hukou_personal_path',
+  certificate_info_page: 'certificate_info_page_path',
+  certificate_records_page: 'certificate_records_page_path'
 }
 
 /** 各培训类型允许的附件字段列表 */
 const ALLOWED_ATTACHMENTS_BY_TYPE = {
   special_operation: ['diploma', 'id_card_front', 'id_card_back'],
   special_equipment: ['photo', 'diploma', 'id_card_front', 'id_card_back', 'hukou_residence', 'hukou_personal']
+}
+
+const ALLOWED_ATTACHMENTS_BY_APPLICATION = {
+  special_equipment_renewal: ['photo', 'certificate_info_page', 'certificate_records_page']
 }
 
 // ======================== 工具函数 ========================
@@ -67,6 +73,20 @@ function normalizeTrainingType(trainingType = '') {
     return value
   }
   return 'special_operation'
+}
+
+function normalizeApplicationType(trainingType = '', applicationType = '') {
+  if (normalizeTrainingType(trainingType) !== 'special_equipment') return 'new_exam'
+  return trimText(applicationType) === 'renewal' ? 'renewal' : 'new_exam'
+}
+
+function getAttachmentProfileKey(trainingType = '', applicationType = '') {
+  const normalizedType = normalizeTrainingType(trainingType)
+  const normalizedApplication = normalizeApplicationType(normalizedType, applicationType)
+  if (normalizedType === 'special_equipment' && normalizedApplication === 'renewal') {
+    return 'special_equipment_renewal'
+  }
+  return normalizedType
 }
 
 /** 将各种值解析为布尔值（支持 '1'/'true'/'yes'/'on'） */
@@ -377,10 +397,15 @@ async function login() {
  * @param {string} trainingType - 培训类型
  * @returns {Object} 标准化后的文件字段
  */
-function normalizeStudentFiles(files = {}, trainingType = '') {
+function normalizeStudentFiles(files = {}, trainingType = '', applicationType = '') {
   const baseUrl = getBaseUrl()
   const normalizedType = normalizeTrainingType(trainingType)
-  const allowedSet = new Set(ALLOWED_ATTACHMENTS_BY_TYPE[normalizedType] || [])
+  const profileKey = getAttachmentProfileKey(normalizedType, applicationType)
+  const allowedSet = new Set(
+    ALLOWED_ATTACHMENTS_BY_APPLICATION[profileKey] ||
+    ALLOWED_ATTACHMENTS_BY_TYPE[normalizedType] ||
+    []
+  )
 
   const toRelativeStudentPath = value => {
     const raw = trimText(value)
@@ -428,6 +453,7 @@ function normalizeStudentFiles(files = {}, trainingType = '') {
  */
 function buildStudentPayload(student = {}, trainingType = '') {
   const normalizedType = normalizeTrainingType(trainingType || student.training_type || 'special_operation')
+  const applicationType = normalizeApplicationType(normalizedType, student.application_type)
   return {
     name: trimText(student.name),
     gender: trimText(student.gender),
@@ -442,8 +468,9 @@ function buildStudentPayload(student = {}, trainingType = '') {
     exam_project: trimText(student.exam_project),
     project_code: trimText(student.project_code),
     training_type: normalizedType,
+    application_type: applicationType,
     training_project_id: student.training_project_id || null,
-    files: normalizeStudentFiles(student.files || {}, normalizedType)
+    files: normalizeStudentFiles(student.files || {}, normalizedType, applicationType)
   }
 }
 
@@ -654,10 +681,12 @@ async function updateStudent(studentId, updates = {}) {
   const id = encodeURIComponent(String(studentId || '').trim())
   if (!id) throw new Error('学员ID不能为空')
   const normalizedType = normalizeTrainingType(updates.training_type || '')
+  const applicationType = normalizeApplicationType(normalizedType, updates.application_type)
 
   const payload = {
     ...updates,
-    files: normalizeStudentFiles(updates.files || {}, normalizedType)
+    application_type: applicationType,
+    files: normalizeStudentFiles(updates.files || {}, normalizedType, applicationType)
   }
   const student = await requestApi(`/api/students/${id}`, {
     method: 'PUT',

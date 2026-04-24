@@ -67,6 +67,7 @@
 
         <view class="meta-row">
           <text class="meta-chip">{{item.trainingTypeText || '-'}}</text>
+          <text wx:if="{{item.training_type === 'special_equipment' && item.application_type === 'renewal'}}" class="meta-chip" style="color:#e65100;background:#fff3e0;">复审</text>
           <text class="meta-chip">{{item.job_category || '-'}}</text>
           <text wx:if="{{item.exam_project}}" class="meta-chip">{{item.exam_project}}</text>
           <text

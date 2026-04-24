@@ -80,6 +80,10 @@
           <text class="info-label">培训类型</text>
           <text class="info-value">{{trainingTypeText}}</text>
         </view>
+        <view class="info-item" wx:if="{{student.training_type === 'special_equipment'}}">
+          <text class="info-label">报名类型</text>
+          <text class="info-value">{{student.application_type === 'renewal' ? '复审' : '新考证'}}</text>
+        </view>
         <view class="info-item">
           <text class="info-label">作业类别</text>
           <text class="info-value">{{student.job_category || '-'}}</text>
@@ -134,6 +138,16 @@
           <image wx:if="{{previewUrls.hukou_personal_path}}" class="attachment-image" src="{{previewUrls.hukou_personal_path}}" mode="aspectFill" />
           <view wx:else class="attachment-empty">点击查看</view>
           <text class="attachment-label">户口本个人页</text>
+        </view>
+        <view class="attachment-item" wx:if="{{downloadUrls.certificate_info_page_path}}" bindtap="previewImage" data-url="{{downloadUrls.certificate_info_page_path}}">
+          <image wx:if="{{previewUrls.certificate_info_page_path}}" class="attachment-image" src="{{previewUrls.certificate_info_page_path}}" mode="aspectFill" />
+          <view wx:else class="attachment-empty">点击查看</view>
+          <text class="attachment-label">原证件说明和个人信息页</text>
+        </view>
+        <view class="attachment-item" wx:if="{{downloadUrls.certificate_records_page_path}}" bindtap="previewImage" data-url="{{downloadUrls.certificate_records_page_path}}">
+          <image wx:if="{{previewUrls.certificate_records_page_path}}" class="attachment-image" src="{{previewUrls.certificate_records_page_path}}" mode="aspectFill" />
+          <view wx:else class="attachment-empty">点击查看</view>
+          <text class="attachment-label">原证件作业项目和聘用记录页</text>
         </view>
       </view>
     </view>
