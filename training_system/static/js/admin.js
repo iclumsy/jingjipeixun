@@ -921,6 +921,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
                         <span style="font-size: 1rem; font-weight: 600; white-space: nowrap;">${student.name}</span>
                         ${rejectedMark}
+                        ${student.training_type === 'special_equipment' && student.application_type === 'renewal' ? '<span style="font-size:0.68rem;padding:1px 8px;border-radius:10px;background:#FFF3E0;color:#E65100;font-weight:600;white-space:nowrap;">复审</span>' : ''}
                     </div>
                     <div style="font-size: 0.78rem; color: #555; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${student.company || ''}</div>
                     <div style="font-size: 0.72rem; color: #888; display: flex; justify-content: space-between; gap: 8px;">
@@ -1314,7 +1315,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             { key: 'company_address', label: '单位地址' },
             { key: 'job_category', label: '作业类别', required: true, type: 'select', options: [] },
             { key: 'exam_project', label: '操作项目', required: true, type: 'select', options: [] },
-            { key: 'project_code', label: '项目代号', readonly: true }
+            { key: 'project_code', label: '项目代号', readonly: true },
+            { key: 'application_type', label: '报名类型', readonly: true, format: v => v === 'renewal' ? '复审' : '新考证', showIf: s => s.training_type === 'special_equipment' }
         ];
 
         const originalData = { ...student };
@@ -1322,9 +1324,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         grid._trackedProjectId = student.training_project_id || '';
 
         editable.forEach(f => {
+            if (f.showIf && !f.showIf(student)) return;
             const item = document.createElement('div');
             item.className = 'detail-item';
-            const val = student[f.key] || '';
+            const rawVal = student[f.key] || '';
+            const val = f.format ? f.format(rawVal) : rawVal;
 
             let input;
             if (f.type === 'select') {
