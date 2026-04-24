@@ -158,6 +158,48 @@ class SxtsksClient:
         })
         self.userid = None
         self.logged_in = False
+        self._steps = []  # 步骤日志收集器
+
+    def _log_step(self, step, status, detail='', resp=None):
+        """记录一个操作步骤的详细日志。"""
+        entry = {
+            'step': step,
+            'status': status,  # ok / fail / warning
+            'detail': detail,
+            'time': time.strftime('%H:%M:%S'),
+        }
+        if resp is not None:
+            entry['http_status'] = resp.status_code
+            entry['url'] = resp.url[:120] if resp.url else ''
+            content_type = resp.headers.get('Content-Type', '')
+            entry['content_type'] = content_type[:60]
+            # 记录响应摘要（截断）
+            if 'json' in content_type:
+                entry['response'] = resp.text[:500]
+            elif 'html' in content_type:
+                entry['response_length'] = len(resp.text)
+                # 从 HTML 中提取有用信息
+                import re as _re
+                alerts = _re.findall(r'alert\(["\']([^"\']+)["\']\)', resp.text[:3000])
+                if alerts:
+                    entry['alerts'] = alerts[:5]
+            else:
+                entry['response_length'] = len(resp.content)
+        self._steps.append(entry)
+        # 同时输出到 logger
+        log_msg = f'[sxtsks] {step}: {status} - {detail}'
+        if status == 'fail':
+            logger.error(log_msg)
+        elif status == 'warning':
+            logger.warning(log_msg)
+        else:
+            logger.info(log_msg)
+
+    def get_steps(self):
+        """获取并清空步骤日志。"""
+        steps = list(self._steps)
+        self._steps.clear()
+        return steps
 
     def login(self, id_card=LOGIN_ID_CARD, password=LOGIN_PASSWORD):
         """
@@ -169,6 +211,7 @@ class SxtsksClient:
         返回:
             dict: {'success': True/False, 'message': str, 'attempts': int}
         """
+        self._log_step('登录-加密密码', 'ok', f'RSA 加密完成，身份证={id_card[:6]}***')
         encrypted_pwd = _rsa_encrypt(password)
 
         for attempt in range(1, MAX_CAPTCHA_RETRIES + 1):
@@ -177,15 +220,16 @@ class SxtsksClient:
                 captcha_url = f'{BASE_URL}/getAuthImage.do?date={int(time.time() * 1000)}'
                 captcha_resp = self.session.get(captcha_url, timeout=10)
                 if captcha_resp.status_code != 200:
-                    logger.warning(f'获取验证码失败: HTTP {captcha_resp.status_code}')
+                    self._log_step(f'登录-验证码(第{attempt}次)', 'fail', f'HTTP {captcha_resp.status_code}', captcha_resp)
                     continue
+                self._log_step(f'登录-验证码(第{attempt}次)', 'ok', f'图片 {len(captcha_resp.content)} 字节')
 
                 # 2. OCR 识别验证码
                 captcha_text = _ocr_captcha(captcha_resp.content)
-                logger.info(f'验证码识别结果 (第{attempt}次): {captcha_text}')
+                self._log_step(f'登录-OCR(第{attempt}次)', 'ok', f'识别结果: {captcha_text}')
 
                 if not captcha_text or len(captcha_text) < 3:
-                    logger.warning(f'验证码识别结果太短: {captcha_text}')
+                    self._log_step(f'登录-OCR(第{attempt}次)', 'warning', f'结果太短 "{captcha_text}"，重试')
                     continue
 
                 # 3. 提交登录
@@ -200,11 +244,8 @@ class SxtsksClient:
                     allow_redirects=True,
                 )
 
-                # 判断登录是否成功
-                # 成功：会重定向到主页，或返回包含 userid 的页面
                 if 'turnToUserLogin' in login_resp.url:
-                    # 重定向回登录页 = 登录失败
-                    logger.warning(f'登录失败 (第{attempt}次)，可能是验证码错误')
+                    self._log_step(f'登录-提交(第{attempt}次)', 'fail', f'重定向回登录页，验证码可能错误', login_resp)
                     continue
 
                 # 尝试从页面中提取 userid
@@ -212,13 +253,12 @@ class SxtsksClient:
                 if userid_match:
                     self.userid = userid_match.group(1)
                 else:
-                    # 从 URL 参数中提取
                     userid_match2 = re.search(r'userid=(\d+)', login_resp.url + login_resp.text)
                     if userid_match2:
                         self.userid = userid_match2.group(1)
 
                 self.logged_in = True
-                logger.info(f'登录成功，userid={self.userid}，共尝试 {attempt} 次')
+                self._log_step(f'登录-提交(第{attempt}次)', 'ok', f'登录成功，userid={self.userid}', login_resp)
                 return {
                     'success': True,
                     'message': f'登录成功（第{attempt}次尝试）',
@@ -227,9 +267,10 @@ class SxtsksClient:
                 }
 
             except Exception as e:
-                logger.error(f'登录异常 (第{attempt}次): {e}')
+                self._log_step(f'登录-异常(第{attempt}次)', 'fail', str(e))
                 continue
 
+        self._log_step('登录', 'fail', f'已重试 {MAX_CAPTCHA_RETRIES} 次均失败')
         return {
             'success': False,
             'message': f'登录失败，已重试 {MAX_CAPTCHA_RETRIES} 次',
@@ -259,6 +300,7 @@ class SxtsksClient:
         with open(photo_path, 'rb') as f:
             photo_data = f.read()
 
+        self._log_step('上传照片', 'ok', f'照片大小 {len(photo_data)} 字节，项目 {zyxm_id}')
         resp = self.session.post(
             f'{BASE_URL}/uploadksimg.do',
             params={
@@ -281,9 +323,10 @@ class SxtsksClient:
         match = re.search(r"_upload_callbacks\(['\"]([^'\"]+)['\"]", resp.text)
         if match:
             tmp_path = match.group(1)
-            logger.info(f'照片上传成功: {tmp_path}')
+            self._log_step('上传照片-结果', 'ok', f'平台路径: {tmp_path}', resp)
             return tmp_path
         else:
+            self._log_step('上传照片-结果', 'fail', f'响应: {resp.text[:300]}', resp)
             raise RuntimeError(f'照片上传失败，响应: {resp.text[:200]}')
 
     def _get_form_token(self, sfzh, zyxm_id):
@@ -298,11 +341,12 @@ class SxtsksClient:
             str: bmVerriToken 值
         """
         # 先保存身份证
-        self.session.post(
+        r0 = self.session.post(
             f'{BASE_URL}/saveDwbmSfzh.do',
             data={'sfzh': sfzh},
             timeout=10,
         )
+        self._log_step('保存身份证到会话', 'ok', f'sfzh={sfzh}', r0)
 
         # 打开报名表单页面
         resp = self.session.get(
@@ -322,12 +366,14 @@ class SxtsksClient:
         # 提取 bmVerriToken
         match = re.search(r'bmVerriToken["\s]+value="([^"]+)"', resp.text)
         if match:
+            self._log_step('获取表单token', 'ok', f'bmVerriToken={match.group(1)[:20]}...', resp)
             return match.group(1)
         # 备选提取
         match2 = re.search(r"bmVerriToken['\s]*[:,=]\s*['\"]([^'\"]+)", resp.text)
         if match2:
+            self._log_step('获取表单token', 'ok', f'bmVerriToken(备选)={match2.group(1)[:20]}...', resp)
             return match2.group(1)
-        logger.warning('未找到 bmVerriToken，继续提交')
+        self._log_step('获取表单token', 'warning', f'未找到 bmVerriToken，页面长度={len(resp.text)}', resp)
         return ''
 
     def _get_captcha_code(self):
@@ -346,62 +392,32 @@ class SxtsksClient:
             dict: 校验结果，包含各步骤响应
         """
         results = {}
-
-        # 校验学历是否满足要求
-        try:
-            r = self.session.get(
+        checks = [
+            ('校验学历', lambda: self.session.get(
                 f'{BASE_URL}/dwbm_validateWhcd.do',
-                params={'zyxm': zyxm_id, 'whcd': '0405', '_': int(time.time() * 1000)},
-                timeout=10,
-            )
-            results['validateWhcd'] = r.text
-        except Exception:
-            pass
-
-        # 检查是否已有证书
-        try:
-            r = self.session.post(
+                params={'zyxm': zyxm_id, 'whcd': '0405', '_': int(time.time() * 1000)}, timeout=10)),
+            ('检查证书', lambda: self.session.post(
                 f'{BASE_URL}/isKsCertExists.do',
                 params={'web_ksjgdm': JGDM},
-                data={'zyzl': '', 'zyxm': zyxm_id, 'sfzh': sfzh},
-                timeout=10,
-            )
-            results['isKsCertExists'] = r.text
-        except Exception:
-            pass
-
-        # 验证身份证
-        try:
-            r = self.session.post(
+                data={'zyzl': '', 'zyxm': zyxm_id, 'sfzh': sfzh}, timeout=10)),
+            ('验证身份证', lambda: self.session.post(
                 f'{BASE_URL}/verifyDwBmIdCard.do',
-                data={'idCard': sfzh, 'jgdm': JGDM},
-                timeout=10,
-            )
-            results['verifyIdCard'] = r.text
-        except Exception:
-            pass
-
-        # 检查是否可以报名
-        try:
-            r = self.session.post(
+                data={'idCard': sfzh, 'jgdm': JGDM}, timeout=10)),
+            ('检查可否报名', lambda: self.session.post(
                 f'{BASE_URL}/wbisCanApply.do',
-                data={'bmlb': '0', 'jgdm': JGDM, 'sfzh': sfzh, 'zyzl': '', 'zyxm': zyxm_id},
-                timeout=10,
-            )
-            results['isCanApply'] = r.text
-        except Exception:
-            pass
-
-        # 检查是否正在考试
-        try:
-            r = self.session.post(
+                data={'bmlb': '0', 'jgdm': JGDM, 'sfzh': sfzh, 'zyzl': '', 'zyxm': zyxm_id}, timeout=10)),
+            ('检查考试状态', lambda: self.session.post(
                 f'{BASE_URL}/isExamDoing.do',
-                data={'bmlb': '0', 'jgdm': JGDM, 'sfzh': sfzh, 'zyzl': '', 'zyxm': zyxm_id},
-                timeout=10,
-            )
-            results['isExamDoing'] = r.text
-        except Exception:
-            pass
+                data={'bmlb': '0', 'jgdm': JGDM, 'sfzh': sfzh, 'zyzl': '', 'zyxm': zyxm_id}, timeout=10)),
+        ]
+        for name, call in checks:
+            try:
+                r = call()
+                resp_summary = r.text[:200] if r.text else '(empty)'
+                self._log_step(f'预校验-{name}', 'ok', resp_summary, r)
+                results[name] = r.text
+            except Exception as e:
+                self._log_step(f'预校验-{name}', 'warning', str(e))
 
         # 验证码校验
         try:
@@ -447,15 +463,13 @@ class SxtsksClient:
 
         try:
             # 1. 上传照片
-            logger.info(f'[{student["name"]}] 开始上传照片...')
+            self._log_step('报名开始', 'ok', f'{student["name"]}（{sfzh}）项目={project_code} → XMID={zyxm_id}')
             self.upload_photo(photo_path, zyxm_id)
 
             # 2. 获取表单 token
-            logger.info(f'[{student["name"]}] 获取表单 token...')
             token = self._get_form_token(sfzh, zyxm_id)
 
             # 3. 执行预校验
-            logger.info(f'[{student["name"]}] 执行预校验...')
             check_results = self._run_pre_checks(sfzh, zyxm_id)
             ver_code = check_results.get('verCode', '')
 
@@ -474,7 +488,7 @@ class SxtsksClient:
                 pass
 
             # 5. 构建并提交表单
-            logger.info(f'[{student["name"]}] 提交报名表单...')
+            self._log_step('构建表单', 'ok', f'token={token[:15]}... verCode={ver_code} 学历={education_code} 性别={gender_code}')
             with open(photo_path, 'rb') as f:
                 photo_data = f.read()
 
@@ -548,25 +562,25 @@ class SxtsksClient:
             )
 
             # 判断是否成功
+            self._log_step('提交表单-响应', 'ok', f'HTTP {resp.status_code}, 长度={len(resp.text)}', resp)
             if resp.status_code == 200:
-                # 检查返回的 HTML 中是否有成功标识
                 if '保存并上报' in resp.text or 'bmid' in resp.text.lower():
-                    # 尝试提取 bmid
                     bmid_match = re.search(r'bmid["\s=]+["\']?(\d+)', resp.text)
                     bmid = bmid_match.group(1) if bmid_match else ''
-                    logger.info(f'[{student["name"]}] 报名提交成功，bmid={bmid}')
+                    self._log_step('提交表单-结果', 'ok', f'报名成功 bmid={bmid}')
                     return {'success': True, 'message': '报名提交成功', 'bmid': bmid}
                 elif '验证码' in resp.text and '错误' in resp.text:
+                    self._log_step('提交表单-结果', 'fail', '验证码错误')
                     return {'success': False, 'message': '验证码错误'}
                 else:
-                    # 可能还是成功了，后面通过查询确认
-                    logger.info(f'[{student["name"]}] 报名已提交，等待查询确认')
+                    self._log_step('提交表单-结果', 'ok', '已提交，需查询确认')
                     return {'success': True, 'message': '报名已提交，需查询确认', 'bmid': ''}
             else:
+                self._log_step('提交表单-结果', 'fail', f'HTTP {resp.status_code}')
                 return {'success': False, 'message': f'HTTP 错误: {resp.status_code}'}
 
         except Exception as e:
-            logger.error(f'[{student["name"]}] 报名异常: {e}', exc_info=True)
+            self._log_step('提交表单-异常', 'fail', str(e))
             return {'success': False, 'message': f'报名异常: {str(e)}'}
 
     def query_registrations(self, sfzh=None):
@@ -684,6 +698,7 @@ class SxtsksClient:
         # 1. 提交报名
         submit_result = self.submit_registration(student, photo_path)
         if not submit_result.get('success'):
+            submit_result['steps'] = self.get_steps()
             return submit_result
 
         # 2. 查询报名获取 bmid
@@ -694,18 +709,23 @@ class SxtsksClient:
             for reg in registrations:
                 if reg['id_card'] == student['id_card']:
                     bmid = str(reg['bmid'])
+                    self._log_step('查询报名', 'ok', f'找到 bmid={bmid}')
                     break
 
         if not bmid:
-            return {
+            self._log_step('查询报名', 'warning', '未找到 bmid')
+            result = {
                 'success': True,
                 'message': '报名已提交但未找到报名 ID，请手动查询',
                 'bmid': '',
             }
+            result['steps'] = self.get_steps()
+            return result
 
         # 3. 下载申请表
         try:
             content, content_type, filename = self.download_application_form(bmid)
+            self._log_step('下载申请表', 'ok', f'bmid={bmid}, 文件={filename}, 大小={len(content)} 字节')
             result = {
                 'success': True,
                 'message': '报名成功并已下载申请表',
@@ -720,14 +740,17 @@ class SxtsksClient:
                 with open(form_path, 'wb') as f:
                     f.write(content)
                 result['form_path'] = form_path
-                logger.info(f'申请表已保存: {form_path}')
+                self._log_step('保存申请表', 'ok', form_path)
 
+            result['steps'] = self.get_steps()
             return result
 
         except Exception as e:
-            logger.warning(f'下载申请表失败: {e}')
-            return {
+            self._log_step('下载申请表', 'fail', str(e))
+            result = {
                 'success': True,
                 'message': f'报名成功但下载申请表失败: {e}',
                 'bmid': bmid,
             }
+            result['steps'] = self.get_steps()
+            return result
