@@ -1,0 +1,3492 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+    <link href="css/biaodan.css" rel="stylesheet" type="text/css">
+    <style type="text/css">
+        <!--
+        li{list-style:none}
+        ul li {
+            list-style: none outside none;
+        }
+        textarea.error { border: 1px solid red; }
+        input.error { border: 1px solid red; }
+        select.error { border: 1px solid red; }
+        .searchFormSelect {background:url(images/input_index.png) no-repeat;width:230px;height:22px;margin-right:10px;float:left;overflow:hidden;}
+        .searchFormSelect input {width:230px;padding-left:25px;height:22px;color:#000;cursor:pointer;background:transparent;text-align:left;margin:0px;margin-top:0px;*margin-top:0px;display:inline; border:none;}
+        @media   print   {
+            @page {
+                margin: 0;
+                size: auto;
+            }
+            .rept td, .rept td p{ /*font-size:20px; line-height:200%;*/ font-family:"STFangsong","SimSun";}
+            #bt{ display:none;}
+            #files{display: none}
+        }
+        -->
+    </style>
+    <script type="text/javascript" src="js/framework/Main.js?v=1.3"></script>
+    <script type="text/javascript" src="js/framework/jquery.blockUI.js"></script>
+    <script type="text/javascript" src="js/framework/verify.js?v=240626"></script>
+    <script type="text/javascript" src="js/framework/fileupload.js?id=js&v=1.3"></script>
+    <script type="text/javascript" src="js/plugins/calendar/WdatePicker.js"></script>
+    <script type="text/javascript" src="js/dwbmApplication.js?v=1.05"></script>
+    <script type="text/javascript" src="js/info.js"></script>
+    <script type="text/javascript">
+        var dwbm_jgdm = "140300111";
+        var dwbm_jglb = "9002";
+        var dwbm_planid = "";
+        var xzkzdq="0";
+        var checkArea = "0";
+        var idcardContrl="0";
+        var xzUnit="1";
+        var fileUploadSwitch="0";
+        var xzAttachIsReq="1";
+        var systype="sx";
+        var cloud_server = "http://118.89.145.145:8888";
+        var cloud_filepath = "filepath";
+        var ksjg_dm = "14030001";
+        var canChooseLqfs = '0';
+        var dwbm_ksjg_dm = "";
+        var whetherUseQrCode = '0';
+        var wsxgcl="0";
+        function isIDCard(val){
+            if(jQuery("#zjlx").val() != "1"){return};
+            if(val.value!=null && val.value!=""){
+                var zt = checkIDCard(val.value,'xb','');
+                if(zt != true){
+                    alert(zt);
+                    return;
+                }
+            }
+        }
+        function validateUpFile(){
+            var suffixs = ["jpg"];
+            var val = jQuery("#files").val();
+            if(val == ""){
+                alert("请选择文件！");
+                return false;
+            }
+            var suffix = val.substr(val.lastIndexOf(".")+1,val.length);
+            for(i = 0;i < suffixs.length;i++){
+                if(suffix == suffixs[i]){
+                    return true;
+                }
+            }
+            alert("请上传【"+suffixs+"】格式文件！");
+            return false;
+        }
+        var yxzt = "";
+        //加载报名信息
+        function loadBmInfo(sfzh){
+            var sz;
+            if(sfzh.value){
+                sz = sfzh.value;
+            }else{
+                sz = sfzh;
+            }
+            if(systype!="sc"){
+                if(yxzt == "edit"){return};
+            }else{
+                if(yxzt == "edit"){
+                    jQuery("#yrdw").attr("readonly",true);
+                    jQuery("#sfzx1").attr("checked",true);
+                    jQuery("#but").attr("disabled",true);
+                    return;
+                }
+            }
+
+            jQuery.get("loadbmbinfo.do?sfzh="+sz,function(data){
+                if('1' == 1 && yxzt != "edit"){
+                    dwbm_bindSelectNewZyxm("zyxm", "zyxmcode", "0195", 0);
+                }else{
+                    dwbm_bindSelectNewZyxm("zyxm", "zyxmcode", "", 0);
+                }
+                if(data == null || data.length <= 0){
+                    return;
+                }
+                if(jQuery("#sqrxm").length > 0){
+                    jQuery("#sqrxm").attr({"value":data.sqrxm});
+                }
+                if(jQuery("#xb1").length > 0){
+                    if(data.xb != null){
+                        if(jQuery("#xb1").val() == data.xb){
+                            jQuery("#xb1").attr("checked",true);
+                        }else{
+                            jQuery("#xb2").attr("checked",true);
+                        }
+                    }
+                }
+                if(jQuery("#txdz").length > 0){
+                    jQuery("#txdz").attr({"value":data.txdz});
+                }
+                if(jQuery("#whcd").length > 0){
+                    if(data.whcd!='0401'){
+                        jQuery("#whcd").attr({"value":data.whcd});
+                    }
+                }
+                if(jQuery("#yzbm").length > 0){
+                    jQuery("#yzbm").attr({"value":data.yzbm});
+                }
+                if(jQuery("#sfzh").length > 0){
+                    jQuery("#sfzh").attr({"value":data.sfzh});
+                }
+                if(jQuery("#lxdh").length > 0){
+                    jQuery("#lxdh").attr({"value":data.lxdh});
+                }
+                if(jQuery("#yrdw").length > 0){
+                    jQuery("#yrdw").attr({"value":data.yrdw});
+                    if(systype=="sc"){
+                        if(data.yrdw!=""&&data.yrdw!=null){
+                            jQuery("#yrdw").attr("readonly",true);
+                            jQuery("#sfzx1").attr("checked",true);
+                            jQuery("#but").attr("disabled",true);
+                        }
+                    }
+                }
+                if(jQuery("#dwlxr").length > 0){
+                    jQuery("#dwlxr").attr({"value":data.dwlxr});
+                }
+                if(jQuery("#dwdz").length > 0){
+                    jQuery("#dwdz").attr({"value":data.dwdz});
+                }
+                if(jQuery("#dwlxdh").length > 0){
+                    jQuery("#dwlxdh").attr({"value":data.dwlxdh});
+                }
+                if(jQuery("#gzjl").length > 0){
+                    jQuery("#gzjl").attr({"value":data.gzjl});
+                }
+                if(jQuery("#yrdwyj").length > 0){
+                    jQuery("#yrdwyj").attr({"value":data.yrdwyj});
+                }
+                if(jQuery("#zsbh").length > 0){
+                    jQuery("#zsbh").attr({"value":data.zsbh});
+                }
+                if(jQuery("#fzrq").length > 0){
+                    jQuery("#fzrq").attr({"value":data.fzrq});
+                }
+                if(jQuery("#zp").length > 0){
+                    jQuery("#zp").attr({"value":data.zp});
+                }
+                if(jQuery("#zb1").length > 0){
+                    jQuery("#zb1").attr({"value":data.zb1});
+                }
+                if(jQuery("#bak2").length > 0){
+                    jQuery("#bak2").attr({"value":data.bak2});
+                }
+                if(jQuery("#bak3").length > 0){
+                    jQuery("#bak3").attr({"value":data.bak3});
+                }
+                if(jQuery("#bak4").length > 0){
+                    jQuery("#bak4").attr({"value":data.bak4});
+                }
+                if(jQuery("#dabh").length > 0){
+                    jQuery("#dabh").attr({"value":data.dabh});
+                }
+                if(jQuery("#dwzzjgdm").length > 0){
+                    jQuery("#dwzzjgdm").attr({"value":data.dwzzjgdm});
+                }
+                //带出此考生报名记录基本信息即可，不需要带出关联项目
+                /*if(jQuery("#pxjgdm").val()!=""&&jQuery("#pxjgdm").length > 0){
+                    jQuery("#pxjgdm").attr({"value":data.pxjgdm});
+                    alert(data.pxjgdm);
+                    if(dwbm_jglb != "9002"){
+                        if (ksjg_dm === "") {
+                            ksjg_dm = dwbm_jgdm;
+                        }
+                        if (data.pxjgdm == "" || data.pxjgdm == null || dwbm_bindselectpxjg("pxjgdm","","") == false) {
+                            dwbm_jgdm = ksjg_dm;
+                            dwbm_jglb = "9001";
+                        } else {
+                            dwbm_jgdm = data.pxjgdm;
+                            dwbm_jglb = "9003";
+                        }
+                    }
+                    //加载作业项目
+                    dwbm_bindSelectNewZyxm("zyxm", "zyxmcode", "", 0);
+                }
+                if(jQuery("#pxjgmc").length > 0){
+                    jQuery("#pxjgmc").attr({"value":data.pxjgmc});
+                }*/
+                if(jQuery("#aqpxqk").length > 0){
+                    jQuery("#aqpxqk").attr({"value":data.aqpxqk});
+                }
+                if(jQuery("#cdhjnl").length > 0){
+                    jQuery("#cdhjnl").attr({"value":data.cdhjnl});
+                }
+                if(jQuery("#yfzjg").length > 0){
+                    jQuery("#yfzjg").attr({"value":data.yfzjg});
+                }
+                if(jQuery("#fzjgdz").length > 0){
+                    jQuery("#fzjgdz").attr({"value":data.fzjgdz});
+                }
+                if(jQuery("#sqrbljl").length > 0){
+                    jQuery("#sqrbljl").attr({"value":data.sqrbljl});
+                }
+                if(jQuery("#image1").length > 0){
+                    loadImage();
+                }
+
+                /*if(jQuery("#lqfs1").length > 0){<!--浙江领取方式-->
+
+                    if(data.lqfs != null){
+                        if(jQuery("#lqfs1").val() == data.lqfs){
+                            jQuery("#lqfs1").attr("checked",true);
+                        }else{
+                            jQuery("#lqfs2").attr("checked",true);
+                        }
+                    }
+                }*/
+                if(xzkzdq ==1){
+                    bindselectdistrictforbm("dwszdq",data.dwszdq);
+                    bindselectregionforbm("dwszqx",data.dwszdq,data.dwszqx);
+
+                }
+
+                if (checkArea == 1) {
+                    bindselectdistrictforbm("residencedq", data.residencedq);
+                    bindselectResidencedqforbm("residenceqx", data.residencedq, data.residenceqx);
+                }
+            });
+        }
+
+        function loadImage() {
+            var sfzh = jQuery("#sfzh").val();
+            var zyxm = jQuery("#zyxmdm").val();
+            var bmlb = jQuery("#bmlb").val();
+            var bmid = jQuery("#bmid").val();
+            jQuery.ajax({
+                type: "POST",
+                url: "loadImage.do",
+                dataType: "json",
+                async: false,
+                data: {
+                    "sfzh": sfzh,
+                    "zyxm": zyxm,
+                    "bmlb": bmlb,
+                    "bmid": bmid
+                },
+                cache: false,
+                success: function (data, status) {
+                    var flag = true;
+                    if (data != null && data.dataset.length > 0) {
+                        if (data.dataset[0].CLOUD_UPLOADIMG != '0') {
+                            flag = "false";
+                        }
+                        if (flag == true) {
+                            if (data.dataset[0].PATH != '0') {
+                                jQuery("#image1").attr("src", "image.do?bmid=&id=" + data.dataset[0].PATH);
+                            } else {
+                                jQuery("#image1").attr("src", "image.do?bmid=&id=" + sfzh);
+                            }
+                        } else {
+                            jQuery("#image1").attr("src", "cloud/showImage.do?type=1&bmid=" + bmid + "&sfzh=" + sfzh);
+                        }
+                    }
+                }
+            });
+            if (systype == 'nmg') {
+                jQuery("#title").html("特种设备安全管理人员、作业人员资格认定申请表");
+            }
+        }
+
+        var ksjgIsMust;
+
+        function printsj() {
+            window.print();
+            return false;
+        }
+
+        function loadKsjg() {
+            jQuery.ajax({
+                type: "POST",
+                url: "loadKsjg.do",
+                dataType: "json",
+                async: false,
+                data: {"jgdm": dwbm_jgdm,"isHj":"0"},
+                cache: false,
+                success: function (data, status) {
+                    for (i = 0; i < data.length; i++){
+                        if (dwbm_jglb == '9002' && (ksjg_dm != '' && ksjg_dm != null)) {
+                            if (ksjg_dm == data[i].JGDM) {
+                                jQuery("#ksjg").append("<option value='" + data[i].JGDM + "'" + "selected = 'selected'>" + data[i].JGMC + "</option>");
+                            } else {
+                                jQuery("#ksjg").append("<option value='" + data[i].JGDM + "'" + ">" + data[i].JGMC + "</option>");
+                            }
+                        } else {
+                            if(systype=="shanxi"&&data[i].JGDM=='TSZK004'){
+
+                            }else{
+                                jQuery("#ksjg").append("<option value='" + data[i].JGDM + "'" + ">" + data[i].JGMC + "</option>");
+                            }
+
+                        }
+                    }
+                }
+            });
+        }
+        function loadZyxm(obj,val){
+            if(val == "" || val == "null"){
+                return;
+            }
+            jQuery.get('exam_zyxm.do?zyzl='+obj.value+'&len=4', function(data) {
+                var options = jQuery("#zyxm");
+                if(jQuery("#zyxm option").length > 1){
+                    var txt = jQuery("#zyxm option:first").text();
+                    var vals = jQuery("#zyxm option:first").val();
+                    jQuery("#zyxm").empty();
+                    if(vals == ''){
+                        jQuery("#zyxm").append("<option value=''>"+txt+"</option>");
+                    }
+                }
+                for(i=0;i<data.length;i++){
+                    var sel = "";
+                    if(data[i].dm == val){
+                        sel = " selected=\"selected\"";
+                    }
+                    jQuery("#zyxm").append("<option value='"+data[i].dm+"'"+sel+">"+data[i].mc+"</option>");
+                }
+            });
+        }
+        var valida;
+        var bmfs = "";
+        var jgdm = "";
+        var info = "";
+        jQuery(document).ready(function loadpage(){
+            // 湖北统一受理平台
+            if ('' == 'tysl') {
+                jQuery('#savedatafrm').attr('action', 'dwbm_savekzbmb_tysl.do');
+            }
+
+            if(dwbm_jglb !="9002") {
+                loadselectplan("plan_id",dwbm_planid,"2",dwbm_jgdm,dwbm_jglb);
+            } else {
+                jQuery("#plantr").css("display", "none");
+            }
+            if(dwbm_jglb =="9002") {
+                jQuery.ajax({
+                    type : "POST",
+                    url : "queryKsjgIsShow.do",
+                    dataType : "json",
+                    data : {
+                        jgdm : dwbm_jgdm
+                    },
+                    cache : false,
+                    async: false,
+                    success : function(data, status) {
+                        if(data.code=='1'){
+                            ksjgIsMust = 1;
+                            loadKsjg();
+                        }else{
+                            jQuery("#ksjgx").css("display", "none");
+                        }
+                    }
+                });
+            } else {
+                jQuery("#ksjgx").css("display", "none");
+            }
+
+            changeImg();
+            var info = "";
+            if( info!= null &&info=="验证码校验失败！"){
+
+                alert("");
+            }
+            else{
+                if(info != null && info != "" && info != "null"){
+
+                    window.parent.dwbm_cellback(info);
+                }
+
+
+            }
+
+
+            var xb = '';
+            var zp = "";
+            var yrdwrq = "";
+            var sqrqzrq = "";
+            var czxm = "";
+            var sfzx = "";
+            /*if(jQuery("#lqfs1").length > 0){<!--浙江领取方式-->
+    alert("");
+                if(""!= null){
+                    if(jQuery("#lqfs1").val() == ""){
+                        jQuery("#lqfs1").attr("checked",true);
+                    }else{
+                        jQuery("#lqfs2").attr("checked",true);
+                    }
+                }
+            }*/
+            loadImage();
+            if(sfzx == "1"){
+                jQuery("#zsbhlabel").show();
+                jQuery("#sfzx1").attr("checked",true);
+            }else if(sfzx == "0"){
+                jQuery("#sfzx2").attr("checked",true);
+            }
+            if(czxm != null && czxm != '' && czxm != 'null'){
+                jQuery("#czxmdip").show();
+            }else{
+                jQuery("#czxmdip").hide();
+            }
+            var sfzx = "";
+            if(sfzx != null && sfzx != '' && sfzx != 'null'){
+                if(sfzx == '1'){
+                    jQuery("#sfzx").attr("checked",true);
+                }
+            }
+            var date = new Date();
+            var zdate = date.getFullYear()+"年"+(date.getMonth()+1)+"月"+date.getDate()+"日";
+            var gdate = date.getFullYear()+"-"+(date.getMonth()+1)+"-"+date.getDate();
+            if(yrdwrq == null || yrdwrq == ""){
+                if("" == ""){
+                    jQuery("#yrdwrq").val(zdate);
+                }
+            }
+            if(sqrqzrq == null || sqrqzrq == ""){
+                //jQuery("#sqrqzrq").val(gdate);
+            }
+            jQuery("#sfzh").focus();
+            var xbs = document.getElementsByName("xb");
+            if(xb == xbs[0].value){
+                xbs[0].checked = true;
+            }else if(xb == xbs[1].value){
+                xbs[1].checked = true;
+            }
+            var pxjgdm = "";
+            //加载下属机构
+            var px = false;
+            //发证机构报名的数据
+            if("9002" == dwbm_jglb){
+                jgdm = "";
+            }
+            px = dwbm_bindselectpxjg("pxjgdm",pxjgdm,jgdm);
+            if(px == null || px){
+                ispx = true;
+                jQuery("#pxjgx").show();
+            }else{
+                ispx = px;
+                jQuery("#pxjgx").hide();
+                jQuery("#pxjgdm").html('<option value=""></option>');
+            }
+            //加载文化程度
+            dwbm_bindselectdm("whcd",'04','');
+
+            if(''==''){
+                var oSel = document.getElementById('whcd');
+                var oOp = oSel.children;        //获取select列表的所有子元素。
+                for(var i=0,len = oOp.length;i<len;i++)
+                {
+                    if(oOp[i].value=='0401'){
+                        oSel.removeChild(oOp[i]);
+                        break;
+                    }
+                }
+            }
+            //证件类型
+            dwbm_bindselectdm("zjlx",'05',''==''?"1":'','1');
+
+
+            if(yxzt == 'edit'){
+                //加载作业项目
+                dwbm_bindSelectNewZyxm("zyxm", "zyxmcode", "", 0);
+            }
+            //加载相关材料
+            loadxgclselected('xgcl',"");
+            //加载所在地区信息
+            if(xzkzdq==1){
+                bindselectdistrictforbm("dwszdq","");
+                if(yxzt == "edit"){
+                    bindselectregionforbm("dwszqx","","");
+                }
+            }
+
+            if (checkArea == 1) {
+                bindselectdistrictforbm("residencedq", "");
+                if (yxzt == "edit") {
+                    bindselectResidencedqforbm("residenceqx", "", "");
+                }
+            }
+
+            if(zp != null && zp != "" && zp != 'null'){
+                jQuery("#img1").html(zp);
+            }
+
+            if (canChooseLqfs && canChooseLqfs != '0') {
+                var lqfs = "";
+                if (lqfs == jQuery("input[name='lqfs']")[0].value) {
+                    jQuery("input[name='lqfs']")[0].checked = true;
+                } else if (lqfs == jQuery("input[name='lqfs']")[1].value) {
+                    jQuery("input[name='lqfs']")[1].checked = true;
+                }
+            }
+
+            var sfzh = "140302197508291331";
+
+            if(sfzh != "" && sfzh != "null"&&info.indexOf("上传头像照片")<0){
+                jQuery("#sfzh").val(sfzh);
+                loadBmInfo(sfzh);
+            }
+            if ("" == "zww") {
+                jQuery("#lxdh").val("");
+            } else {
+                if ("".length >= 11) {
+                    jQuery("#lxdh").val("".replace(/(\d{3})(\d{4})(\d{4})/, "$1****$3"));
+                } else {
+                    jQuery("#lxdh").val("".replace(/(\d{4})/, "****"));
+                }
+            }
+        });
+        /**
+         *表单验证
+         */
+        var time = "2026-04-24";
+        var valid=true;
+        function validateForm(){
+            //山西，报名机构 141300110  太原市综改示范区质量技术监督局，单位地址必须包含综改示范区，不然不让报
+            if("sx"=="sx"&&dwbm_jgdm=='141300110'&&(jQuery("#dwdz").val()==''||jQuery("#dwdz").val().indexOf("综改示范区")<0)){
+                alert("单位地址为空或单位地址不在'综改示范区'，不能报名！");
+                return false;
+            }
+
+             if("sx"=="hubei"&&dwbm_jgdm=='42060001'&&jQuery("#pxjgdm").val() == ""&&"9002"=='9001'){//湖北所属地区为必填项
+             	alert("请选择下属机构（或单位所属地区）！");
+             	jQuery("#pxjgdm").focus();
+             	return false;
+             }
+            if(jQuery("#sfzh").val() == ""){
+                alert("请填写您的证件号！");
+                jQuery("#sfzh").focus();
+                return false;
+            }else{
+                if(idcardContrl=='1'&&jQuery("#zjlx").val() == "1"&&jQuery("#sfzh").val().length<18){
+                    alert("请输入18位身份证号！");
+                    return false;
+                }
+            }
+            if(jQuery("#sqrxm").val() == ""){
+                alert("请填写姓名！");
+                jQuery("#sqrxm").focus();
+                return false;
+            }
+            if(jQuery("#whcd").val() == ""){
+                alert("请填写文化程度！");
+                jQuery("#whcd").focus();
+                return false;
+            }
+            if(jQuery("#whcd").val() == "0402"){
+                alert("初中以下文化程度不能报名！");
+                jQuery("#whcd").focus();
+                return false;
+            }
+            if(jQuery("#yzbm").val() != "" && isNaN(jQuery("#yzbm").val())){
+                alert("邮政编码中含义无效字符！");
+                jQuery("#yzbm").focus();
+                return false;
+            }
+            if(jQuery("#zjlx").val() == "1"){
+                var zt = checkIDCard(jQuery("#sfzh").val(),'xb','');
+                if(zt != true){
+                    alert(zt);
+                    return false;
+                }
+            }
+            // if(("sx"=="hubei"||"sx"=="sx")&&jQuery("#lxdh").val() == ""){//湖北,山西联系电话为必填项
+            //     alert("请填写联系电话！");
+            //     jQuery("#lxdh").focus();
+            //     return false;
+            // }
+            if((jQuery("#phoneIsReq").val()===1||jQuery("#phoneIsReq").val()==='1')&&jQuery("#lxdh").val() === ""){//湖北联系电话为必填项
+                alert("请填写联系电话！");
+                jQuery("#lxdh").focus();
+                return false;
+            }
+            if("sx"=="sc"){
+                var a =jQuery("#sfzh").val();
+                var b="x";
+                if(a.indexOf(b) >=0) {
+                    alert("请将身份证号小写的x改成大写的X  !!!");
+                    jQuery("#sfzh").focus();
+                }
+            }
+            if("sx"=="sx"&&jQuery("#yzbm").val() == ""){//山西邮政编码为必填项
+                alert("请填写邮政编码！");
+                jQuery("#yzbm").focus();
+                return false;
+            }
+            if("sx"=="sx"&&jQuery("#txdz").val() == ""){//山西通信地址为必填项
+                alert("请填写通信地址！");
+                jQuery("#txdz").focus();
+                return false;
+            }
+            if(jQuery("#yzbm").val() != "" && isNaN(jQuery("#yzbm").val())){
+                alert("邮政编码中含义无效字符！");
+                jQuery("#yzbm").focus();
+                return false;
+            }
+            /*var nf = "";
+            var date = new Date(time.split("-")[0],time.split("-")[1]-1,time.split("-")[2]);
+            if(jQuery("#zjlx").val() == "1" && jQuery("#sfzh").val().length == 15){
+                var nf = "19"+jQuery("#sfzh").val().substr(6,6);
+                var nn = parseInt(time.replaceAll("-",""))-parseInt(nf);
+                if(nn < 180000 || nn > 600000){
+                    alert("年龄不符合要求，不能报名！【提示：年龄 18到60；】");
+                    return false;
+                }
+            }else  && jQuery("#sfzh").val().length == 18){
+                var nf = jQuery("#sfzh").val().substr(6,8);
+                var nn = parseInt(time.replaceAll("-",""))-parseInt(nf);
+                if(nn < 180000 || nn > 600000){
+                    alert("年龄不符合要求，不能报名！【提示：年龄 18到60；】");
+                    return false;
+                }
+            }*/
+            if(jQuery("#zjlx").val() == "1"){
+                var obj = applyAgeContrl_XZ(jQuery("#sfzh").val(),jQuery("#zyxm").val(),time);
+                if(!obj.state){
+                    alert(obj.msg);
+                    return false;
+                }
+            }
+            if(jQuery("#zyxm").val() == ""){
+                alert("请选择作业项目！");
+                jQuery("#zyxm").focus();
+                return false;
+            }
+            var zyxmval = jQuery("#zyxm").val();
+            if(((xzbmHasTzsbzlA == "1" && "0195"==zyxmval)
+                    || (xzbmHasTzsbzlG == "1" && "0297"==zyxmval)
+                    || (xzbmHasTzsbzlP == "1" && "0495"==zyxmval)) &&  jQuery("#tzsbzl").val() == ""){
+                alert("请选择所从事的特种设备种类！");
+                xzSelectTzsbzl(zyxmval);
+                return false;
+            }
+            if((zyxmval == "0296" || zyxmval == "1195" || zyxmval == "0695") && systype == "sx" && dwbm_jglb == "9001" ){
+                alert("请报名到山西省市场监督管理局");
+                return false;
+            }
+
+            //南京外网报名N2定制
+            var jgdm = jQuery("#jgdm").val();
+            if(jQuery("#zyxmcode").val() == "1096" && "sx" == "js" && jgdm.startWith('3201')){
+                alert("持有B1 以上(含B1)的《中华人民共和国机动车驾驶证》的观光车和观光列车考生可以免考实际操作技能考试。若需要申请实操免试，请及时提交相关材料。")
+            }
+
+
+            var xmdh = "";
+            if (xmdh != "" && xmdh != jQuery("#zyxm_val").val()) {
+                alert("项目代号和公众服务平台项目代号不一致！");
+                return false;
+            }
+            if(xzUnit=="1"&&jQuery("#yrdw").val() == ""){
+                alert("请填写工作单位！");
+                jQuery("#yrdw").focus();
+                return false;
+            }
+
+            if (xzkzdq != 0 && checkArea != 1) {
+                if (jQuery("#dwszdq").val() == "") {
+                    alert("请选择单位所在地区！");
+                    jQuery("#dwszdq").focus();
+                    return false;
+                }
+                if (jQuery("#dwszqx").val() == "") {
+                    alert("请选择单位所在区县！");
+                    jQuery("#dwszqx").focus();
+                    return false;
+                }
+            }
+            if(systype!="zj"){
+                if(jQuery("#gzjl").val() == ""){
+                    alert("请填写工作简历！");
+                    jQuery("#gzjl").focus();
+                    return false;
+                }
+                // if(jQuery("#pxqk").val() == ""){
+                //     alert("请填写培训情况！");
+                //     jQuery("#pxqk").focus();
+                //     return false;
+                // }
+                if(jQuery("#gzjl").val().length > 500){
+                    alert("工作简历字数不能超过500字！");
+                    jQuery("#gzjl").focus();
+                    return false;
+                }
+            }
+
+            if (checkArea != 0) {
+                var signUp = jQuery("#jgdm").val();
+                var idCardArea = checkIDCardArea(signUp, jQuery("#sfzh").val());
+                if (idCardArea != "") {
+                    alert(idCardArea);
+                    return false;
+                }
+            }
+
+            //提醒即将退休
+            if(!validationCsny(jQuery("#sfzh").val(),time)){
+                return false;
+            }
+
+            if(!verifyIdCardConfirm(jQuery("#sfzh").val())){
+                return false;
+            }
+
+            if(systype!="sx"){
+                if(xzAttachIsReq == "1" && systype == 'hunan') {//需要上传附件
+                    var isPass = true;
+                    var noPassFjmc = "";
+                    var flag = 0;
+                    jQuery(".xgclCls").each(function () {
+                        if(jQuery(this).parent().find(".xgclFj>a").length < 2) {
+                            var fjmc = jQuery(this).text();
+                            if(fjmc.indexOf("学历证明(毕业证复印件1份)") == -1 && fjmc.indexOf("学历证明承诺") == -1) {      //山西的单独加了这个控制
+                                isPass =  false;
+                                noPassFjmc = fjmc;
+                                return false;
+                            }
+
+                            if(fjmc.indexOf("学历证明(毕业证复印件1份)") == 0) {
+                                flag +=1;
+                            }
+
+                            if(fjmc.indexOf("学历证明承诺") == 0) {
+                                flag +=1;
+                            }
+
+                            if(flag == 0 || flag == 2){
+                                isPass =  false;
+                                noPassFjmc = "学历证明(毕业证复印件1份) 和 学历证明承诺至少上传一个";
+                                return false;
+                            }
+                        }
+                    });
+                    if(whetherUseQrCode == "1") {
+                        var weChatUpload = document.getElementById("phoneUpload").innerText;
+                        if (weChatUpload != null && weChatUpload != "") {
+                            isPass = true;
+                        }
+                    }
+                    if(!isPass) {
+                        alert("请上传相关资料“" + noPassFjmc + "”！\r\n（注：仅支持IE浏览器）");
+                        return false;
+                    }
+                }else if(xzAttachIsReq == "1") {//需要上传附件
+                    var isPass = true;
+                    var noPassFjmc = "";
+                    var zyxmdh_array = ["0297", "1095", "1096", "0896"];//这几个必传体检报告
+                    var zyxmdh_array2 = ["0195", "0295", "0296", "0297", "0303", "0895", "0896", "1195"];
+                    var zyxmdh = jQuery("#zyxmcode").val();
+                    //判断逻辑是 便利没有上传附件的 材料列表，当前附件名称如果是申请表等几个 不需要判断，其他的都要进 判断
+                    jQuery(".xgclCls").each(function () {
+                        if (jQuery(this).next().find("a").length < 2) {
+                            var fjmc = jQuery(this).text();
+                            if(fjmc.indexOf("其他") == -1&& fjmc.indexOf("申请表扫描件") == -1&& fjmc.indexOf("居住证") == -1&& fjmc.indexOf("劳动用工合同") == -1&& fjmc.indexOf("社会保险") == -1&& fjmc.indexOf("劳动合同") == -1&& fjmc.indexOf("社保证明") == -1&& fjmc.indexOf("户口或者居住证") == -1) {
+                                //其他和扫描件报名时不用传
+                                if((zyxmdh_array.indexOf(zyxmdh) == -1 && fjmc.indexOf("体检报告") != -1)||
+                                    (zyxmdh_array2.indexOf(zyxmdh) == -1 && fjmc.indexOf("学历证明") != -1)){//非特定项目未传体检报告 或者 非特定项目2未传学历证明  都是符合条件的
+                                    isPass =  true;
+                                    noPassFjmc = fjmc;
+                                }else{//不符合要求的
+                                    isPass =  false;
+                                    noPassFjmc = fjmc;
+                                    return false;
+                                }
+                            }
+                        }
+                    });
+                    if(whetherUseQrCode == "1") {
+                        var weChatUpload = document.getElementById("phoneUpload").innerText;
+                        if (weChatUpload != null && weChatUpload != "") {
+                            isPass = true;
+                        }
+                    }
+                    if (!isPass) {
+                        alert("请上传相关资料“" + noPassFjmc + "”！\r\n（注：仅支持IE浏览器）");
+                        return false;
+                    }
+                }
+            }else{
+                if(xzAttachIsReq == "1") {//需要上传附件
+                    var isPass = true;
+                    var zyxmdh_array = ["0297", "1095", "1096", "0896"];//这几个必传体检报告
+                    var noPassFjmc = "";
+                    var zyxmdh = jQuery("#zyxmcode").val();
+                    jQuery(".xgclCls").each(function () {
+                        if(jQuery(this).parent().find(".xgclFj>a").length < 2) {
+                            var fjmc = jQuery(this).text();
+                            if(fjmc.indexOf("其他") == -1&& fjmc.indexOf("申请表扫描件") == -1&& fjmc.indexOf("居住证") == -1&& fjmc.indexOf("劳动用工合同") == -1&& fjmc.indexOf("社会保险") == -1&& fjmc.indexOf("劳动合同") == -1&& fjmc.indexOf("社保证明") == -1&& fjmc.indexOf("户口或者居住证") == -1) {      //山西的单独加了这个控制
+                                if((zyxmdh_array.indexOf(zyxmdh) == -1 && fjmc.indexOf("体检报告") != -1)){//非特定项目未传体检报告 都是符合条件的
+                                    isPass =  true;
+                                    noPassFjmc = fjmc;
+                                }else{//不符合要求的
+                                    isPass =  false;
+                                    noPassFjmc = fjmc;
+                                    return false;
+                                }
+                            }
+                        }
+                    });
+                    if(whetherUseQrCode == "1") {
+                        var weChatUpload = document.getElementById("phoneUpload").innerText;
+                        if (weChatUpload != null && weChatUpload != "") {
+                            isPass = true;
+                        }
+                    }
+                    if(!isPass) {
+                        alert("请上传相关资料“" + noPassFjmc + "”！\r\n（注：仅支持IE浏览器）");
+                        return false;
+                    }
+                }
+            }
+
+            if(systype=="shanxi" && fileUploadSwitch == "0"){
+                var sfzh=jQuery("#sfzh").val();
+                var zjlx=jQuery("#zjlx").val();
+                sfzh = sfzh.substr(0,2);
+                var isPass = true;
+                var noPassFjmc = "";
+                if((sfzh.substr(0,2)!='61'&&zjlx=='1')||zjlx!='1'){//证件类型不是身份证 或者 是身份证且开头不是61  都是外省人员
+                    var fjmca = 0;//居住证和劳动用工合同 没传附件的个数
+                    jQuery(".xgclCls").each(function () {
+                        if (jQuery(this).next().find("a").length < 2) {
+                            var fjmc = jQuery(this).text();
+                            if(fjmc.indexOf("社会保险") != -1) { //非本省必填社保
+                                isPass =  false;
+                                noPassFjmc = fjmc;
+                                return false;
+                            }
+                           if(fjmc.indexOf("居住证") != -1|| fjmc.indexOf("劳动用工合同") != -1) { //非本省必填居住证或合同
+                               fjmca=fjmca+1;
+                            }
+                        }
+                    });
+                    if (fjmca >= 2) {
+                        isPass =  false;
+                        noPassFjmc = "居住证”或“劳动用工合同";
+                    }
+                }
+                if(!isPass) {
+                    alert("请上传相关资料“" + noPassFjmc + "”！\r\n（注：仅支持IE浏览器）");
+                    return false;
+                }
+            }
+            if( wsxgcl == "1"){//向户籍所在地申请必传户口或者居住证，向用人单位所在地申请必传劳动合同和社保证明,即  户口或者居住证 和 劳动合同、社保证明 二者至少传一个！
+                var isPass = true;
+                var noPassFjmc = "";
+                var fjmcahj = 0;//居住证和劳动用工合同 没传附件的个数
+                var fjmcaht = 0;//居住证和劳动用工合同 没传附件的个数
+                jQuery(".xgclCls").each(function () {
+                    if (jQuery(this).next().find("a").length < 2) {
+                        var fjmc = jQuery(this).text();
+                        // alert(fjmc);alert(fjmc.indexOf("户口或者居住证") );
+                        if(fjmc.indexOf("户口或者居住证") != -1) { //户口或者居住证 没传附件的时候 是0
+                            fjmcahj=1;
+                        }
+                        if(fjmc.indexOf("劳动合同") != -1|| fjmc.indexOf("社保证明") != -1) { //劳动合同 没传附件的时候 是0
+                            fjmcaht=1;
+                        }
+                    }
+                });
+
+                if (fjmcahj>0&&fjmcaht>0) {
+                    isPass =  false;
+                    noPassFjmc = "向户籍所在地申请必传户口或者居住证，向用人单位所在地申请必传劳动合同和社保证明";
+                }
+
+                if(!isPass) {
+                    alert("请上传相关资料“" + noPassFjmc + "”！\r\n（注：仅支持IE浏览器）");
+                    return false;
+                }
+            }
+
+            /* if (xmAttachIsReq == "1") {//特殊项目控制上传附件
+                 var zyxmdh_array = ["0195", "0295", "0296", "0297", "0303", "0895", "0896", "1195"];
+                 var zyxmdh = jQuery("#zyxmcode").val();
+                 if (zyxmdh_array.indexOf(zyxmdh) > -1) {
+                     var isPass = true;
+                     var noPassFjmc = "";
+                     jQuery(".xgclCls").each(function () {
+                         if (jQuery(this).parent().find(".xgclFj>a").length < 2) {
+                             var fjmc = jQuery(this).text();
+                             if (fjmc.indexOf("学历证明") > -1) {
+                                 isPass = false;
+                                 noPassFjmc = fjmc;
+                                 return false;
+                             }
+                         }
+                     });
+                     if (!isPass) {
+                         alert("请上传相关资料“" + noPassFjmc + "”！\r\n（注：仅支持IE浏览器）");
+                         return false;
+                     }
+                 }
+             }*/
+
+            /*if (xzAttachIsReq == "1" ) {
+                var zyxmdh_array = ["0195", "0295", "0296", "0297", "0303", "0895", "0896", "1195"];
+                var zyxmdh = jQuery("#zyxmcode").val();
+
+                var isPass = false;
+                var noPassFjmc = "";
+                jQuery(".xgclCls").each(function () {
+                    if (jQuery(this).next().find("a").length < 2) {
+                        var fjmc = jQuery(this).text();
+                        if (zyxmdh_array.indexOf(zyxmdh) == -1 && (fjmc.indexOf("学历证明") != -1|| fjmc.indexOf("体检报告") != -1|| fjmc.indexOf("身份证明")!=-1)) {
+                            return true;
+                        }
+                        isPass = true;
+                        noPassFjmc = fjmc;
+                        return false;
+                    }
+                });
+
+                if (isPass) {
+                    alert("请上传相关资料“" + noPassFjmc + "”！\r\n（注：仅支持IE浏览器）");
+                    return false;
+                }
+            }*/
+
+          /*  if (xzAttachIsReq == "1" ) {
+                var zyxmdh_array = ["0297", "1095", "1096", "0896"];
+                var zyxmdh = jQuery("#zyxmcode").val();
+
+                var isPass = false;
+                var noPassFjmc = "";
+                jQuery(".xgclCls").each(function () {
+                    if (jQuery(this).next().find("a").length < 2) {
+                        var fjmc = jQuery(this).text();
+                        if (zyxmdh_array.indexOf(zyxmdh) == -1 && fjmc.indexOf("体检报告") != -1) {
+                            return true;
+                        }
+                        isPass = true;
+                        noPassFjmc = fjmc;
+                        return false;
+                    }
+                });
+
+                if (isPass) {
+                    alert("请上传相关资料“" + noPassFjmc + "”！\r\n（注：仅支持IE浏览器）");
+                    return false;
+                }
+            }*/
+
+            if(jQuery("#business_code").val() != ""){
+                var info = "";
+                var flag = true;
+                jQuery.ajax({
+                    type: "POST",
+                    url: "checkBusinessCode.do",
+                    dataType: "json",
+                    data: {
+                        business_code: jQuery("#business_code").val()
+                    },
+                    cache : false,
+                    async: false,
+                    success : function(data, status) {
+                        if(data.code == "1"){
+                            info = data.text;
+                            flag = false;
+                        }else{
+                            flag = true;
+                        }
+                    },
+                    error : function(request, error, status) {
+                        alert(error);
+                    },
+                    complete : function(request, error, status) {
+                    }
+                });
+                if(!flag){
+                    alert(info);
+                    return false;
+                }
+            }
+
+            if(jQuery("#sfzh").val() != ""){//是否要上传照片验证
+                //alert("jgdm="+dwbm_jgdm);
+                jQuery.ajax({
+                    type : "POST",
+                    url : "wbapplycheckUserPortrait.do?bmid=",
+                    dataType : "json",
+                    data : {
+                        bmlb : '0',
+                        jgdm:dwbm_jgdm,
+                        sfz:jQuery("#sfzh").val()
+                    },
+                    cache: false,
+                    async: false,
+                    success : function(data, status) {
+                        if(data.code==1){
+                            alert(data.text);
+                            valid = false;
+                        }else{
+                            valid = true;
+                        }
+                    },
+                    error : function(request, error, status) {
+                        alert(error);
+                    },
+                    complete : function(request, error, status) {
+                    }
+                });
+
+            }
+
+            if (!valid) {
+                return false;
+            }
+
+            //考试未进行完不予重复报名开关验证
+            jQuery.ajax({
+                type : "POST",
+                url : "wbisCanApply.do",
+                dataType : "json",
+                data : {
+                    bmlb : '0',
+                    jgdm:dwbm_jgdm,
+                    sfzh:jQuery("#sfzh").val(),
+                    zyzl:jQuery("#zyzl").val(),
+                    zyxm:jQuery("#zyxm").val()
+                },
+                cache : false,
+                async: false,
+                success : function(data, status) {
+                    if(data.code==1){
+                        alert(data.text);
+                        valid= false;
+                    }else{
+                        valid=true;
+                    }
+                },
+                error : function(request, error, status) {
+                    alert(error);
+                },
+                complete : function(request, error, status) {
+                }
+            });
+            if (!valid) {
+                return false;
+            }
+
+            jQuery.ajax({
+                type: "POST",
+                url: "isExamDoing.do",
+                dataType: "json",
+                data: {
+                    bmlb: '0',
+                    jgdm: dwbm_jgdm,
+                    sfzh: jQuery("#sfzh").val(),
+                    zyzl: jQuery("#zyzl").val(),
+                    zyxm: jQuery("#zyxm").val()
+                },
+                cache: false,
+                async: false,
+                success: function(data, status) {
+                    if (data.code == 1) {
+                        alert(data.text);
+                        valid = false;
+                    } else {
+                        valid = true;
+                    }
+                },
+                error : function(request, error, status) {
+                    alert(error);
+                },
+                complete : function(request, error, status) {
+                }
+            });
+            if (!valid) {
+                return false;
+            }
+
+            if (systype == 'jl') {
+                var yhys = document.getElementById("yhys");
+                if (yhys.checked == false) {
+                    alert("请先阅读用户隐私！")
+                    return false;
+                }
+            }
+
+            // 检验考试计划（预）
+            if (typeof jQuery("#plan_id") != 'undefined' && jQuery("#plan_id").val() != null && jQuery("#plan_id").val() != "") {
+                jQuery.ajax({
+                    type: "POST",
+                    url: "checkPlan.do",
+                    dataType: "json",
+                    data: {
+                        planId: jQuery("#plan_id").val(),
+                        jglb: dwbm_jglb,
+                        jgdm: dwbm_jgdm
+                    },
+                    cache: false,
+                    async: false,
+                    success: function (data, status) {
+                        if (data.code == 0) {
+                            valid = true;
+                        } else {
+                            alert(data.text);
+                            valid = false;
+                        }
+                    }
+                });
+            }
+            if (!valid) {
+                return false;
+            }
+
+            //校验验证码
+            if (jQuery("#verCode").val() == "") {
+                alert("请填写验证码！");
+                jQuery("#verCode").focus();
+                return false;
+            } else {
+                //ajax 校验码正确性，然后返回一个token
+                jQuery.ajax({
+                    type: "POST",
+                    url: "checkVerCode.do",
+                    dataType: "json",
+                    data: {
+                        verCode: jQuery("#verCode").val()
+                    },
+                    cache: false,
+                    async: false,
+                    success: function (data, status) {
+                        if (data.code == 0) {
+                            jQuery("#bmVerriToken").val(data.text);
+                            valid = true;
+                        } else {
+                            alert(data.text);
+                            changeImg();
+                            valid = false;
+                        }
+                    }
+                });
+            }
+
+            if (!valid) {
+                return false;
+            } else {
+                if(!window.confirm("提示：是否已经检查确认填写信息正确无误？")){
+                    return false;
+                }else{
+                    return true;
+                }
+            }
+
+        };
+        function iszjlx(){
+            var txt = jQuery("#zjlx option:selected").val();
+            if(txt == "1"){
+                jQuery("#sfzh").attr({maxlength:18});
+            }else{
+                jQuery("#sfzh").attr({maxlength:50});
+            }
+        }
+        function checkedRadio(obj){
+            if(obj.checked && obj.value == "1"){
+                jQuery("#zsbhlabel").show();
+            }else{
+                jQuery("#zsbhlabel").hide();
+            }
+        }
+        jQuery(document).ready(function (){
+            if(yxzt != "edit" && "sx"=="sx" && "1" =="1" && document.getElementById('tooltip-trigger') != null){
+                var tooltip = document.getElementById('tooltip-trigger');
+                addEvent(tooltip, 'mouseover', function mouseover() {document.getElementById('tooltip').style.display = 'block';});
+                addEvent(tooltip, 'mouseout', function mouseout() {document.getElementById('tooltip').style.display = 'none';});
+            }
+            var tzsbzl = "";
+            if (tzsbzl != "") {
+                jQuery("#tzsbzltr").css("display", "");
+            }
+            if(isOpenAddXgcl() && "yxzt" in window && yxzt == "edit"){
+                var sfzh = "";
+                var zyxm = "";
+                var bmid = "";
+                var zt = "";
+                if (zt == "zww") {
+                    loadXgclAll(sfzh, zyxm, bmid);
+                } else {
+                    dwbm_loadXgclAll(sfzh, zyxm, bmid, yxzt);
+                }
+            }
+        });
+        function addEvent(element, event, handler) {
+            if (element.addEventListener) {
+                element.addEventListener(event, handler, false);
+            } else if (element.attachEvent) {
+                element.attachEvent('on' + event, handler);
+            }
+        }
+        function loadXm(obj){
+            if(ksjg_dm === ""){
+                ksjg_dm = dwbm_jgdm;
+            }
+            if(obj.value == ""){
+                dwbm_jgdm = ksjg_dm;
+                dwbm_jglb = "9001";
+            }else{
+                dwbm_jgdm = obj.value;
+                dwbm_jglb = "9003";
+            }
+            //加载作业项目
+            dwbm_bindSelectNewZyxm("zyxm", "zyxmcode", "", 0);
+            //初始化特种设备种类
+            xzSelectTzsbzl("");
+        }
+        function getUploadSwitch(ksjg){
+            jQuery.ajax({
+                type : "POST",
+                url : "queryUploadSwitch.do",
+                dataType : "json",
+                async: false,
+                data : {
+                    jgdm:ksjg
+                },
+                success : function(data, status) {
+                    fileUploadSwitch = data.code;
+                }
+            });
+        }
+        function loadXmByKsjg(obj){
+            var flag = "";
+            if(obj.value != ""){
+                dwbm_ksjg_dm = obj.value;
+                getUploadSwitch(dwbm_ksjg_dm);
+                if(flag != "" &&  flag == 0){
+                    document.getElementById("ksjgaddress").innerHTML = "";
+                    document.getElementById("ksjglxr").innerHTML = "";
+                    document.getElementById("ksjglxdh").innerHTML ="";
+                    jQuery.ajax({
+                        type: "POST",
+                        url: "ksjgInfo.do",
+                        dataType: "json",
+                        data: {
+                            jgdm: obj.value
+                        },
+                        cache: false,
+                        async: false,
+                        success: function (data, status) {
+                            if(data!=null){
+                                document.getElementById("ksjgaddress").innerHTML = data.DZ ? data.DZ : "";
+                                document.getElementById("ksjglxr").innerHTML = data.LXR ? data.LXR : "";
+                                document.getElementById("ksjglxdh").innerHTML = data.DH ? data.DH : "";
+                            }
+                        }
+                    });
+                }
+            }else{
+                dwbm_ksjg_dm  = "";
+            }
+            if(systype == 'yn') {
+                //加载作业项目
+                dwbm_bindSelectNewZyxmFzjgbmYn("zyxm", "zyxmcode",jQuery("#zyxm").val() , 0);
+            }else{
+                if(systype != 'jx' && !dwbm_jgdm.startsWith("3607")){
+                    //赣州切换考试机构不切换项目
+                    //加载作业项目
+                    dwbm_bindSelectNewZyxmFzjgbm("zyxm", "zyxmcode",jQuery("#zyxm").val() , 0);
+                    //初始化特种设备种类
+                    xzSelectTzsbzl("");
+                }
+            }
+
+        }
+
+
+        //变换考试计划(预)的作业种类取值
+        function loadPlanXm(obj){
+            dwbm_planid = obj.value;
+            //加载作业项目
+            dwbm_bindSelectNewZyxm("zyxm", "zyxmcode", "", 0);
+            //初始化特种设备种类
+            xzSelectTzsbzl("");
+        }
+
+        var xzbmHasTzsbzlA = "1";
+        var xzbmHasTzsbzlG = "1";
+        var xzbmHasTzsbzlP = "1";
+        jQuery(function () {
+            if("" != "") {
+                xzSelectTzsbzl("");
+            }
+            if("0195" != ""){
+                xzSelectTzsbzl("0195");
+            }
+        });
+
+        function selectNewXm(obj, xmid) {
+            jQuery(obj).val(xmid);
+            jQuery("#zyzl").val(xmid.length > 2 ? xmid.substring(0,2) : "");
+            if(systype == 'jx' && dwbm_jgdm.startsWith("3607")){
+                //赣州定制
+                if(ksjgIsMust==1){
+                    jQuery("#ksjg").html("<option value=''>--请选择--</option>");
+                    dwbm_ksjg_dm="";
+                    //考试机构切换成拥有此项目的
+                    jQuery.ajax({
+                        type: "POST",
+                        url: "loadKsjg.do",
+                        dataType: "json",
+                        async: false,
+                        data: {"jgdm": dwbm_jgdm,"isHj":"0",zyxm:xmid},
+                        cache: false,
+                        success: function (data, status) {
+                            for (i = 0; i < data.length; i++){
+                                jQuery("#ksjg").append("<option value='" + data[i].JGDM + "'" + ">" + data[i].JGMC + "</option>");
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        function verifyIdCardConfirm(idCard) {
+            var isRequestSuccess = false;
+            var confirmMsg = '';
+            if(jQuery("#zjlx").val() != "1"){
+                return true;
+            }
+            var jgdm = jQuery('#jgdm').val()
+            jQuery.ajax({
+                type: "POST",
+                url: "verifyDwBmIdCard.do",
+                dataType: "json",
+                data: {idCard: idCard,jgdm:jgdm},
+                cache: false,
+                async: false,
+                success: function(data, status) {
+                    if (data.code == 0) {
+                        isRequestSuccess = true;
+                        if (typeof data.msg != 'undefined' && data.msg != '') {
+                            confirmMsg = '提醒：<br>';
+                            confirmMsg += data.msg;
+                            confirmMsg += '请注意核对！<br>是否确认继续审核？';
+                            confirmMsg = confirmMsg.replaceAll("<br>", "\n");
+                        }
+                    } else {
+                        alert(typeof data.msg == 'undefined' ? '操作失败，请重试' : data.msg);
+                    }
+                }, error: function(request, error, status) {
+                    alert(error);
+                }, complete: function(request, error, status) {
+
+                }
+            });
+
+            return isRequestSuccess ? (confirmMsg === '' ? true : confirm(confirmMsg)) : false;
+        }
+
+        function loadXzXgcl(obj, val, xgcl, bmid) {
+            if (systype != 'gx') {
+                initXgcl(obj, val, xgcl, bmid);
+            } else {
+                var sfzh = jQuery("#sfzh").val();
+                var zyxm = jQuery("#zyxm").length > 0 ? jQuery("#zyxm").val() : "";
+                if (sfzh == '') {
+                    alert('请填写证件号码!');
+                    jQuery(obj).attr("checked", false);
+                } else if (sfzh.indexOf(' ') != -1) {
+                    alert("证件号的格式有误, 不可添加附件, 注意不要有空格！");
+                    jQuery(obj).attr("checked", false);
+                    jQuery("#sfzh").focus();
+                } else if (zyxm == '') {
+                    alert('请选择作业项目!');
+                    jQuery(obj).attr("checked", false);
+                } else {
+                    initXgcl(obj, val, xgcl, bmid);
+                }
+            }
+        }
+
+        function changeSfzh() {
+            if (systype != 'gx') {
+                return;
+            }
+
+            var sfzh = jQuery("#v_sfzh").val();
+            jQuery(".xgclCls").each(function () {
+                var num = jQuery(this).parent().find(".xgclFj").html().indexOf('添加附件') == -1 ? 1 : 2;
+                if (jQuery(this).parent().find(".xgclFj > a").length >= num) {
+                    jQuery("#sfzh").val(sfzh);
+                }
+            });
+
+            var val = jQuery("#sfzh").val();
+            jQuery("#v_sfzh").val(val);
+        }
+        function openYhysxy(){
+            window.open("../privacypolicy.htm");
+        }
+
+        var startData;
+        function getCode() {
+
+            var jgdm = jQuery('#jgdm').val();
+            var sfzh = jQuery('#sfzh').val();
+            var zyxm = jQuery('#zyxm').val();
+            var sqrxm = jQuery('#sqrxm').val();
+            var zyzl = zyxm.substr(0, 2);
+            var bmlb = "0";
+            startData = setInterval("clock()", 7000);
+            if (zyxm == "" || zyzl == "" || zyxm == undefined || zyzl == undefined) {
+                alert("请先填写作业项目");
+                return;
+            }
+            if (sqrxm == "") {
+                alert("请先填写姓名");
+                return;
+            }
+            window.open("../toCreateBmQRCode.do?verCodeUrl=bm_code_url&jgdm=" + jgdm + "&sfzh=" + sfzh + "&zyxm=" + zyxm + "&sqrxm=" + sqrxm + "&zyzl=" + zyzl + "&bmlb=" + bmlb
+                , "_blank", "toolbar=no,width=800,height=800,status=no,scrollbars=yes,resizable=yes,menubar=no,location=no");
+        }
+
+        function clock() {
+            var jgdm = jQuery('#jgdm').val();
+            var sfzh = jQuery('#sfzh').val();
+            var zyxm = jQuery('#zyxm').val();
+            var bmlb = "0";
+            var zyzl = zyxm.substr(0, 2);
+            var ishj;
+            if (zyzl == "12") {
+                ishj = 1;
+            } else {
+                ishj = 0;
+            }
+            var content = document.getElementById("phoneUpload").innerText;
+            if (content == "") {
+                jQuery.ajax({
+                    type: "POST",
+                    url: "weChatIsUploadFile.do",
+                    dataType: "json",
+                    data: {
+                        jgdm: jgdm,
+                        sfzh: sfzh,
+                        zyxm: zyxm,
+                        bmlb: bmlb,
+                        ishj: ishj
+                    },
+                    cache: false,
+                    async: false,
+                    success: function (data, status) {
+                        if (data.count > 0) {
+                            document.getElementById("phoneUpload").innerText = "已上传";
+                        }
+                    },
+                    error: function (request, error, status) {
+                        alert(error);
+                    },
+                    complete: function (request, error, status) {
+                    }
+                });
+            } else {
+                window.clearInterval(startData);
+            }
+        }
+    </script>
+
+    <title>特种设备作业人员考核管理平台</title>
+</head>
+
+<body>
+<link href="css/verify.css" rel="stylesheet" type="text/css">
+<link href="css/font-awesome.min.css" rel="stylesheet">
+<meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<div id="verify-container" draggable="false" class="verify-container">
+    <div id="verify-title" class="verify-title">
+        <span style="margin-left: 20px; font-size: 18px; font-weight: bold;">请先完成安全验证</span>
+        <span id="verifyRefresh"><i class="fa fa-refresh fa-2x"></i></span>
+        <span id="verifyClose"><i class="fa fa-close fa-2x"></i></span>
+    </div>
+    <div id="verify-content">
+        <div id="verify-image-content" class="verify-image-content">
+            <img id="verifyBigImg" class="verifyBigImg" src=""/>
+            <img id="verifySmallImg" class="verifySmallImg" src=""/>
+        </div>
+        <div id="verify-slider-content">
+            <div id="verifySliderChannel">向右拖动滑块填充拼图</div>
+            <div id="verifySliderBtn">
+                <i class="fa fa-arrow-right fa-2x"></i>
+            </div>
+        </div>
+    </div>
+</div><form id="savedatafrm" action="dwbm_savekzbmb.do" target="_self" enctype="multipart/form-data" method="post" onSubmit="return validateForm();">
+    <div id = "printPage">
+    <input type="hidden" id="bmid" name="bmid" value="">
+    <input type="hidden" id="sblsh" name="sblsh" value="">
+    <input type="hidden" id="jgdm" name="jgdm" value="140300111"/>
+    <input type="hidden" id="jglb" name="jglb" value="9002"/>
+    <input type="hidden" id="web_ksjgdm" name="web_ksjgdm" value="140300111"/>
+    <input type="hidden" id="bmjgdm" name="bmjgdm" value="140300111"/>
+    <input type="hidden" name="flag" value="">
+    <input type="hidden" id="bmlb" name="bmlb" value=""/>
+    <input type="hidden" id="bmVerriToken" name="bmVerriToken" value=""/>
+    <input type="hidden" name="tzsbzl" id="tzsbzl" value="">
+    <input name="lzfs" id="lzfs" type="hidden">
+    <input name="sjrxm" id="sjrxm" type="hidden">
+    <input name="sjrlxdh" id="sjrlxdh" type="hidden">
+    <input name="sjrxxdz" id="sjrxxdz" type="hidden">
+    <input name="sjryzbm" id="sjryzbm" type="hidden">
+    <input type="hidden" id="zwwbm" name="zwwbm" value=""/>
+    <input type="hidden" id="business_code" name="business_code" value="">
+    <input type="hidden" id="v_sfzh" name="v_sfzh" value="">
+    <input type="hidden" id="processStatus" name="processStatus" value="">
+    <input type="hidden" id="userid" name="userid" value="13253">
+    <input type="hidden" id="v_lxdh" name="v_lxdh" value="">
+    <input type="hidden" id="phoneIsReq" name="phoneIsReq" value=""/>
+            <input type="hidden" id="siteX" name="siteX" value="" />
+
+    <table width="650" height="50" border="0" align="center" cellpadding="0" cellspacing="0">
+        <tr>
+            <td align="center"><span style="font-size:24px; font-family:'黑体';" id="title">特种设备作业人员资格申请表</span></td>
+        </tr>
+    </table>
+    <table width="650px" border="0" align="center" cellpadding="0" cellspacing="0">
+        <tr id="plantr">
+            <td height="30" align="left" valign="middle">
+                <label style="display: none;" id="planlab">考试计划（预）：
+                    <select name="plan_id" id="plan_id" style="width: 240px;" onchange="loadPlanXm(this)"></select></label>
+            </td>
+        </tr>
+        <tr>
+            <td align="left" valign="middle">
+                <label style="display: none;" id="pxjgx">下属机构（或单位所属地区）：<select name="pxjgdm" id="pxjgdm" onchange="loadXm(this)" style="width: 240px;">
+                    <option value="">--请选择--</option></select>&nbsp;</label>
+            </td>
+        </tr>
+        <tr>
+            <td align="left" valign="middle">
+                <label  id="ksjgx" >考试机构：
+                    <select name="ksjgdm" id="ksjg" onchange="loadXmByKsjg(this)" style="width: 240px;">
+                        <option value="">--请选择--</option>
+                    </select>&nbsp;</label>
+            </td>
+        </tr>
+            </table>
+    <table width="650" align="center" cellpadding="0" cellspacing="1" bgcolor="#000000"  class="blodside">
+        <tr>
+            <td colspan="2">姓名</td>
+            <td>
+                <input name="sqrxm" type="text" id="sqrxm" maxlength="50" value="" onblur="trimStr(this)"
+                       class="bd_input01" style="width:160px"/>
+            </td>
+            <td>性别</td>
+            <td> <input name="xb" type="radio" id="xb1" value="1" checked="checked"/>男<input type="radio" name="xb" id="xb2" value="0" />女</td>
+            <td rowspan="4"><img src='image.do?bmid=&id=&zyxm=&bmlb=0' height="125" width="86" id="image1" style="cursor: pointer;" align="middle"/><br>
+                <input type="file" size="1" name="files" id="files" style="width:70px;" onChange="fileUpload('image1','savedatafrm',this.id)"></td>
+        </tr>
+        <tr>
+            <td colspan="2"><select id="zjlx" name="zjlx" onChange="iszjlx()" ></select></td>
+            <td>
+                <input name="sfzh" type="text" id="sfzh" size="20" maxlength="18" value=""
+                                       onChange="isIDCard(this)" onblur="changeSfzh()"
+                       style="width: 155px; border:1px solid #EA0000; background:#FDE3E3;text-transform:uppercase;"
+                       class="bd_input01"/>
+            </td>
+            <td>文化程度</td>
+            <td><select name="whcd" id="whcd">
+                <option value="">--请选择--</option>
+            </select></td>
+        </tr>
+
+        <tr>
+            <td colspan="2">工作单位</td>
+            <td colspan="3"><input name="yrdw" type="text" id="yrdw" maxlength="100" value="" class="bd_input01"  style="width:66%"/>
+                <input name="but" type="button" class="btnxz_out" onClick="selectDwyrdw()" value="选择" onMouseOver="this.className='btnxz_on'"onmouseout="this.className='btnxz_out'"></td>
+        </tr>
+        <tr>
+            <td colspan="2">工作单位地址</td>
+            <td colspan="3"><input name="dwdz" type="text" id="dwdz" maxlength="100" value="" class="bd_input01" /></td>
+        </tr>
+                <tr>
+            <td colspan="2">通信地址</td>
+            <td colspan="4"><input name="txdz" type="text" id="txdz" size="54" maxlength="200" value="" class="bd_input01"/></td>
+        </tr>
+        <tr>
+            <td colspan="2">邮&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;编</td>
+            <td><input name="yzbm" type="text" id="yzbm" maxlength="6" value="" class="bd_input01" style="width:108px;"/></td>
+            <td>联系电话</td>
+            <td colspan="2">
+                <input name="lxdh" type="text" id="lxdh" size="14" maxlength="50" class="bd_input01" style="width:108px;"/>
+                            </td>
+        </tr>
+        <tr>
+            <td colspan="2">申请作业项目</td>
+            <td>
+                <select name="zyxm" id="zyxm" onChange="selectNewXm('#zyxmcode',this.value); bindzyxmSmX('zyxm',this.value,'sx','xz')">
+                    <option value="">--请选择--</option>
+                </select>
+                <input type="hidden" id="zyzl" name="zyzl" value="">
+            </td>
+            <td>申请项目代号</td>
+            <td colspan="2">
+                <select name="zyxmcode" id="zyxmcode" style="width:110px;" onChange="selectNewXm('#zyxm',this.value); bindzyxmSmX('zyxm',this.value,'sx','xz')">
+                    <option value="">--请选择--</option>
+                </select>
+                            </td>
+        </tr>
+        <tr id="tzsbzltr" style="display:none">
+            <td colspan="2" height="30" style="line-height: 25px">选择的特种<br>设备种类</td>
+            <td colspan="4" id="tzsbzltd" style="line-height: 25px">
+            </td>
+        </tr>
+                        <input type="hidden" name="dwszdq" value=""/>
+        <input type="hidden" name="dwszqx" value=""/>
+                <tr>
+            <td style="width: 40px">工作简历</td>
+            <td colspan="5"><textarea name="gzjl" id="gzjl" cols="50" rows="12" style="width:98%;"></textarea></td>
+        </tr>
+        <tr>
+            <td>相关资料</td>
+            <td colspan="5">
+                                                                <div style="clear: both; vertical-align: middle; height: 22px">
+                    <input type="checkbox" onclick="loadXzXgcl(this,'tj07101','07101','')"
+                           name="xgcl"
+                           id="xgcl07101"
+                           value="07101"
+                           style="vertical-align:middle;"
+                           >
+                    <span class="xgclCls">身份证明(复印件)1份</span>
+                    &nbsp;<span id="tj07101" class="xgclFj"></span>
+                </div>
+                
+                                                <div style="clear: both; vertical-align: middle; height: 22px">
+                    <input type="checkbox" onclick="loadXzXgcl(this,'tj07102','07102','')"
+                           name="xgcl"
+                           id="xgcl07102"
+                           value="07102"
+                           style="vertical-align:middle;"
+                           >
+                    <span class="xgclCls">学历证明(毕业证复印件1份)</span>
+                    &nbsp;<span id="tj07102" class="xgclFj"></span>
+                </div>
+                
+                                                <div style="clear: both; vertical-align: middle; height: 22px">
+                    <input type="checkbox" onclick="loadXzXgcl(this,'tj07103','07103','')"
+                           name="xgcl"
+                           id="xgcl07103"
+                           value="07103"
+                           style="vertical-align:middle;"
+                           >
+                    <span class="xgclCls">体检报告(1份，相应考核大纲有要求的)</span>
+                    &nbsp;<span id="tj07103" class="xgclFj"></span>
+                </div>
+                
+                                                <div style="clear: both; vertical-align: middle; height: 22px">
+                    <input type="checkbox" name="xgcl" id="xgcl07104" value="07104" readonly >
+                    <span id="tooltip-trigger" style="color: grey"  class="xgclCls">申请表扫描件</span>
+                    <div id="tooltip" style="display: none; position: absolute; background: #333; color: #fff; padding: 5px; border-radius: 4px;">
+                        申请表请于上报成功后点击我的报名修改上传！
+                    </div>
+                    &nbsp;<span id="tj07104" class="xgclFj"></span>
+                </div>
+                
+                                                <div style="clear: both; vertical-align: middle; height: 22px">
+                    <input type="checkbox" onclick="loadXzXgcl(this,'tj07114','07114','')"
+                           name="xgcl"
+                           id="xgcl07114"
+                           value="07114"
+                           style="vertical-align:middle;"
+                           >
+                    <span class="xgclCls">劳动合同或社保证明（适用时）</span>
+                    &nbsp;<span id="tj07114" class="xgclFj"></span>
+                </div>
+                
+                
+            </td>
+        </tr>
+        <tr>
+            <td>用人单位意见</td>
+            <td colspan="5">
+                （申请人在非户籍工作所在地申请时需填写本栏）
+                <textarea name="yrdwyj" id="yrdwyj" cols="50" rows="3" style="width:98%;"></textarea>
+                用人单位(加盖公章)：&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;日期：
+                                <input type="hidden" name="yrdwrq" value="2026-04-24" />2026-04-24
+                            </td>
+        </tr>
+        <tr>
+            <td colspan="6" style="line-height: 25px">
+                <div align="left"><strong>本人声明，以上填写信息及所提交的资料均合法、真实、有效，并承诺对填写的内容负责。</strong></div>
+                <div align="right" style="clear: both; padding-right: 20px">申请人(签字)：&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;日期：
+                     <input type="hidden" name="sqrqzrq" value="2026-04-24" />2026-04-24                 </div>
+            </td>
+        </tr>
+    </table>
+    </div>
+    <table width="650" border="0" align="center" cellpadding="0" cellspacing="0" style="margin-top:6px">
+        <tr>
+            <td align="left">注：申请人在网上申请的，填报申请表后打印盖章签字并扫描上传。</td>
+        </tr>
+    </table>
+    <p>&nbsp;</p>
+    <table width="650" border="0" align="center" cellpadding="0" cellspacing="0" style="margin-top:6px">
+                <tr>
+            <td class="black13"  width="40%"  >验证码：<input  id='verCode' name="verCode" type="text" >  </td>
+
+            <td class="black13" width="60%">    <img id="veriimg" src="getAuthImage.do" />
+                <a href="javascript:void(0);" onclick="javascript:changeImg()" style="color:black;"><label style="color:black;">看不清？</label></a></td>
+        </tr>
+        <script type="text/javascript">
+            function changeImg(){
+
+                var img = document.getElementById("veriimg");
+                var timestamp =Date.parse(new Date());
+                img.src = "getAuthImage.do?date=" + timestamp;
+            }
+        </script>
+    </table>
+    <input name="xgclType" type="hidden" id="xgclType" value="071">
+</form>
+
+<script type="text/javascript" language="javascript1.2" src="js/readsyncard.js"></script>
+</body>
+</html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+    <link href="css/biaodan.css" rel="stylesheet" type="text/css">
+    <style type="text/css">
+        <!--
+        li{list-style:none}
+        ul li {
+            list-style: none outside none;
+        }
+        textarea.error { border: 1px solid red; }
+        input.error { border: 1px solid red; }
+        select.error { border: 1px solid red; }
+        .searchFormSelect {background:url(images/input_index.png) no-repeat;width:230px;height:22px;margin-right:10px;float:left;overflow:hidden;}
+        .searchFormSelect input {width:230px;padding-left:25px;height:22px;color:#000;cursor:pointer;background:transparent;text-align:left;margin:0px;margin-top:0px;*margin-top:0px;display:inline; border:none;}
+        @media   print   {
+            @page {
+                margin: 0;
+                size: auto;
+            }
+            .rept td, .rept td p{ /*font-size:20px; line-height:200%;*/ font-family:"STFangsong","SimSun";}
+            #bt{ display:none;}
+            #files{display: none}
+        }
+        -->
+    </style>
+    <script type="text/javascript" src="js/framework/Main.js?v=1.3"></script>
+    <script type="text/javascript" src="js/framework/jquery.blockUI.js"></script>
+    <script type="text/javascript" src="js/framework/verify.js?v=240626"></script>
+    <script type="text/javascript" src="js/framework/fileupload.js?id=js&v=1.3"></script>
+    <script type="text/javascript" src="js/plugins/calendar/WdatePicker.js"></script>
+    <script type="text/javascript" src="js/dwbmApplication.js?v=1.05"></script>
+    <script type="text/javascript" src="js/info.js"></script>
+    <script type="text/javascript">
+        var dwbm_jgdm = "140300111";
+        var dwbm_jglb = "9002";
+        var dwbm_planid = "";
+        var xzkzdq="0";
+        var checkArea = "0";
+        var idcardContrl="0";
+        var xzUnit="1";
+        var fileUploadSwitch="0";
+        var xzAttachIsReq="1";
+        var systype="sx";
+        var cloud_server = "http://118.89.145.145:8888";
+        var cloud_filepath = "filepath";
+        var ksjg_dm = "14030001";
+        var canChooseLqfs = '0';
+        var dwbm_ksjg_dm = "";
+        var whetherUseQrCode = '0';
+        var wsxgcl="0";
+        function isIDCard(val){
+            if(jQuery("#zjlx").val() != "1"){return};
+            if(val.value!=null && val.value!=""){
+                var zt = checkIDCard(val.value,'xb','');
+                if(zt != true){
+                    alert(zt);
+                    return;
+                }
+            }
+        }
+        function validateUpFile(){
+            var suffixs = ["jpg"];
+            var val = jQuery("#files").val();
+            if(val == ""){
+                alert("请选择文件！");
+                return false;
+            }
+            var suffix = val.substr(val.lastIndexOf(".")+1,val.length);
+            for(i = 0;i < suffixs.length;i++){
+                if(suffix == suffixs[i]){
+                    return true;
+                }
+            }
+            alert("请上传【"+suffixs+"】格式文件！");
+            return false;
+        }
+        var yxzt = "";
+        //加载报名信息
+        function loadBmInfo(sfzh){
+            var sz;
+            if(sfzh.value){
+                sz = sfzh.value;
+            }else{
+                sz = sfzh;
+            }
+            if(systype!="sc"){
+                if(yxzt == "edit"){return};
+            }else{
+                if(yxzt == "edit"){
+                    jQuery("#yrdw").attr("readonly",true);
+                    jQuery("#sfzx1").attr("checked",true);
+                    jQuery("#but").attr("disabled",true);
+                    return;
+                }
+            }
+
+            jQuery.get("loadbmbinfo.do?sfzh="+sz,function(data){
+                if('1' == 1 && yxzt != "edit"){
+                    dwbm_bindSelectNewZyxm("zyxm", "zyxmcode", "1095", 0);
+                }else{
+                    dwbm_bindSelectNewZyxm("zyxm", "zyxmcode", "", 0);
+                }
+                if(data == null || data.length <= 0){
+                    return;
+                }
+                if(jQuery("#sqrxm").length > 0){
+                    jQuery("#sqrxm").attr({"value":data.sqrxm});
+                }
+                if(jQuery("#xb1").length > 0){
+                    if(data.xb != null){
+                        if(jQuery("#xb1").val() == data.xb){
+                            jQuery("#xb1").attr("checked",true);
+                        }else{
+                            jQuery("#xb2").attr("checked",true);
+                        }
+                    }
+                }
+                if(jQuery("#txdz").length > 0){
+                    jQuery("#txdz").attr({"value":data.txdz});
+                }
+                if(jQuery("#whcd").length > 0){
+                    if(data.whcd!='0401'){
+                        jQuery("#whcd").attr({"value":data.whcd});
+                    }
+                }
+                if(jQuery("#yzbm").length > 0){
+                    jQuery("#yzbm").attr({"value":data.yzbm});
+                }
+                if(jQuery("#sfzh").length > 0){
+                    jQuery("#sfzh").attr({"value":data.sfzh});
+                }
+                if(jQuery("#lxdh").length > 0){
+                    jQuery("#lxdh").attr({"value":data.lxdh});
+                }
+                if(jQuery("#yrdw").length > 0){
+                    jQuery("#yrdw").attr({"value":data.yrdw});
+                    if(systype=="sc"){
+                        if(data.yrdw!=""&&data.yrdw!=null){
+                            jQuery("#yrdw").attr("readonly",true);
+                            jQuery("#sfzx1").attr("checked",true);
+                            jQuery("#but").attr("disabled",true);
+                        }
+                    }
+                }
+                if(jQuery("#dwlxr").length > 0){
+                    jQuery("#dwlxr").attr({"value":data.dwlxr});
+                }
+                if(jQuery("#dwdz").length > 0){
+                    jQuery("#dwdz").attr({"value":data.dwdz});
+                }
+                if(jQuery("#dwlxdh").length > 0){
+                    jQuery("#dwlxdh").attr({"value":data.dwlxdh});
+                }
+                if(jQuery("#gzjl").length > 0){
+                    jQuery("#gzjl").attr({"value":data.gzjl});
+                }
+                if(jQuery("#yrdwyj").length > 0){
+                    jQuery("#yrdwyj").attr({"value":data.yrdwyj});
+                }
+                if(jQuery("#zsbh").length > 0){
+                    jQuery("#zsbh").attr({"value":data.zsbh});
+                }
+                if(jQuery("#fzrq").length > 0){
+                    jQuery("#fzrq").attr({"value":data.fzrq});
+                }
+                if(jQuery("#zp").length > 0){
+                    jQuery("#zp").attr({"value":data.zp});
+                }
+                if(jQuery("#zb1").length > 0){
+                    jQuery("#zb1").attr({"value":data.zb1});
+                }
+                if(jQuery("#bak2").length > 0){
+                    jQuery("#bak2").attr({"value":data.bak2});
+                }
+                if(jQuery("#bak3").length > 0){
+                    jQuery("#bak3").attr({"value":data.bak3});
+                }
+                if(jQuery("#bak4").length > 0){
+                    jQuery("#bak4").attr({"value":data.bak4});
+                }
+                if(jQuery("#dabh").length > 0){
+                    jQuery("#dabh").attr({"value":data.dabh});
+                }
+                if(jQuery("#dwzzjgdm").length > 0){
+                    jQuery("#dwzzjgdm").attr({"value":data.dwzzjgdm});
+                }
+                //带出此考生报名记录基本信息即可，不需要带出关联项目
+                /*if(jQuery("#pxjgdm").val()!=""&&jQuery("#pxjgdm").length > 0){
+                    jQuery("#pxjgdm").attr({"value":data.pxjgdm});
+                    alert(data.pxjgdm);
+                    if(dwbm_jglb != "9002"){
+                        if (ksjg_dm === "") {
+                            ksjg_dm = dwbm_jgdm;
+                        }
+                        if (data.pxjgdm == "" || data.pxjgdm == null || dwbm_bindselectpxjg("pxjgdm","","") == false) {
+                            dwbm_jgdm = ksjg_dm;
+                            dwbm_jglb = "9001";
+                        } else {
+                            dwbm_jgdm = data.pxjgdm;
+                            dwbm_jglb = "9003";
+                        }
+                    }
+                    //加载作业项目
+                    dwbm_bindSelectNewZyxm("zyxm", "zyxmcode", "", 0);
+                }
+                if(jQuery("#pxjgmc").length > 0){
+                    jQuery("#pxjgmc").attr({"value":data.pxjgmc});
+                }*/
+                if(jQuery("#aqpxqk").length > 0){
+                    jQuery("#aqpxqk").attr({"value":data.aqpxqk});
+                }
+                if(jQuery("#cdhjnl").length > 0){
+                    jQuery("#cdhjnl").attr({"value":data.cdhjnl});
+                }
+                if(jQuery("#yfzjg").length > 0){
+                    jQuery("#yfzjg").attr({"value":data.yfzjg});
+                }
+                if(jQuery("#fzjgdz").length > 0){
+                    jQuery("#fzjgdz").attr({"value":data.fzjgdz});
+                }
+                if(jQuery("#sqrbljl").length > 0){
+                    jQuery("#sqrbljl").attr({"value":data.sqrbljl});
+                }
+                if(jQuery("#image1").length > 0){
+                    loadImage();
+                }
+
+                /*if(jQuery("#lqfs1").length > 0){<!--浙江领取方式-->
+
+                    if(data.lqfs != null){
+                        if(jQuery("#lqfs1").val() == data.lqfs){
+                            jQuery("#lqfs1").attr("checked",true);
+                        }else{
+                            jQuery("#lqfs2").attr("checked",true);
+                        }
+                    }
+                }*/
+                if(xzkzdq ==1){
+                    bindselectdistrictforbm("dwszdq",data.dwszdq);
+                    bindselectregionforbm("dwszqx",data.dwszdq,data.dwszqx);
+
+                }
+
+                if (checkArea == 1) {
+                    bindselectdistrictforbm("residencedq", data.residencedq);
+                    bindselectResidencedqforbm("residenceqx", data.residencedq, data.residenceqx);
+                }
+            });
+        }
+
+        function loadImage() {
+            var sfzh = jQuery("#sfzh").val();
+            var zyxm = jQuery("#zyxmdm").val();
+            var bmlb = jQuery("#bmlb").val();
+            var bmid = jQuery("#bmid").val();
+            jQuery.ajax({
+                type: "POST",
+                url: "loadImage.do",
+                dataType: "json",
+                async: false,
+                data: {
+                    "sfzh": sfzh,
+                    "zyxm": zyxm,
+                    "bmlb": bmlb,
+                    "bmid": bmid
+                },
+                cache: false,
+                success: function (data, status) {
+                    var flag = true;
+                    if (data != null && data.dataset.length > 0) {
+                        if (data.dataset[0].CLOUD_UPLOADIMG != '0') {
+                            flag = "false";
+                        }
+                        if (flag == true) {
+                            if (data.dataset[0].PATH != '0') {
+                                jQuery("#image1").attr("src", "image.do?bmid=&id=" + data.dataset[0].PATH);
+                            } else {
+                                jQuery("#image1").attr("src", "image.do?bmid=&id=" + sfzh);
+                            }
+                        } else {
+                            jQuery("#image1").attr("src", "cloud/showImage.do?type=1&bmid=" + bmid + "&sfzh=" + sfzh);
+                        }
+                    }
+                }
+            });
+            if (systype == 'nmg') {
+                jQuery("#title").html("特种设备安全管理人员、作业人员资格认定申请表");
+            }
+        }
+
+        var ksjgIsMust;
+
+        function printsj() {
+            window.print();
+            return false;
+        }
+
+        function loadKsjg() {
+            jQuery.ajax({
+                type: "POST",
+                url: "loadKsjg.do",
+                dataType: "json",
+                async: false,
+                data: {"jgdm": dwbm_jgdm,"isHj":"0"},
+                cache: false,
+                success: function (data, status) {
+                    for (i = 0; i < data.length; i++){
+                        if (dwbm_jglb == '9002' && (ksjg_dm != '' && ksjg_dm != null)) {
+                            if (ksjg_dm == data[i].JGDM) {
+                                jQuery("#ksjg").append("<option value='" + data[i].JGDM + "'" + "selected = 'selected'>" + data[i].JGMC + "</option>");
+                            } else {
+                                jQuery("#ksjg").append("<option value='" + data[i].JGDM + "'" + ">" + data[i].JGMC + "</option>");
+                            }
+                        } else {
+                            if(systype=="shanxi"&&data[i].JGDM=='TSZK004'){
+
+                            }else{
+                                jQuery("#ksjg").append("<option value='" + data[i].JGDM + "'" + ">" + data[i].JGMC + "</option>");
+                            }
+
+                        }
+                    }
+                }
+            });
+        }
+        function loadZyxm(obj,val){
+            if(val == "" || val == "null"){
+                return;
+            }
+            jQuery.get('exam_zyxm.do?zyzl='+obj.value+'&len=4', function(data) {
+                var options = jQuery("#zyxm");
+                if(jQuery("#zyxm option").length > 1){
+                    var txt = jQuery("#zyxm option:first").text();
+                    var vals = jQuery("#zyxm option:first").val();
+                    jQuery("#zyxm").empty();
+                    if(vals == ''){
+                        jQuery("#zyxm").append("<option value=''>"+txt+"</option>");
+                    }
+                }
+                for(i=0;i<data.length;i++){
+                    var sel = "";
+                    if(data[i].dm == val){
+                        sel = " selected=\"selected\"";
+                    }
+                    jQuery("#zyxm").append("<option value='"+data[i].dm+"'"+sel+">"+data[i].mc+"</option>");
+                }
+            });
+        }
+        var valida;
+        var bmfs = "";
+        var jgdm = "";
+        var info = "";
+        jQuery(document).ready(function loadpage(){
+            // 湖北统一受理平台
+            if ('' == 'tysl') {
+                jQuery('#savedatafrm').attr('action', 'dwbm_savekzbmb_tysl.do');
+            }
+
+            if(dwbm_jglb !="9002") {
+                loadselectplan("plan_id",dwbm_planid,"2",dwbm_jgdm,dwbm_jglb);
+            } else {
+                jQuery("#plantr").css("display", "none");
+            }
+            if(dwbm_jglb =="9002") {
+                jQuery.ajax({
+                    type : "POST",
+                    url : "queryKsjgIsShow.do",
+                    dataType : "json",
+                    data : {
+                        jgdm : dwbm_jgdm
+                    },
+                    cache : false,
+                    async: false,
+                    success : function(data, status) {
+                        if(data.code=='1'){
+                            ksjgIsMust = 1;
+                            loadKsjg();
+                        }else{
+                            jQuery("#ksjgx").css("display", "none");
+                        }
+                    }
+                });
+            } else {
+                jQuery("#ksjgx").css("display", "none");
+            }
+
+            changeImg();
+            var info = "";
+            if( info!= null &&info=="验证码校验失败！"){
+
+                alert("");
+            }
+            else{
+                if(info != null && info != "" && info != "null"){
+
+                    window.parent.dwbm_cellback(info);
+                }
+
+
+            }
+
+
+            var xb = '';
+            var zp = "";
+            var yrdwrq = "";
+            var sqrqzrq = "";
+            var czxm = "";
+            var sfzx = "";
+            /*if(jQuery("#lqfs1").length > 0){<!--浙江领取方式-->
+    alert("");
+                if(""!= null){
+                    if(jQuery("#lqfs1").val() == ""){
+                        jQuery("#lqfs1").attr("checked",true);
+                    }else{
+                        jQuery("#lqfs2").attr("checked",true);
+                    }
+                }
+            }*/
+            loadImage();
+            if(sfzx == "1"){
+                jQuery("#zsbhlabel").show();
+                jQuery("#sfzx1").attr("checked",true);
+            }else if(sfzx == "0"){
+                jQuery("#sfzx2").attr("checked",true);
+            }
+            if(czxm != null && czxm != '' && czxm != 'null'){
+                jQuery("#czxmdip").show();
+            }else{
+                jQuery("#czxmdip").hide();
+            }
+            var sfzx = "";
+            if(sfzx != null && sfzx != '' && sfzx != 'null'){
+                if(sfzx == '1'){
+                    jQuery("#sfzx").attr("checked",true);
+                }
+            }
+            var date = new Date();
+            var zdate = date.getFullYear()+"年"+(date.getMonth()+1)+"月"+date.getDate()+"日";
+            var gdate = date.getFullYear()+"-"+(date.getMonth()+1)+"-"+date.getDate();
+            if(yrdwrq == null || yrdwrq == ""){
+                if("" == ""){
+                    jQuery("#yrdwrq").val(zdate);
+                }
+            }
+            if(sqrqzrq == null || sqrqzrq == ""){
+                //jQuery("#sqrqzrq").val(gdate);
+            }
+            jQuery("#sfzh").focus();
+            var xbs = document.getElementsByName("xb");
+            if(xb == xbs[0].value){
+                xbs[0].checked = true;
+            }else if(xb == xbs[1].value){
+                xbs[1].checked = true;
+            }
+            var pxjgdm = "";
+            //加载下属机构
+            var px = false;
+            //发证机构报名的数据
+            if("9002" == dwbm_jglb){
+                jgdm = "";
+            }
+            px = dwbm_bindselectpxjg("pxjgdm",pxjgdm,jgdm);
+            if(px == null || px){
+                ispx = true;
+                jQuery("#pxjgx").show();
+            }else{
+                ispx = px;
+                jQuery("#pxjgx").hide();
+                jQuery("#pxjgdm").html('<option value=""></option>');
+            }
+            //加载文化程度
+            dwbm_bindselectdm("whcd",'04','');
+
+            if(''==''){
+                var oSel = document.getElementById('whcd');
+                var oOp = oSel.children;        //获取select列表的所有子元素。
+                for(var i=0,len = oOp.length;i<len;i++)
+                {
+                    if(oOp[i].value=='0401'){
+                        oSel.removeChild(oOp[i]);
+                        break;
+                    }
+                }
+            }
+            //证件类型
+            dwbm_bindselectdm("zjlx",'05',''==''?"1":'','1');
+
+
+            if(yxzt == 'edit'){
+                //加载作业项目
+                dwbm_bindSelectNewZyxm("zyxm", "zyxmcode", "", 0);
+            }
+            //加载相关材料
+            loadxgclselected('xgcl',"");
+            //加载所在地区信息
+            if(xzkzdq==1){
+                bindselectdistrictforbm("dwszdq","");
+                if(yxzt == "edit"){
+                    bindselectregionforbm("dwszqx","","");
+                }
+            }
+
+            if (checkArea == 1) {
+                bindselectdistrictforbm("residencedq", "");
+                if (yxzt == "edit") {
+                    bindselectResidencedqforbm("residenceqx", "", "");
+                }
+            }
+
+            if(zp != null && zp != "" && zp != 'null'){
+                jQuery("#img1").html(zp);
+            }
+
+            if (canChooseLqfs && canChooseLqfs != '0') {
+                var lqfs = "";
+                if (lqfs == jQuery("input[name='lqfs']")[0].value) {
+                    jQuery("input[name='lqfs']")[0].checked = true;
+                } else if (lqfs == jQuery("input[name='lqfs']")[1].value) {
+                    jQuery("input[name='lqfs']")[1].checked = true;
+                }
+            }
+
+            var sfzh = "140302197508291331";
+
+            if(sfzh != "" && sfzh != "null"&&info.indexOf("上传头像照片")<0){
+                jQuery("#sfzh").val(sfzh);
+                loadBmInfo(sfzh);
+            }
+            if ("" == "zww") {
+                jQuery("#lxdh").val("");
+            } else {
+                if ("".length >= 11) {
+                    jQuery("#lxdh").val("".replace(/(\d{3})(\d{4})(\d{4})/, "$1****$3"));
+                } else {
+                    jQuery("#lxdh").val("".replace(/(\d{4})/, "****"));
+                }
+            }
+        });
+        /**
+         *表单验证
+         */
+        var time = "2026-04-24";
+        var valid=true;
+        function validateForm(){
+            //山西，报名机构 141300110  太原市综改示范区质量技术监督局，单位地址必须包含综改示范区，不然不让报
+            if("sx"=="sx"&&dwbm_jgdm=='141300110'&&(jQuery("#dwdz").val()==''||jQuery("#dwdz").val().indexOf("综改示范区")<0)){
+                alert("单位地址为空或单位地址不在'综改示范区'，不能报名！");
+                return false;
+            }
+
+             if("sx"=="hubei"&&dwbm_jgdm=='42060001'&&jQuery("#pxjgdm").val() == ""&&"9002"=='9001'){//湖北所属地区为必填项
+             	alert("请选择下属机构（或单位所属地区）！");
+             	jQuery("#pxjgdm").focus();
+             	return false;
+             }
+            if(jQuery("#sfzh").val() == ""){
+                alert("请填写您的证件号！");
+                jQuery("#sfzh").focus();
+                return false;
+            }else{
+                if(idcardContrl=='1'&&jQuery("#zjlx").val() == "1"&&jQuery("#sfzh").val().length<18){
+                    alert("请输入18位身份证号！");
+                    return false;
+                }
+            }
+            if(jQuery("#sqrxm").val() == ""){
+                alert("请填写姓名！");
+                jQuery("#sqrxm").focus();
+                return false;
+            }
+            if(jQuery("#whcd").val() == ""){
+                alert("请填写文化程度！");
+                jQuery("#whcd").focus();
+                return false;
+            }
+            if(jQuery("#whcd").val() == "0402"){
+                alert("初中以下文化程度不能报名！");
+                jQuery("#whcd").focus();
+                return false;
+            }
+            if(jQuery("#yzbm").val() != "" && isNaN(jQuery("#yzbm").val())){
+                alert("邮政编码中含义无效字符！");
+                jQuery("#yzbm").focus();
+                return false;
+            }
+            if(jQuery("#zjlx").val() == "1"){
+                var zt = checkIDCard(jQuery("#sfzh").val(),'xb','');
+                if(zt != true){
+                    alert(zt);
+                    return false;
+                }
+            }
+            // if(("sx"=="hubei"||"sx"=="sx")&&jQuery("#lxdh").val() == ""){//湖北,山西联系电话为必填项
+            //     alert("请填写联系电话！");
+            //     jQuery("#lxdh").focus();
+            //     return false;
+            // }
+            if((jQuery("#phoneIsReq").val()===1||jQuery("#phoneIsReq").val()==='1')&&jQuery("#lxdh").val() === ""){//湖北联系电话为必填项
+                alert("请填写联系电话！");
+                jQuery("#lxdh").focus();
+                return false;
+            }
+            if("sx"=="sc"){
+                var a =jQuery("#sfzh").val();
+                var b="x";
+                if(a.indexOf(b) >=0) {
+                    alert("请将身份证号小写的x改成大写的X  !!!");
+                    jQuery("#sfzh").focus();
+                }
+            }
+            if("sx"=="sx"&&jQuery("#yzbm").val() == ""){//山西邮政编码为必填项
+                alert("请填写邮政编码！");
+                jQuery("#yzbm").focus();
+                return false;
+            }
+            if("sx"=="sx"&&jQuery("#txdz").val() == ""){//山西通信地址为必填项
+                alert("请填写通信地址！");
+                jQuery("#txdz").focus();
+                return false;
+            }
+            if(jQuery("#yzbm").val() != "" && isNaN(jQuery("#yzbm").val())){
+                alert("邮政编码中含义无效字符！");
+                jQuery("#yzbm").focus();
+                return false;
+            }
+            /*var nf = "";
+            var date = new Date(time.split("-")[0],time.split("-")[1]-1,time.split("-")[2]);
+            if(jQuery("#zjlx").val() == "1" && jQuery("#sfzh").val().length == 15){
+                var nf = "19"+jQuery("#sfzh").val().substr(6,6);
+                var nn = parseInt(time.replaceAll("-",""))-parseInt(nf);
+                if(nn < 180000 || nn > 600000){
+                    alert("年龄不符合要求，不能报名！【提示：年龄 18到60；】");
+                    return false;
+                }
+            }else  && jQuery("#sfzh").val().length == 18){
+                var nf = jQuery("#sfzh").val().substr(6,8);
+                var nn = parseInt(time.replaceAll("-",""))-parseInt(nf);
+                if(nn < 180000 || nn > 600000){
+                    alert("年龄不符合要求，不能报名！【提示：年龄 18到60；】");
+                    return false;
+                }
+            }*/
+            if(jQuery("#zjlx").val() == "1"){
+                var obj = applyAgeContrl_XZ(jQuery("#sfzh").val(),jQuery("#zyxm").val(),time);
+                if(!obj.state){
+                    alert(obj.msg);
+                    return false;
+                }
+            }
+            if(jQuery("#zyxm").val() == ""){
+                alert("请选择作业项目！");
+                jQuery("#zyxm").focus();
+                return false;
+            }
+            var zyxmval = jQuery("#zyxm").val();
+            if(((xzbmHasTzsbzlA == "1" && "0195"==zyxmval)
+                    || (xzbmHasTzsbzlG == "1" && "0297"==zyxmval)
+                    || (xzbmHasTzsbzlP == "1" && "0495"==zyxmval)) &&  jQuery("#tzsbzl").val() == ""){
+                alert("请选择所从事的特种设备种类！");
+                xzSelectTzsbzl(zyxmval);
+                return false;
+            }
+            if((zyxmval == "0296" || zyxmval == "1195" || zyxmval == "0695") && systype == "sx" && dwbm_jglb == "9001" ){
+                alert("请报名到山西省市场监督管理局");
+                return false;
+            }
+
+            //南京外网报名N2定制
+            var jgdm = jQuery("#jgdm").val();
+            if(jQuery("#zyxmcode").val() == "1096" && "sx" == "js" && jgdm.startWith('3201')){
+                alert("持有B1 以上(含B1)的《中华人民共和国机动车驾驶证》的观光车和观光列车考生可以免考实际操作技能考试。若需要申请实操免试，请及时提交相关材料。")
+            }
+
+
+            var xmdh = "";
+            if (xmdh != "" && xmdh != jQuery("#zyxm_val").val()) {
+                alert("项目代号和公众服务平台项目代号不一致！");
+                return false;
+            }
+            if(xzUnit=="1"&&jQuery("#yrdw").val() == ""){
+                alert("请填写工作单位！");
+                jQuery("#yrdw").focus();
+                return false;
+            }
+
+            if (xzkzdq != 0 && checkArea != 1) {
+                if (jQuery("#dwszdq").val() == "") {
+                    alert("请选择单位所在地区！");
+                    jQuery("#dwszdq").focus();
+                    return false;
+                }
+                if (jQuery("#dwszqx").val() == "") {
+                    alert("请选择单位所在区县！");
+                    jQuery("#dwszqx").focus();
+                    return false;
+                }
+            }
+            if(systype!="zj"){
+                if(jQuery("#gzjl").val() == ""){
+                    alert("请填写工作简历！");
+                    jQuery("#gzjl").focus();
+                    return false;
+                }
+                // if(jQuery("#pxqk").val() == ""){
+                //     alert("请填写培训情况！");
+                //     jQuery("#pxqk").focus();
+                //     return false;
+                // }
+                if(jQuery("#gzjl").val().length > 500){
+                    alert("工作简历字数不能超过500字！");
+                    jQuery("#gzjl").focus();
+                    return false;
+                }
+            }
+
+            if (checkArea != 0) {
+                var signUp = jQuery("#jgdm").val();
+                var idCardArea = checkIDCardArea(signUp, jQuery("#sfzh").val());
+                if (idCardArea != "") {
+                    alert(idCardArea);
+                    return false;
+                }
+            }
+
+            //提醒即将退休
+            if(!validationCsny(jQuery("#sfzh").val(),time)){
+                return false;
+            }
+
+            if(!verifyIdCardConfirm(jQuery("#sfzh").val())){
+                return false;
+            }
+
+            if(systype!="sx"){
+                if(xzAttachIsReq == "1" && systype == 'hunan') {//需要上传附件
+                    var isPass = true;
+                    var noPassFjmc = "";
+                    var flag = 0;
+                    jQuery(".xgclCls").each(function () {
+                        if(jQuery(this).parent().find(".xgclFj>a").length < 2) {
+                            var fjmc = jQuery(this).text();
+                            if(fjmc.indexOf("学历证明(毕业证复印件1份)") == -1 && fjmc.indexOf("学历证明承诺") == -1) {      //山西的单独加了这个控制
+                                isPass =  false;
+                                noPassFjmc = fjmc;
+                                return false;
+                            }
+
+                            if(fjmc.indexOf("学历证明(毕业证复印件1份)") == 0) {
+                                flag +=1;
+                            }
+
+                            if(fjmc.indexOf("学历证明承诺") == 0) {
+                                flag +=1;
+                            }
+
+                            if(flag == 0 || flag == 2){
+                                isPass =  false;
+                                noPassFjmc = "学历证明(毕业证复印件1份) 和 学历证明承诺至少上传一个";
+                                return false;
+                            }
+                        }
+                    });
+                    if(whetherUseQrCode == "1") {
+                        var weChatUpload = document.getElementById("phoneUpload").innerText;
+                        if (weChatUpload != null && weChatUpload != "") {
+                            isPass = true;
+                        }
+                    }
+                    if(!isPass) {
+                        alert("请上传相关资料“" + noPassFjmc + "”！\r\n（注：仅支持IE浏览器）");
+                        return false;
+                    }
+                }else if(xzAttachIsReq == "1") {//需要上传附件
+                    var isPass = true;
+                    var noPassFjmc = "";
+                    var zyxmdh_array = ["0297", "1095", "1096", "0896"];//这几个必传体检报告
+                    var zyxmdh_array2 = ["0195", "0295", "0296", "0297", "0303", "0895", "0896", "1195"];
+                    var zyxmdh = jQuery("#zyxmcode").val();
+                    //判断逻辑是 便利没有上传附件的 材料列表，当前附件名称如果是申请表等几个 不需要判断，其他的都要进 判断
+                    jQuery(".xgclCls").each(function () {
+                        if (jQuery(this).next().find("a").length < 2) {
+                            var fjmc = jQuery(this).text();
+                            if(fjmc.indexOf("其他") == -1&& fjmc.indexOf("申请表扫描件") == -1&& fjmc.indexOf("居住证") == -1&& fjmc.indexOf("劳动用工合同") == -1&& fjmc.indexOf("社会保险") == -1&& fjmc.indexOf("劳动合同") == -1&& fjmc.indexOf("社保证明") == -1&& fjmc.indexOf("户口或者居住证") == -1) {
+                                //其他和扫描件报名时不用传
+                                if((zyxmdh_array.indexOf(zyxmdh) == -1 && fjmc.indexOf("体检报告") != -1)||
+                                    (zyxmdh_array2.indexOf(zyxmdh) == -1 && fjmc.indexOf("学历证明") != -1)){//非特定项目未传体检报告 或者 非特定项目2未传学历证明  都是符合条件的
+                                    isPass =  true;
+                                    noPassFjmc = fjmc;
+                                }else{//不符合要求的
+                                    isPass =  false;
+                                    noPassFjmc = fjmc;
+                                    return false;
+                                }
+                            }
+                        }
+                    });
+                    if(whetherUseQrCode == "1") {
+                        var weChatUpload = document.getElementById("phoneUpload").innerText;
+                        if (weChatUpload != null && weChatUpload != "") {
+                            isPass = true;
+                        }
+                    }
+                    if (!isPass) {
+                        alert("请上传相关资料“" + noPassFjmc + "”！\r\n（注：仅支持IE浏览器）");
+                        return false;
+                    }
+                }
+            }else{
+                if(xzAttachIsReq == "1") {//需要上传附件
+                    var isPass = true;
+                    var zyxmdh_array = ["0297", "1095", "1096", "0896"];//这几个必传体检报告
+                    var noPassFjmc = "";
+                    var zyxmdh = jQuery("#zyxmcode").val();
+                    jQuery(".xgclCls").each(function () {
+                        if(jQuery(this).parent().find(".xgclFj>a").length < 2) {
+                            var fjmc = jQuery(this).text();
+                            if(fjmc.indexOf("其他") == -1&& fjmc.indexOf("申请表扫描件") == -1&& fjmc.indexOf("居住证") == -1&& fjmc.indexOf("劳动用工合同") == -1&& fjmc.indexOf("社会保险") == -1&& fjmc.indexOf("劳动合同") == -1&& fjmc.indexOf("社保证明") == -1&& fjmc.indexOf("户口或者居住证") == -1) {      //山西的单独加了这个控制
+                                if((zyxmdh_array.indexOf(zyxmdh) == -1 && fjmc.indexOf("体检报告") != -1)){//非特定项目未传体检报告 都是符合条件的
+                                    isPass =  true;
+                                    noPassFjmc = fjmc;
+                                }else{//不符合要求的
+                                    isPass =  false;
+                                    noPassFjmc = fjmc;
+                                    return false;
+                                }
+                            }
+                        }
+                    });
+                    if(whetherUseQrCode == "1") {
+                        var weChatUpload = document.getElementById("phoneUpload").innerText;
+                        if (weChatUpload != null && weChatUpload != "") {
+                            isPass = true;
+                        }
+                    }
+                    if(!isPass) {
+                        alert("请上传相关资料“" + noPassFjmc + "”！\r\n（注：仅支持IE浏览器）");
+                        return false;
+                    }
+                }
+            }
+
+            if(systype=="shanxi" && fileUploadSwitch == "0"){
+                var sfzh=jQuery("#sfzh").val();
+                var zjlx=jQuery("#zjlx").val();
+                sfzh = sfzh.substr(0,2);
+                var isPass = true;
+                var noPassFjmc = "";
+                if((sfzh.substr(0,2)!='61'&&zjlx=='1')||zjlx!='1'){//证件类型不是身份证 或者 是身份证且开头不是61  都是外省人员
+                    var fjmca = 0;//居住证和劳动用工合同 没传附件的个数
+                    jQuery(".xgclCls").each(function () {
+                        if (jQuery(this).next().find("a").length < 2) {
+                            var fjmc = jQuery(this).text();
+                            if(fjmc.indexOf("社会保险") != -1) { //非本省必填社保
+                                isPass =  false;
+                                noPassFjmc = fjmc;
+                                return false;
+                            }
+                           if(fjmc.indexOf("居住证") != -1|| fjmc.indexOf("劳动用工合同") != -1) { //非本省必填居住证或合同
+                               fjmca=fjmca+1;
+                            }
+                        }
+                    });
+                    if (fjmca >= 2) {
+                        isPass =  false;
+                        noPassFjmc = "居住证”或“劳动用工合同";
+                    }
+                }
+                if(!isPass) {
+                    alert("请上传相关资料“" + noPassFjmc + "”！\r\n（注：仅支持IE浏览器）");
+                    return false;
+                }
+            }
+            if( wsxgcl == "1"){//向户籍所在地申请必传户口或者居住证，向用人单位所在地申请必传劳动合同和社保证明,即  户口或者居住证 和 劳动合同、社保证明 二者至少传一个！
+                var isPass = true;
+                var noPassFjmc = "";
+                var fjmcahj = 0;//居住证和劳动用工合同 没传附件的个数
+                var fjmcaht = 0;//居住证和劳动用工合同 没传附件的个数
+                jQuery(".xgclCls").each(function () {
+                    if (jQuery(this).next().find("a").length < 2) {
+                        var fjmc = jQuery(this).text();
+                        // alert(fjmc);alert(fjmc.indexOf("户口或者居住证") );
+                        if(fjmc.indexOf("户口或者居住证") != -1) { //户口或者居住证 没传附件的时候 是0
+                            fjmcahj=1;
+                        }
+                        if(fjmc.indexOf("劳动合同") != -1|| fjmc.indexOf("社保证明") != -1) { //劳动合同 没传附件的时候 是0
+                            fjmcaht=1;
+                        }
+                    }
+                });
+
+                if (fjmcahj>0&&fjmcaht>0) {
+                    isPass =  false;
+                    noPassFjmc = "向户籍所在地申请必传户口或者居住证，向用人单位所在地申请必传劳动合同和社保证明";
+                }
+
+                if(!isPass) {
+                    alert("请上传相关资料“" + noPassFjmc + "”！\r\n（注：仅支持IE浏览器）");
+                    return false;
+                }
+            }
+
+            /* if (xmAttachIsReq == "1") {//特殊项目控制上传附件
+                 var zyxmdh_array = ["0195", "0295", "0296", "0297", "0303", "0895", "0896", "1195"];
+                 var zyxmdh = jQuery("#zyxmcode").val();
+                 if (zyxmdh_array.indexOf(zyxmdh) > -1) {
+                     var isPass = true;
+                     var noPassFjmc = "";
+                     jQuery(".xgclCls").each(function () {
+                         if (jQuery(this).parent().find(".xgclFj>a").length < 2) {
+                             var fjmc = jQuery(this).text();
+                             if (fjmc.indexOf("学历证明") > -1) {
+                                 isPass = false;
+                                 noPassFjmc = fjmc;
+                                 return false;
+                             }
+                         }
+                     });
+                     if (!isPass) {
+                         alert("请上传相关资料“" + noPassFjmc + "”！\r\n（注：仅支持IE浏览器）");
+                         return false;
+                     }
+                 }
+             }*/
+
+            /*if (xzAttachIsReq == "1" ) {
+                var zyxmdh_array = ["0195", "0295", "0296", "0297", "0303", "0895", "0896", "1195"];
+                var zyxmdh = jQuery("#zyxmcode").val();
+
+                var isPass = false;
+                var noPassFjmc = "";
+                jQuery(".xgclCls").each(function () {
+                    if (jQuery(this).next().find("a").length < 2) {
+                        var fjmc = jQuery(this).text();
+                        if (zyxmdh_array.indexOf(zyxmdh) == -1 && (fjmc.indexOf("学历证明") != -1|| fjmc.indexOf("体检报告") != -1|| fjmc.indexOf("身份证明")!=-1)) {
+                            return true;
+                        }
+                        isPass = true;
+                        noPassFjmc = fjmc;
+                        return false;
+                    }
+                });
+
+                if (isPass) {
+                    alert("请上传相关资料“" + noPassFjmc + "”！\r\n（注：仅支持IE浏览器）");
+                    return false;
+                }
+            }*/
+
+          /*  if (xzAttachIsReq == "1" ) {
+                var zyxmdh_array = ["0297", "1095", "1096", "0896"];
+                var zyxmdh = jQuery("#zyxmcode").val();
+
+                var isPass = false;
+                var noPassFjmc = "";
+                jQuery(".xgclCls").each(function () {
+                    if (jQuery(this).next().find("a").length < 2) {
+                        var fjmc = jQuery(this).text();
+                        if (zyxmdh_array.indexOf(zyxmdh) == -1 && fjmc.indexOf("体检报告") != -1) {
+                            return true;
+                        }
+                        isPass = true;
+                        noPassFjmc = fjmc;
+                        return false;
+                    }
+                });
+
+                if (isPass) {
+                    alert("请上传相关资料“" + noPassFjmc + "”！\r\n（注：仅支持IE浏览器）");
+                    return false;
+                }
+            }*/
+
+            if(jQuery("#business_code").val() != ""){
+                var info = "";
+                var flag = true;
+                jQuery.ajax({
+                    type: "POST",
+                    url: "checkBusinessCode.do",
+                    dataType: "json",
+                    data: {
+                        business_code: jQuery("#business_code").val()
+                    },
+                    cache : false,
+                    async: false,
+                    success : function(data, status) {
+                        if(data.code == "1"){
+                            info = data.text;
+                            flag = false;
+                        }else{
+                            flag = true;
+                        }
+                    },
+                    error : function(request, error, status) {
+                        alert(error);
+                    },
+                    complete : function(request, error, status) {
+                    }
+                });
+                if(!flag){
+                    alert(info);
+                    return false;
+                }
+            }
+
+            if(jQuery("#sfzh").val() != ""){//是否要上传照片验证
+                //alert("jgdm="+dwbm_jgdm);
+                jQuery.ajax({
+                    type : "POST",
+                    url : "wbapplycheckUserPortrait.do?bmid=",
+                    dataType : "json",
+                    data : {
+                        bmlb : '0',
+                        jgdm:dwbm_jgdm,
+                        sfz:jQuery("#sfzh").val()
+                    },
+                    cache: false,
+                    async: false,
+                    success : function(data, status) {
+                        if(data.code==1){
+                            alert(data.text);
+                            valid = false;
+                        }else{
+                            valid = true;
+                        }
+                    },
+                    error : function(request, error, status) {
+                        alert(error);
+                    },
+                    complete : function(request, error, status) {
+                    }
+                });
+
+            }
+
+            if (!valid) {
+                return false;
+            }
+
+            //考试未进行完不予重复报名开关验证
+            jQuery.ajax({
+                type : "POST",
+                url : "wbisCanApply.do",
+                dataType : "json",
+                data : {
+                    bmlb : '0',
+                    jgdm:dwbm_jgdm,
+                    sfzh:jQuery("#sfzh").val(),
+                    zyzl:jQuery("#zyzl").val(),
+                    zyxm:jQuery("#zyxm").val()
+                },
+                cache : false,
+                async: false,
+                success : function(data, status) {
+                    if(data.code==1){
+                        alert(data.text);
+                        valid= false;
+                    }else{
+                        valid=true;
+                    }
+                },
+                error : function(request, error, status) {
+                    alert(error);
+                },
+                complete : function(request, error, status) {
+                }
+            });
+            if (!valid) {
+                return false;
+            }
+
+            jQuery.ajax({
+                type: "POST",
+                url: "isExamDoing.do",
+                dataType: "json",
+                data: {
+                    bmlb: '0',
+                    jgdm: dwbm_jgdm,
+                    sfzh: jQuery("#sfzh").val(),
+                    zyzl: jQuery("#zyzl").val(),
+                    zyxm: jQuery("#zyxm").val()
+                },
+                cache: false,
+                async: false,
+                success: function(data, status) {
+                    if (data.code == 1) {
+                        alert(data.text);
+                        valid = false;
+                    } else {
+                        valid = true;
+                    }
+                },
+                error : function(request, error, status) {
+                    alert(error);
+                },
+                complete : function(request, error, status) {
+                }
+            });
+            if (!valid) {
+                return false;
+            }
+
+            if (systype == 'jl') {
+                var yhys = document.getElementById("yhys");
+                if (yhys.checked == false) {
+                    alert("请先阅读用户隐私！")
+                    return false;
+                }
+            }
+
+            // 检验考试计划（预）
+            if (typeof jQuery("#plan_id") != 'undefined' && jQuery("#plan_id").val() != null && jQuery("#plan_id").val() != "") {
+                jQuery.ajax({
+                    type: "POST",
+                    url: "checkPlan.do",
+                    dataType: "json",
+                    data: {
+                        planId: jQuery("#plan_id").val(),
+                        jglb: dwbm_jglb,
+                        jgdm: dwbm_jgdm
+                    },
+                    cache: false,
+                    async: false,
+                    success: function (data, status) {
+                        if (data.code == 0) {
+                            valid = true;
+                        } else {
+                            alert(data.text);
+                            valid = false;
+                        }
+                    }
+                });
+            }
+            if (!valid) {
+                return false;
+            }
+
+            //校验验证码
+            if (jQuery("#verCode").val() == "") {
+                alert("请填写验证码！");
+                jQuery("#verCode").focus();
+                return false;
+            } else {
+                //ajax 校验码正确性，然后返回一个token
+                jQuery.ajax({
+                    type: "POST",
+                    url: "checkVerCode.do",
+                    dataType: "json",
+                    data: {
+                        verCode: jQuery("#verCode").val()
+                    },
+                    cache: false,
+                    async: false,
+                    success: function (data, status) {
+                        if (data.code == 0) {
+                            jQuery("#bmVerriToken").val(data.text);
+                            valid = true;
+                        } else {
+                            alert(data.text);
+                            changeImg();
+                            valid = false;
+                        }
+                    }
+                });
+            }
+
+            if (!valid) {
+                return false;
+            } else {
+                if(!window.confirm("提示：是否已经检查确认填写信息正确无误？")){
+                    return false;
+                }else{
+                    return true;
+                }
+            }
+
+        };
+        function iszjlx(){
+            var txt = jQuery("#zjlx option:selected").val();
+            if(txt == "1"){
+                jQuery("#sfzh").attr({maxlength:18});
+            }else{
+                jQuery("#sfzh").attr({maxlength:50});
+            }
+        }
+        function checkedRadio(obj){
+            if(obj.checked && obj.value == "1"){
+                jQuery("#zsbhlabel").show();
+            }else{
+                jQuery("#zsbhlabel").hide();
+            }
+        }
+        jQuery(document).ready(function (){
+            if(yxzt != "edit" && "sx"=="sx" && "1" =="1" && document.getElementById('tooltip-trigger') != null){
+                var tooltip = document.getElementById('tooltip-trigger');
+                addEvent(tooltip, 'mouseover', function mouseover() {document.getElementById('tooltip').style.display = 'block';});
+                addEvent(tooltip, 'mouseout', function mouseout() {document.getElementById('tooltip').style.display = 'none';});
+            }
+            var tzsbzl = "";
+            if (tzsbzl != "") {
+                jQuery("#tzsbzltr").css("display", "");
+            }
+            if(isOpenAddXgcl() && "yxzt" in window && yxzt == "edit"){
+                var sfzh = "";
+                var zyxm = "";
+                var bmid = "";
+                var zt = "";
+                if (zt == "zww") {
+                    loadXgclAll(sfzh, zyxm, bmid);
+                } else {
+                    dwbm_loadXgclAll(sfzh, zyxm, bmid, yxzt);
+                }
+            }
+        });
+        function addEvent(element, event, handler) {
+            if (element.addEventListener) {
+                element.addEventListener(event, handler, false);
+            } else if (element.attachEvent) {
+                element.attachEvent('on' + event, handler);
+            }
+        }
+        function loadXm(obj){
+            if(ksjg_dm === ""){
+                ksjg_dm = dwbm_jgdm;
+            }
+            if(obj.value == ""){
+                dwbm_jgdm = ksjg_dm;
+                dwbm_jglb = "9001";
+            }else{
+                dwbm_jgdm = obj.value;
+                dwbm_jglb = "9003";
+            }
+            //加载作业项目
+            dwbm_bindSelectNewZyxm("zyxm", "zyxmcode", "", 0);
+            //初始化特种设备种类
+            xzSelectTzsbzl("");
+        }
+        function getUploadSwitch(ksjg){
+            jQuery.ajax({
+                type : "POST",
+                url : "queryUploadSwitch.do",
+                dataType : "json",
+                async: false,
+                data : {
+                    jgdm:ksjg
+                },
+                success : function(data, status) {
+                    fileUploadSwitch = data.code;
+                }
+            });
+        }
+        function loadXmByKsjg(obj){
+            var flag = "";
+            if(obj.value != ""){
+                dwbm_ksjg_dm = obj.value;
+                getUploadSwitch(dwbm_ksjg_dm);
+                if(flag != "" &&  flag == 0){
+                    document.getElementById("ksjgaddress").innerHTML = "";
+                    document.getElementById("ksjglxr").innerHTML = "";
+                    document.getElementById("ksjglxdh").innerHTML ="";
+                    jQuery.ajax({
+                        type: "POST",
+                        url: "ksjgInfo.do",
+                        dataType: "json",
+                        data: {
+                            jgdm: obj.value
+                        },
+                        cache: false,
+                        async: false,
+                        success: function (data, status) {
+                            if(data!=null){
+                                document.getElementById("ksjgaddress").innerHTML = data.DZ ? data.DZ : "";
+                                document.getElementById("ksjglxr").innerHTML = data.LXR ? data.LXR : "";
+                                document.getElementById("ksjglxdh").innerHTML = data.DH ? data.DH : "";
+                            }
+                        }
+                    });
+                }
+            }else{
+                dwbm_ksjg_dm  = "";
+            }
+            if(systype == 'yn') {
+                //加载作业项目
+                dwbm_bindSelectNewZyxmFzjgbmYn("zyxm", "zyxmcode",jQuery("#zyxm").val() , 0);
+            }else{
+                if(systype != 'jx' && !dwbm_jgdm.startsWith("3607")){
+                    //赣州切换考试机构不切换项目
+                    //加载作业项目
+                    dwbm_bindSelectNewZyxmFzjgbm("zyxm", "zyxmcode",jQuery("#zyxm").val() , 0);
+                    //初始化特种设备种类
+                    xzSelectTzsbzl("");
+                }
+            }
+
+        }
+
+
+        //变换考试计划(预)的作业种类取值
+        function loadPlanXm(obj){
+            dwbm_planid = obj.value;
+            //加载作业项目
+            dwbm_bindSelectNewZyxm("zyxm", "zyxmcode", "", 0);
+            //初始化特种设备种类
+            xzSelectTzsbzl("");
+        }
+
+        var xzbmHasTzsbzlA = "1";
+        var xzbmHasTzsbzlG = "1";
+        var xzbmHasTzsbzlP = "1";
+        jQuery(function () {
+            if("" != "") {
+                xzSelectTzsbzl("");
+            }
+            if("1095" != ""){
+                xzSelectTzsbzl("1095");
+            }
+        });
+
+        function selectNewXm(obj, xmid) {
+            jQuery(obj).val(xmid);
+            jQuery("#zyzl").val(xmid.length > 2 ? xmid.substring(0,2) : "");
+            if(systype == 'jx' && dwbm_jgdm.startsWith("3607")){
+                //赣州定制
+                if(ksjgIsMust==1){
+                    jQuery("#ksjg").html("<option value=''>--请选择--</option>");
+                    dwbm_ksjg_dm="";
+                    //考试机构切换成拥有此项目的
+                    jQuery.ajax({
+                        type: "POST",
+                        url: "loadKsjg.do",
+                        dataType: "json",
+                        async: false,
+                        data: {"jgdm": dwbm_jgdm,"isHj":"0",zyxm:xmid},
+                        cache: false,
+                        success: function (data, status) {
+                            for (i = 0; i < data.length; i++){
+                                jQuery("#ksjg").append("<option value='" + data[i].JGDM + "'" + ">" + data[i].JGMC + "</option>");
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        function verifyIdCardConfirm(idCard) {
+            var isRequestSuccess = false;
+            var confirmMsg = '';
+            if(jQuery("#zjlx").val() != "1"){
+                return true;
+            }
+            var jgdm = jQuery('#jgdm').val()
+            jQuery.ajax({
+                type: "POST",
+                url: "verifyDwBmIdCard.do",
+                dataType: "json",
+                data: {idCard: idCard,jgdm:jgdm},
+                cache: false,
+                async: false,
+                success: function(data, status) {
+                    if (data.code == 0) {
+                        isRequestSuccess = true;
+                        if (typeof data.msg != 'undefined' && data.msg != '') {
+                            confirmMsg = '提醒：<br>';
+                            confirmMsg += data.msg;
+                            confirmMsg += '请注意核对！<br>是否确认继续审核？';
+                            confirmMsg = confirmMsg.replaceAll("<br>", "\n");
+                        }
+                    } else {
+                        alert(typeof data.msg == 'undefined' ? '操作失败，请重试' : data.msg);
+                    }
+                }, error: function(request, error, status) {
+                    alert(error);
+                }, complete: function(request, error, status) {
+
+                }
+            });
+
+            return isRequestSuccess ? (confirmMsg === '' ? true : confirm(confirmMsg)) : false;
+        }
+
+        function loadXzXgcl(obj, val, xgcl, bmid) {
+            if (systype != 'gx') {
+                initXgcl(obj, val, xgcl, bmid);
+            } else {
+                var sfzh = jQuery("#sfzh").val();
+                var zyxm = jQuery("#zyxm").length > 0 ? jQuery("#zyxm").val() : "";
+                if (sfzh == '') {
+                    alert('请填写证件号码!');
+                    jQuery(obj).attr("checked", false);
+                } else if (sfzh.indexOf(' ') != -1) {
+                    alert("证件号的格式有误, 不可添加附件, 注意不要有空格！");
+                    jQuery(obj).attr("checked", false);
+                    jQuery("#sfzh").focus();
+                } else if (zyxm == '') {
+                    alert('请选择作业项目!');
+                    jQuery(obj).attr("checked", false);
+                } else {
+                    initXgcl(obj, val, xgcl, bmid);
+                }
+            }
+        }
+
+        function changeSfzh() {
+            if (systype != 'gx') {
+                return;
+            }
+
+            var sfzh = jQuery("#v_sfzh").val();
+            jQuery(".xgclCls").each(function () {
+                var num = jQuery(this).parent().find(".xgclFj").html().indexOf('添加附件') == -1 ? 1 : 2;
+                if (jQuery(this).parent().find(".xgclFj > a").length >= num) {
+                    jQuery("#sfzh").val(sfzh);
+                }
+            });
+
+            var val = jQuery("#sfzh").val();
+            jQuery("#v_sfzh").val(val);
+        }
+        function openYhysxy(){
+            window.open("../privacypolicy.htm");
+        }
+
+        var startData;
+        function getCode() {
+
+            var jgdm = jQuery('#jgdm').val();
+            var sfzh = jQuery('#sfzh').val();
+            var zyxm = jQuery('#zyxm').val();
+            var sqrxm = jQuery('#sqrxm').val();
+            var zyzl = zyxm.substr(0, 2);
+            var bmlb = "0";
+            startData = setInterval("clock()", 7000);
+            if (zyxm == "" || zyzl == "" || zyxm == undefined || zyzl == undefined) {
+                alert("请先填写作业项目");
+                return;
+            }
+            if (sqrxm == "") {
+                alert("请先填写姓名");
+                return;
+            }
+            window.open("../toCreateBmQRCode.do?verCodeUrl=bm_code_url&jgdm=" + jgdm + "&sfzh=" + sfzh + "&zyxm=" + zyxm + "&sqrxm=" + sqrxm + "&zyzl=" + zyzl + "&bmlb=" + bmlb
+                , "_blank", "toolbar=no,width=800,height=800,status=no,scrollbars=yes,resizable=yes,menubar=no,location=no");
+        }
+
+        function clock() {
+            var jgdm = jQuery('#jgdm').val();
+            var sfzh = jQuery('#sfzh').val();
+            var zyxm = jQuery('#zyxm').val();
+            var bmlb = "0";
+            var zyzl = zyxm.substr(0, 2);
+            var ishj;
+            if (zyzl == "12") {
+                ishj = 1;
+            } else {
+                ishj = 0;
+            }
+            var content = document.getElementById("phoneUpload").innerText;
+            if (content == "") {
+                jQuery.ajax({
+                    type: "POST",
+                    url: "weChatIsUploadFile.do",
+                    dataType: "json",
+                    data: {
+                        jgdm: jgdm,
+                        sfzh: sfzh,
+                        zyxm: zyxm,
+                        bmlb: bmlb,
+                        ishj: ishj
+                    },
+                    cache: false,
+                    async: false,
+                    success: function (data, status) {
+                        if (data.count > 0) {
+                            document.getElementById("phoneUpload").innerText = "已上传";
+                        }
+                    },
+                    error: function (request, error, status) {
+                        alert(error);
+                    },
+                    complete: function (request, error, status) {
+                    }
+                });
+            } else {
+                window.clearInterval(startData);
+            }
+        }
+    </script>
+
+    <title>特种设备作业人员考核管理平台</title>
+</head>
+
+<body>
+<link href="css/verify.css" rel="stylesheet" type="text/css">
+<link href="css/font-awesome.min.css" rel="stylesheet">
+<meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<div id="verify-container" draggable="false" class="verify-container">
+    <div id="verify-title" class="verify-title">
+        <span style="margin-left: 20px; font-size: 18px; font-weight: bold;">请先完成安全验证</span>
+        <span id="verifyRefresh"><i class="fa fa-refresh fa-2x"></i></span>
+        <span id="verifyClose"><i class="fa fa-close fa-2x"></i></span>
+    </div>
+    <div id="verify-content">
+        <div id="verify-image-content" class="verify-image-content">
+            <img id="verifyBigImg" class="verifyBigImg" src=""/>
+            <img id="verifySmallImg" class="verifySmallImg" src=""/>
+        </div>
+        <div id="verify-slider-content">
+            <div id="verifySliderChannel">向右拖动滑块填充拼图</div>
+            <div id="verifySliderBtn">
+                <i class="fa fa-arrow-right fa-2x"></i>
+            </div>
+        </div>
+    </div>
+</div><form id="savedatafrm" action="dwbm_savekzbmb.do" target="_self" enctype="multipart/form-data" method="post" onSubmit="return validateForm();">
+    <div id = "printPage">
+    <input type="hidden" id="bmid" name="bmid" value="">
+    <input type="hidden" id="sblsh" name="sblsh" value="">
+    <input type="hidden" id="jgdm" name="jgdm" value="140300111"/>
+    <input type="hidden" id="jglb" name="jglb" value="9002"/>
+    <input type="hidden" id="web_ksjgdm" name="web_ksjgdm" value="140300111"/>
+    <input type="hidden" id="bmjgdm" name="bmjgdm" value="140300111"/>
+    <input type="hidden" name="flag" value="">
+    <input type="hidden" id="bmlb" name="bmlb" value=""/>
+    <input type="hidden" id="bmVerriToken" name="bmVerriToken" value=""/>
+    <input type="hidden" name="tzsbzl" id="tzsbzl" value="">
+    <input name="lzfs" id="lzfs" type="hidden">
+    <input name="sjrxm" id="sjrxm" type="hidden">
+    <input name="sjrlxdh" id="sjrlxdh" type="hidden">
+    <input name="sjrxxdz" id="sjrxxdz" type="hidden">
+    <input name="sjryzbm" id="sjryzbm" type="hidden">
+    <input type="hidden" id="zwwbm" name="zwwbm" value=""/>
+    <input type="hidden" id="business_code" name="business_code" value="">
+    <input type="hidden" id="v_sfzh" name="v_sfzh" value="">
+    <input type="hidden" id="processStatus" name="processStatus" value="">
+    <input type="hidden" id="userid" name="userid" value="13253">
+    <input type="hidden" id="v_lxdh" name="v_lxdh" value="">
+    <input type="hidden" id="phoneIsReq" name="phoneIsReq" value=""/>
+            <input type="hidden" id="siteX" name="siteX" value="" />
+
+    <table width="650" height="50" border="0" align="center" cellpadding="0" cellspacing="0">
+        <tr>
+            <td align="center"><span style="font-size:24px; font-family:'黑体';" id="title">特种设备作业人员资格申请表</span></td>
+        </tr>
+    </table>
+    <table width="650px" border="0" align="center" cellpadding="0" cellspacing="0">
+        <tr id="plantr">
+            <td height="30" align="left" valign="middle">
+                <label style="display: none;" id="planlab">考试计划（预）：
+                    <select name="plan_id" id="plan_id" style="width: 240px;" onchange="loadPlanXm(this)"></select></label>
+            </td>
+        </tr>
+        <tr>
+            <td align="left" valign="middle">
+                <label style="display: none;" id="pxjgx">下属机构（或单位所属地区）：<select name="pxjgdm" id="pxjgdm" onchange="loadXm(this)" style="width: 240px;">
+                    <option value="">--请选择--</option></select>&nbsp;</label>
+            </td>
+        </tr>
+        <tr>
+            <td align="left" valign="middle">
+                <label  id="ksjgx" >考试机构：
+                    <select name="ksjgdm" id="ksjg" onchange="loadXmByKsjg(this)" style="width: 240px;">
+                        <option value="">--请选择--</option>
+                    </select>&nbsp;</label>
+            </td>
+        </tr>
+            </table>
+    <table width="650" align="center" cellpadding="0" cellspacing="1" bgcolor="#000000"  class="blodside">
+        <tr>
+            <td colspan="2">姓名</td>
+            <td>
+                <input name="sqrxm" type="text" id="sqrxm" maxlength="50" value="" onblur="trimStr(this)"
+                       class="bd_input01" style="width:160px"/>
+            </td>
+            <td>性别</td>
+            <td> <input name="xb" type="radio" id="xb1" value="1" checked="checked"/>男<input type="radio" name="xb" id="xb2" value="0" />女</td>
+            <td rowspan="4"><img src='image.do?bmid=&id=&zyxm=&bmlb=0' height="125" width="86" id="image1" style="cursor: pointer;" align="middle"/><br>
+                <input type="file" size="1" name="files" id="files" style="width:70px;" onChange="fileUpload('image1','savedatafrm',this.id)"></td>
+        </tr>
+        <tr>
+            <td colspan="2"><select id="zjlx" name="zjlx" onChange="iszjlx()" ></select></td>
+            <td>
+                <input name="sfzh" type="text" id="sfzh" size="20" maxlength="18" value=""
+                                       onChange="isIDCard(this)" onblur="changeSfzh()"
+                       style="width: 155px; border:1px solid #EA0000; background:#FDE3E3;text-transform:uppercase;"
+                       class="bd_input01"/>
+            </td>
+            <td>文化程度</td>
+            <td><select name="whcd" id="whcd">
+                <option value="">--请选择--</option>
+            </select></td>
+        </tr>
+
+        <tr>
+            <td colspan="2">工作单位</td>
+            <td colspan="3"><input name="yrdw" type="text" id="yrdw" maxlength="100" value="" class="bd_input01"  style="width:66%"/>
+                <input name="but" type="button" class="btnxz_out" onClick="selectDwyrdw()" value="选择" onMouseOver="this.className='btnxz_on'"onmouseout="this.className='btnxz_out'"></td>
+        </tr>
+        <tr>
+            <td colspan="2">工作单位地址</td>
+            <td colspan="3"><input name="dwdz" type="text" id="dwdz" maxlength="100" value="" class="bd_input01" /></td>
+        </tr>
+                <tr>
+            <td colspan="2">通信地址</td>
+            <td colspan="4"><input name="txdz" type="text" id="txdz" size="54" maxlength="200" value="" class="bd_input01"/></td>
+        </tr>
+        <tr>
+            <td colspan="2">邮&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;编</td>
+            <td><input name="yzbm" type="text" id="yzbm" maxlength="6" value="" class="bd_input01" style="width:108px;"/></td>
+            <td>联系电话</td>
+            <td colspan="2">
+                <input name="lxdh" type="text" id="lxdh" size="14" maxlength="50" class="bd_input01" style="width:108px;"/>
+                            </td>
+        </tr>
+        <tr>
+            <td colspan="2">申请作业项目</td>
+            <td>
+                <select name="zyxm" id="zyxm" onChange="selectNewXm('#zyxmcode',this.value); bindzyxmSmX('zyxm',this.value,'sx','xz')">
+                    <option value="">--请选择--</option>
+                </select>
+                <input type="hidden" id="zyzl" name="zyzl" value="">
+            </td>
+            <td>申请项目代号</td>
+            <td colspan="2">
+                <select name="zyxmcode" id="zyxmcode" style="width:110px;" onChange="selectNewXm('#zyxm',this.value); bindzyxmSmX('zyxm',this.value,'sx','xz')">
+                    <option value="">--请选择--</option>
+                </select>
+                            </td>
+        </tr>
+        <tr id="tzsbzltr" style="display:none">
+            <td colspan="2" height="30" style="line-height: 25px">选择的特种<br>设备种类</td>
+            <td colspan="4" id="tzsbzltd" style="line-height: 25px">
+            </td>
+        </tr>
+                        <input type="hidden" name="dwszdq" value=""/>
+        <input type="hidden" name="dwszqx" value=""/>
+                <tr>
+            <td style="width: 40px">工作简历</td>
+            <td colspan="5"><textarea name="gzjl" id="gzjl" cols="50" rows="12" style="width:98%;"></textarea></td>
+        </tr>
+        <tr>
+            <td>相关资料</td>
+            <td colspan="5">
+                                                                <div style="clear: both; vertical-align: middle; height: 22px">
+                    <input type="checkbox" onclick="loadXzXgcl(this,'tj07101','07101','')"
+                           name="xgcl"
+                           id="xgcl07101"
+                           value="07101"
+                           style="vertical-align:middle;"
+                           >
+                    <span class="xgclCls">身份证明(复印件)1份</span>
+                    &nbsp;<span id="tj07101" class="xgclFj"></span>
+                </div>
+                
+                                                <div style="clear: both; vertical-align: middle; height: 22px">
+                    <input type="checkbox" onclick="loadXzXgcl(this,'tj07102','07102','')"
+                           name="xgcl"
+                           id="xgcl07102"
+                           value="07102"
+                           style="vertical-align:middle;"
+                           >
+                    <span class="xgclCls">学历证明(毕业证复印件1份)</span>
+                    &nbsp;<span id="tj07102" class="xgclFj"></span>
+                </div>
+                
+                                                <div style="clear: both; vertical-align: middle; height: 22px">
+                    <input type="checkbox" onclick="loadXzXgcl(this,'tj07103','07103','')"
+                           name="xgcl"
+                           id="xgcl07103"
+                           value="07103"
+                           style="vertical-align:middle;"
+                           >
+                    <span class="xgclCls">体检报告(1份，相应考核大纲有要求的)</span>
+                    &nbsp;<span id="tj07103" class="xgclFj"></span>
+                </div>
+                
+                                                <div style="clear: both; vertical-align: middle; height: 22px">
+                    <input type="checkbox" name="xgcl" id="xgcl07104" value="07104" readonly >
+                    <span id="tooltip-trigger" style="color: grey"  class="xgclCls">申请表扫描件</span>
+                    <div id="tooltip" style="display: none; position: absolute; background: #333; color: #fff; padding: 5px; border-radius: 4px;">
+                        申请表请于上报成功后点击我的报名修改上传！
+                    </div>
+                    &nbsp;<span id="tj07104" class="xgclFj"></span>
+                </div>
+                
+                                                <div style="clear: both; vertical-align: middle; height: 22px">
+                    <input type="checkbox" onclick="loadXzXgcl(this,'tj07114','07114','')"
+                           name="xgcl"
+                           id="xgcl07114"
+                           value="07114"
+                           style="vertical-align:middle;"
+                           >
+                    <span class="xgclCls">劳动合同或社保证明（适用时）</span>
+                    &nbsp;<span id="tj07114" class="xgclFj"></span>
+                </div>
+                
+                
+            </td>
+        </tr>
+        <tr>
+            <td>用人单位意见</td>
+            <td colspan="5">
+                （申请人在非户籍工作所在地申请时需填写本栏）
+                <textarea name="yrdwyj" id="yrdwyj" cols="50" rows="3" style="width:98%;"></textarea>
+                用人单位(加盖公章)：&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;日期：
+                                <input type="hidden" name="yrdwrq" value="2026-04-24" />2026-04-24
+                            </td>
+        </tr>
+        <tr>
+            <td colspan="6" style="line-height: 25px">
+                <div align="left"><strong>本人声明，以上填写信息及所提交的资料均合法、真实、有效，并承诺对填写的内容负责。</strong></div>
+                <div align="right" style="clear: both; padding-right: 20px">申请人(签字)：&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;日期：
+                     <input type="hidden" name="sqrqzrq" value="2026-04-24" />2026-04-24                 </div>
+            </td>
+        </tr>
+    </table>
+    </div>
+    <table width="650" border="0" align="center" cellpadding="0" cellspacing="0" style="margin-top:6px">
+        <tr>
+            <td align="left">注：申请人在网上申请的，填报申请表后打印盖章签字并扫描上传。</td>
+        </tr>
+    </table>
+    <p>&nbsp;</p>
+    <table width="650" border="0" align="center" cellpadding="0" cellspacing="0" style="margin-top:6px">
+                <tr>
+            <td class="black13"  width="40%"  >验证码：<input  id='verCode' name="verCode" type="text" >  </td>
+
+            <td class="black13" width="60%">    <img id="veriimg" src="getAuthImage.do" />
+                <a href="javascript:void(0);" onclick="javascript:changeImg()" style="color:black;"><label style="color:black;">看不清？</label></a></td>
+        </tr>
+        <script type="text/javascript">
+            function changeImg(){
+
+                var img = document.getElementById("veriimg");
+                var timestamp =Date.parse(new Date());
+                img.src = "getAuthImage.do?date=" + timestamp;
+            }
+        </script>
+    </table>
+    <input name="xgclType" type="hidden" id="xgclType" value="071">
+</form>
+
+<script type="text/javascript" language="javascript1.2" src="js/readsyncard.js"></script>
+</body>
+</html>

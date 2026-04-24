@@ -414,6 +414,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
 
+        // 默认滚动到底部
+        body.scrollTop = body.scrollHeight;
+
         const close = () => overlay.remove();
         overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
         modal.querySelector('#material-log-modal-close').onclick = close;
@@ -2013,7 +2016,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                     submitRegBtn.textContent = '📤 提交报名';
                     submitRegBtn.title = '一键提交到山西特种设备考试报名平台并下载申请表';
                     submitRegBtn.onclick = async () => {
-                        if (!confirm(`确认将「${student.name}」的信息提交到报名平台？\n\n提交后将自动查询并下载申请表。`)) return;
+                        // 自定义确认弹窗
+                        const confirmed = await new Promise(resolve => {
+                            const ov = document.createElement('div');
+                            ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:10000;display:flex;align-items:center;justify-content:center;';
+                            ov.innerHTML = `<div style="background:#fff;border-radius:12px;padding:24px 28px;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;">
+                                <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px;">📤 提交报名</div>
+                                <div style="color:#555;font-size:0.9rem;margin-bottom:20px;">确认将「${student.name}」的信息提交到报名平台？<br><span style="color:#888;font-size:0.8rem;">提交后将自动查询并下载申请表</span></div>
+                                <div style="display:flex;gap:12px;justify-content:center;">
+                                    <button id="sxtsks-cancel" style="padding:8px 24px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;font-size:0.9rem;">取消</button>
+                                    <button id="sxtsks-confirm" style="padding:8px 24px;border:none;border-radius:8px;background:linear-gradient(135deg,#F59E0B,#D97706);color:#fff;cursor:pointer;font-weight:600;font-size:0.9rem;">确认提交</button>
+                                </div>
+                            </div>`;
+                            document.body.appendChild(ov);
+                            ov.querySelector('#sxtsks-confirm').onclick = () => { ov.remove(); resolve(true); };
+                            ov.querySelector('#sxtsks-cancel').onclick = () => { ov.remove(); resolve(false); };
+                        });
+                        if (!confirmed) return;
                         const origText = submitRegBtn.textContent;
                         submitRegBtn.textContent = '⏳ 提交中...';
                         submitRegBtn.disabled = true;

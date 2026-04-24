@@ -102,6 +102,20 @@ def submit_registration(student_id):
         # 不返回 form_content 二进制字段
         result.pop('form_content', None)
 
+        if result.get('success'):
+            from models.student import update_student
+            import time
+            logs = student.get('material_logs', [])
+            if not isinstance(logs, list):
+                logs = []
+            logs.append({
+                'date': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'operator': '系统(自动报名)',
+                'action': '成功提取并提交了考试平台报名资料',
+                'user': 'System'
+            })
+            update_student(student_id, {'material_logs': logs})
+
         return jsonify(result)
 
     except Exception as e:

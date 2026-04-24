@@ -244,21 +244,39 @@ class SxtsksClient:
                     allow_redirects=True,
                 )
 
-                if 'turnToUserLogin' in login_resp.url:
-                    self._log_step(f'登录-提交(第{attempt}次)', 'fail', f'重定向回登录页，验证码可能错误', login_resp)
-                    continue
-
-                # 尝试从页面中提取 userid
-                userid_match = re.search(r'userid[=:][\s"]*(\d+)', login_resp.text)
-                if userid_match:
-                    self.userid = userid_match.group(1)
-                else:
-                    userid_match2 = re.search(r'userid=(\d+)', login_resp.url + login_resp.text)
-                    if userid_match2:
-                        self.userid = userid_match2.group(1)
+                # 判断登录结果 - 接口返回 JSON: {"text":"登录成功！","code":1}
+                try:
+                    login_data = login_resp.json()
+                    if login_data.get('code') != 1:
+                        self._log_step(f'登录-提交(第{attempt}次)', 'fail', f'平台拒绝: {login_data.get("text", "")}', login_resp)
+                        continue
+                except (ValueError, AttributeError):
+                    # 非 JSON 响应，检查 URL 是否重定向回登录页
+                    if 'turnToUserLogin' in login_resp.url:
+                        self._log_step(f'登录-提交(第{attempt}次)', 'fail', '重定向回登录页，验证码可能错误', login_resp)
+                        continue
 
                 self.logged_in = True
-                self._log_step(f'登录-提交(第{attempt}次)', 'ok', f'登录成功，userid={self.userid}', login_resp)
+                self._log_step(f'登录-提交(第{attempt}次)', 'ok', '登录成功', login_resp)
+
+                # 登录成功后访问主页提取 userid
+                try:
+                    home_resp = self.session.get(f'{BASE_URL}/turnToUserLogin.do', timeout=10)
+                    userid_match = re.search(r'userid[=:"\s]*(\d+)', home_resp.text)
+                    if userid_match:
+                        self.userid = userid_match.group(1)
+                        self._log_step('登录-获取userid', 'ok', f'userid={self.userid}')
+                    else:
+                        # 从 URL 参数中再找
+                        userid_match2 = re.search(r'userid=(\d+)', home_resp.url)
+                        if userid_match2:
+                            self.userid = userid_match2.group(1)
+                            self._log_step('登录-获取userid', 'ok', f'userid={self.userid}(从URL)')
+                        else:
+                            self._log_step('登录-获取userid', 'warning', f'未从主页提取到userid，页面长度={len(home_resp.text)}')
+                except Exception as ue:
+                    self._log_step('登录-获取userid', 'warning', str(ue))
+
                 return {
                     'success': True,
                     'message': f'登录成功（第{attempt}次尝试）',
@@ -363,18 +381,24 @@ class SxtsksClient:
             timeout=15,
         )
 
-        # 提取 bmVerriToken
-        match = re.search(r'bmVerriToken["\s]+value="([^"]+)"', resp.text)
-        if match:
-            self._log_step('获取表单token', 'ok', f'bmVerriToken={match.group(1)[:20]}...', resp)
-            return match.group(1)
-        # 备选提取
-        match2 = re.search(r"bmVerriToken['\s]*[:,=]\s*['\"]([^'\"]+)", resp.text)
-        if match2:
-            self._log_step('获取表单token', 'ok', f'bmVerriToken(备选)={match2.group(1)[:20]}...', resp)
-            return match2.group(1)
-        self._log_step('获取表单token', 'warning', f'未找到 bmVerriToken，页面长度={len(resp.text)}', resp)
-        return ''
+        # 提取 bmVerriToken（多种可能的 HTML 模式）
+        token = ''
+        patterns = [
+            r'name="bmVerriToken"[^>]*value="([^"]+)"',   # <input name="bmVerriToken" value="xxx">
+            r'value="([^"]+)"[^>]*name="bmVerriToken"',   # <input value="xxx" name="bmVerriToken">
+            r'bmVerriToken["\s]+value="([^"]+)"',          # 原有模式
+            r'bmVerriToken["\']?\s*[:,=]\s*["\']([^"\']+)', # JS 变量赋值
+            r'id="bmVerriToken"[^>]*value="([^"]+)"',      # id 模式
+        ]
+        for pat in patterns:
+            m = re.search(pat, resp.text)
+            if m:
+                token = m.group(1)
+                self._log_step('获取表单token', 'ok', f'bmVerriToken={token[:20]}... (模式: {pat[:30]})', resp)
+                break
+        if not token:
+            self._log_step('获取表单token', 'warning', f'未找到 bmVerriToken，页面长度={len(resp.text)}', resp)
+        return token
 
     def _get_captcha_code(self):
         """获取并识别新的验证码。"""
@@ -383,6 +407,25 @@ class SxtsksClient:
             timeout=10,
         )
         return _ocr_captcha(captcha_resp.content)
+
+    def _upload_attachment(self, code, photo_data, zyxm_id):
+        """上传单独的附件（身份证明等）"""
+        att_filename = f'tj{code}'
+        self._log_step(f'上传附件-{code}', 'ok', f'准备上传, ID={att_filename}')
+        try:
+            att_resp = self.session.post(
+                f'{BASE_URL}/uploadksimg.do',
+                params={'suffix': 'jpg', 'filename': att_filename, 'zyxm': str(zyxm_id)},
+                files={att_filename: ('attachment.jpg', photo_data, 'image/jpeg')},
+                timeout=15,
+            )
+            att_result = att_resp.json()
+            if att_result.get('id') == 1:
+                self._log_step(f'上传附件结果-{code}', 'ok', '成功', att_resp)
+            else:
+                self._log_step(f'上传附件结果-{code}', 'fail', att_result.get('text', ''), att_resp)
+        except Exception as e:
+            self._log_step(f'上传附件结果-{code}', 'warning', f'异常: {str(e)}')
 
     def _run_pre_checks(self, sfzh, zyxm_id):
         """
@@ -466,16 +509,23 @@ class SxtsksClient:
             self._log_step('报名开始', 'ok', f'{student["name"]}（{sfzh}）项目={project_code} → XMID={zyxm_id}')
             self.upload_photo(photo_path, zyxm_id)
 
-            # 2. 获取表单 token
+            # 获取表单 token
             token = self._get_form_token(sfzh, zyxm_id)
 
             # 3. 执行预校验
             check_results = self._run_pre_checks(sfzh, zyxm_id)
             ver_code = check_results.get('verCode', '')
-
-            # 如果验证码空了，再获取一次
+            
             if not ver_code:
                 ver_code = self._get_captcha_code()
+
+            # 新增: 提交表单前上传证明材料 (07101 = 身份证明, 07102 = 学历证明, 07103 = 体检报告)
+            # 平台上点击"添加附件"就是发此类请求
+            with open(photo_path, 'rb') as f:
+                photo_data = f.read()
+
+            for code in XGCL_DEFAULT:
+                self._upload_attachment(code, photo_data, zyxm_id)
 
             # 4. 检查是否需要配合机构必选
             try:
@@ -489,8 +539,6 @@ class SxtsksClient:
 
             # 5. 构建并提交表单
             self._log_step('构建表单', 'ok', f'token={token[:15]}... verCode={ver_code} 学历={education_code} 性别={gender_code}')
-            with open(photo_path, 'rb') as f:
-                photo_data = f.read()
 
             # 构建 multipart 表单数据
             form_fields = {
