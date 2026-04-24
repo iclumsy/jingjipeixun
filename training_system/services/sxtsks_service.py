@@ -178,9 +178,9 @@ class SxtsksClient:
                 entry['response'] = resp.text[:500]
             elif 'html' in content_type:
                 entry['response_length'] = len(resp.text)
-                # 从 HTML 中提取有用信息
+                # 从 HTML 中提取有用信息（仅提取包含 alert 包含特定错误时的关键词，避免误提取页面静态代码）
                 import re as _re
-                alerts = _re.findall(r'alert\(["\']([^"\']+)["\']\)', resp.text[:3000])
+                alerts = _re.findall(r'alert\(["\'](.*?不正确.*?|.*?不符合.*?|.*?已存在.*?|.*?失败.*?)["\']\)', resp.text[:3000])
                 if alerts:
                     entry['alerts'] = alerts[:5]
             else:
@@ -624,26 +624,33 @@ class SxtsksClient:
             # 照片文件
             files_list.append(('files', ('photo.jpg', photo_data, 'image/jpeg')))
 
+            # 发送请求，加上 X-Requested-With 以防止被 Struts 当作普通跳转而返回表单页
             resp = self.session.post(
                 f'{BASE_URL}/dwbm_savekzbmb.do',
                 files=files_list,
+                headers={'X-Requested-With': 'XMLHttpRequest'},
                 timeout=30,
             )
 
             # 判断是否成功
             self._log_step('提交表单-响应', 'ok', f'HTTP {resp.status_code}, 长度={len(resp.text)}', resp)
             if resp.status_code == 200:
-                if '保存并上报' in resp.text or 'bmid' in resp.text.lower():
-                    bmid_match = re.search(r'bmid["\s=]+["\']?(\d+)', resp.text)
-                    bmid = bmid_match.group(1) if bmid_match else ''
+                resp_text = resp.text.strip()
+                if '保存并上报成功' in resp_text:
+                    # 响应格式: "保存并上报成功,12345"
+                    parts = resp_text.split(',')
+                    bmid = parts[1] if len(parts) > 1 else ''
                     self._log_step('提交表单-结果', 'ok', f'报名成功 bmid={bmid}')
                     return {'success': True, 'message': '报名提交成功', 'bmid': bmid}
-                elif '验证码' in resp.text and '错误' in resp.text:
+                elif '验证码' in resp_text and '不正确' in resp_text:
                     self._log_step('提交表单-结果', 'fail', '验证码错误')
                     return {'success': False, 'message': '验证码错误'}
+                elif '已存在' in resp_text:
+                    self._log_step('提交表单-结果', 'fail', resp_text)
+                    return {'success': False, 'message': f'报名失败: {resp_text}'}
                 else:
-                    self._log_step('提交表单-结果', 'ok', '已提交，需查询确认')
-                    return {'success': True, 'message': '报名已提交，需查询确认', 'bmid': ''}
+                    self._log_step('提交表单-结果', 'warning', f'未知响应: {resp_text[:100]}')
+                    return {'success': False, 'message': f'未知响应: {resp_text}'}
             else:
                 self._log_step('提交表单-结果', 'fail', f'HTTP {resp.status_code}')
                 return {'success': False, 'message': f'HTTP 错误: {resp.status_code}'}
@@ -682,6 +689,7 @@ class SxtsksClient:
                 'zyzltwo': '',
                 'zyxmtwo': '',
             },
+            headers={'X-Requested-With': 'XMLHttpRequest'},
             timeout=15,
         )
 
