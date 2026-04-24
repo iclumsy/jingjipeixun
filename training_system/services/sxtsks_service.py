@@ -662,7 +662,9 @@ class SxtsksClient:
                     return {'success': False, 'message': f'报名失败: {resp_text}'}
                 else:
                     self._log_step('提交表单-结果', 'warning', f'未知响应: {resp_text[:100]}')
-                    return {'success': False, 'message': f'未知响应: {resp_text}'}
+                    with open('tmp/error_71k.html', 'w', encoding='utf-8') as f:
+                        f.write(resp.text)
+                    return {'success': False, 'message': f'未知响应 (已导出测试环境 HTML 到 tmp/error_71k.html)'}
             else:
                 self._log_step('提交表单-结果', 'fail', f'HTTP {resp.status_code}')
                 return {'success': False, 'message': f'HTTP 错误: {resp.status_code}'}
