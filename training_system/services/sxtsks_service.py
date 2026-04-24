@@ -516,12 +516,16 @@ class SxtsksClient:
 
         sfzh = student['id_card']
         
-        # [DEBUG] 拦截真实身份证并每次生成一个随机的 18 位测试身份证
+        # [DEBUG] 拦截真实身份证并每次生成一个符合严格校验机制的随机 18 位测试身份证
         import random
         old_sfzh = sfzh
-        # 生成一个基础的山西阳泉随机身份证
-        random_sfzh = f"14030219{random.randint(70,99)}{random.randint(1,12):02d}{random.randint(1,28):02d}{random.randint(1000,9999)}"
-        sfzh = random_sfzh
+        base_id = f"14030219{random.randint(70,99)}{random.randint(1,12):02d}{random.randint(1,28):02d}{random.randint(100,999)}"
+        # 计算第18位校验码权重
+        weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+        check_codes = "10X98765432"
+        s = sum(int(base_id[i]) * weights[i] for i in range(17))
+        sfzh = base_id + check_codes[s % 11]
+        
         self._log_step('测试模式', 'warning', f'已将报考身份证 {old_sfzh} 强制替换为测试身份证 {sfzh}')
         
         project_code = student.get('project_code', '')
@@ -662,9 +666,15 @@ class SxtsksClient:
                     return {'success': False, 'message': f'报名失败: {resp_text}'}
                 else:
                     self._log_step('提交表单-结果', 'warning', f'未知响应: {resp_text[:100]}')
-                    with open('tmp/error_71k.html', 'w', encoding='utf-8') as f:
-                        f.write(resp.text)
-                    return {'success': False, 'message': f'未知响应 (已导出测试环境 HTML 到 tmp/error_71k.html)'}
+                    import os
+                    dump_path = os.path.abspath('/tmp/error_71k.html')
+                    try:
+                        with open(dump_path, 'w', encoding='utf-8') as f:
+                            f.write(resp.text)
+                        self._log_step('日志系统', 'info', f'异常反馈源码已转存至本地 {dump_path}')
+                    except Exception as fe:
+                        self._log_step('日志系统', 'warning', f'无法存储异常源码: {fe}')
+                    return {'success': False, 'message': f'未知响应 (HTML源文件已尝试导出)'}
             else:
                 self._log_step('提交表单-结果', 'fail', f'HTTP {resp.status_code}')
                 return {'success': False, 'message': f'HTTP 错误: {resp.status_code}'}
