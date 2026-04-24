@@ -419,11 +419,15 @@ class SxtsksClient:
                 files={att_filename: ('attachment.jpg', photo_data, 'image/jpeg')},
                 timeout=15,
             )
-            att_result = att_resp.json()
-            if att_result.get('id') == 1:
+            # 解析响应: <script>window.parent._upload_callbacks('tmp/xxx.jpg','1');</script>
+            import re
+            match = re.search(r"_upload_callbacks\(['\"]([^'\"]+)['\"]\s*,\s*['\"]([^'\"]+)['\"]", att_resp.text)
+            status_code = match.group(2) if match else ''
+            
+            if match and status_code == '1':
                 self._log_step(f'上传附件结果-{code}', 'ok', '成功', att_resp)
             else:
-                self._log_step(f'上传附件结果-{code}', 'fail', att_result.get('text', ''), att_resp)
+                self._log_step(f'上传附件结果-{code}', 'fail', f'状态: {status_code} 响应: {att_resp.text[:100]}', att_resp)
         except Exception as e:
             self._log_step(f'上传附件结果-{code}', 'warning', f'异常: {str(e)}')
 
@@ -472,9 +476,16 @@ class SxtsksClient:
             )
             results['checkVerCode'] = r.text
             results['verCode'] = ver_code
+            try:
+                cv_json = r.json()
+                if cv_json.get('code') == 0:
+                    results['bmVerriToken'] = cv_json.get('text', '')
+            except Exception:
+                pass
         except Exception as e:
             logger.warning(f'验证码校验异常: {e}')
             results['verCode'] = ''
+            results['bmVerriToken'] = ''
 
         return results
 
@@ -515,6 +526,9 @@ class SxtsksClient:
             # 3. 执行预校验
             check_results = self._run_pre_checks(sfzh, zyxm_id)
             ver_code = check_results.get('verCode', '')
+            
+            if not token:
+                token = check_results.get('bmVerriToken', '')
             
             if not ver_code:
                 ver_code = self._get_captcha_code()
