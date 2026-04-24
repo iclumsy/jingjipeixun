@@ -512,6 +512,15 @@ class SxtsksClient:
         self._ensure_login()
 
         sfzh = student['id_card']
+        
+        # [DEBUG] 拦截真实身份证并每次生成一个随机的 18 位测试身份证
+        import random
+        old_sfzh = sfzh
+        # 生成一个基础的山西阳泉随机身份证
+        random_sfzh = f"14030219{random.randint(70,99)}{random.randint(1,12):02d}{random.randint(1,28):02d}{random.randint(1000,9999)}"
+        sfzh = random_sfzh
+        self._log_step('测试模式', 'warning', f'已将报考身份证 {old_sfzh} 强制替换为测试身份证 {sfzh}')
+        
         project_code = student.get('project_code', '')
         zyxm_id = PROJECT_CODE_TO_XMID.get(project_code)
         if not zyxm_id:

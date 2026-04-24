@@ -414,10 +414,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
 
-        // 默认滚动到底部，用 requestAnimationFrame 避免由于元素未完整渲染导致 height 不准确
-        requestAnimationFrame(() => {
-            body.scrollTop = body.scrollHeight;
-        });
+        // 重新设计滚动，加入时间缓冲使其一定能够被浏览器触发
+        const forceScroll = () => { if (body) body.scrollTop = body.scrollHeight; };
+        forceScroll();
+        requestAnimationFrame(forceScroll);
+        setTimeout(forceScroll, 50);
+        setTimeout(forceScroll, 200);
 
         const close = () => overlay.remove();
         overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
@@ -2085,10 +2087,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     ${data.form_path ? '<div style="padding:10px 20px;border-top:1px solid #eee;font-size:0.8rem;color:#666;">📄 申请表已保存: ' + data.form_path + '</div>' : ''}
                                 </div>`;
                             document.body.appendChild(overlay);
-                            requestAnimationFrame(() => {
+                            // 同样保证这里一定滚动到底部
+                            const forceScrollLog = () => {
                                 const logContainer = overlay.querySelector('#sxtsks-log-container');
                                 if (logContainer) logContainer.scrollTop = logContainer.scrollHeight;
-                            });
+                            };
+                            forceScrollLog();
+                            requestAnimationFrame(forceScrollLog);
+                            setTimeout(forceScrollLog, 50);
+                            setTimeout(forceScrollLog, 200);
                             overlay.querySelector('#sxtsks-log-close').onclick = () => overlay.remove();
                             overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 
