@@ -637,14 +637,12 @@ class SxtsksClient:
             for code in XGCL_DEFAULT:
                 files_list.append(('xgcl', (None, code)))
 
-            # 照片文件
-            files_list.append(('files', ('photo.jpg', photo_data, 'image/jpeg')))
+            # 删除强制带入二进制文件的包袱，因为平台靠事先上传就够了
 
-            # 发送请求，加上 X-Requested-With 以防止被 Struts 当作普通跳转而返回表单页
+            # 发送请求，不再画蛇添足伪造 AJAX 头，因为 Struts 可能靠 iframe 兼容
             resp = self.session.post(
                 f'{BASE_URL}/dwbm_savekzbmb.do',
                 files=files_list,
-                headers={'X-Requested-With': 'XMLHttpRequest'},
                 timeout=30,
             )
 
