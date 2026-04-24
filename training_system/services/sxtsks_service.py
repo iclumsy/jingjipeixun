@@ -488,7 +488,7 @@ class SxtsksClient:
             results['verCode'] = ver_code
             try:
                 cv_json = r.json()
-                if cv_json.get('code') == 0:
+                if str(cv_json.get('code', '')) == '0':
                     results['bmVerriToken'] = cv_json.get('text', '')
             except Exception:
                 pass
