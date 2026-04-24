@@ -188,12 +188,19 @@ class SxtsksClient:
         self._steps.append(entry)
         # 同时输出到 logger
         log_msg = f'[sxtsks] {step}: {status} - {detail}'
-        if status == 'fail':
-            logger.error(log_msg)
-        elif status == 'warning':
-            logger.warning(log_msg)
+        
+        from flask import has_app_context, current_app
+        if has_app_context():
+            app_logger = current_app.logger
         else:
-            logger.info(log_msg)
+            app_logger = logger
+            
+        if status == 'fail':
+            app_logger.error(log_msg)
+        elif status == 'warning':
+            app_logger.warning(log_msg)
+        else:
+            app_logger.info(log_msg)
 
     def get_steps(self):
         """获取并清空步骤日志。"""
