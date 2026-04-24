@@ -414,8 +414,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
 
-        // 默认滚动到底部
-        body.scrollTop = body.scrollHeight;
+        // 默认滚动到底部，用 requestAnimationFrame 避免由于元素未完整渲染导致 height 不准确
+        requestAnimationFrame(() => {
+            body.scrollTop = body.scrollHeight;
+        });
 
         const close = () => overlay.remove();
         overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
@@ -2077,12 +2079,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         <span style="font-size:1rem;font-weight:700;color:${titleColor}">${titleText}</span>
                                         <button id="sxtsks-log-close" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#999;">✕</button>
                                     </div>
-                                    <div style="padding:12px 20px;overflow-y:auto;flex:1;">
+                                    <div id="sxtsks-log-container" style="padding:12px 20px;overflow-y:auto;flex:1;">
                                         ${data.steps ? buildStepsHtml(data.steps) : '<p style="color:#888;">无日志</p>'}
                                     </div>
                                     ${data.form_path ? '<div style="padding:10px 20px;border-top:1px solid #eee;font-size:0.8rem;color:#666;">📄 申请表已保存: ' + data.form_path + '</div>' : ''}
                                 </div>`;
                             document.body.appendChild(overlay);
+                            requestAnimationFrame(() => {
+                                const logContainer = overlay.querySelector('#sxtsks-log-container');
+                                if (logContainer) logContainer.scrollTop = logContainer.scrollHeight;
+                            });
                             overlay.querySelector('#sxtsks-log-close').onclick = () => overlay.remove();
                             overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 
