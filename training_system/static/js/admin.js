@@ -2005,6 +2005,43 @@ document.addEventListener('DOMContentLoaded', async () => {
                 };
                 actionBar.appendChild(downloadZipBtn);
 
+                // 报名平台提交按钮（仅特种设备学员）
+                if (student.training_type === 'special_equipment') {
+                    const submitRegBtn = document.createElement('button');
+                    submitRegBtn.className = 'btn';
+                    submitRegBtn.style.cssText = 'background:linear-gradient(135deg,#F59E0B,#D97706);color:#fff;font-weight:600;margin-right:8px;';
+                    submitRegBtn.textContent = '📤 提交报名';
+                    submitRegBtn.title = '一键提交到山西特种设备考试报名平台并下载申请表';
+                    submitRegBtn.onclick = async () => {
+                        if (!confirm(`确认将「${student.name}」的信息提交到报名平台？\n\n提交后将自动查询并下载申请表。`)) return;
+                        const origText = submitRegBtn.textContent;
+                        submitRegBtn.textContent = '⏳ 提交中...';
+                        submitRegBtn.disabled = true;
+                        try {
+                            const res = await fetch(`/api/sxtsks/submit/${student.id}`, { method: 'POST' });
+                            const data = await res.json();
+                            if (data.success) {
+                                let msg = data.message || '报名成功';
+                                if (data.bmid) msg += `（报名ID: ${data.bmid}）`;
+                                if (data.form_path) msg += '\n申请表已保存到学员目录';
+                                showMessage(msg, 'success', 8000);
+                                // 如果有报名ID，自动打开下载
+                                if (data.bmid) {
+                                    window.open(`/api/sxtsks/form/${data.bmid}`, '_blank');
+                                }
+                            } else {
+                                showMessage(data.message || '提交失败', 'error');
+                            }
+                        } catch (e) {
+                            showMessage('提交异常: ' + e.message, 'error');
+                        } finally {
+                            submitRegBtn.textContent = origText;
+                            submitRegBtn.disabled = false;
+                        }
+                    };
+                    actionBar.appendChild(submitRegBtn);
+                }
+
 
                 const rejectBtn = document.createElement('button');
                 rejectBtn.className = 'btn';

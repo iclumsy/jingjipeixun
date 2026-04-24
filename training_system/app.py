@@ -275,6 +275,13 @@ def create_app():
     app.register_blueprint(config_bp)        # /api/config/*       配置接口
     app.register_blueprint(log_bp)           # /api/logs/content, /admin/logs 日志查看
 
+    # 报名平台自动化（按需加载，缺依赖不阻断启动）
+    try:
+        from routes.sxtsks_routes import sxtsks_bp
+        app.register_blueprint(sxtsks_bp)    # /api/sxtsks/*  报名平台自动化
+    except ImportError as _e:
+        app.logger.info(f'报名平台模块未加载（缺少依赖）: {_e}')
+
     # ======================== 认证中间件 ========================
     @app.before_request
     def require_authentication():

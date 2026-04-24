@@ -1,0 +1,733 @@
+"""
+山西特种设备考试报名平台 (www.sxtsks.com) 自动化对接服务。
+
+核心功能:
+    - 自动登录（RSA 加密密码 + ddddocr 验证码识别）
+    - 自动提交学员报名
+    - 查询已提交的报名记录
+    - 下载申请表 PDF
+
+使用方式:
+    client = SxtsksClient()
+    client.login()
+    result = client.submit_and_download(student_data, photo_path)
+"""
+import os
+import io
+import re
+import time
+import logging
+import requests
+from urllib.parse import urlencode
+
+logger = logging.getLogger(__name__)
+
+# ======================== 常量配置 ========================
+
+BASE_URL = 'http://www.sxtsks.com'
+
+# 登录凭证
+LOGIN_ID_CARD = '130983198906195314'
+LOGIN_PASSWORD = '53299009'
+
+# RSA 公钥（从平台登录页 JS 提取）
+RSA_PUBLIC_KEY = 'MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAKoR8mX0rGKLqzcWmOzbfj64K8ZIgOdHnzkXSOVOZbFu/TJhZ7rFAN+eaGkl3C4buccQd/EjEsj9ir7ijT7h96MCAwEAAQ=='
+
+# 阳泉市固定参数
+JGDM = '140300111'       # 发证机构代码
+JGLB = '9002'            # 机构类别
+KSJGDM = '14030001'      # 考试机构代码
+YZBM = '045000'          # 邮编
+GZJL = '从事特种设备工作三个月以上。'  # 工作简历
+
+# 学历映射：小程序值 → 平台代码
+EDUCATION_MAP = {
+    '初中': '0403',
+    '中技': '0406',
+    '中专': '0405',
+    '中专或同等学历': '0405',
+    '职高': '0407',
+    '高中': '0408',
+    '高中或同等学历': '0408',
+    '高技': '0413',
+    '大专': '0409',
+    '专科或同等学历': '0409',
+    '本科': '0410',
+    '本科或同等学历': '0410',
+    '硕士': '0411',
+    '研究生及以上': '0411',
+    '博士': '0412',
+}
+
+# 项目代号 → 平台 XMID 映射
+PROJECT_CODE_TO_XMID = {
+    'A':  '0195',   # 特种设备安全管理
+    'G1': '0295',   # 工业锅炉司炉
+    'G3': '0297',   # 锅炉水处理
+    'R1': '0395',   # 快开门式压力容器操作
+    'P':  '0495',   # 气瓶充装
+    'Q1': '0791',   # 起重机指挥
+    'Q2(限塔式起重机)':      '0793',
+    'Q2(限门座式起重机)':    '0794',
+    'Q2(限缆索式起重机)':    '0795',
+    'Q2(限流动式起重机)':    '0796',
+    'N1': '1095',   # 叉车司机
+}
+
+# 性别映射
+GENDER_MAP = {
+    '男': '1',
+    '女': '2',
+}
+
+# 相关材料代码（根据 HAR 数据，固定勾选）
+# 07101 = 身份证明, 07102 = 学历证明, 07103 = 体检报告
+XGCL_DEFAULT = ['07101', '07102', '07103']
+
+# 验证码最大重试次数
+MAX_CAPTCHA_RETRIES = 5
+
+
+def _rsa_encrypt(plaintext, public_key_b64=RSA_PUBLIC_KEY):
+    """
+    使用 RSA 公钥加密密码，与平台 JSEncrypt 行为一致。
+
+    参数:
+        plaintext: 明文密码
+        public_key_b64: base64 编码的 DER 公钥
+
+    返回:
+        str: base64 编码的密文
+    """
+    try:
+        from Crypto.PublicKey import RSA
+        from Crypto.Cipher import PKCS1_v1_5
+        import base64
+
+        der_key = base64.b64decode(public_key_b64)
+        rsa_key = RSA.import_key(der_key)
+        cipher = PKCS1_v1_5.new(rsa_key)
+        ciphertext = cipher.encrypt(plaintext.encode('utf-8'))
+        return base64.b64encode(ciphertext).decode('utf-8')
+    except ImportError:
+        logger.warning('pycryptodome 未安装，尝试使用 rsa 库')
+        try:
+            import rsa as rsa_lib
+            import base64
+            der_key = base64.b64decode(public_key_b64)
+            pub_key = rsa_lib.PublicKey.load_pkcs1_openssl_der(der_key)
+            ciphertext = rsa_lib.encrypt(plaintext.encode('utf-8'), pub_key)
+            return base64.b64encode(ciphertext).decode('utf-8')
+        except ImportError:
+            raise RuntimeError('需要安装 pycryptodome 或 rsa 库来进行 RSA 加密')
+
+
+def _ocr_captcha(image_bytes):
+    """
+    使用 ddddocr 识别验证码图片。
+
+    参数:
+        image_bytes: 验证码图片的二进制内容
+
+    返回:
+        str: 识别出的验证码文本
+    """
+    try:
+        import ddddocr
+        ocr = ddddocr.DdddOcr(show_ad=False)
+        result = ocr.classification(image_bytes)
+        return result.strip()
+    except ImportError:
+        raise RuntimeError('ddddocr 未安装，请执行 pip install ddddocr')
+
+
+class SxtsksClient:
+    """
+    报名平台 HTTP 客户端。
+
+    使用 requests.Session 维持登录态（Cookie），
+    提供登录、报名、查询、下载申请表等完整业务方法。
+    """
+
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        })
+        self.userid = None
+        self.logged_in = False
+
+    def login(self, id_card=LOGIN_ID_CARD, password=LOGIN_PASSWORD):
+        """
+        登录报名平台。
+
+        流程: 获取验证码图片 → OCR 识别 → RSA 加密密码 → 提交登录
+        验证码识别失败时自动重试。
+
+        返回:
+            dict: {'success': True/False, 'message': str, 'attempts': int}
+        """
+        encrypted_pwd = _rsa_encrypt(password)
+
+        for attempt in range(1, MAX_CAPTCHA_RETRIES + 1):
+            try:
+                # 1. 获取验证码图片
+                captcha_url = f'{BASE_URL}/getAuthImage.do?date={int(time.time() * 1000)}'
+                captcha_resp = self.session.get(captcha_url, timeout=10)
+                if captcha_resp.status_code != 200:
+                    logger.warning(f'获取验证码失败: HTTP {captcha_resp.status_code}')
+                    continue
+
+                # 2. OCR 识别验证码
+                captcha_text = _ocr_captcha(captcha_resp.content)
+                logger.info(f'验证码识别结果 (第{attempt}次): {captcha_text}')
+
+                if not captcha_text or len(captcha_text) < 3:
+                    logger.warning(f'验证码识别结果太短: {captcha_text}')
+                    continue
+
+                # 3. 提交登录
+                login_resp = self.session.post(
+                    f'{BASE_URL}/loginByIdCard.do',
+                    data={
+                        'idCard': id_card,
+                        'password': encrypted_pwd,
+                        'validCode': captcha_text,
+                    },
+                    timeout=15,
+                    allow_redirects=True,
+                )
+
+                # 判断登录是否成功
+                # 成功：会重定向到主页，或返回包含 userid 的页面
+                if 'turnToUserLogin' in login_resp.url:
+                    # 重定向回登录页 = 登录失败
+                    logger.warning(f'登录失败 (第{attempt}次)，可能是验证码错误')
+                    continue
+
+                # 尝试从页面中提取 userid
+                userid_match = re.search(r'userid[=:][\s"]*(\d+)', login_resp.text)
+                if userid_match:
+                    self.userid = userid_match.group(1)
+                else:
+                    # 从 URL 参数中提取
+                    userid_match2 = re.search(r'userid=(\d+)', login_resp.url + login_resp.text)
+                    if userid_match2:
+                        self.userid = userid_match2.group(1)
+
+                self.logged_in = True
+                logger.info(f'登录成功，userid={self.userid}，共尝试 {attempt} 次')
+                return {
+                    'success': True,
+                    'message': f'登录成功（第{attempt}次尝试）',
+                    'attempts': attempt,
+                    'userid': self.userid,
+                }
+
+            except Exception as e:
+                logger.error(f'登录异常 (第{attempt}次): {e}')
+                continue
+
+        return {
+            'success': False,
+            'message': f'登录失败，已重试 {MAX_CAPTCHA_RETRIES} 次',
+            'attempts': MAX_CAPTCHA_RETRIES,
+        }
+
+    def _ensure_login(self):
+        """确保已登录，未登录则自动登录。"""
+        if not self.logged_in:
+            result = self.login()
+            if not result['success']:
+                raise RuntimeError(f'自动登录失败: {result["message"]}')
+
+    def upload_photo(self, photo_path, zyxm_id):
+        """
+        上传证件照到报名平台。
+
+        参数:
+            photo_path: 本地照片路径
+            zyxm_id: 作业项目 ID
+
+        返回:
+            str: 平台返回的临时照片路径（如 tmp/xxx.jpg）
+        """
+        self._ensure_login()
+
+        with open(photo_path, 'rb') as f:
+            photo_data = f.read()
+
+        resp = self.session.post(
+            f'{BASE_URL}/uploadksimg.do',
+            params={
+                'suffix': 'jpg',
+                'filename': 'files',
+                'zyxm': zyxm_id,
+            },
+            files={
+                'files': ('photo.jpg', photo_data, 'image/jpeg'),
+            },
+            data={
+                'bmid': '',
+                'sblsh': '',
+                'jgdm': JGDM,
+            },
+            timeout=30,
+        )
+
+        # 响应格式: <script>window.parent._upload_callbacks('tmp/xxx.jpg?dateXXX','1');</script>
+        match = re.search(r"_upload_callbacks\(['\"]([^'\"]+)['\"]", resp.text)
+        if match:
+            tmp_path = match.group(1)
+            logger.info(f'照片上传成功: {tmp_path}')
+            return tmp_path
+        else:
+            raise RuntimeError(f'照片上传失败，响应: {resp.text[:200]}')
+
+    def _get_form_token(self, sfzh, zyxm_id):
+        """
+        获取报名表单页面中的 bmVerriToken 防重 token。
+
+        参数:
+            sfzh: 学员身份证号
+            zyxm_id: 作业项目 XMID
+
+        返回:
+            str: bmVerriToken 值
+        """
+        # 先保存身份证
+        self.session.post(
+            f'{BASE_URL}/saveDwbmSfzh.do',
+            data={'sfzh': sfzh},
+            timeout=10,
+        )
+
+        # 打开报名表单页面
+        resp = self.session.get(
+            f'{BASE_URL}/dwbm_kzbm.do',
+            params={
+                'jgdm': JGDM,
+                'jglb': JGLB,
+                'sfzh': sfzh,
+                'processStatus': 'undefined',
+                'zyxm': zyxm_id,
+                'userid': self.userid or '',
+                'ksjg_dm': KSJGDM,
+            },
+            timeout=15,
+        )
+
+        # 提取 bmVerriToken
+        match = re.search(r'bmVerriToken["\s]+value="([^"]+)"', resp.text)
+        if match:
+            return match.group(1)
+        # 备选提取
+        match2 = re.search(r"bmVerriToken['\s]*[:,=]\s*['\"]([^'\"]+)", resp.text)
+        if match2:
+            return match2.group(1)
+        logger.warning('未找到 bmVerriToken，继续提交')
+        return ''
+
+    def _get_captcha_code(self):
+        """获取并识别新的验证码。"""
+        captcha_resp = self.session.get(
+            f'{BASE_URL}/getAuthImage.do?date={int(time.time() * 1000)}',
+            timeout=10,
+        )
+        return _ocr_captcha(captcha_resp.content)
+
+    def _run_pre_checks(self, sfzh, zyxm_id):
+        """
+        执行提交前的多步校验（模拟前端 JS 行为）。
+
+        返回:
+            dict: 校验结果，包含各步骤响应
+        """
+        results = {}
+
+        # 校验学历是否满足要求
+        try:
+            r = self.session.get(
+                f'{BASE_URL}/dwbm_validateWhcd.do',
+                params={'zyxm': zyxm_id, 'whcd': '0405', '_': int(time.time() * 1000)},
+                timeout=10,
+            )
+            results['validateWhcd'] = r.text
+        except Exception:
+            pass
+
+        # 检查是否已有证书
+        try:
+            r = self.session.post(
+                f'{BASE_URL}/isKsCertExists.do',
+                params={'web_ksjgdm': JGDM},
+                data={'zyzl': '', 'zyxm': zyxm_id, 'sfzh': sfzh},
+                timeout=10,
+            )
+            results['isKsCertExists'] = r.text
+        except Exception:
+            pass
+
+        # 验证身份证
+        try:
+            r = self.session.post(
+                f'{BASE_URL}/verifyDwBmIdCard.do',
+                data={'idCard': sfzh, 'jgdm': JGDM},
+                timeout=10,
+            )
+            results['verifyIdCard'] = r.text
+        except Exception:
+            pass
+
+        # 检查是否可以报名
+        try:
+            r = self.session.post(
+                f'{BASE_URL}/wbisCanApply.do',
+                data={'bmlb': '0', 'jgdm': JGDM, 'sfzh': sfzh, 'zyzl': '', 'zyxm': zyxm_id},
+                timeout=10,
+            )
+            results['isCanApply'] = r.text
+        except Exception:
+            pass
+
+        # 检查是否正在考试
+        try:
+            r = self.session.post(
+                f'{BASE_URL}/isExamDoing.do',
+                data={'bmlb': '0', 'jgdm': JGDM, 'sfzh': sfzh, 'zyzl': '', 'zyxm': zyxm_id},
+                timeout=10,
+            )
+            results['isExamDoing'] = r.text
+        except Exception:
+            pass
+
+        # 验证码校验
+        try:
+            ver_code = self._get_captcha_code()
+            r = self.session.post(
+                f'{BASE_URL}/checkVerCode.do',
+                data={'verCode': ver_code},
+                timeout=10,
+            )
+            results['checkVerCode'] = r.text
+            results['verCode'] = ver_code
+        except Exception as e:
+            logger.warning(f'验证码校验异常: {e}')
+            results['verCode'] = ''
+
+        return results
+
+    def submit_registration(self, student, photo_path):
+        """
+        提交单个学员的报名信息。
+
+        参数:
+            student: 学员数据字典，需包含:
+                name, gender, id_card, education, phone, company,
+                company_address, project_code
+            photo_path: 证件照本地路径
+
+        返回:
+            dict: {'success': True/False, 'message': str, 'bmid': str}
+        """
+        self._ensure_login()
+
+        sfzh = student['id_card']
+        project_code = student.get('project_code', '')
+        zyxm_id = PROJECT_CODE_TO_XMID.get(project_code)
+        if not zyxm_id:
+            return {'success': False, 'message': f'未知的项目代号: {project_code}'}
+
+        gender_code = GENDER_MAP.get(student.get('gender', ''), '1')
+        education_code = EDUCATION_MAP.get(student.get('education', ''), '0405')
+        company = student.get('company', '')
+        company_address = student.get('company_address', '')
+
+        try:
+            # 1. 上传照片
+            logger.info(f'[{student["name"]}] 开始上传照片...')
+            self.upload_photo(photo_path, zyxm_id)
+
+            # 2. 获取表单 token
+            logger.info(f'[{student["name"]}] 获取表单 token...')
+            token = self._get_form_token(sfzh, zyxm_id)
+
+            # 3. 执行预校验
+            logger.info(f'[{student["name"]}] 执行预校验...')
+            check_results = self._run_pre_checks(sfzh, zyxm_id)
+            ver_code = check_results.get('verCode', '')
+
+            # 如果验证码空了，再获取一次
+            if not ver_code:
+                ver_code = self._get_captcha_code()
+
+            # 4. 检查是否需要配合机构必选
+            try:
+                r = self.session.post(
+                    f'{BASE_URL}/queryKsjgIsMust.do',
+                    data={'jgdm': JGDM},
+                    timeout=10,
+                )
+            except Exception:
+                pass
+
+            # 5. 构建并提交表单
+            logger.info(f'[{student["name"]}] 提交报名表单...')
+            with open(photo_path, 'rb') as f:
+                photo_data = f.read()
+
+            # 构建 multipart 表单数据
+            form_fields = {
+                'bmid': '',
+                'sblsh': '',
+                'jgdm': JGDM,
+                'jglb': JGLB,
+                'web_ksjgdm': JGDM,
+                'bmjgdm': JGDM,
+                'flag': '',
+                'bmlb': '',
+                'bmVerriToken': token,
+                'tzsbzl': '',
+                'lzfs': '',
+                'sjrxm': '',
+                'sjrlxdh': '',
+                'sjrxxdz': '',
+                'sjryzbm': '',
+                'zwwbm': '',
+                'business_code': '',
+                'v_sfzh': '',
+                'processStatus': '',
+                'userid': self.userid or '',
+                'v_lxdh': '',
+                'phoneIsReq': '',
+                'siteX': '',
+                'pxjgdm': '',
+                'ksjgdm': KSJGDM,
+                'sqrxm': student['name'],
+                'xb': gender_code,
+                'zjlx': '1',
+                'sfzh': sfzh,
+                'whcd': education_code,
+                'yrdw': company,
+                'dwdz': company_address,
+                'txdz': company_address,
+                'yzbm': YZBM,
+                'lxdh': student.get('phone', ''),
+                'zyxm': zyxm_id,
+                'zyzl': '',
+                'zyxmcode': zyxm_id,
+                'dwszdq': '',
+                'dwszqx': '',
+                'gzjl': GZJL,
+                'yrdwyj': '',
+                'yrdwrq': time.strftime('%Y-%m-%d'),
+                'sqrqzrq': time.strftime('%Y-%m-%d'),
+                'verCode': ver_code,
+                'xgclType': '071',
+            }
+
+            # 构建 multipart 请求
+            # 注意 xgcl 需要多个同名字段
+            files_list = []
+            for key, value in form_fields.items():
+                files_list.append((key, (None, value)))
+
+            # 多个 xgcl 字段
+            for code in XGCL_DEFAULT:
+                files_list.append(('xgcl', (None, code)))
+
+            # 照片文件
+            files_list.append(('files', ('photo.jpg', photo_data, 'image/jpeg')))
+
+            resp = self.session.post(
+                f'{BASE_URL}/dwbm_savekzbmb.do',
+                files=files_list,
+                timeout=30,
+            )
+
+            # 判断是否成功
+            if resp.status_code == 200:
+                # 检查返回的 HTML 中是否有成功标识
+                if '保存并上报' in resp.text or 'bmid' in resp.text.lower():
+                    # 尝试提取 bmid
+                    bmid_match = re.search(r'bmid["\s=]+["\']?(\d+)', resp.text)
+                    bmid = bmid_match.group(1) if bmid_match else ''
+                    logger.info(f'[{student["name"]}] 报名提交成功，bmid={bmid}')
+                    return {'success': True, 'message': '报名提交成功', 'bmid': bmid}
+                elif '验证码' in resp.text and '错误' in resp.text:
+                    return {'success': False, 'message': '验证码错误'}
+                else:
+                    # 可能还是成功了，后面通过查询确认
+                    logger.info(f'[{student["name"]}] 报名已提交，等待查询确认')
+                    return {'success': True, 'message': '报名已提交，需查询确认', 'bmid': ''}
+            else:
+                return {'success': False, 'message': f'HTTP 错误: {resp.status_code}'}
+
+        except Exception as e:
+            logger.error(f'[{student["name"]}] 报名异常: {e}', exc_info=True)
+            return {'success': False, 'message': f'报名异常: {str(e)}'}
+
+    def query_registrations(self, sfzh=None):
+        """
+        查询已提交的报名记录。
+
+        参数:
+            sfzh: 按身份证查询，为空则查全部
+
+        返回:
+            list[dict]: 报名记录列表
+        """
+        self._ensure_login()
+
+        resp = self.session.post(
+            f'{BASE_URL}/dwbm_queryKsZtInfo.do',
+            params={
+                'sfzh': LOGIN_ID_CARD,
+                'userid': self.userid or '',
+            },
+            data={
+                'page': '1',
+                'rp': '100',
+                'sortname': 'undefined',
+                'sortorder': 'undefined',
+                'query': '',
+                'qtype': '',
+                'params': '',
+                'bmlb': '',
+                'zyzltwo': '',
+                'zyxmtwo': '',
+            },
+            timeout=15,
+        )
+
+        if resp.status_code != 200:
+            logger.error(f'查询报名列表失败: HTTP {resp.status_code}')
+            return []
+
+        try:
+            data = resp.json()
+            rows = data.get('rows', [])
+            result = []
+            for row in rows:
+                # 如果指定了 sfzh，只返回匹配的
+                if sfzh and row.get('SFZH') != sfzh:
+                    continue
+                result.append({
+                    'bmid': row.get('BMID'),
+                    'name': row.get('SQRXM'),
+                    'id_card': row.get('SFZH'),
+                    'project': row.get('ZYXM'),
+                    'project_code': row.get('ZYXM_DM'),
+                    'status': row.get('FLAG'),
+                    'apply_date': row.get('SQRQ'),
+                    'exam_org': row.get('KSJG_MC'),
+                    'edit_url': row.get('CZ'),
+                })
+            return result
+        except Exception as e:
+            logger.error(f'解析报名列表失败: {e}')
+            return []
+
+    def download_application_form(self, bmid):
+        """
+        下载申请表 PDF/HTML。
+
+        参数:
+            bmid: 报名 ID
+
+        返回:
+            tuple: (content_bytes, content_type, filename)
+        """
+        self._ensure_login()
+
+        resp = self.session.get(
+            f'{BASE_URL}/dwbm_printBzSqb.do',
+            params={'bmid': bmid},
+            timeout=30,
+        )
+
+        if resp.status_code != 200:
+            raise RuntimeError(f'下载申请表失败: HTTP {resp.status_code}')
+
+        content_type = resp.headers.get('Content-Type', 'text/html')
+        filename = f'申请表-{bmid}'
+
+        if 'pdf' in content_type.lower():
+            filename += '.pdf'
+        elif 'html' in content_type.lower():
+            filename += '.html'
+        else:
+            filename += '.pdf'
+
+        return resp.content, content_type, filename
+
+    def submit_and_download(self, student, photo_path, output_dir=None):
+        """
+        一键完成：报名 → 查询 → 下载申请表。
+
+        参数:
+            student: 学员数据字典
+            photo_path: 证件照路径
+            output_dir: 申请表保存目录，为空则只返回内容
+
+        返回:
+            dict: {
+                'success': bool,
+                'message': str,
+                'bmid': str,
+                'form_path': str (如果指定了 output_dir),
+                'form_content': bytes,
+            }
+        """
+        # 1. 提交报名
+        submit_result = self.submit_registration(student, photo_path)
+        if not submit_result.get('success'):
+            return submit_result
+
+        # 2. 查询报名获取 bmid
+        bmid = submit_result.get('bmid')
+        if not bmid:
+            time.sleep(2)  # 等待平台处理
+            registrations = self.query_registrations(sfzh=student['id_card'])
+            for reg in registrations:
+                if reg['id_card'] == student['id_card']:
+                    bmid = str(reg['bmid'])
+                    break
+
+        if not bmid:
+            return {
+                'success': True,
+                'message': '报名已提交但未找到报名 ID，请手动查询',
+                'bmid': '',
+            }
+
+        # 3. 下载申请表
+        try:
+            content, content_type, filename = self.download_application_form(bmid)
+            result = {
+                'success': True,
+                'message': '报名成功并已下载申请表',
+                'bmid': bmid,
+                'form_content': content,
+                'form_filename': filename,
+            }
+
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+                form_path = os.path.join(output_dir, filename)
+                with open(form_path, 'wb') as f:
+                    f.write(content)
+                result['form_path'] = form_path
+                logger.info(f'申请表已保存: {form_path}')
+
+            return result
+
+        except Exception as e:
+            logger.warning(f'下载申请表失败: {e}')
+            return {
+                'success': True,
+                'message': f'报名成功但下载申请表失败: {e}',
+                'bmid': bmid,
+            }
