@@ -231,6 +231,8 @@
           <text class="grid-value">{{submitStudent.education || '-'}}</text>
           <text class="grid-label">工作单位</text>
           <text class="grid-value" style="font-size:24rpx;line-height:1.2;align-self:center;">{{submitStudent.company || '-'}}</text>
+          <text class="grid-label">单位地址</text>
+          <text class="grid-value" style="font-size:24rpx;line-height:1.2;align-self:center;">{{submitStudent.company_address || '-'}}</text>
           <text class="grid-label">作业类别</text>
           <text class="grid-value">{{submitStudent._tp_job_category || submitStudent.job_category || '-'}}</text>
           <text class="grid-label">报考项目</text>
