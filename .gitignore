@@ -35,3 +35,5 @@ training_system/tmp_*.html
 training_system/test_multipart.py
 training_system/test_upload.py
 training_system/tmp/
+jingji_cookies.txt
+training_system/static/fonts/

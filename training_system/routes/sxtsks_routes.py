@@ -194,7 +194,8 @@ def download_form(bmid):
                 pdf_filename = f"{id_card}-{name}-报名申请表.pdf"
 
             base_dir = _get_base_dir()
-            output_dir = os.path.join(_get_student_output_dir(student, base_dir), '报名材料')
+            material_folder = f"{id_card}-{name}-报名材料" if id_card and name else '报名材料'
+            output_dir = os.path.join(_get_student_output_dir(student, base_dir), material_folder)
             os.makedirs(output_dir, exist_ok=True)
             form_path = os.path.join(output_dir, pdf_filename)
             
@@ -239,30 +240,42 @@ def download_form(bmid):
         html = html.replace('width="650"', '')
         html = html.replace('width="650px"', '')
 
-        # 注入精确匹配原版 PDF 的 CSS
-        inject_css = """<style>
-@page { size: A4; margin: 15mm; }
-body { font-size:12pt; font-family:"PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif; margin:0; padding:0; }
-.tit1 { padding:0 0 10px 0; line-height:36pt; text-align:center; font-size:18pt; font-weight:normal;
-        font-family:"PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif; }
-.tbsd { border:1px solid #000; width:100%; border-collapse:collapse; margin:0 auto; table-layout:fixed; box-sizing:border-box; }
-.tbsd tr:first-child td:nth-child(1) { width: 20%; }
-.tbsd tr:first-child td:nth-child(2) { width: 32%; }
-.tbsd tr:first-child td:nth-child(3) { width: 15%; }
-.tbsd tr:first-child td:nth-child(4) { width: 15%; }
-.tbsd tr:first-child td:nth-child(5) { width: 18%; }
-.tbsd td { font-size:12pt; padding:6px 4px; line-height:16pt; border:1px solid #000;
-           font-family:"PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif; word-break:break-all; vertical-align:middle; box-sizing:border-box; }
-.tbsd td p { font-size:12pt; font-family:"PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif; margin:0; }
-td[height="84"] { height:64pt; }
-td[height="115"] { height:85pt; }
-table { width:100%; border-collapse:collapse; }
-img { max-width:86px; max-height:125px; display:block; margin:0 auto; }
-.noprint,.Noprint { display:none !important; }
-input[type="hidden"] { display:none; }
-strong { font-weight:bold; font-family:"PingFang SC","Microsoft YaHei",sans-serif; font-size:9pt; }
-div[align="right"] { font-size:9pt; text-align:right; margin-right:20px; }
-div[align="left"] { font-size:9pt; text-align:left; margin-left:10px; }
+        # 构建字体文件的绝对路径（用于 @font-face url()）
+        base_dir = _get_base_dir()
+        font_path = os.path.join(base_dir, 'static', 'fonts', 'NotoSansSC-Regular.ttf')
+        font_url = f'file://{font_path}'
+
+        # 注入精确匹配原版 PDF 的 CSS（含嵌入中文字体）
+        inject_css = f"""<style>
+@font-face {{
+  font-family: "NotoSansSC";
+  src: url("{font_url}") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}}
+@page {{ size: A4; margin: 15mm; }}
+body {{ font-size:12pt; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; margin:0; padding:0; }}
+.tit1 {{ padding:0 0 10px 0; line-height:36pt; text-align:center; font-size:18pt; font-weight:normal;
+        font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; }}
+.tbsd {{ border:1px solid #000; width:100%; border-collapse:collapse; margin:0 auto; table-layout:fixed; box-sizing:border-box; }}
+.tbsd tr:first-child td:nth-child(1) {{ width: 20%; }}
+.tbsd tr:first-child td:nth-child(2) {{ width: 32%; }}
+.tbsd tr:first-child td:nth-child(3) {{ width: 15%; }}
+.tbsd tr:first-child td:nth-child(4) {{ width: 15%; }}
+.tbsd tr:first-child td:nth-child(5) {{ width: 18%; }}
+.tbsd td {{ font-size:12pt; padding:6px 4px; line-height:16pt; border:1px solid #000;
+           font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; word-break:break-all; vertical-align:middle; box-sizing:border-box; }}
+.tbsd td p {{ font-size:12pt; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; margin:0; }}
+td[height="84"] {{ height:64pt; }}
+td[height="115"] {{ height:85pt; }}
+table {{ width:100%; border-collapse:collapse; }}
+img {{ max-width:86px; max-height:125px; display:block; margin:0 auto; }}
+.noprint,.Noprint {{ display:none !important; }}
+input[type="hidden"] {{ display:none; }}
+strong {{ font-weight:bold; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; font-size:9pt; }}
+div[align="right"] {{ font-size:9pt; text-align:right; margin-right:20px; }}
+div[align="left"] {{ font-size:9pt; text-align:left; margin-left:10px; }}
+* {{ font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif !important; }}
 </style>"""
         html = html.replace('</head>', inject_css + '</head>')
 
