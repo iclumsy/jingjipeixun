@@ -103,7 +103,7 @@
             </view>
           </view>
           <view
-            wx:if="{{item.status === 'registered' || item.status === 'reviewed'}}"
+            wx:if="{{item.status === 'registered'}}"
             class="form-side-btn"
             catchtap="onDownloadRegFormTap"
             data-id="{{item._id}}"
