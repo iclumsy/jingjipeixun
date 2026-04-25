@@ -316,7 +316,7 @@
   <view class="log-overlay" wx:if="{{showRegFormLogModal}}" catchtap="">
     <view class="log-modal">
       <view class="log-modal-header">
-        <text class="log-modal-title">📄 报名申请表</text>
+        <text class="log-modal-title">{{regFormLogTitle || '📄 报名申请表'}}</text>
         <text class="log-modal-close" catchtap="closeRegFormLogModal" wx:if="{{!regFormLoading}}">✕</text>
       </view>
       <scroll-view class="log-modal-body" scroll-y scroll-into-view="{{regFormLogAnchor}}" enhanced show-scrollbar="{{false}}">

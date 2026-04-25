@@ -101,6 +101,12 @@ def submit_registration(student_id):
         result = client.submit_registration(student, photo_path)
         result.pop('form_content', None)
         
+        # 附带完整的步骤日志供前端展示
+        result['steps'] = [
+            f"[{s.get('status','').upper()}] {s.get('step','')}: {s.get('detail','')}"
+            for s in getattr(client, '_steps', [])
+        ]
+        
         if result.get('success'):
             from models.student import update_student
             update_student(student_id, {'status': 'registered'})

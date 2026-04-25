@@ -62,7 +62,8 @@ Page({
     regFormLogs: [],
     regFormLoading: false,
     regFormError: false,
-    regFormLogAnchor: ''
+    regFormLogAnchor: '',
+    regFormLogTitle: ''
   },
 
   async onLoad() {
@@ -509,37 +510,59 @@ Page({
     const student = this.data.submitStudent
     if (!student) return
 
-    this.setData({ submitting: true })
+    // 关闭确认弹窗，打开日志弹窗
+    this.setData({
+      showSubmitModal: false,
+      submitting: true,
+      showRegFormLogModal: true,
+      regFormLogs: [],
+      regFormLoading: true,
+      regFormError: false,
+      regFormLogTitle: '📤 提交报名到省平台'
+    })
+
+    this._addRegLog('正在向省平台提交报名信息...')
+    this._addRegLog(`学员: ${student.name}  身份证: ${student.id_card}`)
+
     try {
       const res = await api.submitPlatformRegistration(student._id)
-      
-      // 后端/api/sxtsks/submit的批量结构是返回 results: [...]
-      if (res && res.results && res.results.length > 0) {
-          const detail = res.results[0]
-          const isSuccess = detail.success
-          const logs = (detail.logs || []).join('\n')
-          
-          wx.showModal({
-              title: isSuccess ? '✅ 报名成功' : '❌ 报名失败',
-              content: logs || detail.message || '没有返回明确信息',
-              showCancel: false
+
+      // 展示后端返回的步骤日志
+      if (res && res.steps && res.steps.length) {
+        res.steps.forEach(log => {
+          const isOk = log.startsWith('[OK]')
+          const isFail = log.startsWith('[FAIL]')
+          this._addRegLog(log.replace(/^\[(OK|FAIL|WARNING|INFO)\]\s*/, ''), {
+            done: isOk, error: isFail
           })
-          
-          if (isSuccess) {
-              await this.loadRecords(true)
-          }
+        })
+      }
+
+      if (res && res.results && res.results.length > 0) {
+        const detail = res.results[0]
+        if (detail.success) {
+          this._addRegLog('🎉 报名提交成功！', { done: true })
+          await this.loadRecords(true)
+        } else {
+          this._addRegLog(`报名失败: ${detail.message || '未知'}`, { error: true })
+          this.setData({ regFormError: true })
+        }
+      } else if (res && res.success) {
+        this._addRegLog('🎉 报名提交成功！', { done: true })
+        await this.loadRecords(true)
       } else {
-          wx.showToast({ title: res.message || '操作异常，无数据返回', icon: 'none' })
+        this._addRegLog(`操作异常: ${res.message || '无数据返回'}`, { error: true })
+        this.setData({ regFormError: true })
       }
     } catch (err) {
-      wx.showModal({
-        title: '提交失败',
-        content: err.message || '网络请求发生异常',
-        showCancel: false
-      })
+      this._addRegLog(`提交异常: ${err.message || '网络错误'}`, { error: true })
+      this.setData({ regFormError: true })
     } finally {
-      this.setData({ submitting: false })
-      this.closeSubmitModal()
+      this.setData({ submitting: false, regFormLoading: false, submitStudent: null })
+      // 成功时 2 秒后自动关闭
+      if (!this.data.regFormError) {
+        setTimeout(() => this.closeRegFormLogModal(), 2000)
+      }
     }
   },
 
