@@ -422,6 +422,12 @@ def get_students(status='unreviewed', search='', company='', training_type='', s
                 # "待处理"视图：包含未审核和已驳回的记录
                 query += " AND s.status IN (?, ?)"
                 params.extend(['unreviewed', 'rejected'])
+            elif ',' in status:
+                # 支持传入类似 'reviewed,registered' 的复合状态
+                status_list = [s.strip() for s in status.split(',') if s.strip()]
+                placeholders = ', '.join(['?'] * len(status_list))
+                query += f" AND s.status IN ({placeholders})"
+                params.extend(status_list)
             else:
                 query += " AND s.status = ?"
                 params.append(status)

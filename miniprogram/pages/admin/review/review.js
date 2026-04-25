@@ -4,7 +4,7 @@ const { hasAdminAccess, formatDateTime } = require('../../../utils/page-helpers'
 
 const STATUS_FILTERS = [
   { label: '待审核', value: 'unreviewed' },
-  { label: '已通过', value: 'reviewed' },
+  { label: '已通过', value: 'reviewed,registered' },
   { label: '已驳回', value: 'rejected' }
 ]
 
@@ -16,6 +16,7 @@ const TRAINING_TYPE_FILTERS = [
 const STATUS_TEXT_MAP = {
   unreviewed: '待审核',
   reviewed: '已通过',
+  registered: '已报名',
   rejected: '已驳回'
 }
 
@@ -343,8 +344,8 @@ Page({
     const { id, status } = e.currentTarget.dataset
     if (!id) return
 
-    if (status !== 'unreviewed') {
-      wx.showToast({ title: '仅待审核记录可操作', icon: 'none' })
+    if (status === 'registered') {
+      wx.showToast({ title: '省网已生成报名流水号，无法直接驳回，请先撤销', icon: 'none' })
       return
     }
 
@@ -473,6 +474,74 @@ Page({
       wx.showToast({ title: err.message || '开卡失败', icon: 'none' })
     } finally {
       this.setData({ activating: false })
+    }
+  },
+
+  async onSubmitRegisterTap(e) {
+    const { id } = e.currentTarget.dataset
+    if (!id) return
+
+    const confirmed = await this.confirmAction('提交报名', '确定将该学员推送到省局平台报名吗？')
+    if (!confirmed) return
+
+    wx.showLoading({ title: '提交报名排队中...', mask: true })
+    try {
+      const res = await api.submitPlatformRegistration(id)
+      wx.hideLoading()
+      
+      // 后端/api/sxtsks/submit的批量结构是返回 results: [...]
+      if (res && res.results && res.results.length > 0) {
+          const detail = res.results[0]
+          const isSuccess = detail.success
+          const logs = (detail.logs || []).join('\n')
+          
+          wx.showModal({
+              title: isSuccess ? '✅ 报名成功' : '❌ 报名失败',
+              content: logs || detail.message || '没有返回明确信息',
+              showCancel: false
+          })
+          
+          if (isSuccess) {
+              await this.loadRecords(true)
+          }
+      } else {
+          wx.showToast({ title: res.message || '操作异常，无数据返回', icon: 'none' })
+      }
+    } catch (err) {
+      wx.hideLoading()
+      wx.showModal({
+        title: '提交失败',
+        content: err.message || '网络请求发生异常',
+        showCancel: false
+      })
+    }
+  },
+
+  async onDownloadRegFormTap(e) {
+    const { id, name, idCard, status } = e.currentTarget.dataset
+    if (!id) return
+
+    if (status !== 'registered') {
+        wx.showModal({
+            title: '提示',
+            content: '必须先提交报名成功，并在平台生成流水号之后才可下载报名申请表。',
+            showCancel: false
+        })
+        return
+    }
+
+    wx.showLoading({ title: '获取中...', mask: true })
+    try {
+      await api.downloadRegForm(id, name, idCard)
+      wx.hideLoading()
+    } catch (err) {
+      wx.hideLoading()
+      console.error('下载报名表失败:', err)
+      wx.showModal({
+        title: '下载失败',
+        content: err.message || '无法获取到省平台申请表 PDF，请稍后重试',
+        showCancel: false
+      })
     }
   }
 })

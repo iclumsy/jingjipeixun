@@ -978,6 +978,81 @@ async function queryCard(studentId) {
 }
 
 
+/**
+ * 向省网平台提交报名
+ *
+ * @param {number|string} studentId - 学员 ID
+ * @returns {Promise<Object>} 操作结果
+ */
+async function submitPlatformRegistration(studentId) {
+  const id = encodeURIComponent(String(studentId || '').trim())
+  if (!id) throw new Error('学员ID不能为空')
+
+  const result = await requestApi('/api/sxtsks/submit', {
+    method: 'POST',
+    data: { student_ids: [id] }
+  })
+  return result
+}
+
+/**
+ * 下载特种设备报名申请表。
+ * 与下载体检表机制类似，需要先向平台获取 bmid，随后下载。
+ *
+ * @param {number|string} studentId - 学员 ID
+ * @param {string} name - 姓名
+ * @param {string} idCard - 身份证号
+ * @returns {Promise<void>}
+ */
+async function downloadRegForm(studentId, name, idCard) {
+  const id = encodeURIComponent(String(studentId || '').trim())
+  if (!id) throw new Error('学员ID不能为空')
+
+  const baseUrl = ensureBaseUrl()
+  const token = getToken()
+
+  // 构建友好的文件名
+  const cleanName = (name || '').trim()
+  const cleanIdCard = (idCard || '').trim()
+  const filename = `${cleanIdCard || 'id'}-${cleanName || '学员'}-报名申请表.pdf`
+  const filePath = `${wx.env.USER_DATA_PATH}/${filename}`
+
+  // 1. 先去获取 BMID
+  const bmidResult = await requestApi(`/api/sxtsks/bmid/${id}`, { method: 'GET' })
+  if (!bmidResult || !bmidResult.success || !bmidResult.bmid) {
+    throw new Error(bmidResult.message || '无法获取该学员在平台的记录')
+  }
+
+  // 2. 组装下载 URL
+  const bmid = encodeURIComponent(bmidResult.bmid)
+  const url = `${baseUrl}/api/sxtsks/form/${bmid}?student_id=${id}` + (token ? `&mini_token=${encodeURIComponent(token)}` : '')
+
+  return new Promise((resolve, reject) => {
+    wx.downloadFile({
+      url,
+      filePath, 
+      header: token ? { Authorization: `Bearer ${token}`, 'X-Mini-Token': token } : {},
+      success(res) {
+        const finalPath = res.filePath || res.tempFilePath
+        if (res.statusCode !== 200 && !finalPath) {
+          reject(new Error(`下载失败（${res.statusCode}）`))
+          return
+        }
+        wx.openDocument({
+          filePath: finalPath,
+          showMenu: true,
+          success() { resolve() },
+          fail(err) { reject(new Error(err.errMsg || '保存文档失败')) }
+        })
+      },
+      fail(err) {
+        reject(new Error(err.errMsg || '下载失败'))
+      }
+    })
+  })
+}
+
+
 // ======================== 导出接口 ========================
 module.exports = {
   login,               // 登录
@@ -994,6 +1069,8 @@ module.exports = {
   getAttachmentConfig,  // 获取附件启用配置
   uploadAttachment,     // 上传附件
   downloadTrainingForm, // 下载体检表
+  submitPlatformRegistration, // 提交报名
+  downloadRegForm,      // 下载报名表
   activateCard,         // 开学习卡
   queryCard,            // 查询学习卡信息
   toAbsoluteFileUrl,    // 文件路径转 URL

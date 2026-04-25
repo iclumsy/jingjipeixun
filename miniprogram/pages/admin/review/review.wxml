@@ -103,6 +103,18 @@
             </view>
           </view>
           <view
+            wx:if="{{item.status === 'registered' || item.status === 'reviewed'}}"
+            class="form-side-btn"
+            catchtap="onDownloadRegFormTap"
+            data-id="{{item._id}}"
+            data-name="{{item.name}}"
+            data-id-card="{{item.id_card}}"
+            data-status="{{item.status}}"
+          >
+            <text class="form-side-emoji">📄</text>
+            <text class="form-side-label">报名表</text>
+          </view>
+          <view
             wx:if="{{item.trainingFormUrl}}"
             class="form-side-btn"
             catchtap="onDownloadTrainingFormTap"
@@ -122,27 +134,38 @@
 
         <view class="record-actions">
           <button
-            class="action-btn btn-approve {{item.status !== 'unreviewed' ? 'disabled' : ''}}"
+            wx:if="{{item.status === 'unreviewed'}}"
+            class="action-btn btn-approve"
             size="mini"
             catchtap="onApproveTap"
             data-id="{{item._id}}"
             data-status="{{item.status}}"
-            disabled="{{item.status !== 'unreviewed'}}"
           >✅ 审核通过</button>
+
           <button
-            class="action-btn btn-reject {{item.status !== 'unreviewed' ? 'disabled' : ''}}"
+            class="action-btn btn-reject {{(item.status === 'registered') ? 'disabled' : ''}}"
             size="mini"
             catchtap="onRejectTap"
             data-id="{{item._id}}"
             data-status="{{item.status}}"
-            disabled="{{item.status !== 'unreviewed'}}"
+            disabled="{{item.status === 'registered'}}"
           >↩️ 驳回</button>
+
           <button
             class="action-btn btn-delete"
             size="mini"
             catchtap="onDeleteTap"
             data-id="{{item._id}}"
           >🗑️ 删除</button>
+
+          <button
+            wx:if="{{item.status === 'reviewed' || item.status === 'registered'}}"
+            class="action-btn btn-secondary {{item.status === 'registered' ? 'disabled' : ''}}"
+            size="mini"
+            catchtap="onSubmitRegisterTap"
+            data-id="{{item._id}}"
+            disabled="{{item.status === 'registered'}}"
+          >🚀 提交报名</button>
         </view>
       </view>
 
