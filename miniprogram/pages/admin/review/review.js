@@ -26,11 +26,11 @@ function mapRecord(item) {
     statusText: STATUS_TEXT_MAP[item.status] || item.status || '-',
     trainingTypeText: TRAINING_TYPE_LABELS[item.training_type] || item.training_type || '-',
     submitTimeText: formatDateTime(item.created_at),
-    // 已审核且存在体检表时，拼接完整下载 URL（和网页端 toFileUrl 逻辑一致）
-    trainingFormUrl: (item.status === 'reviewed' && item.training_form_path)
+    // 已审核或已报名且存在体检表时，拼接完整下载 URL（和网页端逻辑一致）
+    trainingFormUrl: ((item.status === 'reviewed' || item.status === 'registered') && item.training_form_path)
       ? api.toAbsoluteFileUrl(item.training_form_path)
       : '',
-    hasTrainingForm: item.status === 'reviewed' && !!item.training_form_path
+    hasTrainingForm: (item.status === 'reviewed' || item.status === 'registered') && !!item.training_form_path
   }
 }
 
