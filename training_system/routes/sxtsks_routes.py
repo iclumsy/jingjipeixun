@@ -174,8 +174,14 @@ def download_form(bmid):
     """
     下载指定报名 ID 的申请表 PDF。
     服务端从平台获取 HTML → weasyprint 转 PDF → 直接下载。
+
+    查询参数:
+        student_id: 学员 ID
+        mode: 'generate' 时只生成PDF并返回JSON日志，不返回文件流
     """
     student_id = request.args.get('student_id', type=int)
+    mode = request.args.get('mode', '')  # 'generate' = 只生成并返回日志
+    step_logs = []  # 收集进度日志
 
     try:
         from models.student import get_student_by_id
@@ -185,6 +191,7 @@ def download_form(bmid):
         form_path = None
         
         student_label = f"[{student['id_card']}] {student['name']}" if student else f"未知学员"
+        step_logs.append(f'开始获取 {student_label} 的报名申请表')
         current_app.logger.info(f'{student_label} 开始获取报名平台申请表(BMID: {bmid})')
         
         if student:
@@ -202,6 +209,9 @@ def download_form(bmid):
             # 如果申请表已在本地缓存，直接返回下载
             if os.path.exists(form_path):
                 current_app.logger.info(f'{student_label} 命中本地已生成的 PDF 申请表缓存: {pdf_filename}')
+                step_logs.append('命中本地缓存，直接使用已生成的 PDF')
+                if mode == 'generate':
+                    return jsonify({'success': True, 'logs': step_logs, 'cached': True, 'filename': pdf_filename})
                 return send_file(
                     form_path,
                     mimetype='application/pdf',
@@ -212,9 +222,11 @@ def download_form(bmid):
         # ----------------------------
         # 缓存未命中，前往网站获取 HTML 处理
         # ----------------------------
+        step_logs.append('本地无缓存，正在连接省平台抓取数据...')
         current_app.logger.info(f'{student_label} 本地无缓存，前往平台抓取核心数据 (BMID: {bmid})...')
         client = _get_client()
         content, content_type, filename = client.download_application_form(bmid)
+        step_logs.append('平台数据获取成功，正在注入排版规则...')
         current_app.logger.info(f'{student_label} 平台数据源获取成功，准备注入离线排版规则...')
 
         # 解码平台 HTML
@@ -299,17 +311,23 @@ div[align="left"] {{ font-size:9pt; text-align:left; margin-left:10px; }}
         html = _re.sub(r'(<body[^>]*>)', r'\1' + watermark_html, html, count=1)
 
         # weasyprint 转 PDF
+        step_logs.append('正在调用 WeasyPrint 渲染 PDF 文件...')
         current_app.logger.info(f'{student_label} 准备调用 WeasyPrint 将 HTML 排版为保真 PDF 文件...')
         import weasyprint
         pdf_bytes = weasyprint.HTML(string=html).write_pdf()
-        current_app.logger.info(f'{student_label} PDF 转换生成完毕，最终大小缩略约为 {len(pdf_bytes) // 1024} KB')
+        pdf_size_kb = len(pdf_bytes) // 1024
+        step_logs.append(f'PDF 渲染完成，文件大小 {pdf_size_kb} KB')
+        current_app.logger.info(f'{student_label} PDF 转换生成完毕，最终大小缩略约为 {pdf_size_kb} KB')
 
         # 保存并返回
         if form_path:
             try:
                 with open(form_path, 'wb') as f:
                     f.write(pdf_bytes)
+                step_logs.append('PDF 已保存到服务器')
                 current_app.logger.info(f'{student_label} PDF 文件已成功冷备份到设备持久化层: {form_path}')
+                if mode == 'generate':
+                    return jsonify({'success': True, 'logs': step_logs, 'cached': False, 'filename': pdf_filename})
                 return send_file(
                     form_path,
                     mimetype='application/pdf',
@@ -320,6 +338,9 @@ div[align="left"] {{ font-size:9pt; text-align:left; margin-left:10px; }}
                 current_app.logger.warning(f'保存申请表失败: {save_err}')
 
         # 降级: 放内存处理
+        if mode == 'generate':
+            step_logs.append('PDF 生成完毕（内存模式）')
+            return jsonify({'success': True, 'logs': step_logs, 'cached': False, 'filename': pdf_filename})
         return send_file(
             io.BytesIO(pdf_bytes),
             mimetype='application/pdf',

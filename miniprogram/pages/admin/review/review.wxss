@@ -723,3 +723,56 @@
 .card-info-close-btn::after {
   border: none;
 }
+
+/* ========== 报名表下载进度弹窗 ========== */
+.log-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.55); z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+}
+.log-modal {
+  width: 85%; max-height: 70vh;
+  background: #0f172a; border-radius: 24rpx;
+  overflow: hidden; display: flex; flex-direction: column;
+  box-shadow: 0 20rpx 60rpx rgba(0,0,0,0.5);
+}
+.log-modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 28rpx 32rpx; border-bottom: 1rpx solid #1e293b;
+}
+.log-modal-title {
+  font-size: 30rpx; font-weight: 600; color: #f1f5f9;
+}
+.log-modal-close {
+  font-size: 36rpx; color: #64748b; padding: 0 10rpx;
+}
+.log-modal-body {
+  padding: 20rpx 32rpx; flex: 1; max-height: 50vh;
+}
+.log-line {
+  display: flex; align-items: flex-start; gap: 16rpx;
+  padding: 12rpx 0; animation: logFadeIn 0.3s ease;
+}
+@keyframes logFadeIn {
+  from { opacity: 0; transform: translateY(10rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.log-dot {
+  font-size: 28rpx; flex-shrink: 0; width: 40rpx; text-align: center;
+}
+.log-text {
+  font-size: 26rpx; color: #94a3b8; line-height: 1.5;
+}
+.log-dot.done + .log-text { color: #4ade80; }
+.log-dot.error + .log-text { color: #f87171; }
+.log-dot.running + .log-text { color: #38bdf8; }
+.log-modal-footer {
+  padding: 20rpx 32rpx; border-top: 1rpx solid #1e293b;
+}
+.log-retry-btn {
+  width: 100%; padding: 18rpx 0;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff; border-radius: 16rpx; font-size: 28rpx;
+  font-weight: 600; border: none;
+}
+.log-retry-btn::after { border: none; }

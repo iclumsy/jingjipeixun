@@ -1073,6 +1073,7 @@ module.exports = {
   downloadRegForm,      // 下载报名表
   activateCard,         // 开学习卡
   queryCard,            // 查询学习卡信息
+  requestApi,           // 通用 API 请求（日志弹窗分步调用）
   toAbsoluteFileUrl,    // 文件路径转 URL
   getBaseUrl,           // 获取 API 地址
   setBaseUrl,           // 设置 API 地址

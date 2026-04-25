@@ -55,7 +55,14 @@ Page({
     
     showActivateModal: false,
     activateStudent: {},
-    activating: false
+    activating: false,
+
+    // 报名表下载进度弹窗
+    showRegFormLogModal: false,
+    regFormLogs: [],
+    regFormLoading: false,
+    regFormError: false,
+    regFormLogAnchor: ''
   },
 
   async onLoad() {
@@ -536,31 +543,84 @@ Page({
     }
   },
 
+  // ========== 报名表下载 - 实时日志弹窗模式 ==========
+  _addRegLog(text, opts = {}) {
+    const logs = this.data.regFormLogs.concat({ text, done: !!opts.done, error: !!opts.error })
+    this.setData({ regFormLogs: logs, regFormLogAnchor: 'regFormLogBottom' })
+  },
+
+  closeRegFormLogModal() {
+    this.setData({ showRegFormLogModal: false, regFormLogs: [], regFormError: false })
+  },
+
+  onRetryRegForm() {
+    const d = this.data._lastRegFormParams
+    if (d) {
+      this.setData({ regFormLogs: [], regFormError: false })
+      this._doDownloadRegForm(d.id, d.name, d.idCard)
+    }
+  },
+
   async onDownloadRegFormTap(e) {
     const { id, name, idCard, status } = e.currentTarget.dataset
     if (!id) return
 
     if (status !== 'registered') {
-        wx.showModal({
-            title: '提示',
-            content: '必须先提交报名成功，并在平台生成流水号之后才可下载报名申请表。',
-            showCancel: false
-        })
-        return
-    }
-
-    wx.showLoading({ title: '获取中...', mask: true })
-    try {
-      await api.downloadRegForm(id, name, idCard)
-      wx.hideLoading()
-    } catch (err) {
-      wx.hideLoading()
-      console.error('下载报名表失败:', err)
       wx.showModal({
-        title: '下载失败',
-        content: err.message || '无法获取到省平台申请表 PDF，请稍后重试',
+        title: '提示',
+        content: '必须先提交报名成功，并在平台生成流水号之后才可下载报名申请表。',
         showCancel: false
       })
+      return
+    }
+
+    this.setData({
+      showRegFormLogModal: true,
+      regFormLogs: [],
+      regFormLoading: true,
+      regFormError: false,
+      _lastRegFormParams: { id, name, idCard }
+    })
+
+    await this._doDownloadRegForm(id, name, idCard)
+  },
+
+  async _doDownloadRegForm(id, name, idCard) {
+    try {
+      // 步骤 1: 查询 BMID
+      this._addRegLog('正在查询平台报名流水号(BMID)...')
+      const bmidResult = await api.requestApi(`/api/sxtsks/bmid/${id}`, { method: 'GET' })
+      if (!bmidResult || !bmidResult.success || !bmidResult.bmid) {
+        throw new Error(bmidResult.message || '无法获取该学员在平台的报名记录')
+      }
+      this._addRegLog(`流水号获取成功: BMID=${bmidResult.bmid}`, { done: true })
+
+      // 步骤 2: 调用 generate 模式生成 PDF
+      this._addRegLog('正在连接省平台获取申请表数据...')
+      const genResult = await api.requestApi(`/api/sxtsks/form/${bmidResult.bmid}?student_id=${id}&mode=generate`, { method: 'GET' })
+      if (!genResult || !genResult.success) {
+        throw new Error(genResult.message || 'PDF 生成失败')
+      }
+      // 将服务端返回的日志依次展示
+      if (genResult.logs && genResult.logs.length) {
+        genResult.logs.forEach(log => {
+          this._addRegLog(log, { done: true })
+        })
+      }
+
+      // 步骤 3: 下载已生成的 PDF 文件
+      this._addRegLog('正在下载 PDF 文件到本地...')
+      await api.downloadRegForm(id, name, idCard)
+      this._addRegLog('报名申请表下载完成！', { done: true })
+
+      this.setData({ regFormLoading: false })
+      // 1.5 秒后自动关闭弹窗
+      setTimeout(() => this.closeRegFormLogModal(), 1500)
+
+    } catch (err) {
+      console.error('报名表下载失败:', err)
+      this._addRegLog(`失败: ${err.message || '未知错误'}`, { error: true })
+      this.setData({ regFormLoading: false, regFormError: true })
     }
   }
 })

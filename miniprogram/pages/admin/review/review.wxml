@@ -312,5 +312,24 @@
       </view>
     </view>
   </view>
+  <!-- 报名表下载进度弹窗 -->
+  <view class="log-overlay" wx:if="{{showRegFormLogModal}}" catchtap="">
+    <view class="log-modal">
+      <view class="log-modal-header">
+        <text class="log-modal-title">📄 报名申请表</text>
+        <text class="log-modal-close" catchtap="closeRegFormLogModal" wx:if="{{!regFormLoading}}">✕</text>
+      </view>
+      <scroll-view class="log-modal-body" scroll-y scroll-into-view="{{regFormLogAnchor}}" enhanced show-scrollbar="{{false}}">
+        <view class="log-line" wx:for="{{regFormLogs}}" wx:key="index">
+          <text class="log-dot {{item.done ? 'done' : (item.error ? 'error' : 'running')}}">{{item.done ? '✅' : (item.error ? '❌' : '⏳')}}</text>
+          <text class="log-text">{{item.text}}</text>
+        </view>
+        <view id="regFormLogBottom"></view>
+      </scroll-view>
+      <view class="log-modal-footer" wx:if="{{regFormError}}">
+        <button class="log-retry-btn" catchtap="onRetryRegForm">重新尝试</button>
+      </view>
+    </view>
+  </view>
 
 </view>
