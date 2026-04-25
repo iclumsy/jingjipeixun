@@ -210,6 +210,44 @@
     </view>
   </view>
 
+  <!-- 提交报名确认弹窗 -->
+  <view class="custom-modal-mask fade-enter" wx:if="{{showSubmitModal}}" catchtap="closeSubmitModal">
+    <view class="custom-modal-box" catchtap="preventD">
+      <view class="activate-modal-header" style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);">
+        <view class="activate-modal-title">📤 提交报名确认</view>
+        <view class="activate-modal-sub">需保送至省网平台的数据如下，请确认是否真实无误</view>
+      </view>
+      <view class="activate-modal-body">
+        <view class="activate-info-grid">
+          <text class="grid-label">姓名</text>
+          <text class="grid-value grid-name">{{submitStudent.name || '-'}}</text>
+          <text class="grid-label">性别</text>
+          <text class="grid-value">{{submitStudent.gender || '-'}}</text>
+          <text class="grid-label">手机号</text>
+          <text class="grid-value grid-phone">{{submitStudent.phone || '-'}}</text>
+          <text class="grid-label">身份证</text>
+          <text class="grid-value grid-id">{{submitStudent.id_card || '-'}}</text>
+          <text class="grid-label">学历</text>
+          <text class="grid-value">{{submitStudent.education || '-'}}</text>
+          <text class="grid-label">工作单位</text>
+          <text class="grid-value" style="font-size:24rpx;line-height:1.2;align-self:center;">{{submitStudent.company || '-'}}</text>
+          <text class="grid-label">作业类别</text>
+          <text class="grid-value">{{submitStudent._tp_job_category || submitStudent.job_category || '-'}}</text>
+          <text class="grid-label">报考项目</text>
+          <text class="grid-value grid-project">{{submitStudent._tp_exam_project || submitStudent.exam_project || '-'}}</text>
+        </view>
+        <view class="activate-warning" style="background: #FFF7ED; color: #EA580C; border-left: 6rpx solid #F97316;">
+          <text class="warning-icon">⚠️</text>
+          <text class="warning-text">核对无误后进行推送并生成流水号，如信息有误需退网走人工补单！</text>
+        </view>
+      </view>
+      <view class="activate-modal-footer">
+        <button class="activate-btn-cancel" catchtap="closeSubmitModal">取消</button>
+        <button class="activate-btn-confirm" style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); box-shadow: 0 6rpx 16rpx rgba(217, 119, 6, 0.35);" catchtap="confirmSubmitRegister" disabled="{{submitting}}">{{submitting ? '通信中...' : '确定上报'}}</button>
+      </view>
+    </view>
+  </view>
+
   <!-- 学习卡信息查询弹窗 -->
   <view class="custom-modal-mask fade-enter" wx:if="{{showCardInfoModal}}" catchtap="closeCardInfoModal">
     <view class="card-info-modal" catchtap="preventD">

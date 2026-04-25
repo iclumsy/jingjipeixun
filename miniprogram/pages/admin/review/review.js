@@ -481,20 +481,30 @@ Page({
     const { id } = e.currentTarget.dataset
     if (!id) return
 
-    // 在列表数据中找到指定的学员信息
     const student = this.data.records.find(r => r._id === id)
     if (!student) return
 
-    const infoStr = `姓名: ${student.name || '-'}\n身份证: ${student.id_card || '-'}\n公司: ${student.company || '-'}`
-    
-    // 显示包含了学员详细信息的确认弹窗
-    const confirmed = await this.confirmAction('确认提交报名？', `${infoStr}\n\n确定要将该学员推送到省局平台报名吗？`)
-    if (!confirmed) return
+    this.setData({
+      showSubmitModal: true,
+      submitStudent: student
+    })
+  },
 
-    wx.showLoading({ title: '提交报名排队中...', mask: true })
+  closeSubmitModal() {
+    if (this.data.submitting) return
+    this.setData({
+      showSubmitModal: false,
+      submitStudent: null
+    })
+  },
+
+  async confirmSubmitRegister() {
+    const student = this.data.submitStudent
+    if (!student) return
+
+    this.setData({ submitting: true })
     try {
-      const res = await api.submitPlatformRegistration(id)
-      wx.hideLoading()
+      const res = await api.submitPlatformRegistration(student._id)
       
       // 后端/api/sxtsks/submit的批量结构是返回 results: [...]
       if (res && res.results && res.results.length > 0) {
@@ -515,12 +525,14 @@ Page({
           wx.showToast({ title: res.message || '操作异常，无数据返回', icon: 'none' })
       }
     } catch (err) {
-      wx.hideLoading()
       wx.showModal({
         title: '提交失败',
         content: err.message || '网络请求发生异常',
         showCancel: false
       })
+    } finally {
+      this.setData({ submitting: false })
+      this.closeSubmitModal()
     }
   },
 
