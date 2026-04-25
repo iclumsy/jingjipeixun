@@ -3,134 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>操作日志 - 学员信息管理</title>
+    <title>系统终端日志 - 学员信息管理</title>
     <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
-        .terminal-container {
-            background-color: #0f172a;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            height: calc(100vh - 180px);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            margin-top: 20px;
+        body { margin: 0; background: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; overflow: hidden; }
+        
+        .header-bar {
+            position: fixed; top: 0; left: 0; right: 0;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px);
+            border-bottom: 1px solid #1e293b; padding: 12px 24px;
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 1000; box-sizing: border-box; height: 60px;
         }
-        .terminal-header {
-            background-color: #1e293b;
-            padding: 12px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #334155;
+        
+        .header-title { display: flex; align-items: center; gap: 12px; }
+        .header-title h1 { margin: 0; font-size: 1.25rem; font-weight: 600; color: #f1f5f9; display: flex; align-items: center; gap: 8px; }
+        .header-title h1::before { content: '💻'; font-size: 1.1rem; }
+        
+        .header-actions { display: flex; gap: 12px; align-items: center; }
+        .header-actions a, .btn {
+            background: #1e293b; color: #e2e8f0; border: 1px solid #334155;
+            padding: 6px 14px; border-radius: 6px; text-decoration: none;
+            font-size: 0.85rem; font-weight: 500; cursor: pointer;
+            transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px;
         }
+        .header-actions a:hover, .btn:hover { background: #334155; border-color: #475569; }
+        
         .terminal-controls {
-            display: flex;
-            gap: 15px;
-            align-items: center;
+            position: fixed; top: 60px; left: 0; right: 0;
+            background: #0f172a; padding: 10px 24px;
+            border-bottom: 1px solid #1e293b; display: flex;
+            justify-content: space-between; align-items: center;
+            z-index: 999; box-sizing: border-box; height: 50px;
         }
-        .terminal-btn {
-            background: #334155;
-            color: #f1f5f9;
-            border: 1px solid #475569;
-            padding: 6px 14px;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            outline: none;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+        
+        .tab-group { display: flex; gap: 8px; }
+        .tab-btn {
+            background: transparent; color: #64748b; border: 1px solid transparent;
+            padding: 4px 12px; font-size: 0.85rem; font-weight: 600; border-radius: 6px;
+            cursor: pointer; transition: all 0.2s;
         }
-        .terminal-btn:hover {
-            background: #475569;
+        .tab-btn:hover { color: #94a3b8; background: rgba(255, 255, 255, 0.05); }
+        .tab-btn.active { background: #1e293b; color: #38bdf8; border-color: #334155; }
+        
+        .tool-group { display: flex; gap: 12px; align-items: center; font-size: 0.85rem; color: #94a3b8; }
+        .tool-group select { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; outline: none; cursor: pointer; }
+        .auto-scroll-label { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+        .auto-scroll-label input { cursor: pointer; accent-color: #38bdf8; }
+        
+        .terminal-viewport {
+            position: absolute; top: 110px; bottom: 0; left: 0; right: 0;
+            background: #000; padding: 20px; overflow-y: auto;
+            font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+            font-size: 0.85rem; line-height: 1.5; color: #a1a1aa;
+            scroll-behavior: smooth;
         }
-        .terminal-btn.active {
-            background: #2563eb;
-            border-color: #3b82f6;
-            font-weight: 600;
-        }
-        .terminal-body {
-            padding: 20px;
-            flex: 1;
-            overflow-y: auto;
-            font-family: 'JetBrains Mono', 'Consolas', 'Menlo', 'Monaco', monospace;
-            font-size: 0.9rem;
-            color: #cbd5e1;
-            line-height: 1.6;
-        }
-        .log-line {
-            margin: 0;
-            padding: 2px 0;
-            word-wrap: break-word;
-            white-space: pre-wrap;
-        }
-        .log-timestamp {
-            color: #6ee7b7;
-        }
-        .log-level-info {
-            color: #93c5fd;
-        }
-        .log-level-warning {
-            color: #fde047;
-        }
-        .log-level-error {
-            color: #fca5a5;
-        }
-        .log-module {
-            color: #c4b5fd;
-        }
-        .auto-scroll-toggle {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: #94a3b8;
-            font-size: 0.85rem;
-            cursor: pointer;
+        
+        .log-line { margin: 0; padding: 2px 0; word-wrap: break-word; white-space: pre-wrap; display: flex; gap: 10px; }
+        .log-line:hover { background: rgba(255, 255, 255, 0.05); }
+        
+        .log-timestamp { color: #059669; flex-shrink: 0; width: 155px; }
+        .log-level-info { color: #38bdf8; font-weight: 600; flex-shrink: 0; width: 60px; }
+        .log-level-warning { color: #fbbf24; font-weight: 600; flex-shrink: 0; width: 60px; }
+        .log-level-error { color: #ef4444; font-weight: 600; flex-shrink: 0; width: 60px; }
+        .log-module { color: #a78bfa; flex-shrink: 0; width: 140px; margin-right: 8px; }
+        .log-message { flex: 1; min-width: 0; color: #d1d5db; }
+        
+        /* 简单的进度条动画 */
+        #refresh-indicator {
+            position: absolute; top: 0; left: 0; height: 2px;
+            background: #38bdf8; transition: width 4.9s linear; width: 0%;
         }
     </style>
 </head>
-<body class="admin-page">
-    <div style="position: fixed; top: 0; right: 0; left: 0; display: flex; justify-content: flex-end; gap: 12px; z-index: 1000; align-items: center; padding: 12px 20px; background: rgba(245, 247, 250, 0.92); backdrop-filter: blur(8px); border-bottom: 1px solid #e5e7eb; box-sizing: border-box;">
-        <a href="/admin" style="padding: 6px 16px; background-color: #f8fafc; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 6px; text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: all 0.2s ease;">⬅ 返回面板</a>
-        <a href="/admin/config" style="padding: 6px 16px; background-color: #f8fafc; color: #4f46e5; border: 1px solid #4f46e5; border-radius: 6px; text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: all 0.2s ease;">⚙️ 系统配置</a>
-        <a href="/auth/logout" class="admin-logout-btn" style="position: static; transform: none; margin: 0; right: auto; top: auto;">退出</a>
+<body>
+    <div class="header-bar">
+        <div class="header-title">
+            <h1>系统终端日志</h1>
+        </div>
+        <div class="header-actions">
+            <a href="/admin">⬅ 返回主面板</a>
+            <a href="/admin/config">⚙️ 系统配置</a>
+            <a href="/auth/logout" style="color: #fca5a5; border-color: #7f1d1d; background: rgba(127, 29, 29, 0.2);">退出登录</a>
+        </div>
     </div>
 
-    <div style="padding: 30px; max-width: 1400px; margin: 0 auto; height: 100vh; box-sizing: border-box; padding-top: 72px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
-            <div>
-                <h1 style="margin: 0 0 10px 0; font-size: 1.8rem; color: #0f172a;">操作日志</h1>
-                <p style="margin: 0; color: #64748b; font-size: 0.95rem;">实时查看系统运行状态与管理员操作记录</p>
-            </div>
+    <div class="terminal-controls">
+        <div id="refresh-indicator"></div>
+        <div class="tab-group">
+            <button class="tab-btn active" id="btnAppLog">🎯 综合日志 (app.log)</button>
+            <button class="tab-btn" id="btnErrorLog">🚨 错误日志 (error.log)</button>
         </div>
+        <div class="tool-group">
+            <select id="linesSelect">
+                <option value="100">倒取 100 行</option>
+                <option value="500" selected>倒取 500 行</option>
+                <option value="2000">倒取 2000 行</option>
+                <option value="5000">倒取 5000 行</option>
+            </select>
+            <label class="auto-scroll-label">
+                <input type="checkbox" id="autoScrollCheck" checked>
+                强力触底追踪
+            </label>
+            <button class="btn" id="btnRefresh" style="padding: 4px 10px; font-size: 0.8rem;">🔄 强制刷新</button>
+            <button class="btn" id="btnClear" style="padding: 4px 10px; font-size: 0.8rem; border-color: #374151;">🧹 清屏</button>
+        </div>
+    </div>
 
-        <div class="terminal-container">
-            <div class="terminal-header">
-                <div class="terminal-controls">
-                    <button class="terminal-btn active" id="btnAppLog">综合日志 (app.log)</button>
-                    <button class="terminal-btn" id="btnErrorLog">错误日志 (error.log)</button>
-                    <select id="linesSelect" style="background:#334155; color:#f1f5f9; border:1px solid #475569; border-radius:6px; padding:5px 10px; font-size:0.85rem; outline:none;">
-                        <option value="100">显示最近 100 行</option>
-                        <option value="500" selected>显示最近 500 行</option>
-                        <option value="1000">显示最近 1000 行</option>
-                    </select>
-                </div>
-                <div class="terminal-controls">
-                    <label class="auto-scroll-toggle">
-                        <input type="checkbox" id="autoScrollCheck">
-                        自动滚动到底部
-                    </label>
-                    <button class="terminal-btn" id="btnRefresh">🔄 刷新</button>
-                    <button class="terminal-btn" id="btnClear">清屏</button>
-                </div>
-            </div>
-            <div class="terminal-body" id="logContent">
-                <div style="color: #64748b; text-align: center; margin-top: 50px;">正在加载日志数据...</div>
-            </div>
-        </div>
+    <div class="terminal-viewport" id="logContent">
+        <div style="color: #64748b; text-align: center; margin-top: 10vh;">📡 正在连接到服务器日志流...</div>
     </div>
 
     <script src="/static/js/notifications.js"></script>
@@ -143,18 +125,15 @@
             const btnClear = document.getElementById('btnClear');
             const autoScrollCheck = document.getElementById('autoScrollCheck');
             const linesSelect = document.getElementById('linesSelect');
+            const indicator = document.getElementById('refresh-indicator');
 
             let currentType = 'app';
-            let autoRefreshInterval = null;
+            let lastLogData = '';
 
-            // 格式化日志行，为其添加高亮
+            // 日志正则切分格式
             function formatLogLine(line) {
-                // 逃逸 HTML
-                let safeLine = line.replace(/&/g, "&amp;")
-                                   .replace(/</g, "&lt;")
-                                   .replace(/>/g, "&gt;");
-
-                // 匹配格式: [2026-04-10 12:34:56] [INFO] [app] Message
+                if (!line.trim()) return '';
+                let safeLine = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                 const regex = /^(\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\])\s(\[[A-Z]+\])\s(\[[^\]]+\])\s(.*)$/;
                 const match = safeLine.match(regex);
 
@@ -164,72 +143,106 @@
                     if (level.includes('WARNING')) levelClass = 'log-level-warning';
                     if (level.includes('ERROR') || level.includes('CRITICAL')) levelClass = 'log-level-error';
 
-                    return `<p class="log-line"><span class="log-timestamp">${timestamp}</span> <span class="${levelClass}">${level}</span> <span class="log-module">${moduleName}</span> ${message}</p>`;
+                    return `<div class="log-line">
+                                <span class="log-timestamp">${timestamp}</span>
+                                <span class="${levelClass}">${level}</span>
+                                <span class="log-module">${moduleName}</span>
+                                <span class="log-message">${message}</span>
+                            </div>`;
                 }
-                return `<p class="log-line">${safeLine}</p>`;
+                return `<div class="log-line"><span class="log-message">${safeLine}</span></div>`;
             }
 
-            async function fetchLogs() {
+            // 滚动最下方核心逻辑
+            function scrollToBottom() {
+                if (autoScrollCheck.checked) {
+                    // 使用原生顺滑倒冲
+                    setTimeout(() => {
+                        logContent.scrollTo({
+                            top: logContent.scrollHeight,
+                            behavior: 'smooth'
+                        });
+                    }, 50);
+                }
+            }
+
+            async function fetchLogs(force = false) {
                 try {
                     const lines = linesSelect.value;
                     const res = await fetch(`/api/logs/content?type=${currentType}&lines=${lines}`);
                     const data = await res.json();
 
                     if (!data.success) {
-                        logContent.innerHTML = `<p class="log-line log-level-error">加载失败: ${data.error || '未知错误'}</p>`;
+                        logContent.innerHTML += `<div class="log-line"><span class="log-level-error">[ERROR]</span> <span class="log-message">加载失败: ${data.error || '未知网络错误'}</span></div>`;
                         return;
                     }
 
                     if (data.lines.length === 0) {
-                        logContent.innerHTML = `<div style="color: #64748b; text-align: center; margin-top: 50px;">暂无日志内容</div>`;
+                        logContent.innerHTML = `<div style="color: #475569; text-align: center; margin-top: 10vh;">文件中尚无任何记录</div>`;
                         return;
                     }
 
-                    const html = data.lines.map(formatLogLine).join('');
+                    const rawText = data.lines.join('\\n');
                     
-                    // 检查是否需要自动滚动
-                    const shouldScroll = autoScrollCheck.checked;
-                    
-                    logContent.innerHTML = html;
-                    
-                    if (shouldScroll) {
-                        logContent.scrollTop = logContent.scrollHeight;
+                    // 对比增量避免页面抖动破坏滚动条抓取
+                    if (rawText !== lastLogData || force) {
+                        lastLogData = rawText;
+                        const html = data.lines.map(formatLogLine).join('');
+                        logContent.innerHTML = html;
+                        scrollToBottom();
                     }
                 } catch (err) {
-                    currentAppLog = `<p class="log-line log-level-error">网络请求失败: ${err.message}</p>`;
-                    logContent.innerHTML = currentAppLog;
+                    console.error(err);
+                } finally {
+                    // 重置进度条动画
+                    indicator.style.transition = 'none';
+                    indicator.style.width = '0%';
+                    setTimeout(() => {
+                        indicator.style.transition = 'width 4.9s linear';
+                        indicator.style.width = '100%';
+                    }, 50);
                 }
             }
 
             // 初始加载
-            fetchLogs();
-            autoRefreshInterval = setInterval(fetchLogs, 5000); // 每 5 秒自动刷新
+            fetchLogs(true);
+            setInterval(() => fetchLogs(false), 5000); // 周期轮询
 
             btnRefresh.addEventListener('click', () => {
-                fetchLogs();
-                showMessage('已刷新日志', 'success');
+                lastLogData = '';
+                fetchLogs(true);
+                scrollToBottom();
             });
 
             btnAppLog.addEventListener('click', () => {
                 currentType = 'app';
                 btnAppLog.classList.add('active');
                 btnErrorLog.classList.remove('active');
-                logContent.innerHTML = `<div style="color: #64748b; text-align: center; margin-top: 50px;">加载中...</div>`;
-                fetchLogs();
+                lastLogData = '';
+                fetchLogs(true);
             });
 
             btnErrorLog.addEventListener('click', () => {
                 currentType = 'error';
                 btnErrorLog.classList.add('active');
                 btnAppLog.classList.remove('active');
-                logContent.innerHTML = `<div style="color: #64748b; text-align: center; margin-top: 50px;">加载中...</div>`;
-                fetchLogs();
+                lastLogData = '';
+                fetchLogs(true);
             });
 
-            linesSelect.addEventListener('change', fetchLogs);
+            linesSelect.addEventListener('change', () => {
+                lastLogData = '';
+                fetchLogs(true);
+            });
 
             btnClear.addEventListener('click', () => {
-                logContent.innerHTML = '';
+                lastLogData = '';
+                logContent.innerHTML = '<div style="color: #475569; text-align: center; margin-top: 10vh;">(已清屏)</div>';
+            });
+            
+            // 下滚开关监听
+            autoScrollCheck.addEventListener('change', () => {
+                if(autoScrollCheck.checked) scrollToBottom();
             });
         });
     </script>
