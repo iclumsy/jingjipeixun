@@ -2061,8 +2061,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     };
 
                     // ========== 按钮 1：📤 提交报名（仅提交，不下载） ==========
-                    const submitRegBtn = document.createElement('button');
-                    submitRegBtn.className = 'btn';
+                    if (currentStatus === 'reviewed') {
+                        const submitRegBtn = document.createElement('button');
+                        submitRegBtn.className = 'btn';
                     submitRegBtn.style.cssText = 'background:linear-gradient(135deg,#F59E0B,#D97706);color:#fff;font-weight:600;margin-right:8px;';
                     submitRegBtn.textContent = '📤 提交报名';
                     submitRegBtn.title = '提交到山西特种设备考试报名平台';
@@ -2112,12 +2113,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                             submitRegBtn.textContent = origText;
                             submitRegBtn.disabled = false;
                         }
-                    };
-                    actionBar.appendChild(submitRegBtn);
+                        };
+                        actionBar.appendChild(submitRegBtn);
+                    }
 
                     // ========== 按钮 2：📄 下载申请表 ==========
-                    const downloadFormBtn = document.createElement('button');
-                    downloadFormBtn.className = 'btn';
+                    if (currentStatus === 'registered') {
+                        const downloadFormBtn = document.createElement('button');
+                        downloadFormBtn.className = 'btn';
                     downloadFormBtn.style.cssText = 'background:linear-gradient(135deg,#3B82F6,#2563EB);color:#fff;font-weight:600;margin-right:8px;';
                     downloadFormBtn.textContent = '📄 下载申请表';
                     downloadFormBtn.title = '从报名平台下载该学员的申请表';
@@ -2144,8 +2147,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                             downloadFormBtn.textContent = origText;
                             downloadFormBtn.disabled = false;
                         }
-                    };
-                    actionBar.appendChild(downloadFormBtn);
+                        };
+                        actionBar.appendChild(downloadFormBtn);
+                    }
                 }
 
 
