@@ -481,7 +481,14 @@ Page({
     const { id } = e.currentTarget.dataset
     if (!id) return
 
-    const confirmed = await this.confirmAction('提交报名', '确定将该学员推送到省局平台报名吗？')
+    // 在列表数据中找到指定的学员信息
+    const student = this.data.records.find(r => r._id === id)
+    if (!student) return
+
+    const infoStr = `姓名: ${student.name || '-'}\n身份证: ${student.id_card || '-'}\n公司: ${student.company || '-'}`
+    
+    // 显示包含了学员详细信息的确认弹窗
+    const confirmed = await this.confirmAction('确认提交报名？', `${infoStr}\n\n确定要将该学员推送到省局平台报名吗？`)
     if (!confirmed) return
 
     wx.showLoading({ title: '提交报名排队中...', mask: true })
