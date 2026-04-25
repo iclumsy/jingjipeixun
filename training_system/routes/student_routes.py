@@ -1290,7 +1290,17 @@ def activate_card_route(id):
         from services.junrui_service import activate_card_for_student
         from datetime import datetime
         
-        operator = session.get('auth_user', 'unknown')
+        operator_openid = get_mini_openid()
+        if operator_openid:
+            # 常见管理员映射提取
+            mini_admin_names = {
+                'oQRQz3VglMF63fWRtTCX8gbl21jo': '程超',
+                'oQRQz3amHUiSlU5RYNqu-r4GBJlk': '单利亚',
+                'oQRQz3SPn9tEiMy74NxfrzV1ZzJE': '霍玉萍'
+            }
+            operator = f"小程序-{mini_admin_names.get(operator_openid, operator_openid)}"
+        else:
+            operator = session.get('auth_user', 'unknown')
         client_ip = get_client_ip(request)
         current_app.logger.info(
             f'[开卡请求] 操作人={operator} IP={client_ip} '

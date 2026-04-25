@@ -2018,45 +2018,108 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     // ---------- 日志弹窗公共方法 ----------
                     const buildStepsHtml = (steps) => {
-                        if (!steps || !steps.length) return '';
-                        return steps.map(s => {
-                            const icon = s.status === 'ok' ? '✅' : s.status === 'fail' ? '❌' : '⚠️';
-                            const color = s.status === 'fail' ? '#DC2626' : s.status === 'warning' ? '#D97706' : '#059669';
-                            let html = `<div style="padding:4px 0;border-bottom:1px solid #f0f0f0;font-size:0.82rem;">`;
-                            html += `<span>${icon}</span> <span style="color:#888;font-size:0.75rem;">${s.time || ''}</span> `;
-                            html += `<strong style="color:${color}">${s.step}</strong>`;
-                            if (s.detail) html += `<span style="color:#555;margin-left:6px;">${s.detail.substring(0,120)}</span>`;
-                            if (s.http_status) html += ` <span style="color:#888;font-size:0.72rem;">(HTTP ${s.http_status})</span>`;
-                            if (s.response) html += `<div style="color:#888;font-size:0.72rem;padding-left:20px;word-break:break-all;max-height:60px;overflow:auto;">响应: ${s.response.substring(0,200)}</div>`;
-                            if (s.alerts && s.alerts.length) html += `<div style="color:#B45309;font-size:0.72rem;padding-left:20px;">⚡ ${s.alerts.join('; ')}</div>`;
-                            html += `</div>`;
+                        if (!steps || !steps.length) return '<div class="log-empty" style="padding:20px; color:#6B7280; text-align:center;">没有记录到执行日志</div>';
+                        return steps.map((s, index) => {
+                            const isSuccess = s.status === 'ok';
+                            const isFail = s.status === 'fail';
+                            const isWarn = s.status === 'warning';
+                            
+                            let icon = isSuccess ? `<span style="color:#10B981;">✓</span>` : isFail ? `<span style="color:#EF4444;">✗</span>` : `<span style="color:#F59E0B;">⚠</span>`;
+                            if (s.step.includes('登录')) icon = '🔑';
+                            if (s.step.includes('照片') || s.step.includes('附件')) icon = '🖼️';
+                            if (s.step.includes('提交')) icon = '📤';
+                            
+                            const timeStr = s.time ? `<span style="color:#6B7280;font-family:monospace;font-size:12px;">[${s.time}]</span>` : '';
+                            const indexStr = `<span style="color:#4B5563;font-family:monospace;font-size:12px;margin-right:6px;">${String(index + 1).padStart(2, '0')}</span>`;
+                            
+                            let html = `
+                            <div class="log-item" style="padding: 12px 16px; border-bottom: 1px solid #374151; background: ${isFail ? 'rgba(239, 68, 68, 0.05)' : 'transparent'};">
+                                <div style="display: flex; align-items: flex-start; gap: 10px;">
+                                    <div style="margin-top: 2px;">${icon}</div>
+                                    <div style="flex: 1; min-width: 0;">
+                                        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 6px;">
+                                            ${indexStr}
+                                            ${timeStr}
+                                            <strong style="color: ${isFail ? '#FCA5A5' : isWarn ? '#FDE047' : '#D1D5DB'}; font-size: 14px;">${s.step}</strong>
+                                        </div>
+                                        ${s.detail ? `<div style="color: #9CA3AF; font-size: 13px; line-height: 1.5; word-wrap: break-word;">${s.detail}</div>` : ''}
+                                        
+                                        ${s.http_status ? `<div style="display: inline-block; margin-top: 8px; padding: 2px 8px; border-radius: 4px; background: rgba(55, 65, 81, 0.5); color: #9CA3AF; font-size: 11px; font-family: monospace;">HTTP ${s.http_status}</div>` : ''}
+                                        
+                                        ${s.alerts && s.alerts.length ? `<div style="margin-top: 10px; padding: 8px 12px; border-left: 3px solid #F59E0B; background: rgba(245, 158, 11, 0.1); color: #FCD34D; font-size: 12px; border-radius: 0 4px 4px 0;">拦截警报：<br/>${s.alerts.join('<br/>')}</div>` : ''}
+                                        
+                                        ${s.response ? `<details style="margin-top: 8px; cursor: pointer;">
+                                            <summary style="font-size: 12px; color: #6B7280; user-select: none;">查看响应详情 (Trace)</summary>
+                                            <div style="margin-top: 8px; padding: 12px; background: rgba(17, 24, 39, 0.8); border: 1px solid #374151; border-radius: 6px; color: #A78BFA; font-family: monospace; font-size: 11px; max-height: 120px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;">${s.response}</div>
+                                        </details>` : ''}
+                                    </div>
+                                </div>
+                            </div>`;
                             return html;
                         }).join('');
                     };
+                    
                     const showLogOverlay = (titleText, titleColor, data) => {
+                        const oldOverlay = document.getElementById('sxtsks-log-overlay');
+                        if (oldOverlay) oldOverlay.remove();
+                    
                         const overlay = document.createElement('div');
-                        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+                        overlay.id = 'sxtsks-log-overlay';
+                        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);z-index:10000;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.25s ease;';
+                        
                         overlay.innerHTML = `
-                            <div style="background:#fff;border-radius:12px;width:90%;max-width:640px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-                                <div style="padding:16px 20px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between;">
-                                    <span style="font-size:1rem;font-weight:700;color:${titleColor}">${titleText}</span>
-                                    <button id="sxtsks-log-close" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#999;">✕</button>
+                            <div style="background:#1F2937; border:1px solid #374151; border-radius:12px; width:90%; max-width:760px; height:85vh; max-height:850px; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);">
+                                <!-- Header -->
+                                <div style="padding:16px 20px; border-bottom:1px solid #374151; display:flex; align-items:center; justify-content:space-between; background:linear-gradient(to right, #111827, #1F2937); border-radius:12px 12px 0 0;">
+                                    <div style="display:flex; align-items:center; gap:12px;">
+                                        <div style="display:flex; gap:6px;">
+                                            <div style="width:12px; height:12px; border-radius:50%; background:#EF4444;"></div>
+                                            <div style="width:12px; height:12px; border-radius:50%; background:#F59E0B;"></div>
+                                            <div style="width:12px; height:12px; border-radius:50%; background:#10B981;"></div>
+                                        </div>
+                                        <span style="font-size:1.1rem; font-weight:600; color:${titleColor === '#DC2626' ? '#F87171' : titleColor === '#059669' ? '#34D399' : '#F3F4F6'}; line-height:1;">${titleText}</span>
+                                    </div>
+                                    <button id="sxtsks-log-close" style="background:rgba(255,255,255,0.1); border:none; width:30px; height:30px; border-radius:6px; cursor:pointer; color:#9CA3AF; display:flex; align-items:center; justify-content:center; transition:all 0.2s;">✕</button>
                                 </div>
-                                <div id="sxtsks-log-container" style="padding:12px 20px;overflow-y:auto;flex:1;">
-                                    ${data.steps ? buildStepsHtml(data.steps) : '<p style="color:#888;">无日志</p>'}
+                                
+                                <!-- Log Body -->
+                                <div id="sxtsks-log-container" style="flex:1; overflow-y:auto; padding:0; background:#111827; scroll-behavior: smooth;">
+                                    ${data.steps ? buildStepsHtml(data.steps) : ''}
+                                    <div style="height: 40px;"></div> <!-- 占位确保滚动彻底 -->
                                 </div>
-                                ${data.form_path ? '<div style="padding:10px 20px;border-top:1px solid #eee;font-size:0.8rem;color:#666;">📄 申请表已保存: ' + data.form_path + '</div>' : ''}
+                                
+                                <!-- Footer Summary -->
+                                <div style="padding:14px 20px; border-top:1px solid #374151; background:#1F2937; border-radius:0 0 12px 12px; display:flex; align-items:center; justify-content:space-between;">
+                                    ${data.form_path ? `<span style="color:#A78BFA; font-size:13px; display:flex; align-items:center; gap:6px;">📄 <span style="font-family:monospace;">${data.form_path}</span></span>` : '<span style="color:#6B7280; font-size:13px;">没有产生可供下载的申请表输出</span>'}
+                                    <span id="scroll-to-bottom-btn" style="color:#3B82F6; font-size:13px; cursor:pointer; padding:4px 10px; border-radius:6px; background:rgba(59,130,246,0.1);">⬇️ 滚至最新一行</span>
+                                </div>
                             </div>`;
+                            
                         document.body.appendChild(overlay);
-                        const forceScrollLog = () => {
-                            const logContainer = overlay.querySelector('#sxtsks-log-container');
-                            if (logContainer) logContainer.scrollTop = logContainer.scrollHeight;
+                        
+                        const logContainer = overlay.querySelector('#sxtsks-log-container');
+                        const scrollFn = () => {
+                            if (logContainer) {
+                                logContainer.scrollTo({
+                                    top: logContainer.scrollHeight,
+                                    behavior: 'smooth'
+                                });
+                            }
                         };
-                        forceScrollLog();
-                        requestAnimationFrame(forceScrollLog);
-                        setTimeout(forceScrollLog, 50);
-                        setTimeout(forceScrollLog, 200);
-                        overlay.querySelector('#sxtsks-log-close').onclick = () => overlay.remove();
+                        
+                        // 多重保障确保渲染贴图后滑动到底部
+                        requestAnimationFrame(() => {
+                            scrollFn();
+                            setTimeout(scrollFn, 100);
+                            setTimeout(scrollFn, 300);
+                            setTimeout(scrollFn, 600);
+                        });
+                        
+                        const closeBtn = overlay.querySelector('#sxtsks-log-close');
+                        closeBtn.onmouseover = () => closeBtn.style.background = 'rgba(255,255,255,0.2)';
+                        closeBtn.onmouseout = () => closeBtn.style.background = 'rgba(255,255,255,0.1)';
+                        closeBtn.onclick = () => overlay.remove();
+                        overlay.querySelector('#scroll-to-bottom-btn').onclick = scrollFn;
                         overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
                     };
 
