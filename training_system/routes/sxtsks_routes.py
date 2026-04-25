@@ -271,11 +271,11 @@ def download_form(bmid):
   font-weight: normal;
   font-style: normal;
 }}
-@page {{ size: A4; margin: 15mm; }}
+@page {{ size: A4; margin: 15mm 12mm 15mm 15mm; }}
 body {{ font-size:12pt; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; margin:0; padding:0; }}
 .tit1 {{ padding:0 0 10px 0; line-height:36pt; text-align:center; font-size:18pt; font-weight:normal;
         font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; }}
-.tbsd {{ border:1px solid #000; width:100%; border-collapse:collapse; margin:0 auto; table-layout:fixed; box-sizing:border-box; }}
+.tbsd {{ border:2px solid #000; width:100%; max-width:100%; border-collapse:collapse; margin:0 auto; table-layout:fixed; box-sizing:border-box; overflow:hidden; }}
 .tbsd tr:first-child td:nth-child(1) {{ width: 20%; }}
 .tbsd tr:first-child td:nth-child(2) {{ width: 32%; }}
 .tbsd tr:first-child td:nth-child(3) {{ width: 15%; }}
@@ -283,10 +283,11 @@ body {{ font-size:12pt; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei"
 .tbsd tr:first-child td:nth-child(5) {{ width: 18%; }}
 .tbsd td {{ font-size:12pt; padding:6px 4px; line-height:16pt; border:1px solid #000;
            font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; word-break:break-all; vertical-align:middle; box-sizing:border-box; }}
+.tbsd td[colspan] {{ border-right:2px solid #000 !important; }}
 .tbsd td p {{ font-size:12pt; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; margin:0; }}
 td[height="84"] {{ height:64pt; }}
 td[height="115"] {{ height:85pt; }}
-table {{ width:100%; border-collapse:collapse; }}
+table {{ width:100%; max-width:100%; border-collapse:collapse; box-sizing:border-box; }}
 img {{ max-width:86px; max-height:125px; display:block; margin:0 auto; }}
 .noprint,.Noprint {{ display:none !important; }}
 input[type="hidden"] {{ display:none; }}
