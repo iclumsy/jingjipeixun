@@ -70,13 +70,13 @@
           <text class="meta-chip">{{item.job_category || '-'}}</text>
           <text wx:if="{{item.exam_project}}" class="meta-chip">{{item.exam_project}}</text>
           <text
-            wx:if="{{item.status === 'reviewed' && item.training_type === 'special_equipment' && item.card_activated}}"
+            wx:if="{{(item.status === 'reviewed' || item.status === 'registered') && item.training_type === 'special_equipment' && item.card_activated}}"
             class="meta-chip card-query-chip"
             catchtap="onQueryCardTap"
             data-id="{{item._id}}"
           >🔍 学习卡信息</text>
           <text
-            wx:if="{{item.status === 'reviewed' && item.training_type === 'special_equipment' && !item.card_activated}}"
+            wx:if="{{(item.status === 'reviewed' || item.status === 'registered') && item.training_type === 'special_equipment' && !item.card_activated}}"
             class="meta-chip card-activate-chip"
             catchtap="onActivateCardTap"
             data-id="{{item._id}}"

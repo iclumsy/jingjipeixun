@@ -1205,8 +1205,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             statusBadge.style.display = 'flex';
             statusBadge.style.alignItems = 'center';
 
-            // 仅特种设备且已审核学员在顶部显示「开卡」按钮
-            if (student.status === 'reviewed' && student.training_type === 'special_equipment') {
+            // 仅特种设备且已审核（或已报名）学员在顶部显示「开卡」按钮
+            if ((student.status === 'reviewed' || student.status === 'registered') && student.training_type === 'special_equipment') {
                 const isActivated = !!student.card_activated;
 
                 if (isActivated) {
@@ -1761,7 +1761,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        if (student.status === 'reviewed' && student.training_form_path) {
+        if ((student.status === 'reviewed' || student.status === 'registered') && student.training_form_path) {
             const healthCheckWrapper = document.createElement('div');
             healthCheckWrapper.className = 'file-item-wrapper';
             healthCheckWrapper.style.display = 'flex';
@@ -1837,7 +1837,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             filesContainer.appendChild(healthCheckWrapper);
         }
 
-        if (student.status === 'reviewed') {
+        if (student.status === 'reviewed' || student.status === 'registered') {
             const materialsSection = document.createElement('div');
             materialsSection.className = 'generated-materials-section';
             materialsSection.style.marginTop = '20px';
