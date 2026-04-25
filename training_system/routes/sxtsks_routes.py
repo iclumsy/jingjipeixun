@@ -168,50 +168,128 @@ def download_form(bmid):
     student_id = request.args.get('student_id', type=int)
 
     try:
+        from models.student import get_student_by_id
+        student = get_student_by_id(student_id) if student_id else None
+        
+        pdf_filename = f'申请表-{bmid}.pdf'
+        form_path = None
+        
+        if student:
+            id_card = student.get('id_card', '')
+            name = student.get('name', '')
+            if id_card and name:
+                pdf_filename = f"{id_card}-{name}-报名申请表.pdf"
+
+            base_dir = _get_base_dir()
+            output_dir = os.path.join(_get_student_output_dir(student, base_dir), '报名材料')
+            os.makedirs(output_dir, exist_ok=True)
+            form_path = os.path.join(output_dir, pdf_filename)
+            
+            # 如果申请表已在本地缓存，直接返回下载
+            if os.path.exists(form_path):
+                current_app.logger.info(f'命中本地申请表缓存: {form_path}')
+                return send_file(
+                    form_path,
+                    mimetype='application/pdf',
+                    as_attachment=True,
+                    download_name=pdf_filename,
+                )
+
+        # ----------------------------
+        # 缓存未命中，前往网站获取 HTML 处理
+        # ----------------------------
         client = _get_client()
         content, content_type, filename = client.download_application_form(bmid)
 
         # 解码平台 HTML
-        html_body = content.decode('utf-8', errors='replace')
+        html = content.decode('utf-8', errors='replace')
 
         # 修正图片相对路径
-        html_body = html_body.replace('src="image.do', 'src="http://www.sxtsks.com/image.do')
-        html_body = html_body.replace("src='image.do", "src='http://www.sxtsks.com/image.do")
+        html = html.replace("src='image.do", "src='http://www.sxtsks.com/image.do")
+        html = html.replace('src="image.do', 'src="http://www.sxtsks.com/image.do')
 
-        # 隐藏平台自带的「下载」「关闭」按钮，并确保表格样式对 PDF 友好
-        pdf_html = f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<style>
-    body {{ font-family: "SimSun", "STSong", "Noto Serif CJK SC", serif; font-size: 14px; }}
-    #bt {{ display: none !important; }}
-    table {{ border-collapse: collapse; width: 100%; }}
-    td, th {{ border: 1px solid #000; padding: 6px 8px; }}
-    @page {{ size: A4; margin: 15mm; }}
-</style>
-</head><body>{html_body}</body></html>"""
+        # 清理 weasyprint 无法处理的外部引用和 JS
+        import re as _re
+        html = _re.sub(r'<link[^>]+href=["\']css/[^"\']+["\'][^>]*/?\s*>', '', html)
+        html = _re.sub(r'<script[^>]+src=["\'][^"\']+["\'][^>]*>\s*</script>', '', html)
+        html = _re.sub(r'<script[\s\S]*?</script>', '', html)
+        html = html.replace('onLoad="loadpage()"', '')
+        html = html.replace('class="noprint"', 'class="noprint" style="display:none"')
+
+        # 删除原始 style 块，用精准复刻的样式替代
+        html = _re.sub(r'<style type="text/css">\s*body\{.*?</style>', '', html, flags=_re.S)
+        html = _re.sub(r'<style type="text/css" media="print">.*?</style>', '', html, flags=_re.S)
+
+        # 去掉固定像素宽度，交给 CSS 自动布局（避免右边框被截断和身份证折行）
+        html = html.replace('width="650"', '')
+        html = html.replace('width="650px"', '')
+
+        # 注入精确匹配原版 PDF 的 CSS
+        inject_css = """<style>
+@page { size: A4; margin: 15mm; }
+body { font-size:12pt; font-family:"PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif; margin:0; padding:0; }
+.tit1 { padding:0 0 10px 0; line-height:36pt; text-align:center; font-size:18pt; font-weight:normal;
+        font-family:"PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif; }
+.tbsd { border:1px solid #000; width:100%; border-collapse:collapse; margin:0 auto; table-layout:fixed; box-sizing:border-box; }
+.tbsd tr:first-child td:nth-child(1) { width: 20%; }
+.tbsd tr:first-child td:nth-child(2) { width: 32%; }
+.tbsd tr:first-child td:nth-child(3) { width: 15%; }
+.tbsd tr:first-child td:nth-child(4) { width: 15%; }
+.tbsd tr:first-child td:nth-child(5) { width: 18%; }
+.tbsd td { font-size:12pt; padding:6px 4px; line-height:16pt; border:1px solid #000;
+           font-family:"PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif; word-break:break-all; vertical-align:middle; box-sizing:border-box; }
+.tbsd td p { font-size:12pt; font-family:"PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif; margin:0; }
+td[height="84"] { height:64pt; }
+td[height="115"] { height:85pt; }
+table { width:100%; border-collapse:collapse; }
+img { max-width:86px; max-height:125px; display:block; margin:0 auto; }
+.noprint,.Noprint { display:none !important; }
+input[type="hidden"] { display:none; }
+strong { font-weight:bold; font-family:"PingFang SC","Microsoft YaHei",sans-serif; font-size:9pt; }
+div[align="right"] { font-size:9pt; text-align:right; margin-right:20px; }
+div[align="left"] { font-size:9pt; text-align:left; margin-left:10px; }
+</style>"""
+        html = html.replace('</head>', inject_css + '</head>')
+
+        # 从原始 HTML 中提取身份证计算性别，如果原有性别为空则填上
+        id_card_match = _re.search(r'身份证件号\s*</td>\s*<td[^>]*>\s*([0-9X]{18})', html, _re.I)
+        if id_card_match:
+            try:
+                card = id_card_match.group(1)
+                gender_char = card[16:17]
+                gender_str = '女' if int(gender_char) % 2 == 0 else '男'
+                html = _re.sub(r'(>性别\s*</td>\s*<td[^>]*>)\s*&nbsp;\s*</td>', f'\\g<1>{gender_str}</td>', html)
+            except Exception:
+                pass
+
+        # 从原始 HTML 中提取水印文字
+        watermark_match = _re.search(r"watermark\.innerText\s*=\s*'([^']+)'", content.decode('utf-8', errors='replace'))
+        watermark_text = watermark_match.group(1) if watermark_match else '山西省特种设备作业人员考核管理平台'
+
+        # 原版水印：调整为底层显示 (z-index:-10)，从 body 顶部注入使其渲染在文字下方
+        watermark_html = f'<div style="position:fixed; top:105mm; left:15mm; font-size:20pt; font-family:PingFang SC,Microsoft YaHei,sans-serif; color:#a1a1ab; white-space:nowrap; z-index:-10;">{watermark_text}</div>'
+        html = _re.sub(r'(<body[^>]*>)', r'\1' + watermark_html, html, count=1)
 
         # weasyprint 转 PDF
         import weasyprint
-        pdf_bytes = weasyprint.HTML(string=pdf_html).write_pdf()
+        pdf_bytes = weasyprint.HTML(string=html).write_pdf()
 
-        pdf_filename = f'申请表-{bmid}.pdf'
-
-        # 保存到学员目录
-        if student_id:
+        # 保存并返回
+        if form_path:
             try:
-                from models.student import get_student_by_id
-                student = get_student_by_id(student_id)
-                if student:
-                    base_dir = _get_base_dir()
-                    output_dir = _get_student_output_dir(student, base_dir)
-                    os.makedirs(output_dir, exist_ok=True)
-                    form_path = os.path.join(output_dir, pdf_filename)
-                    with open(form_path, 'wb') as f:
-                        f.write(pdf_bytes)
-                    current_app.logger.info(f'申请表 PDF 已保存: {form_path}')
+                with open(form_path, 'wb') as f:
+                    f.write(pdf_bytes)
+                current_app.logger.info(f'申请表 PDF 已保存为新文件: {form_path}')
+                return send_file(
+                    form_path,
+                    mimetype='application/pdf',
+                    as_attachment=True,
+                    download_name=pdf_filename,
+                )
             except Exception as save_err:
                 current_app.logger.warning(f'保存申请表失败: {save_err}')
 
+        # 降级: 放内存处理
         return send_file(
             io.BytesIO(pdf_bytes),
             mimetype='application/pdf',
