@@ -162,8 +162,8 @@ def query_bmid(student_id):
 @sxtsks_bp.route('/api/sxtsks/form/<int:bmid>', methods=['GET'])
 def download_form(bmid):
     """
-    下载指定报名 ID 的申请表。
-    如果提供了 student_id 参数，同时保存到学员目录。
+    下载指定报名 ID 的申请表 PDF。
+    服务端从平台获取 HTML → weasyprint 转 PDF → 直接下载。
     """
     student_id = request.args.get('student_id', type=int)
 
@@ -171,7 +171,32 @@ def download_form(bmid):
         client = _get_client()
         content, content_type, filename = client.download_application_form(bmid)
 
-        # 如果传了 student_id，同时保存到学员目录
+        # 解码平台 HTML
+        html_body = content.decode('utf-8', errors='replace')
+
+        # 修正图片相对路径
+        html_body = html_body.replace('src="image.do', 'src="http://www.sxtsks.com/image.do')
+        html_body = html_body.replace("src='image.do", "src='http://www.sxtsks.com/image.do")
+
+        # 隐藏平台自带的「下载」「关闭」按钮，并确保表格样式对 PDF 友好
+        pdf_html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+    body {{ font-family: "SimSun", "STSong", "Noto Serif CJK SC", serif; font-size: 14px; }}
+    #bt {{ display: none !important; }}
+    table {{ border-collapse: collapse; width: 100%; }}
+    td, th {{ border: 1px solid #000; padding: 6px 8px; }}
+    @page {{ size: A4; margin: 15mm; }}
+</style>
+</head><body>{html_body}</body></html>"""
+
+        # weasyprint 转 PDF
+        import weasyprint
+        pdf_bytes = weasyprint.HTML(string=pdf_html).write_pdf()
+
+        pdf_filename = f'申请表-{bmid}.pdf'
+
+        # 保存到学员目录
         if student_id:
             try:
                 from models.student import get_student_by_id
@@ -180,18 +205,18 @@ def download_form(bmid):
                     base_dir = _get_base_dir()
                     output_dir = _get_student_output_dir(student, base_dir)
                     os.makedirs(output_dir, exist_ok=True)
-                    form_path = os.path.join(output_dir, filename)
+                    form_path = os.path.join(output_dir, pdf_filename)
                     with open(form_path, 'wb') as f:
-                        f.write(content)
-                    current_app.logger.info(f'申请表已保存: {form_path}')
+                        f.write(pdf_bytes)
+                    current_app.logger.info(f'申请表 PDF 已保存: {form_path}')
             except Exception as save_err:
-                current_app.logger.warning(f'保存申请表到学员目录失败: {save_err}')
+                current_app.logger.warning(f'保存申请表失败: {save_err}')
 
         return send_file(
-            io.BytesIO(content),
-            mimetype=content_type,
+            io.BytesIO(pdf_bytes),
+            mimetype='application/pdf',
             as_attachment=True,
-            download_name=filename,
+            download_name=pdf_filename,
         )
     except Exception as e:
         current_app.logger.error(f'下载申请表异常: {e}', exc_info=True)

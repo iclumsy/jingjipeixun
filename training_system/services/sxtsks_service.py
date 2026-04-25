@@ -16,6 +16,7 @@ import os
 import io
 import re
 import time
+import json
 import logging
 import requests
 from urllib.parse import urlencode
@@ -86,6 +87,9 @@ XGCL_DEFAULT = ['07101', '07102', '07103']
 
 # 验证码最大重试次数
 MAX_CAPTCHA_RETRIES = 5
+
+# Cookie 持久化路径
+COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'logs', '.sxtsks_session.json')
 
 
 def _rsa_encrypt(plaintext, public_key_b64=RSA_PUBLIC_KEY):
@@ -162,6 +166,7 @@ class SxtsksClient:
         self.userid = None
         self.logged_in = False
         self._steps = []  # 步骤日志收集器
+        self._try_load_session()
 
     def _log_step(self, step, status, detail='', resp=None):
         """记录一个操作步骤的详细日志。"""
@@ -287,6 +292,7 @@ class SxtsksClient:
                 except Exception as ue:
                     self._log_step('登录-获取userid', 'warning', str(ue))
 
+                self._save_session()
                 return {
                     'success': True,
                     'message': f'登录成功（第{attempt}次尝试）',
@@ -305,12 +311,66 @@ class SxtsksClient:
             'attempts': MAX_CAPTCHA_RETRIES,
         }
 
+    def _save_session(self):
+        """将当前会话的 cookies 和 userid 持久化到本地文件。"""
+        try:
+            os.makedirs(os.path.dirname(COOKIE_FILE), exist_ok=True)
+            data = {
+                'cookies': dict(self.session.cookies),
+                'userid': self.userid,
+                'saved_at': time.time(),
+            }
+            with open(COOKIE_FILE, 'w') as f:
+                json.dump(data, f)
+            logger.info(f'会话已持久化到 {COOKIE_FILE}')
+        except Exception as e:
+            logger.warning(f'保存会话失败: {e}')
+
+    def _try_load_session(self):
+        """尝试从本地文件恢复上次的登录会话。"""
+        try:
+            if not os.path.exists(COOKIE_FILE):
+                return
+            with open(COOKIE_FILE, 'r') as f:
+                data = json.load(f)
+            # 超过 24 小时的 cookie 视为过期
+            if time.time() - data.get('saved_at', 0) > 86400:
+                logger.info('持久化会话已过期(>24h)，将重新登录')
+                return
+            for name, value in data.get('cookies', {}).items():
+                self.session.cookies.set(name, value)
+            self.userid = data.get('userid')
+            self.logged_in = True
+            logger.info(f'已恢复持久化会话，userid={self.userid}')
+        except Exception as e:
+            logger.warning(f'恢复会话失败: {e}')
+
+    def _verify_session(self):
+        """验证当前 cookie 是否仍然有效（轻量探测）。"""
+        try:
+            r = self.session.get(f'{BASE_URL}/turnToUserLogin.do', timeout=10, allow_redirects=False)
+            # 302 重定向到登录页说明 cookie 已失效
+            if r.status_code == 302 or 'login' in r.headers.get('Location', '').lower():
+                return False
+            # 页面中有 userid 说明有效
+            if self.userid and self.userid in r.text:
+                return True
+            # 页面长度过小大概率是跳转页
+            return len(r.text) > 1000
+        except Exception:
+            return False
+
     def _ensure_login(self):
-        """确保已登录，未登录则自动登录。"""
-        if not self.logged_in:
-            result = self.login()
-            if not result['success']:
-                raise RuntimeError(f'自动登录失败: {result["message"]}')
+        """确保已登录：先尝试验证持久化 cookie，失效则重新登录。"""
+        if self.logged_in:
+            if self._verify_session():
+                return
+            # cookie 已失效，重新登录
+            self.logged_in = False
+            self._log_step('会话检查', 'warning', '持久化 cookie 已失效，重新登录')
+        result = self.login()
+        if not result['success']:
+            raise RuntimeError(f'自动登录失败: {result["message"]}')
 
     def _build_form_fields(
             self,
