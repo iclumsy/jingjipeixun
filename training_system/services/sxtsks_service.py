@@ -709,8 +709,10 @@ class SxtsksClient:
         """
         self._ensure_login()
 
-        sfzh = self._generate_test_id_card()
-        self._log_step('测试身份证', 'warning', f'平台提交使用随机测试身份证 {sfzh}，原学员身份证不改动')
+        sfzh = student.get('id_card', '')
+        if not sfzh:
+            return {'success': False, 'message': '缺少学员身份证号'}
+        self._log_step('使用真实身份证', 'ok', f'平台提交使用学员真实身份证: {sfzh}')
 
         project_code = student.get('project_code', '')
         zyxm_id = PROJECT_CODE_TO_XMID.get(project_code)

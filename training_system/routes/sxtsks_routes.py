@@ -100,6 +100,11 @@ def submit_registration(student_id):
         # 只提交报名，不下载申请表
         result = client.submit_registration(student, photo_path)
         result.pop('form_content', None)
+        
+        if result.get('success'):
+            from models.student import update_student
+            update_student(student_id, {'status': 'registered'})
+            
         return jsonify(result)
 
     except Exception as e:
@@ -124,7 +129,7 @@ def query_registrations():
 def query_bmid(student_id):
     """
     查询学员在平台上的报名 BMID。
-    由于提交时使用的是随机测试身份证，这里查询全部报名列表后按姓名匹配。
+    使用本地学员真实的身份证号向平台发起精准定位。
     """
     from models.student import get_student_by_id
 
@@ -133,14 +138,19 @@ def query_bmid(student_id):
         return jsonify({'success': False, 'message': '学员不存在'}), 404
 
     student_name = student.get('name', '')
+    student_id_card = student.get('id_card', '')
+
+    if not student_id_card:
+        return jsonify({'success': False, 'message': f'学员「{student_name}」缺少身份证信息，无法查询流水号'}), 400
 
     try:
         client = _get_client()
-        # 不传 sfzh，查询该账号下的全部报名记录
-        registrations = client.query_registrations()
+        # 传入 sfzh 进行精准调用
+        registrations = client.query_registrations(sfzh=student_id_card)
 
-        # 按姓名匹配（可能有多条，取最新的一条）
-        matched = [r for r in registrations if r['name'] == student_name]
+        # 拿到同身份证的所有记录后稍微过审一下姓名对不对（防平台重写或者错乱）
+        matched = [r for r in registrations if r['id_card'] == student_id_card and r['name'] == student_name]
+        
         if matched:
             reg = matched[0]  # 第一条即最新
             return jsonify({
@@ -152,7 +162,7 @@ def query_bmid(student_id):
                 'apply_date': reg['apply_date'],
             })
         else:
-            return jsonify({'success': False, 'message': f'未找到「{student_name}」的报名记录'})
+            return jsonify({'success': False, 'message': f'未找到「{student_name}」（{student_id_card}）的报名记录'})
 
     except Exception as e:
         current_app.logger.error(f'查询 BMID 异常: {e}', exc_info=True)
@@ -174,6 +184,9 @@ def download_form(bmid):
         pdf_filename = f'申请表-{bmid}.pdf'
         form_path = None
         
+        student_label = f"[{student['id_card']}] {student['name']}" if student else f"未知学员"
+        current_app.logger.info(f'{student_label} 开始获取报名平台申请表(BMID: {bmid})')
+        
         if student:
             id_card = student.get('id_card', '')
             name = student.get('name', '')
@@ -187,7 +200,7 @@ def download_form(bmid):
             
             # 如果申请表已在本地缓存，直接返回下载
             if os.path.exists(form_path):
-                current_app.logger.info(f'命中本地申请表缓存: {form_path}')
+                current_app.logger.info(f'{student_label} 命中本地已生成的 PDF 申请表缓存: {pdf_filename}')
                 return send_file(
                     form_path,
                     mimetype='application/pdf',
@@ -198,8 +211,10 @@ def download_form(bmid):
         # ----------------------------
         # 缓存未命中，前往网站获取 HTML 处理
         # ----------------------------
+        current_app.logger.info(f'{student_label} 本地无缓存，前往平台抓取核心数据 (BMID: {bmid})...')
         client = _get_client()
         content, content_type, filename = client.download_application_form(bmid)
+        current_app.logger.info(f'{student_label} 平台数据源获取成功，准备注入离线排版规则...')
 
         # 解码平台 HTML
         html = content.decode('utf-8', errors='replace')
@@ -271,15 +286,17 @@ div[align="left"] { font-size:9pt; text-align:left; margin-left:10px; }
         html = _re.sub(r'(<body[^>]*>)', r'\1' + watermark_html, html, count=1)
 
         # weasyprint 转 PDF
+        current_app.logger.info(f'{student_label} 准备调用 WeasyPrint 将 HTML 排版为保真 PDF 文件...')
         import weasyprint
         pdf_bytes = weasyprint.HTML(string=html).write_pdf()
+        current_app.logger.info(f'{student_label} PDF 转换生成完毕，最终大小缩略约为 {len(pdf_bytes) // 1024} KB')
 
         # 保存并返回
         if form_path:
             try:
                 with open(form_path, 'wb') as f:
                     f.write(pdf_bytes)
-                current_app.logger.info(f'申请表 PDF 已保存为新文件: {form_path}')
+                current_app.logger.info(f'{student_label} PDF 文件已成功冷备份到设备持久化层: {form_path}')
                 return send_file(
                     form_path,
                     mimetype='application/pdf',

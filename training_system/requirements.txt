@@ -11,4 +11,5 @@ openpyxl
 cos-python-sdk-v5
 tencentcloud-sdk-python-sts
 ddddocr
-pycryptodomeweasyprint
+pycryptodome
+weasyprint

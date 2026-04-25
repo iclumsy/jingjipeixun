@@ -223,6 +223,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (status === 'rejected') {
             return { label: '已驳回', className: 'rejected' };
         }
+        if (status === 'registered') {
+            return { label: '已报名', className: 'registered' };
+        }
         return { label: '未审核', className: 'unreviewed' };
     }
 
@@ -569,12 +572,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             const statusLabels = {
                 unreviewed: '待审核',
                 reviewed: '已审核',
-                rejected: '已驳回'
+                rejected: '已驳回',
+                registered: '已报名'
             };
             const statusColors = {
                 unreviewed: { bg: '#FEF3C7', color: '#92400E', icon: '⏳' },
                 reviewed:   { bg: '#D1FAE5', color: '#065F46', icon: '✅' },
-                rejected:   { bg: '#FEE2E2', color: '#991B1B', icon: '↩️' }
+                rejected:   { bg: '#FEE2E2', color: '#991B1B', icon: '↩️' },
+                registered: { bg: '#E0E7FF', color: '#3730A3', icon: '🚀' }
             };
 
             // 状态卡片
@@ -766,60 +771,56 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateStatusButtons() {
         const btnUnreviewed = document.getElementById('btnUnreviewed');
         const btnReviewed = document.getElementById('btnReviewed');
-        if (btnUnreviewed && btnReviewed) {
-            if (currentStatus === 'unreviewed') {
-                btnUnreviewed.style.background = '#4f46e5';
-                btnUnreviewed.style.color = '#fff';
-                btnUnreviewed.style.borderColor = '#4f46e5';
-                btnReviewed.style.background = '#fff';
-                btnReviewed.style.color = '#333';
-                btnReviewed.style.borderColor = '#ddd';
-            } else {
-                btnReviewed.style.background = '#4f46e5';
-                btnReviewed.style.color = '#fff';
-                btnReviewed.style.borderColor = '#4f46e5';
-                btnUnreviewed.style.background = '#fff';
-                btnUnreviewed.style.color = '#333';
-                btnUnreviewed.style.borderColor = '#ddd';
+        const btnRegistered = document.getElementById('btnRegistered');
+        
+        const buttons = {
+            'unreviewed': btnUnreviewed,
+            'reviewed': btnReviewed,
+            'registered': btnRegistered
+        };
+
+        Object.keys(buttons).forEach(status => {
+            const btn = buttons[status];
+            if (btn) {
+                if (currentStatus === status) {
+                    btn.style.background = '#4f46e5';
+                    btn.style.color = '#fff';
+                    btn.style.borderColor = '#4f46e5';
+                } else {
+                    btn.style.background = '#fff';
+                    btn.style.color = '#333';
+                    btn.style.borderColor = '#ddd';
+                }
             }
-        }
+        });
     }
     updateStatusButtons();
 
     const btnUnreviewed = document.getElementById('btnUnreviewed');
     const btnReviewed = document.getElementById('btnReviewed');
+    const btnRegistered = document.getElementById('btnRegistered');
 
-    if (btnUnreviewed) {
-        btnUnreviewed.addEventListener('click', () => {
-            currentStatus = 'unreviewed';
-            syncGlobalAdminState();
-            updateStatusButtons();
-            loadStudents();
-            loadCompanies(currentStatus);
-            if (companyFilter) {
-                companyFilter.value = '';
-                currentFilters.company = '';
-            }
-            mainContent.innerHTML = '<div class="empty-state">请选择左侧学员查看详情</div>';
-            currentStudentId = null;
-        });
+    function setupStatusBtnEvent(btn, targetStatus) {
+        if (btn) {
+            btn.addEventListener('click', () => {
+                currentStatus = targetStatus;
+                syncGlobalAdminState();
+                updateStatusButtons();
+                loadStudents();
+                loadCompanies(currentStatus);
+                if (companyFilter) {
+                    companyFilter.value = '';
+                    currentFilters.company = '';
+                }
+                mainContent.innerHTML = '<div class="empty-state">请选择左侧学员查看详情</div>';
+                currentStudentId = null;
+            });
+        }
     }
 
-    if (btnReviewed) {
-        btnReviewed.addEventListener('click', () => {
-            currentStatus = 'reviewed';
-            syncGlobalAdminState();
-            updateStatusButtons();
-            loadStudents();
-            loadCompanies(currentStatus);
-            if (companyFilter) {
-                companyFilter.value = '';
-                currentFilters.company = '';
-            }
-            mainContent.innerHTML = '<div class="empty-state">请选择左侧学员查看详情</div>';
-            currentStudentId = null;
-        });
-    }
+    setupStatusBtnEvent(btnUnreviewed, 'unreviewed');
+    setupStatusBtnEvent(btnReviewed, 'reviewed');
+    setupStatusBtnEvent(btnRegistered, 'registered');
 
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
