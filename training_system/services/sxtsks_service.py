@@ -312,40 +312,139 @@ class SxtsksClient:
             if not result['success']:
                 raise RuntimeError(f'自动登录失败: {result["message"]}')
 
-    def upload_photo(self, photo_path, zyxm_id):
+    def _build_form_fields(
+            self,
+            student,
+            sfzh,
+            zyxm_id,
+            gender_code,
+            education_code,
+            token='',
+            ver_code='',
+            include_submit_values=True):
+        """构建平台报名表单字段，字段顺序按浏览器 HAR 保持稳定。"""
+        company = student.get('company', '')
+        company_address = student.get('company_address', '')
+
+        return {
+            'bmid': '',
+            'sblsh': '',
+            'jgdm': JGDM,
+            'jglb': JGLB,
+            'web_ksjgdm': JGDM,
+            'bmjgdm': JGDM,
+            'flag': '',
+            'bmlb': '',
+            'bmVerriToken': token,
+            'tzsbzl': '',
+            'lzfs': '',
+            'sjrxm': '',
+            'sjrlxdh': '',
+            'sjrxxdz': '',
+            'sjryzbm': '',
+            'zwwbm': '',
+            'business_code': '',
+            'v_sfzh': '',
+            'processStatus': '',
+            'userid': self.userid or '',
+            'v_lxdh': '',
+            'phoneIsReq': '',
+            'siteX': '',
+            'pxjgdm': '',
+            'ksjgdm': KSJGDM,
+            'sqrxm': student['name'],
+            'xb': gender_code,
+            'zjlx': '1',
+            'sfzh': sfzh,
+            'whcd': education_code,
+            'yrdw': company,
+            'dwdz': company_address,
+            'txdz': company_address,
+            'yzbm': YZBM if include_submit_values else '',
+            'lxdh': student.get('phone', '') if include_submit_values else '',
+            'zyxm': zyxm_id,
+            'zyzl': '',
+            'zyxmcode': zyxm_id,
+            'dwszdq': '',
+            'dwszqx': '',
+            'gzjl': GZJL if include_submit_values else '',
+            'yrdwyj': '',
+            'yrdwrq': time.strftime('%Y-%m-%d'),
+            'sqrqzrq': time.strftime('%Y-%m-%d'),
+            'verCode': ver_code,
+            'xgclType': '071',
+        }
+
+    def _build_multipart_parts(self, form_fields, photo_data=None, include_xgcl=False):
+        """将普通表单字段和照片文件拼成 requests 可发送的 multipart parts。"""
+        parts = []
+        for key, value in form_fields.items():
+            parts.append((key, (None, value)))
+            if key == 'xb' and photo_data is not None:
+                parts.append(('files', ('photo.jpg', photo_data, 'image/jpeg')))
+            if key == 'gzjl' and include_xgcl:
+                for code in XGCL_DEFAULT:
+                    parts.append(('xgcl', (None, code)))
+
+        return parts
+
+    def _generate_test_id_card(self):
+        """生成平台测试提交用的随机 18 位身份证号。"""
+        import random
+
+        base_id = (
+            f"14030219"
+            f"{random.randint(70, 99)}"
+            f"{random.randint(1, 12):02d}"
+            f"{random.randint(1, 28):02d}"
+            f"{random.randint(100, 999)}"
+        )
+        weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+        check_codes = "10X98765432"
+        total = sum(int(base_id[i]) * weights[i] for i in range(17))
+        return base_id + check_codes[total % 11]
+
+    def upload_photo(self, photo_path, zyxm_id, form_fields=None, photo_data=None):
         """
         上传证件照到报名平台。
 
         参数:
             photo_path: 本地照片路径
             zyxm_id: 作业项目 ID
+            form_fields: 浏览器上传照片时附带的报名表单字段
+            photo_data: 已读取的照片二进制，避免重复读文件
 
         返回:
             str: 平台返回的临时照片路径（如 tmp/xxx.jpg）
         """
         self._ensure_login()
 
-        with open(photo_path, 'rb') as f:
-            photo_data = f.read()
+        if photo_data is None:
+            with open(photo_path, 'rb') as f:
+                photo_data = f.read()
 
         self._log_step('上传照片', 'ok', f'照片大小 {len(photo_data)} 字节，项目 {zyxm_id}')
-        resp = self.session.post(
-            f'{BASE_URL}/uploadksimg.do',
-            params={
+        request_kwargs = {
+            'params': {
                 'suffix': 'jpg',
                 'filename': 'files',
                 'zyxm': zyxm_id,
             },
-            files={
+            'timeout': 30,
+        }
+        if form_fields:
+            request_kwargs['files'] = self._build_multipart_parts(form_fields, photo_data=photo_data)
+        else:
+            request_kwargs['files'] = {
                 'files': ('photo.jpg', photo_data, 'image/jpeg'),
-            },
-            data={
+            }
+            request_kwargs['data'] = {
                 'bmid': '',
                 'sblsh': '',
                 'jgdm': JGDM,
-            },
-            timeout=30,
-        )
+            }
+
+        resp = self.session.post(f'{BASE_URL}/uploadksimg.do', **request_kwargs)
 
         # 响应格式: <script>window.parent._upload_callbacks('tmp/xxx.jpg?dateXXX','1');</script>
         match = re.search(r"_upload_callbacks\(['\"]([^'\"]+)['\"]", resp.text)
@@ -441,7 +540,7 @@ class SxtsksClient:
         except Exception as e:
             self._log_step(f'上传附件结果-{code}', 'warning', f'异常: {str(e)}')
 
-    def _run_pre_checks(self, sfzh, zyxm_id):
+    def _run_pre_checks(self, sfzh, zyxm_id, education_code='0405'):
         """
         执行提交前的多步校验（模拟前端 JS 行为）。
 
@@ -452,7 +551,7 @@ class SxtsksClient:
         checks = [
             ('校验学历', lambda: self.session.get(
                 f'{BASE_URL}/dwbm_validateWhcd.do',
-                params={'zyxm': zyxm_id, 'whcd': '0405', '_': int(time.time() * 1000)}, timeout=10)),
+                params={'zyxm': zyxm_id, 'whcd': education_code, '_': int(time.time() * 1000)}, timeout=10)),
             ('检查证书', lambda: self.session.post(
                 f'{BASE_URL}/isKsCertExists.do',
                 params={'web_ksjgdm': JGDM},
@@ -460,6 +559,10 @@ class SxtsksClient:
             ('验证身份证', lambda: self.session.post(
                 f'{BASE_URL}/verifyDwBmIdCard.do',
                 data={'idCard': sfzh, 'jgdm': JGDM}, timeout=10)),
+            ('验证头像照片', lambda: self.session.post(
+                f'{BASE_URL}/wbapplycheckUserPortrait.do',
+                params={'bmid': ''},
+                data={'bmlb': '0', 'jgdm': JGDM, 'sfz': sfzh}, timeout=10)),
             ('检查可否报名', lambda: self.session.post(
                 f'{BASE_URL}/wbisCanApply.do',
                 data={'bmlb': '0', 'jgdm': JGDM, 'sfzh': sfzh, 'zyzl': '', 'zyxm': zyxm_id}, timeout=10)),
@@ -499,6 +602,38 @@ class SxtsksClient:
 
         return results
 
+    def _extract_submit_info(self, resp_text):
+        """提取平台保存页中的 info 回调消息。"""
+        match = re.search(r'var\s+info\s*=\s*([\'"])(.*?)\1', resp_text, re.S)
+        if not match:
+            return ''
+        return match.group(2).replace(r'\"', '"').replace(r"\'", "'").strip()
+
+    def _parse_submit_response(self, resp_text):
+        """解析保存响应；平台成功时可能返回短文本，也可能返回 HTML 回调页。"""
+        text = resp_text.strip()
+        info = self._extract_submit_info(text)
+
+        if info:
+            if '验证码校验失败' in info or ('验证码' in info and '不正确' in info):
+                return {'success': False, 'message': '验证码错误', 'bmid': ''}
+            if '填报信息保存' in info:
+                return {'success': True, 'message': '报名提交成功', 'bmid': ''}
+            return {'success': False, 'message': info, 'bmid': ''}
+
+        if '验证码校验失败' in text or ('验证码' in text and '不正确' in text):
+            return {'success': False, 'message': '验证码错误', 'bmid': ''}
+
+        if '保存并上报成功' in text:
+            parts = text.split(',')
+            bmid = parts[1] if len(parts) > 1 else ''
+            return {'success': True, 'message': '报名提交成功', 'bmid': bmid}
+
+        if '已存在' in text:
+            return {'success': False, 'message': f'报名失败: {text}', 'bmid': ''}
+
+        return {'success': False, 'message': '', 'bmid': ''}
+
     def submit_registration(self, student, photo_path):
         """
         提交单个学员的报名信息。
@@ -514,20 +649,9 @@ class SxtsksClient:
         """
         self._ensure_login()
 
-        sfzh = student['id_card']
-        
-        # [DEBUG] 拦截真实身份证并每次生成一个符合严格校验机制的随机 18 位测试身份证
-        import random
-        old_sfzh = sfzh
-        base_id = f"14030219{random.randint(70,99)}{random.randint(1,12):02d}{random.randint(1,28):02d}{random.randint(100,999)}"
-        # 计算第18位校验码权重
-        weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
-        check_codes = "10X98765432"
-        s = sum(int(base_id[i]) * weights[i] for i in range(17))
-        sfzh = base_id + check_codes[s % 11]
-        
-        self._log_step('测试模式', 'warning', f'已将报考身份证 {old_sfzh} 强制替换为测试身份证 {sfzh}')
-        
+        sfzh = self._generate_test_id_card()
+        self._log_step('测试身份证', 'warning', f'平台提交使用随机测试身份证 {sfzh}，原学员身份证不改动')
+
         project_code = student.get('project_code', '')
         zyxm_id = PROJECT_CODE_TO_XMID.get(project_code)
         if not zyxm_id:
@@ -535,19 +659,31 @@ class SxtsksClient:
 
         gender_code = GENDER_MAP.get(student.get('gender', ''), '1')
         education_code = EDUCATION_MAP.get(student.get('education', ''), '0405')
-        company = student.get('company', '')
-        company_address = student.get('company_address', '')
 
         try:
-            # 1. 上传照片
-            self._log_step('报名开始', 'ok', f'{student["name"]}（{sfzh}）项目={project_code} → XMID={zyxm_id}')
-            self.upload_photo(photo_path, zyxm_id)
+            with open(photo_path, 'rb') as f:
+                photo_data = f.read()
 
-            # 获取表单 token
+            self._log_step('报名开始', 'ok', f'{student["name"]}（{sfzh}）项目={project_code} → XMID={zyxm_id}')
+
+            # 1. 进入报名表单，让服务器建立当前身份证/项目的会话上下文。
             token = self._get_form_token(sfzh, zyxm_id)
 
+            # 2. 上传照片。浏览器会把当前表单字段一并放进 multipart，这里按 HAR 复现。
+            upload_fields = self._build_form_fields(
+                student,
+                sfzh,
+                zyxm_id,
+                gender_code,
+                education_code,
+                token='',
+                ver_code='',
+                include_submit_values=False,
+            )
+            self.upload_photo(photo_path, zyxm_id, form_fields=upload_fields, photo_data=photo_data)
+
             # 3. 执行预校验
-            check_results = self._run_pre_checks(sfzh, zyxm_id)
+            check_results = self._run_pre_checks(sfzh, zyxm_id, education_code)
             ver_code = check_results.get('verCode', '')
             
             if not token:
@@ -555,14 +691,6 @@ class SxtsksClient:
             
             if not ver_code:
                 ver_code = self._get_captcha_code()
-
-            # 新增: 提交表单前上传证明材料 (07101 = 身份证明, 07102 = 学历证明, 07103 = 体检报告)
-            # 平台上点击"添加附件"就是发此类请求
-            with open(photo_path, 'rb') as f:
-                photo_data = f.read()
-
-            for code in XGCL_DEFAULT:
-                self._upload_attachment(code, photo_data, zyxm_id)
 
             # 4. 检查是否需要配合机构必选
             try:
@@ -578,66 +706,20 @@ class SxtsksClient:
             self._log_step('构建表单', 'ok', f'token={token[:15]}... verCode={ver_code} 学历={education_code} 性别={gender_code}')
 
             # 构建 multipart 表单数据
-            form_fields = {
-                'bmid': '',
-                'sblsh': '',
-                'jgdm': JGDM,
-                'jglb': JGLB,
-                'web_ksjgdm': JGDM,
-                'bmjgdm': JGDM,
-                'flag': '',
-                'bmlb': '',
-                'bmVerriToken': token,
-                'tzsbzl': '',
-                'lzfs': '',
-                'sjrxm': '',
-                'sjrlxdh': '',
-                'sjrxxdz': '',
-                'sjryzbm': '',
-                'zwwbm': '',
-                'business_code': '',
-                'v_sfzh': '',
-                'processStatus': '',
-                'userid': self.userid or '',
-                'v_lxdh': '',
-                'phoneIsReq': '',
-                'siteX': '',
-                'pxjgdm': '',
-                'ksjgdm': KSJGDM,
-                'sqrxm': student['name'],
-                'xb': gender_code,
-                'zjlx': '1',
-                'sfzh': sfzh,
-                'whcd': education_code,
-                'yrdw': company,
-                'dwdz': company_address,
-                'txdz': company_address,
-                'yzbm': YZBM,
-                'lxdh': student.get('phone', ''),
-                'zyxm': zyxm_id,
-                'zyzl': '',
-                'zyxmcode': zyxm_id,
-                'dwszdq': '',
-                'dwszqx': '',
-                'gzjl': GZJL,
-                'yrdwyj': '',
-                'yrdwrq': time.strftime('%Y-%m-%d'),
-                'sqrqzrq': time.strftime('%Y-%m-%d'),
-                'verCode': ver_code,
-                'xgclType': '071',
-            }
+            form_fields = self._build_form_fields(
+                student,
+                sfzh,
+                zyxm_id,
+                gender_code,
+                education_code,
+                token=token,
+                ver_code=ver_code,
+                include_submit_values=True,
+            )
 
             # 构建 multipart 请求
-            # 注意 xgcl 需要多个同名字段
-            files_list = []
-            for key, value in form_fields.items():
-                files_list.append((key, (None, value)))
-
-            # 多个 xgcl 字段
-            for code in XGCL_DEFAULT:
-                files_list.append(('xgcl', (None, code)))
-
-            # 删除强制带入二进制文件的包袱，因为平台靠事先上传就够了
+            # 注意 xgcl 需要多个同名字段；照片文件也要随最终保存请求一起提交。
+            files_list = self._build_multipart_parts(form_fields, photo_data=photo_data, include_xgcl=True)
 
             # 发送请求，不再画蛇添足伪造 AJAX 头，因为 Struts 可能靠 iframe 兼容
             resp = self.session.post(
@@ -649,30 +731,28 @@ class SxtsksClient:
             # 判断是否成功
             self._log_step('提交表单-响应', 'ok', f'HTTP {resp.status_code}, 长度={len(resp.text)}', resp)
             if resp.status_code == 200:
+                parsed = self._parse_submit_response(resp.text)
+                if parsed['success']:
+                    detail = f'报名成功 bmid={parsed.get("bmid", "")}' if parsed.get('bmid') else '报名成功，待查询报名ID'
+                    self._log_step('提交表单-结果', 'ok', detail)
+                    parsed['submitted_id_card'] = sfzh
+                    return parsed
+
+                if parsed['message']:
+                    self._log_step('提交表单-结果', 'fail', parsed['message'])
+                    return {'success': False, 'message': parsed['message']}
+
                 resp_text = resp.text.strip()
-                if '保存并上报成功' in resp_text:
-                    # 响应格式: "保存并上报成功,12345"
-                    parts = resp_text.split(',')
-                    bmid = parts[1] if len(parts) > 1 else ''
-                    self._log_step('提交表单-结果', 'ok', f'报名成功 bmid={bmid}')
-                    return {'success': True, 'message': '报名提交成功', 'bmid': bmid}
-                elif '验证码' in resp_text and '不正确' in resp_text:
-                    self._log_step('提交表单-结果', 'fail', '验证码错误')
-                    return {'success': False, 'message': '验证码错误'}
-                elif '已存在' in resp_text:
-                    self._log_step('提交表单-结果', 'fail', resp_text)
-                    return {'success': False, 'message': f'报名失败: {resp_text}'}
-                else:
-                    self._log_step('提交表单-结果', 'warning', f'未知响应: {resp_text[:100]}')
-                    import os
-                    dump_path = os.path.abspath('/tmp/error_71k.html')
-                    try:
-                        with open(dump_path, 'w', encoding='utf-8') as f:
-                            f.write(resp.text)
-                        self._log_step('日志系统', 'info', f'异常反馈源码已转存至本地 {dump_path}')
-                    except Exception as fe:
-                        self._log_step('日志系统', 'warning', f'无法存储异常源码: {fe}')
-                    return {'success': False, 'message': f'未知响应 (HTML源文件已尝试导出)'}
+                self._log_step('提交表单-结果', 'warning', f'未知响应: {resp_text[:100]}')
+                import os
+                dump_path = os.path.abspath('/tmp/error_71k.html')
+                try:
+                    with open(dump_path, 'w', encoding='utf-8') as f:
+                        f.write(resp.text)
+                    self._log_step('日志系统', 'info', f'异常反馈源码已转存至本地 {dump_path}')
+                except Exception as fe:
+                    self._log_step('日志系统', 'warning', f'无法存储异常源码: {fe}')
+                return {'success': False, 'message': f'未知响应 (HTML源文件已尝试导出)'}
             else:
                 self._log_step('提交表单-结果', 'fail', f'HTTP {resp.status_code}')
                 return {'success': False, 'message': f'HTTP 错误: {resp.status_code}'}
@@ -802,11 +882,12 @@ class SxtsksClient:
 
         # 2. 查询报名获取 bmid
         bmid = submit_result.get('bmid')
+        submitted_sfzh = submit_result.get('submitted_id_card') or student['id_card']
         if not bmid:
             time.sleep(2)  # 等待平台处理
-            registrations = self.query_registrations(sfzh=student['id_card'])
+            registrations = self.query_registrations(sfzh=submitted_sfzh)
             for reg in registrations:
-                if reg['id_card'] == student['id_card']:
+                if reg['id_card'] == submitted_sfzh:
                     bmid = str(reg['bmid'])
                     self._log_step('查询报名', 'ok', f'找到 bmid={bmid}')
                     break
@@ -817,6 +898,7 @@ class SxtsksClient:
                 'success': True,
                 'message': '报名已提交但未找到报名 ID，请手动查询',
                 'bmid': '',
+                'submitted_id_card': submitted_sfzh,
             }
             result['steps'] = self.get_steps()
             return result
@@ -829,6 +911,7 @@ class SxtsksClient:
                 'success': True,
                 'message': '报名成功并已下载申请表',
                 'bmid': bmid,
+                'submitted_id_card': submitted_sfzh,
                 'form_content': content,
                 'form_filename': filename,
             }
@@ -850,6 +933,7 @@ class SxtsksClient:
                 'success': True,
                 'message': f'报名成功但下载申请表失败: {e}',
                 'bmid': bmid,
+                'submitted_id_card': submitted_sfzh,
             }
             result['steps'] = self.get_steps()
             return result

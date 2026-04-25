@@ -26,3 +26,12 @@ training_system/uploads/students/
 students/
 .superpowers/
 .worktrees/
+
+# 自动测试脚本及产生的网络抓包和异常源码落地文件
+training_system/har_params.txt
+training_system/postData.json
+training_system/uploadksimg_params.json
+training_system/tmp_*.html
+training_system/test_multipart.py
+training_system/test_upload.py
+training_system/tmp/
