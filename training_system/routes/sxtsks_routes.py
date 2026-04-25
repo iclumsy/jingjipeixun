@@ -2,12 +2,13 @@
 报名平台 (www.sxtsks.com) 自动化对接路由。
 
 API 端点:
-    POST /api/sxtsks/submit/<student_id>    - 提交报名并自动下载申请表
+    POST /api/sxtsks/submit/<student_id>    - 仅提交报名（不下载申请表）
     GET  /api/sxtsks/registrations          - 查询已报名列表
-    GET  /api/sxtsks/form/<bmid>            - 下载指定报名的申请表
+    GET  /api/sxtsks/bmid/<student_id>      - 根据学员提交的身份证查询平台 BMID
+    GET  /api/sxtsks/form/<bmid>            - 下载指定报名的申请表并保存到学员目录
 """
 import os
-import base64
+import io
 from flask import Blueprint, jsonify, request, current_app, send_file
 from services.sxtsks_service import SxtsksClient
 from services import storage_service
@@ -26,30 +27,34 @@ def _get_client():
     return _client
 
 
+def _get_base_dir():
+    """获取系统根目录。"""
+    base_dir = current_app.config.get('BASE_DIR', os.path.dirname(os.path.abspath(__file__)))
+    if not base_dir.endswith('training_system'):
+        base_dir = os.path.join(base_dir, 'training_system') if os.path.isdir(os.path.join(base_dir, 'training_system')) else base_dir
+    return base_dir
+
+
 def _get_student_photo_path(student, base_dir):
     """
     获取学员证件照的本地路径。
     优先使用已处理的材料输出照片，其次使用原始上传照片。
     """
-    # 优先查找已生成的白底证件照
     training_type = student.get('training_type', 'special_equipment')
     training_type_name = '特种设备' if training_type == 'special_equipment' else '特种作业'
     student_folder = f"students/{training_type_name}-{student.get('company', '')}-{student['name']}"
     id_card = student.get('id_card', '')
     name = student.get('name', '')
 
-    # 检查 material_service 生成的照片
     processed_photo = os.path.join(base_dir, student_folder, f"{id_card}-{name}-个人照片.jpg")
     if os.path.exists(processed_photo):
         return processed_photo
 
-    # 降级：使用原始上传的照片
     photo_path = student.get('photo_path', '')
     if photo_path:
         abs_path = os.path.join(base_dir, photo_path)
         if os.path.exists(abs_path):
             return abs_path
-        # 尝试从 COS 下载
         import tempfile
         tmp_fd, tmp_path = tempfile.mkstemp(suffix='.jpg')
         os.close(tmp_fd)
@@ -59,12 +64,19 @@ def _get_student_photo_path(student, base_dir):
     return None
 
 
+def _get_student_output_dir(student, base_dir):
+    """根据学员信息构建学员目录路径。"""
+    student_folder_name = f"特种设备-{student.get('company', '')}-{student['name']}"
+    return os.path.join(base_dir, 'students', student_folder_name)
+
+
 @sxtsks_bp.route('/api/sxtsks/submit/<int:student_id>', methods=['POST'])
 def submit_registration(student_id):
     """
-    提交学员报名到平台并自动下载申请表。
+    仅提交学员报名到平台（不下载申请表）。
 
-    完整流程: 登录 → 上传照片 → 提交报名 → 查询 → 下载申请表 → 保存到学员目录
+    流程: 登录 → 上传照片 → 提交报名
+    返回 submitted_id_card 供后续查询 BMID 使用。
     """
     from models.student import get_student_by_id
 
@@ -72,36 +84,22 @@ def submit_registration(student_id):
     if not student:
         return jsonify({'success': False, 'message': '学员不存在'}), 404
 
-    # 仅允许已审核的特种设备学员
     if student.get('training_type') != 'special_equipment':
         return jsonify({'success': False, 'message': '仅支持特种设备学员'}), 400
 
     if student.get('status') != 'reviewed':
         return jsonify({'success': False, 'message': '学员状态不是已审核'}), 400
 
-    base_dir = current_app.config.get('BASE_DIR', os.path.dirname(os.path.abspath(__file__)))
-    if not base_dir.endswith('training_system'):
-        base_dir = os.path.join(base_dir, 'training_system') if os.path.isdir(os.path.join(base_dir, 'training_system')) else base_dir
-
-    # 获取证件照路径
+    base_dir = _get_base_dir()
     photo_path = _get_student_photo_path(student, base_dir)
     if not photo_path:
         return jsonify({'success': False, 'message': '未找到学员证件照'}), 400
 
     try:
         client = _get_client()
-
-        # 构建学员目录用于保存申请表
-        training_type_name = '特种设备'
-        student_folder_name = f"{training_type_name}-{student.get('company', '')}-{student['name']}"
-        output_dir = os.path.join(base_dir, 'students', student_folder_name)
-
-        # 一键提交并下载
-        result = client.submit_and_download(student, photo_path, output_dir=output_dir)
-
-        # 不返回 form_content 二进制字段
+        # 只提交报名，不下载申请表
+        result = client.submit_registration(student, photo_path)
         result.pop('form_content', None)
-
         return jsonify(result)
 
     except Exception as e:
@@ -122,14 +120,73 @@ def query_registrations():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
+@sxtsks_bp.route('/api/sxtsks/bmid/<int:student_id>', methods=['GET'])
+def query_bmid(student_id):
+    """
+    查询学员在平台上的报名 BMID。
+    由于提交时使用的是随机测试身份证，这里查询全部报名列表后按姓名匹配。
+    """
+    from models.student import get_student_by_id
+
+    student = get_student_by_id(student_id)
+    if not student:
+        return jsonify({'success': False, 'message': '学员不存在'}), 404
+
+    student_name = student.get('name', '')
+
+    try:
+        client = _get_client()
+        # 不传 sfzh，查询该账号下的全部报名记录
+        registrations = client.query_registrations()
+
+        # 按姓名匹配（可能有多条，取最新的一条）
+        matched = [r for r in registrations if r['name'] == student_name]
+        if matched:
+            reg = matched[0]  # 第一条即最新
+            return jsonify({
+                'success': True,
+                'bmid': reg['bmid'],
+                'name': reg['name'],
+                'id_card': reg['id_card'],
+                'status': reg['status'],
+                'apply_date': reg['apply_date'],
+            })
+        else:
+            return jsonify({'success': False, 'message': f'未找到「{student_name}」的报名记录'})
+
+    except Exception as e:
+        current_app.logger.error(f'查询 BMID 异常: {e}', exc_info=True)
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 @sxtsks_bp.route('/api/sxtsks/form/<int:bmid>', methods=['GET'])
 def download_form(bmid):
-    """下载指定报名 ID 的申请表。"""
+    """
+    下载指定报名 ID 的申请表。
+    如果提供了 student_id 参数，同时保存到学员目录。
+    """
+    student_id = request.args.get('student_id', type=int)
+
     try:
         client = _get_client()
         content, content_type, filename = client.download_application_form(bmid)
 
-        import io
+        # 如果传了 student_id，同时保存到学员目录
+        if student_id:
+            try:
+                from models.student import get_student_by_id
+                student = get_student_by_id(student_id)
+                if student:
+                    base_dir = _get_base_dir()
+                    output_dir = _get_student_output_dir(student, base_dir)
+                    os.makedirs(output_dir, exist_ok=True)
+                    form_path = os.path.join(output_dir, filename)
+                    with open(form_path, 'wb') as f:
+                        f.write(content)
+                    current_app.logger.info(f'申请表已保存: {form_path}')
+            except Exception as save_err:
+                current_app.logger.warning(f'保存申请表到学员目录失败: {save_err}')
+
         return send_file(
             io.BytesIO(content),
             mimetype=content_type,

@@ -2012,21 +2012,66 @@ document.addEventListener('DOMContentLoaded', async () => {
                 };
                 actionBar.appendChild(downloadZipBtn);
 
-                // 报名平台提交按钮（仅特种设备学员）
+                // ============ 报名平台操作按钮区（仅特种设备学员） ============
                 if (student.training_type === 'special_equipment') {
+
+                    // ---------- 日志弹窗公共方法 ----------
+                    const buildStepsHtml = (steps) => {
+                        if (!steps || !steps.length) return '';
+                        return steps.map(s => {
+                            const icon = s.status === 'ok' ? '✅' : s.status === 'fail' ? '❌' : '⚠️';
+                            const color = s.status === 'fail' ? '#DC2626' : s.status === 'warning' ? '#D97706' : '#059669';
+                            let html = `<div style="padding:4px 0;border-bottom:1px solid #f0f0f0;font-size:0.82rem;">`;
+                            html += `<span>${icon}</span> <span style="color:#888;font-size:0.75rem;">${s.time || ''}</span> `;
+                            html += `<strong style="color:${color}">${s.step}</strong>`;
+                            if (s.detail) html += `<span style="color:#555;margin-left:6px;">${s.detail.substring(0,120)}</span>`;
+                            if (s.http_status) html += ` <span style="color:#888;font-size:0.72rem;">(HTTP ${s.http_status})</span>`;
+                            if (s.response) html += `<div style="color:#888;font-size:0.72rem;padding-left:20px;word-break:break-all;max-height:60px;overflow:auto;">响应: ${s.response.substring(0,200)}</div>`;
+                            if (s.alerts && s.alerts.length) html += `<div style="color:#B45309;font-size:0.72rem;padding-left:20px;">⚡ ${s.alerts.join('; ')}</div>`;
+                            html += `</div>`;
+                            return html;
+                        }).join('');
+                    };
+                    const showLogOverlay = (titleText, titleColor, data) => {
+                        const overlay = document.createElement('div');
+                        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+                        overlay.innerHTML = `
+                            <div style="background:#fff;border-radius:12px;width:90%;max-width:640px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                                <div style="padding:16px 20px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between;">
+                                    <span style="font-size:1rem;font-weight:700;color:${titleColor}">${titleText}</span>
+                                    <button id="sxtsks-log-close" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#999;">✕</button>
+                                </div>
+                                <div id="sxtsks-log-container" style="padding:12px 20px;overflow-y:auto;flex:1;">
+                                    ${data.steps ? buildStepsHtml(data.steps) : '<p style="color:#888;">无日志</p>'}
+                                </div>
+                                ${data.form_path ? '<div style="padding:10px 20px;border-top:1px solid #eee;font-size:0.8rem;color:#666;">📄 申请表已保存: ' + data.form_path + '</div>' : ''}
+                            </div>`;
+                        document.body.appendChild(overlay);
+                        const forceScrollLog = () => {
+                            const logContainer = overlay.querySelector('#sxtsks-log-container');
+                            if (logContainer) logContainer.scrollTop = logContainer.scrollHeight;
+                        };
+                        forceScrollLog();
+                        requestAnimationFrame(forceScrollLog);
+                        setTimeout(forceScrollLog, 50);
+                        setTimeout(forceScrollLog, 200);
+                        overlay.querySelector('#sxtsks-log-close').onclick = () => overlay.remove();
+                        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+                    };
+
+                    // ========== 按钮 1：📤 提交报名（仅提交，不下载） ==========
                     const submitRegBtn = document.createElement('button');
                     submitRegBtn.className = 'btn';
                     submitRegBtn.style.cssText = 'background:linear-gradient(135deg,#F59E0B,#D97706);color:#fff;font-weight:600;margin-right:8px;';
                     submitRegBtn.textContent = '📤 提交报名';
-                    submitRegBtn.title = '一键提交到山西特种设备考试报名平台并下载申请表';
+                    submitRegBtn.title = '提交到山西特种设备考试报名平台';
                     submitRegBtn.onclick = async () => {
-                        // 自定义确认弹窗
                         const confirmed = await new Promise(resolve => {
                             const ov = document.createElement('div');
                             ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:10000;display:flex;align-items:center;justify-content:center;';
                             ov.innerHTML = `<div style="background:#fff;border-radius:12px;padding:24px 28px;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;">
                                 <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px;">📤 提交报名</div>
-                                <div style="color:#555;font-size:0.9rem;margin-bottom:20px;">确认将「${student.name}」的信息提交到报名平台？<br><span style="color:#888;font-size:0.8rem;">提交后将自动查询并下载申请表</span></div>
+                                <div style="color:#555;font-size:0.9rem;margin-bottom:20px;">确认将「${student.name}」的信息提交到报名平台？</div>
                                 <div style="display:flex;gap:12px;justify-content:center;">
                                     <button id="sxtsks-cancel" style="padding:8px 24px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;font-size:0.9rem;">取消</button>
                                     <button id="sxtsks-confirm" style="padding:8px 24px;border:none;border-radius:8px;background:linear-gradient(135deg,#F59E0B,#D97706);color:#fff;cursor:pointer;font-weight:600;font-size:0.9rem;">确认提交</button>
@@ -2043,65 +2088,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                         try {
                             const res = await fetch(`/api/sxtsks/submit/${student.id}`, { method: 'POST' });
                             const data = await res.json();
-                            // 弹窗显示详细日志
-                            const buildStepsHtml = (steps) => {
-                                if (!steps || !steps.length) return '';
-                                return steps.map(s => {
-                                    const icon = s.status === 'ok' ? '✅' : s.status === 'fail' ? '❌' : '⚠️';
-                                    const color = s.status === 'fail' ? '#DC2626' : s.status === 'warning' ? '#D97706' : '#059669';
-                                    let html = `<div style="padding:4px 0;border-bottom:1px solid #f0f0f0;font-size:0.82rem;">`;
-                                    html += `<span>${icon}</span> <span style="color:#888;font-size:0.75rem;">${s.time || ''}</span> `;
-                                    html += `<strong style="color:${color}">${s.step}</strong>`;
-                                    if (s.detail) html += `<span style="color:#555;margin-left:6px;">${s.detail.substring(0,120)}</span>`;
-                                    if (s.http_status) html += ` <span style="color:#888;font-size:0.72rem;">(HTTP ${s.http_status})</span>`;
-                                    if (s.response) html += `<div style="color:#888;font-size:0.72rem;padding-left:20px;word-break:break-all;max-height:60px;overflow:auto;">响应: ${s.response.substring(0,200)}</div>`;
-                                    if (s.alerts && s.alerts.length) html += `<div style="color:#B45309;font-size:0.72rem;padding-left:20px;">⚡ ${s.alerts.join('; ')}</div>`;
-                                    html += `</div>`;
-                                    return html;
-                                }).join('');
-                            };
 
                             let titleText, titleColor;
                             if (data.success) {
-                                titleText = `✅ ${data.message || '报名成功'}`;
+                                titleText = `✅ ${data.message || '报名提交成功'}`;
                                 titleColor = '#059669';
-                                if (data.bmid) titleText += `（ID: ${data.bmid}）`;
-                                if (data.bmid) window.open(`/api/sxtsks/form/${data.bmid}`, '_blank');
+                                if (data.submitted_id_card) titleText += `（测试身份证: ${data.submitted_id_card}）`;
                             } else {
                                 titleText = `❌ ${data.message || '提交失败'}`;
                                 titleColor = '#DC2626';
                             }
+                            showLogOverlay(titleText, titleColor, data);
 
-                            // 创建弹窗
-                            const overlay = document.createElement('div');
-                            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
-                            overlay.innerHTML = `
-                                <div style="background:#fff;border-radius:12px;width:90%;max-width:640px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-                                    <div style="padding:16px 20px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between;">
-                                        <span style="font-size:1rem;font-weight:700;color:${titleColor}">${titleText}</span>
-                                        <button id="sxtsks-log-close" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#999;">✕</button>
-                                    </div>
-                                    <div id="sxtsks-log-container" style="padding:12px 20px;overflow-y:auto;flex:1;">
-                                        ${data.steps ? buildStepsHtml(data.steps) : '<p style="color:#888;">无日志</p>'}
-                                    </div>
-                                    ${data.form_path ? '<div style="padding:10px 20px;border-top:1px solid #eee;font-size:0.8rem;color:#666;">📄 申请表已保存: ' + data.form_path + '</div>' : ''}
-                                </div>`;
-                            document.body.appendChild(overlay);
-                            // 同样保证这里一定滚动到底部
-                            const forceScrollLog = () => {
-                                const logContainer = overlay.querySelector('#sxtsks-log-container');
-                                if (logContainer) logContainer.scrollTop = logContainer.scrollHeight;
-                            };
-                            forceScrollLog();
-                            requestAnimationFrame(forceScrollLog);
-                            setTimeout(forceScrollLog, 50);
-                            setTimeout(forceScrollLog, 200);
-                            overlay.querySelector('#sxtsks-log-close').onclick = () => overlay.remove();
-                            overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-
-                            // 控制台也输出
                             if (data.steps) {
-                                console.group('📤 报名平台提交日志');
+                                console.group('📤 报名提交日志');
                                 data.steps.forEach(s => console.log(`[${s.status}] ${s.step}:`, s));
                                 console.groupEnd();
                             }
@@ -2113,6 +2113,38 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     };
                     actionBar.appendChild(submitRegBtn);
+
+                    // ========== 按钮 2：📄 下载申请表 ==========
+                    const downloadFormBtn = document.createElement('button');
+                    downloadFormBtn.className = 'btn';
+                    downloadFormBtn.style.cssText = 'background:linear-gradient(135deg,#3B82F6,#2563EB);color:#fff;font-weight:600;margin-right:8px;';
+                    downloadFormBtn.textContent = '📄 下载申请表';
+                    downloadFormBtn.title = '从报名平台下载该学员的申请表';
+                    downloadFormBtn.onclick = async () => {
+                        const origText = downloadFormBtn.textContent;
+                        downloadFormBtn.textContent = '⏳ 查询中...';
+                        downloadFormBtn.disabled = true;
+                        try {
+                            // 先查询该学员在平台上的 BMID
+                            const bmidRes = await fetch(`/api/sxtsks/bmid/${student.id}`);
+                            const bmidData = await bmidRes.json();
+                            if (!bmidData.success || !bmidData.bmid) {
+                                showMessage(bmidData.message || '未找到该学员的报名记录，请先提交报名', 'warning');
+                                return;
+                            }
+                            const bmid = bmidData.bmid;
+                            downloadFormBtn.textContent = '⏳ 下载中...';
+                            // 下载申请表（同时保存到学员目录）
+                            window.open(`/api/sxtsks/form/${bmid}?student_id=${student.id}`, '_blank');
+                            showMessage(`申请表下载已开始（BMID: ${bmid}）`, 'success');
+                        } catch (e) {
+                            showMessage('下载异常: ' + e.message, 'error');
+                        } finally {
+                            downloadFormBtn.textContent = origText;
+                            downloadFormBtn.disabled = false;
+                        }
+                    };
+                    actionBar.appendChild(downloadFormBtn);
                 }
 
 
