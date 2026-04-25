@@ -173,6 +173,11 @@
   color: #b42318;
 }
 
+.badge-registered {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
 .meta-row {
   margin-top: 10rpx;
   display: flex;
@@ -259,8 +264,17 @@
 .form-side-label {
   font-size: 22rpx;
   font-weight: 700;
-  color: #6d28d9;
   line-height: 1;
+}
+
+.btn-form-health {
+  background: #f0ebff;
+  color: #6d28d9;
+}
+
+.btn-form-reg {
+  background: #e0f2fe;
+  color: #0369a1;
 }
 
 
