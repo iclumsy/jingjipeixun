@@ -70,6 +70,21 @@ def _get_student_output_dir(student, base_dir):
     return os.path.join(base_dir, 'students', student_folder_name)
 
 
+@sxtsks_bp.route('/api/sxtsks/submit', methods=['POST'])
+def submit_registration_compat():
+    """兼容旧版小程序：POST body 传 student_ids 数组，转发到 submit_registration。"""
+    data = request.get_json(silent=True) or {}
+    student_ids = data.get('student_ids', [])
+    if not student_ids:
+        return jsonify({'success': False, 'message': '缺少 student_ids'}), 400
+    # 取第一个 ID 转发
+    try:
+        sid = int(student_ids[0])
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': 'student_id 无效'}), 400
+    return submit_registration(sid)
+
+
 @sxtsks_bp.route('/api/sxtsks/submit/<int:student_id>', methods=['POST'])
 def submit_registration(student_id):
     """
