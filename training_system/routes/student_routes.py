@@ -798,6 +798,11 @@ def update_student_route(id):
             updates['reject_reason'] = ''  # 清空旧的驳回原因
         # =========================================================
 
+        # 通用逻辑：任何人（包括管理员）修改了已驳回学员的信息，自动重置为未审核
+        if current_student.get('status') == 'rejected' and 'status' not in updates:
+            updates['status'] = 'unreviewed'
+            updates['reject_reason'] = ''
+
         # 执行数据库更新
         updated_student = update_student(id, updates)
         current_app.logger.info(f'修改学员资料: ID={id}, 姓名={updates.get("name", current_student.get("name"))}')
