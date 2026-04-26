@@ -422,17 +422,14 @@ def get_students(status='unreviewed', search='', company='', training_type='', s
                 # "待处理"视图：包含未审核和已驳回的记录
                 query += " AND s.status IN (?, ?)"
                 params.extend(['unreviewed', 'rejected'])
-            elif status == 'reviewed':
-                # "已通过"视图：包含已审核和已报名的记录（已报名是已通过的下一阶段）
-                query += " AND s.status IN (?, ?)"
-                params.extend(['reviewed', 'registered'])
             elif ',' in status:
-                # 支持传入类似 'reviewed,registered' 的复合状态
+                # 支持传入类似 'reviewed,registered' 的复合状态（兼容旧版小程序）
                 status_list = [s.strip() for s in status.split(',') if s.strip()]
                 placeholders = ', '.join(['?'] * len(status_list))
                 query += f" AND s.status IN ({placeholders})"
                 params.extend(status_list)
             else:
+                # 精确匹配（reviewed/registered/unreviewed/rejected 各自独立）
                 query += " AND s.status = ?"
                 params.append(status)
 
@@ -619,9 +616,11 @@ def get_companies(status='', company_filter='', training_type=''):
             if status == 'pending':
                 query += " AND status IN (?, ?)"
                 params.extend(['unreviewed', 'rejected'])
-            elif status == 'reviewed':
-                query += " AND status IN (?, ?)"
-                params.extend(['reviewed', 'registered'])
+            elif ',' in status:
+                status_list = [s.strip() for s in status.split(',') if s.strip()]
+                placeholders = ', '.join(['?'] * len(status_list))
+                query += f" AND status IN ({placeholders})"
+                params.extend(status_list)
             else:
                 query += " AND status = ?"
                 params.append(status)

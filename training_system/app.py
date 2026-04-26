@@ -323,6 +323,9 @@ def create_app():
         # 附件配置接口公开访问（小程序启动时拉取启用的附件列表）
         if path == '/api/config/attachments':
             return None
+        # 学员筛选配置接口公开访问（小程序/网页端拉取 tab 配置）
+        if path == '/api/config/student_filters':
+            return None
 
         # ---------- Session 认证 ----------
         # 管理后台登录成功后 session 中会设置 auth_verified=True

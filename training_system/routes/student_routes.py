@@ -38,6 +38,7 @@ from services.wechat_service import send_review_result_message, broadcast_new_st
 from services.image_service import process_and_save_file, delete_student_files
 from services.document_service import generate_health_check_form
 from services import storage_service
+from services.student_serializer import enrich_student, enrich_students
 from utils.validators import validate_student_data, validate_file_upload
 from utils.error_handlers import AppError, ValidationError, NotFoundError
 from utils.auth import get_client_ip, resolve_openid_name
@@ -558,7 +559,7 @@ def get_students_route():
                 submitter_openid = ''
 
         students = get_students(status, search, company, training_type, submitter_openid)
-        return jsonify(students)
+        return jsonify(enrich_students(students))
 
     except AppError as e:
         return jsonify(e.to_dict()), e.status_code
@@ -588,7 +589,7 @@ def get_student_route(id):
         student = get_student_by_id(id)
         # 检查小程序用户是否有权查看此记录
         ensure_mini_owner_or_admin(student)
-        return jsonify(student)
+        return jsonify(enrich_student(student))
     except NotFoundError as e:
         return jsonify(e.to_dict()), e.status_code
     except AppError as e:
@@ -824,7 +825,7 @@ def update_student_route(id):
             student_name_for_notice = updates.get('name', current_student.get('name', ''))
             broadcast_new_student_to_admins(student_name_for_notice)
 
-        return jsonify(updated_student)
+        return jsonify(enrich_student(updated_student))
 
     except (ValidationError, NotFoundError, AppError) as e:
         return jsonify(e.to_dict()), e.status_code
@@ -1098,7 +1099,7 @@ def reject_student_route(id):
                 f'[驱回] 操作人={operator} IP={client_ip} 目标状态={target_status} '
                 f'学员ID={id} 姓名={student_name} 提交人={submitter}'
             )
-            return jsonify({'message': f'Student moved to {target_status}', 'student': student})
+            return jsonify({'message': f'Student moved to {target_status}', 'student': enrich_student(student)})
 
     except NotFoundError as e:
         return jsonify(e.to_dict()), e.status_code
@@ -1199,7 +1200,7 @@ def approve_student_route(id):
 
         result = dict(student)
         result['materials_auto_generated'] = materials_ok
-        return jsonify(result)
+        return jsonify(enrich_student(result))
 
     except NotFoundError as e:
         return jsonify(e.to_dict()), e.status_code
@@ -1253,7 +1254,7 @@ def swap_materials_route(id):
             f'学员ID={id} 姓名={student_name} 提交人={submitter}'
         )
         
-        return jsonify({'message': '互换成功', 'student': updated})
+        return jsonify({'message': '互换成功', 'student': enrich_student(updated)})
 
     except NotFoundError as e:
         return jsonify(e.to_dict()), e.status_code
@@ -1327,7 +1328,7 @@ def activate_card_route(id):
         })
 
         current_app.logger.info(f'[开卡完成] 学员ID={id} 成功')
-        return jsonify({'message': result.get("message", "开卡成功"), 'student': updated_student})
+        return jsonify({'message': result.get("message", "开卡成功"), 'student': enrich_student(updated_student)})
 
     except NotFoundError as e:
         return jsonify(e.to_dict()), e.status_code

@@ -306,3 +306,53 @@ def toggle_attachment(training_type, attachment_key):
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
+# ======================== 学员筛选配置 API ========================
+
+@config_bp.route('/api/config/student_filters', methods=['GET'])
+def get_student_filters():
+    """获取小程序/网页端学员列表的筛选 tab 配置。
+
+    将状态枚举、培训类型选项、默认筛选值由后端统一下发，
+    避免前端硬编码。新增/调整 tab 不需要发版小程序。
+
+    查询参数:
+        role (str)  : 'admin' | 'user'，默认 'admin'。
+
+    返回:
+        {
+            "status_filters": [{"label": "...", "value": "..."}, ...],
+            "training_type_filters": [...],
+            "default": {"status": "...", "training_type": "..."}
+        }
+    """
+    role = (request.args.get('role') or 'admin').strip().lower()
+
+    if role == 'user':
+        # 用户端目前只看自己提交的所有记录，不分 tab；保留接口便于将来扩展
+        status_filters = []
+        default_status = ''
+    else:
+        # 管理端：4 个独立状态 tab，与网页端 admin.html 保持一致
+        status_filters = [
+            {'label': '待审核', 'value': 'unreviewed'},
+            {'label': '已通过', 'value': 'reviewed'},
+            {'label': '已报名', 'value': 'registered'},
+            {'label': '已驳回', 'value': 'rejected'},
+        ]
+        default_status = 'unreviewed'
+
+    training_type_filters = [
+        {'label': '特种设备', 'value': 'special_equipment'},
+        {'label': '特种作业', 'value': 'special_operation'},
+    ]
+
+    return jsonify({
+        'status_filters': status_filters,
+        'training_type_filters': training_type_filters,
+        'default': {
+            'status': default_status,
+            'training_type': 'special_equipment',
+        },
+    })
