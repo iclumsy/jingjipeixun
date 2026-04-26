@@ -1837,6 +1837,99 @@ document.addEventListener('DOMContentLoaded', async () => {
             filesContainer.appendChild(healthCheckWrapper);
         }
 
+        // 已报名学员显示「报名申请表」独立下载卡片，按学员状态显示，不依赖当前筛选 tab
+        if (student.status === 'registered') {
+            const regFormWrapper = document.createElement('div');
+            regFormWrapper.className = 'file-item-wrapper';
+            regFormWrapper.style.display = 'flex';
+            regFormWrapper.style.flexDirection = 'column';
+            regFormWrapper.style.alignItems = 'center';
+            regFormWrapper.style.gap = '5px';
+            regFormWrapper.style.minWidth = '100px';
+
+            const regFormBox = document.createElement('div');
+            regFormBox.className = 'upload-box reg-form-doc';
+            regFormBox.style.width = '100px';
+            regFormBox.style.height = '100px';
+            regFormBox.style.border = '2px solid #3B82F6';
+            regFormBox.style.borderRadius = '8px';
+            regFormBox.style.display = 'flex';
+            regFormBox.style.flexDirection = 'column';
+            regFormBox.style.alignItems = 'center';
+            regFormBox.style.justifyContent = 'center';
+            regFormBox.style.cursor = 'pointer';
+            regFormBox.style.background = 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)';
+            regFormBox.style.transition = 'all 0.3s ease';
+
+            regFormBox.onmouseover = () => {
+                regFormBox.style.transform = 'scale(1.05)';
+                regFormBox.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+            };
+            regFormBox.onmouseout = () => {
+                regFormBox.style.transform = 'scale(1)';
+                regFormBox.style.boxShadow = 'none';
+            };
+
+            const regDocIcon = document.createElement('span');
+            regDocIcon.textContent = '📄';
+            regDocIcon.style.fontSize = '32px';
+
+            const regDocLabel = document.createElement('span');
+            regDocLabel.textContent = '报名申请表';
+            regDocLabel.style.fontSize = '12px';
+            regDocLabel.style.color = '#1E40AF';
+            regDocLabel.style.fontWeight = '600';
+            regDocLabel.style.marginTop = '5px';
+
+            regFormBox.appendChild(regDocIcon);
+            regFormBox.appendChild(regDocLabel);
+
+            const regDownloadBtn = document.createElement('button');
+            regDownloadBtn.textContent = '下载';
+            regDownloadBtn.style.marginTop = '5px';
+            regDownloadBtn.style.fontSize = '12px';
+            regDownloadBtn.style.padding = '2px 8px';
+            regDownloadBtn.style.border = '1px solid #3B82F6';
+            regDownloadBtn.style.borderRadius = '4px';
+            regDownloadBtn.style.background = '#dbeafe';
+            regDownloadBtn.style.color = '#1E40AF';
+            regDownloadBtn.style.cursor = 'pointer';
+            regDownloadBtn.style.fontWeight = '500';
+
+            // 下载流程：先查 BMID，再触发文件下载
+            // 后端 /api/sxtsks/form/<bmid> 命中本地缓存秒返，未命中则现抓平台
+            const triggerDownload = async () => {
+                regDownloadBtn.disabled = true;
+                regDownloadBtn.textContent = '查询中...';
+                try {
+                    const bmidRes = await fetch(`/api/sxtsks/bmid/${student.id}`);
+                    const bmidData = await bmidRes.json();
+                    if (!bmidData.success || !bmidData.bmid) {
+                        showMessage(bmidData.message || '未找到该学员的报名记录，请先提交报名', 'warning');
+                        return;
+                    }
+                    regDownloadBtn.textContent = '下载中...';
+                    window.open(`/api/sxtsks/form/${bmidData.bmid}?student_id=${student.id}`, '_blank');
+                    showMessage(`申请表下载已开始（BMID: ${bmidData.bmid}）`, 'success');
+                } catch (e) {
+                    showMessage('下载异常: ' + e.message, 'error');
+                } finally {
+                    regDownloadBtn.disabled = false;
+                    regDownloadBtn.textContent = '下载';
+                }
+            };
+
+            regFormBox.onclick = triggerDownload;
+            regDownloadBtn.onclick = (e) => {
+                e.stopPropagation();
+                triggerDownload();
+            };
+
+            regFormWrapper.appendChild(regFormBox);
+            regFormWrapper.appendChild(regDownloadBtn);
+            filesContainer.appendChild(regFormWrapper);
+        }
+
         if (student.status === 'reviewed' || student.status === 'registered') {
             const materialsSection = document.createElement('div');
             materialsSection.className = 'generated-materials-section';
