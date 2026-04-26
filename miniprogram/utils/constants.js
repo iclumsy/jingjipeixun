@@ -14,10 +14,12 @@ const TRAINING_TYPE_LABELS = {
   special_equipment: '特种设备'
 }
 
-// 审核状态标签
+// 审核状态标签（仅作为后端 statusText 字段缺失时的本地兜底）
+// 状态新增/调整请改后端 services/student_serializer.py，前端无需发版
 const STATUS_LABELS = {
-  unreviewed: '未审核',
-  reviewed: '已审核',
+  unreviewed: '待审核',
+  reviewed: '已通过',
+  registered: '已报名',
   rejected: '已驳回'
 }
 

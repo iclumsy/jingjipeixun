@@ -98,9 +98,12 @@ Page({
     }
 
     const status = (student && student.status) || detail.status || dataset.status || ''
+    // 编辑权限优先读后端 actions.canEdit；缺失时回退到 status === 'rejected' 的旧逻辑
+    const canEdit = (student && student.actions && typeof student.actions.canEdit === 'boolean')
+      ? student.actions.canEdit
+      : (status === 'rejected')
 
-    // 仅驳回记录允许修改，其他状态只能查看
-    if (status === 'rejected') {
+    if (canEdit) {
       wx.navigateTo({
         url: `/pages/user/edit/edit?id=${studentId}`,
         fail: () => {

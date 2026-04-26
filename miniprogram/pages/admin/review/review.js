@@ -1,43 +1,63 @@
 const api = require('../../../utils/api')
-const { TRAINING_TYPE_LABELS } = require('../../../utils/constants')
+const { TRAINING_TYPE_LABELS, STATUS_LABELS } = require('../../../utils/constants')
 const { hasAdminAccess, formatDateTime } = require('../../../utils/page-helpers')
 
-const STATUS_FILTERS = [
+// 启动时的本地兜底筛选项；onLoad 会从 /api/config/student_filters 拉取最新版本覆盖。
+// 状态/培训类型筛选条目变更请改后端配置接口，前端无需发版。
+const FALLBACK_STATUS_FILTERS = [
   { label: '待审核', value: 'unreviewed' },
-  { label: '已通过', value: 'reviewed,registered' },
+  { label: '已通过', value: 'reviewed' },
+  { label: '已报名', value: 'registered' },
   { label: '已驳回', value: 'rejected' }
 ]
 
-const TRAINING_TYPE_FILTERS = [
+const FALLBACK_TRAINING_TYPE_FILTERS = [
   { label: '特种设备', value: 'special_equipment' },
   { label: '特种作业', value: 'special_operation' }
 ]
 
-const STATUS_TEXT_MAP = {
-  unreviewed: '待审核',
-  reviewed: '已通过',
-  registered: '已报名',
-  rejected: '已驳回'
+// 后端 enrich 缺失时的本地能力位兜底，逻辑须与 services/student_serializer.py::_build_actions 保持一致
+function buildLocalActions(item) {
+  const status = item.status || ''
+  const tt = item.training_type || ''
+  const isSe = tt === 'special_equipment'
+  const isPassed = status === 'reviewed' || status === 'registered'
+  const cardActivated = !!item.card_activated
+  const hasHealthForm = !!item.training_form_path
+  return {
+    canApprove: status === 'unreviewed',
+    canReject: status !== 'registered',
+    canDelete: true,
+    canSubmitReg: isSe && status === 'reviewed',
+    canActivateCard: isSe && isPassed && !cardActivated,
+    canQueryCard: isSe && isPassed && cardActivated,
+    canDownloadRegForm: status === 'registered',
+    canDownloadHealthForm: isPassed && hasHealthForm,
+    canEdit: status === 'rejected'
+  }
 }
 
 function mapRecord(item) {
+  const fallbackTags = []
+  if (item.training_type === 'special_equipment' && item.application_type === 'renewal') {
+    fallbackTags.push({ text: '复审', color: '#e65100', bg: '#fff3e0' })
+  }
+  const actions = item.actions || buildLocalActions(item)
   return {
     ...item,
-    statusText: STATUS_TEXT_MAP[item.status] || item.status || '-',
-    trainingTypeText: TRAINING_TYPE_LABELS[item.training_type] || item.training_type || '-',
-    submitTimeText: formatDateTime(item.created_at),
-    // 已审核或已报名且存在体检表时，拼接完整下载 URL（和网页端逻辑一致）
-    trainingFormUrl: ((item.status === 'reviewed' || item.status === 'registered') && item.training_form_path)
-      ? api.toAbsoluteFileUrl(item.training_form_path)
-      : '',
-    hasTrainingForm: (item.status === 'reviewed' || item.status === 'registered') && !!item.training_form_path
+    actions,
+    statusText: item.statusText || STATUS_LABELS[item.status] || item.status || '-',
+    statusClass: item.statusClass || item.status || '',
+    trainingTypeText: item.trainingTypeText || TRAINING_TYPE_LABELS[item.training_type] || item.training_type || '-',
+    tags: Array.isArray(item.tags) ? item.tags : fallbackTags,
+    submitTimeText: formatDateTime(item.created_at)
   }
 }
 
 Page({
   data: {
-    statusFilters: STATUS_FILTERS,
-    trainingTypeFilters: TRAINING_TYPE_FILTERS,
+    statusFilters: FALLBACK_STATUS_FILTERS,
+    trainingTypeFilters: FALLBACK_TRAINING_TYPE_FILTERS,
     filters: {
       status: 'unreviewed',
       training_type: 'special_equipment',
@@ -52,7 +72,7 @@ Page({
     loading: false,
     refreshing: false,
     initialized: false,
-    
+
     showActivateModal: false,
     activateStudent: {},
     activating: false,
@@ -68,6 +88,24 @@ Page({
 
   async onLoad() {
     if (!this.ensureAdminAccess()) return
+
+    // 异步加载筛选 tab 配置，失败时使用本地兜底
+    api.getStudentFilters('admin').then(res => {
+      if (!res) return
+      const updates = {}
+      if (Array.isArray(res.status_filters) && res.status_filters.length > 0) {
+        updates.statusFilters = res.status_filters
+      }
+      if (Array.isArray(res.training_type_filters) && res.training_type_filters.length > 0) {
+        updates.trainingTypeFilters = res.training_type_filters
+      }
+      if (res.default && typeof res.default === 'object') {
+        if (res.default.status) updates['filters.status'] = res.default.status
+        if (res.default.training_type) updates['filters.training_type'] = res.default.training_type
+      }
+      if (Object.keys(updates).length > 0) this.setData(updates)
+    }).catch(() => {})
+
     await this.refreshAll(true)
     this._skipRefreshOnShow = true
     this.setData({ initialized: true })
@@ -324,11 +362,13 @@ Page({
   },
 
   async onApproveTap(e) {
-    const { id, status } = e.currentTarget.dataset
+    const { id } = e.currentTarget.dataset
     if (!id) return
 
-    if (status !== 'unreviewed') {
-      wx.showToast({ title: '仅待审核记录可操作', icon: 'none' })
+    const record = this.data.records.find(r => r._id === id)
+    const canApprove = record && record.actions ? record.actions.canApprove : (record && record.status === 'unreviewed')
+    if (!canApprove) {
+      wx.showToast({ title: '当前状态不可审核通过', icon: 'none' })
       return
     }
 
@@ -349,10 +389,12 @@ Page({
   },
 
   async onRejectTap(e) {
-    const { id, status } = e.currentTarget.dataset
+    const { id } = e.currentTarget.dataset
     if (!id) return
 
-    if (status === 'registered') {
+    const record = this.data.records.find(r => r._id === id)
+    const canReject = record && record.actions ? record.actions.canReject : (record && record.status !== 'registered')
+    if (!canReject) {
       wx.showToast({ title: '省网已生成报名流水号，无法直接驳回，请先撤销', icon: 'none' })
       return
     }
@@ -585,10 +627,14 @@ Page({
   },
 
   async onDownloadRegFormTap(e) {
-    const { id, name, idCard, status } = e.currentTarget.dataset
+    const { id, name, idCard } = e.currentTarget.dataset
     if (!id) return
 
-    if (status !== 'registered') {
+    const record = this.data.records.find(r => r._id === id)
+    const canDownload = record && record.actions
+      ? record.actions.canDownloadRegForm
+      : (record && record.status === 'registered')
+    if (!canDownload) {
       wx.showModal({
         title: '提示',
         content: '必须先提交报名成功，并在平台生成流水号之后才可下载报名申请表。',

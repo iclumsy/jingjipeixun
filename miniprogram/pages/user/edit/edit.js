@@ -237,6 +237,10 @@ Page({
         trainingType,
         status: student.status,
         rejectReason: student.reject_reason,
+        // 编辑权限优先取后端 actions.canEdit；缺失时回退 status === 'rejected'
+        canEdit: (student.actions && typeof student.actions.canEdit === 'boolean')
+          ? student.actions.canEdit
+          : (student.status === 'rejected'),
         jobCategoryNames: this.getJobCategoryNames(trainingType),
         enabledAttachments: this.data.attachmentConfig[getAttachmentProfileKey(trainingType, applicationType)] || [],
         fieldErrors: {

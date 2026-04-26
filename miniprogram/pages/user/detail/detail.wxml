@@ -12,7 +12,7 @@
     <view class="section-card summary-card fade-enter">
       <view class="summary-row">
         <view class="summary-title">审核状态</view>
-        <view class="status-tag status-{{student.status}}">{{statusText}}</view>
+        <view class="status-tag status-{{statusClass}}">{{statusText}}</view>
       </view>
       <view class="summary-hint">{{statusHint}}</view>
       <view class="summary-meta">培训类型：{{trainingTypeText}}</view>
@@ -82,7 +82,7 @@
         </view>
         <view class="info-item" wx:if="{{student.training_type === 'special_equipment'}}">
           <text class="info-label">报名类型</text>
-          <text class="info-value">{{student.application_type === 'renewal' ? '复审' : '新考证'}}</text>
+          <text class="info-value">{{applicationTypeText}}</text>
         </view>
         <view class="info-item">
           <text class="info-label">作业类别</text>
@@ -95,7 +95,7 @@
       </view>
     </view>
 
-    <view class="section-card action-card fade-enter" wx:if="{{student.status === 'rejected'}}">
+    <view class="section-card action-card fade-enter" wx:if="{{canEdit}}">
       <view class="action-title">该记录已驳回，可修改后重新提交</view>
       <view wx:if="{{student.reject_reason}}" class="reject-reason-box">
         <text class="reject-reason-label">驳回原因：</text>

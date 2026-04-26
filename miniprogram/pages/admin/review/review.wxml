@@ -62,21 +62,21 @@
             <view class="student-name">{{item.name || '-'}}</view>
             <view class="time-text">{{item.submitTimeText}}</view>
           </view>
-          <view class="status-badge badge-{{item.status}}">{{item.statusText}}</view>
+          <view class="status-badge badge-{{item.statusClass}}">{{item.statusText}}</view>
         </view>
 
         <view class="meta-row">
-          <text wx:if="{{item.training_type === 'special_equipment' && item.application_type === 'renewal'}}" class="meta-chip" style="color:#e65100;background:#fff3e0;">复审</text>
+          <text wx:for="{{item.tags}}" wx:for-item="tag" wx:key="text" class="meta-chip" style="color:{{tag.color}};background:{{tag.bg}};">{{tag.text}}</text>
           <text class="meta-chip">{{item.job_category || '-'}}</text>
           <text wx:if="{{item.exam_project}}" class="meta-chip">{{item.exam_project}}</text>
           <text
-            wx:if="{{(item.status === 'reviewed' || item.status === 'registered') && item.training_type === 'special_equipment' && item.card_activated}}"
+            wx:if="{{item.actions.canQueryCard}}"
             class="meta-chip card-query-chip"
             catchtap="onQueryCardTap"
             data-id="{{item._id}}"
           >🔍 学习卡信息</text>
           <text
-            wx:if="{{(item.status === 'reviewed' || item.status === 'registered') && item.training_type === 'special_equipment' && !item.card_activated}}"
+            wx:if="{{item.actions.canActivateCard}}"
             class="meta-chip card-activate-chip"
             catchtap="onActivateCardTap"
             data-id="{{item._id}}"
@@ -104,19 +104,18 @@
           </view>
           <view class="side-buttons-wrap" style="display:flex;gap:12rpx;flex-shrink:0;">
             <view
-              wx:if="{{item.status === 'registered'}}"
+              wx:if="{{item.actions.canDownloadRegForm}}"
               class="form-side-btn btn-form-reg"
               catchtap="onDownloadRegFormTap"
               data-id="{{item._id}}"
               data-name="{{item.name}}"
               data-id-card="{{item.id_card}}"
-              data-status="{{item.status}}"
             >
               <text class="form-side-emoji">✏️</text>
               <text class="form-side-label">报名表</text>
             </view>
             <view
-              wx:if="{{item.trainingFormUrl}}"
+              wx:if="{{item.actions.canDownloadHealthForm}}"
               class="form-side-btn btn-form-health"
               catchtap="onDownloadTrainingFormTap"
               data-id="{{item._id}}"
@@ -129,31 +128,30 @@
           </view>
         </view>
 
-        <view wx:if="{{item.status === 'rejected' && item.reject_reason}}" class="reject-reason-row">
+        <view wx:if="{{item.reject_reason}}" class="reject-reason-row">
           <text class="reject-label">驳回原因</text>
           <text class="reject-text">{{item.reject_reason}}</text>
         </view>
 
         <view class="record-actions">
           <button
-            wx:if="{{item.status === 'unreviewed'}}"
+            wx:if="{{item.actions.canApprove}}"
             class="action-btn btn-approve"
             size="mini"
             catchtap="onApproveTap"
             data-id="{{item._id}}"
-            data-status="{{item.status}}"
           >✅ 审核通过</button>
 
           <button
-            class="action-btn btn-reject {{(item.status === 'registered') ? 'disabled' : ''}}"
+            class="action-btn btn-reject {{!item.actions.canReject ? 'disabled' : ''}}"
             size="mini"
             catchtap="onRejectTap"
             data-id="{{item._id}}"
-            data-status="{{item.status}}"
-            disabled="{{item.status === 'registered'}}"
+            disabled="{{!item.actions.canReject}}"
           >↩️ 驳回</button>
 
           <button
+            wx:if="{{item.actions.canDelete}}"
             class="action-btn btn-delete"
             size="mini"
             catchtap="onDeleteTap"
@@ -161,12 +159,12 @@
           >🗑️ 删除</button>
 
           <button
-            wx:if="{{item.status === 'reviewed' || item.status === 'registered'}}"
-            class="action-btn btn-secondary {{item.status === 'registered' ? 'disabled' : ''}}"
+            wx:if="{{item.actions.canSubmitReg || item.actions.canDownloadRegForm}}"
+            class="action-btn btn-secondary {{!item.actions.canSubmitReg ? 'disabled' : ''}}"
             size="mini"
             catchtap="onSubmitRegisterTap"
             data-id="{{item._id}}"
-            disabled="{{item.status === 'registered'}}"
+            disabled="{{!item.actions.canSubmitReg}}"
           >🚀 提交报名</button>
         </view>
       </view>

@@ -6,7 +6,7 @@
 
   <view class="meta-row">
     <text class="meta-chip">{{trainingTypeText || '-'}}</text>
-    <text wx:if="{{student.training_type === 'special_equipment' && student.application_type === 'renewal'}}" class="meta-chip" style="color:#e65100;background:#fff3e0;">复审</text>
+    <text wx:for="{{tags}}" wx:key="text" class="meta-chip" style="color:{{item.color}};background:{{item.bg}};">{{item.text}}</text>
     <text class="meta-chip">{{student.job_category || '-'}}</text>
     <text wx:if="{{student.exam_project}}" class="meta-chip">{{student.exam_project}}</text>
     <text wx:if="{{student.card_activated}}" class="meta-chip card-activated-chip">学习卡已开</text>
@@ -27,7 +27,7 @@
     </view>
   </view>
 
-  <view wx:if="{{student.status === 'rejected' && student.reject_reason}}" class="reject-reason-row">
+  <view wx:if="{{student.reject_reason}}" class="reject-reason-row">
     <text class="reject-label">驳回原因</text>
     <text class="reject-text">{{student.reject_reason}}</text>
   </view>

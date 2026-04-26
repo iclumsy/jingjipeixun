@@ -773,6 +773,23 @@ async function getAttachmentConfig() {
   return data
 }
 
+/**
+ * 获取学员列表筛选 tab 配置（状态/培训类型/默认值）。
+ *
+ * 后端返回 status_filters / training_type_filters / default 三段，
+ * 小程序按结果渲染筛选条，未来加 tab/改文案/改顺序无需发版。
+ *
+ * @param {string} role - 'admin' | 'user'，默认 'admin'
+ * @returns {Promise<Object>} {status_filters, training_type_filters, default}
+ */
+async function getStudentFilters(role = 'admin') {
+  const data = await requestApi(`/api/config/student_filters?role=${encodeURIComponent(role)}`, {
+    method: 'GET',
+    auth: false
+  })
+  return data
+}
+
 const COS = require('./cos-wx-sdk-v5.js');
 
 let cosInstance = null;
@@ -1067,6 +1084,7 @@ module.exports = {
   getJobCategories,     // 获取作业类别配置
   getWechatConfig,      // 获取微信配置
   getAttachmentConfig,  // 获取附件启用配置
+  getStudentFilters,    // 获取学员列表筛选 tab 配置
   uploadAttachment,     // 上传附件
   downloadTrainingForm, // 下载体检表
   submitPlatformRegistration, // 提交报名

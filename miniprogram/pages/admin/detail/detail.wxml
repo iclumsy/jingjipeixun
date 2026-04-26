@@ -5,14 +5,14 @@
     <view class="section-card summary-card fade-enter">
       <view class="summary-row">
         <view class="summary-title">审核详情</view>
-        <view class="status-tag status-{{student.status}}">{{statusText}}</view>
+        <view class="status-tag status-{{statusClass}}">{{statusText}}</view>
       </view>
       <view class="summary-meta">提交人：{{student.name || '-'}}</view>
       <view class="summary-meta">培训类型：{{trainingTypeText}}</view>
       <view class="summary-meta">公司：{{student.company || '-'}}</view>
       <view class="summary-meta">提交时间：{{submitTimeText}}</view>
       <view class="summary-meta" wx:if="{{student.reviewed_at}}">审核时间：{{reviewTimeText}}</view>
-      <view wx:if="{{student.status === 'rejected' && student.reject_reason}}" class="reject-reason-row">
+      <view wx:if="{{student.reject_reason}}" class="reject-reason-row">
         <text class="reject-label">驳回原因</text>
         <text class="reject-text">{{student.reject_reason}}</text>
       </view>

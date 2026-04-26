@@ -1,11 +1,14 @@
 // pages/user/detail/detail.js
+// 状态文案/提示/培训类型文案优先读后端 enrich 字段，缺失时回退到本地常量
 const api = require('../../../utils/api')
 const { STATUS_LABELS, TRAINING_TYPE_LABELS } = require('../../../utils/constants')
 const { formatDateTime } = require('../../../utils/page-helpers')
 
-const STATUS_HINTS = {
+// 仅作为后端 statusHint 字段缺失时的本地兜底；状态/文案变更请改后端
+const STATUS_HINTS_FALLBACK = {
   unreviewed: '资料已提交，正在等待管理员审核',
   reviewed: '资料已审核通过，可在后台继续办理',
+  registered: '已提交报名到省网平台',
   rejected: '资料已被驳回，可修改后重新提交'
 }
 
@@ -45,7 +48,11 @@ Page({
     previewUrls: {},
     statusText: '',
     statusHint: '',
+    statusClass: '',
     trainingTypeText: '',
+    applicationTypeText: '',
+    tags: [],
+    canEdit: false,
     createTime: '',
     loading: true
   },
@@ -66,15 +73,25 @@ Page({
       if (result.student) {
         const downloadUrls = result.downloadUrls || {}
         const previewUrls = await this.buildPreviewUrls(downloadUrls)
+        const s = result.student
+        // 编辑权限优先取后端 actions.canEdit
+        const canEdit = (s.actions && typeof s.actions.canEdit === 'boolean')
+          ? s.actions.canEdit
+          : (s.status === 'rejected')
 
         this.setData({
-          student: result.student,
+          student: s,
           downloadUrls,
           previewUrls,
-          statusText: STATUS_LABELS[result.student.status] || result.student.status,
-          statusHint: STATUS_HINTS[result.student.status] || '',
-          trainingTypeText: TRAINING_TYPE_LABELS[result.student.training_type] || result.student.training_type,
-          createTime: formatDateTime(result.student.created_at),
+          // 全部派生字段优先读后端，缺失时回退本地映射
+          statusText: s.statusText || STATUS_LABELS[s.status] || s.status || '-',
+          statusHint: (typeof s.statusHint === 'string' ? s.statusHint : '') || STATUS_HINTS_FALLBACK[s.status] || '',
+          statusClass: s.statusClass || s.status || '',
+          trainingTypeText: s.trainingTypeText || TRAINING_TYPE_LABELS[s.training_type] || s.training_type || '-',
+          applicationTypeText: s.applicationTypeText || (s.application_type === 'renewal' ? '复审' : '新考证'),
+          tags: Array.isArray(s.tags) ? s.tags : [],
+          canEdit,
+          createTime: formatDateTime(s.created_at),
           loading: false
         })
       }

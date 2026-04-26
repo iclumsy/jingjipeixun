@@ -1,5 +1,5 @@
 const api = require('../../../utils/api')
-const { TRAINING_TYPE_LABELS, EDUCATION_OPTIONS } = require('../../../utils/constants')
+const { TRAINING_TYPE_LABELS, EDUCATION_OPTIONS, STATUS_LABELS } = require('../../../utils/constants')
 const { hasAdminAccess, formatDateTime } = require('../../../utils/page-helpers')
 const {
   validateStudent,
@@ -14,12 +14,8 @@ const {
   writeJobCategoriesCache
 } = require('../../../utils/job-categories-cache')
 
-const STATUS_TEXT_MAP = {
-  unreviewed: '待审核',
-  reviewed: '已通过',
-  rejected: '已驳回'
-}
-
+// 编辑表单本地兜底：附件类型与培训类型的映射，仅在后端 attachment 配置接口失败时使用。
+// 真正的附件清单由 /api/config/attachments 下发；状态/能力位由后端 enrich 提供。
 const DEFAULT_ATTACHMENTS = {
   special_equipment: ['photo', 'diploma', 'id_card_front', 'id_card_back', 'hukou_residence', 'hukou_personal'],
   special_equipment_renewal: ['photo', 'certificate_info_page', 'certificate_records_page'],
@@ -107,6 +103,7 @@ Page({
       phone: ''
     },
     statusText: '-',
+    statusClass: '',
     submitTimeText: '-',
     reviewTimeText: '-',
     loading: true,
@@ -240,11 +237,16 @@ Page({
         trainingType,
         enabledAttachments: this.data.attachmentConfig[getAttachmentProfileKey(trainingType, applicationType)] || [],
         jobCategoryNames: this.getJobCategoryNames(trainingType),
-        trainingTypeText: TRAINING_TYPE_LABELS[trainingType] || trainingType,
-        statusText: STATUS_TEXT_MAP[student.status] || student.status || '-',
+        // 文案优先读后端 enrich 字段，缺失时回退到本地常量
+        trainingTypeText: student.trainingTypeText || TRAINING_TYPE_LABELS[trainingType] || trainingType,
+        statusText: student.statusText || STATUS_LABELS[student.status] || student.status || '-',
+        statusClass: student.statusClass || student.status || '',
         submitTimeText: formatDateTime(student.created_at),
         reviewTimeText: formatDateTime(student.reviewed_at),
-        canReview: student.status === 'unreviewed',
+        // 审核权限优先读后端 actions.canApprove
+        canReview: (student.actions && typeof student.actions.canApprove === 'boolean')
+          ? student.actions.canApprove
+          : (student.status === 'unreviewed'),
         fieldErrors: {
           id_card: getIdCardError(normalizedIdCard),
           phone: getPhoneError(normalizedPhone)
