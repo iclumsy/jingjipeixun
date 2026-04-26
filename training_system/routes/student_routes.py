@@ -448,6 +448,8 @@ def create_student_route():
                 raise ValidationError('必传附件处理失败', fields=fields)
 
             student_payload = dict(payload)
+            # 剔除前端 JSON 中非数据库列的字段（files 是附件路径字典，不是数据库列）
+            student_payload.pop('files', None)
 
         # 体检表/培训表路径初始为空（审核通过时自动生成）
         file_paths['training_form_path'] = ""
@@ -469,7 +471,7 @@ def create_student_route():
                 )
             ).fetchone()
             if existing:
-                if existing['status'] in ('unreviewed', 'reviewed'):
+                if existing['status'] in ('unreviewed', 'reviewed', 'registered'):
                     raise AppError('该项目您已有正在处理或已通过的报名，请勿重复提交', status_code=400)
                 elif existing['status'] == 'rejected':
                     rejected_id = existing['id']
@@ -787,9 +789,9 @@ def update_student_route(id):
             if 'status' in updates:
                 del updates['status']
                 
-            # 2. 防止 ABA 并发流转：如果此时数据库已经是通过状态（管理员刚批完），报错拦截他提交，保留你的审核成果
-            if current_student.get('status') == 'reviewed':
-                raise AppError('管理员刚刚已审核通过，无法再提交修改', status_code=403)
+            # 2. 防止 ABA 并发流转：如果此时数据库已经是通过/已报名状态（管理员已处理），报错拦截
+            if current_student.get('status') in ('reviewed', 'registered'):
+                raise AppError('管理员已审核通过或已完成报名，无法再提交修改', status_code=403)
                 
             # 3. 强制降维：既然他确实重新编辑并提交了图片或文字，强制恢复为待审核状态
             updates['status'] = 'unreviewed'
