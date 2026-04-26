@@ -988,8 +988,9 @@ async function submitPlatformRegistration(studentId) {
   const id = encodeURIComponent(String(studentId || '').trim())
   if (!id) throw new Error('学员ID不能为空')
 
-  const result = await requestApi(`/api/sxtsks/submit/${id}`, {
-    method: 'POST'
+  const result = await requestApi('/api/sxtsks/submit', {
+    method: 'POST',
+    data: { student_ids: [id] }
   })
   return result
 }
