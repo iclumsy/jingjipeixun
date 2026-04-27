@@ -73,7 +73,27 @@ PROJECT_CODE_TO_XMID = {
     'Q2(限门座式起重机)':    '0794',
     'Q2(限缆索式起重机)':    '0795',
     'Q2(限流动式起重机)':    '0796',
+    'Q2(限桥式起重机)':      '0798',
+    'Q2(限门式起重机)':      '0799',
     'N1': '1095',   # 叉车司机
+}
+
+# 操作项目名称 → 平台 XMID 映射（当 project_code 不精确时按名称兜底）
+EXAM_PROJECT_TO_XMID = {
+    '特种设备安全管理':       '0195',
+    '电梯安全管理':           '0195',
+    '起重机械安全管理':       '0195',
+    '锅炉压力容器压力管道安全管理': '0195',
+    '场内机动车安全管理':     '0195',
+    '工业锅炉司炉':           '0295',
+    '锅炉水处理':             '0297',
+    '快开门式压力容器操作':   '0395',
+    '气瓶充装':               '0495',
+    '起重机指挥':             '0791',
+    '桥式起重机司机':         '0798',
+    '门式起重机司机':         '0799',
+    '叉车司机':               '1095',
+    '观光车和观光列车司机':   '1096',
 }
 
 # 性别映射
@@ -790,9 +810,13 @@ class SxtsksClient:
 
         # 动态获取失败时，降级使用本地硬编码映射
         if not zyxm_id:
+            # 先尝试 project_code 精确匹配
             zyxm_id = PROJECT_CODE_TO_XMID.get(project_code)
+            # 再尝试按 exam_project 名称匹配
+            if not zyxm_id and exam_project:
+                zyxm_id = EXAM_PROJECT_TO_XMID.get(exam_project.strip())
             if zyxm_id:
-                self._log_step('XMID降级', 'warning', f'动态获取失败，使用本地映射: {project_code} → {zyxm_id}')
+                self._log_step('XMID降级', 'warning', f'动态获取失败，使用本地映射: exam_project={exam_project}, project_code={project_code} → {zyxm_id}')
 
         if not zyxm_id:
             return {'success': False, 'message': f'无法确定作业项目代号: exam_project={exam_project}, project_code={project_code}'}
