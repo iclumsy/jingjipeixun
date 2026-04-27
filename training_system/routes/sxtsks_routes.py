@@ -280,6 +280,21 @@ def download_form(bmid):
         font_path = os.path.join(base_dir, 'static', 'fonts', 'NotoSansSC-Regular.ttf')
         font_url = f'file://{font_path}'
 
+        # ========== 体检打勾修正 ==========
+        # 平台默认对所有项目都在"体检"栏打勾，但实际只有叉车司机(N1)和锅炉水处理(G3)需要
+        # 与 document_service.HEALTH_CHECK_PROJECT_CODES 保持一致
+        needs_health = False
+        if student:
+            from services.document_service import needs_health_check as _needs_hc
+            needs_health, _ = _needs_hc(
+                student.get('exam_project', ''),
+                student.get('project_code', '')
+            )
+        if not needs_health:
+            # 将体检行的 √/☑/■ 替换为 □（不勾选）
+            html = _re.sub(r'(体检[^<]{0,20})(√|☑|■)', r'\1□', html)
+            step_logs.append('非体检项目，已取消体检栏打勾')
+
         # 注入精确匹配原版 PDF 的 CSS（含嵌入中文字体）
         inject_css = f"""<style>
 @font-face {{
@@ -301,6 +316,7 @@ body {{ font-size:12pt; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei"
 .tbsd td {{ font-size:12pt; padding:6px 4px; line-height:16pt; border:1px solid #000;
            font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; word-break:break-all; vertical-align:middle; box-sizing:border-box; }}
 .tbsd td[colspan] {{ border-right:2px solid #000 !important; }}
+.tbsd td:last-child {{ border-right:2px solid #000 !important; }}
 .tbsd td p {{ font-size:12pt; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; margin:0; }}
 td[height="84"] {{ height:64pt; }}
 td[height="115"] {{ height:85pt; }}
