@@ -13,6 +13,11 @@ const {
   readJobCategoriesCache,
   writeJobCategoriesCache
 } = require('../../../utils/job-categories-cache')
+const {
+  MATERIAL_LABELS,
+  normalizeGeneratedMaterials,
+  buildManualCropPayload
+} = require('./materials')
 
 // 编辑表单本地兜底：附件类型与培训类型的映射，仅在后端 attachment 配置接口失败时使用。
 // 真正的附件清单由 /api/config/attachments 下发；状态/能力位由后端 enrich 提供。
@@ -110,7 +115,19 @@ Page({
     saving: false,
     actionLoading: false,
     actionType: '',
-    canReview: false
+    canReview: false,
+    materialsLoading: false,
+    generatedMaterials: [],
+    generatedMaterialsExists: false,
+    materialModal: {
+      visible: false,
+      title: '',
+      materialType: '',
+      panels: [],
+      activeKey: '',
+      activePanel: null,
+      submitting: false
+    }
   },
 
   async onLoad(options) {
@@ -132,6 +149,7 @@ Page({
     await this.loadAttachmentConfig()
     await this.loadJobCategories()
     await this.loadDetail()
+    await this.loadGeneratedMaterials()
   },
 
   async loadAttachmentConfig() {
@@ -288,6 +306,27 @@ Page({
       console.error('加载审核详情失败:', err)
       this.setData({ loading: false })
       wx.showToast({ title: err.message || '加载失败', icon: 'none' })
+    }
+  },
+
+  async loadGeneratedMaterials() {
+    if (!this.data.studentId) return
+    this.setData({ materialsLoading: true })
+    try {
+      const result = await api.getGeneratedMaterials(this.data.studentId)
+      const materials = normalizeGeneratedMaterials(result.materials || [], api.toAbsoluteFileUrl)
+      this.setData({
+        generatedMaterials: materials,
+        generatedMaterialsExists: !!result.exists && materials.length > 0,
+        materialsLoading: false
+      })
+    } catch (err) {
+      console.warn('加载报名材料失败:', err)
+      this.setData({
+        generatedMaterials: [],
+        generatedMaterialsExists: false,
+        materialsLoading: false
+      })
     }
   },
 
@@ -569,6 +608,7 @@ Page({
       wx.showToast({ title: '已通过', icon: 'success' })
       this.silentRequestSubscription()
       await this.loadDetail()
+      await this.loadGeneratedMaterials()
     } catch (err) {
       wx.hideLoading()
       wx.showToast({ title: err.message || '操作失败', icon: 'none' })
@@ -625,6 +665,538 @@ Page({
         actionType: ''
       })
     }
+  },
+
+  previewGeneratedMaterial(e) {
+    const index = Number(e.currentTarget.dataset.index)
+    const item = this.data.generatedMaterials[index]
+    if (!item || !item.previewUrl) {
+      wx.showToast({ title: '材料地址不可用', icon: 'none' })
+      return
+    }
+    if (/\.docx?$/i.test(item.name || '')) {
+      wx.showLoading({ title: '打开中...' })
+      wx.downloadFile({
+        url: item.previewUrl,
+        success: res => {
+          wx.hideLoading()
+          wx.openDocument({
+            filePath: res.tempFilePath,
+            showMenu: true,
+            fail: () => wx.showToast({ title: '文件打开失败', icon: 'none' })
+          })
+        },
+        fail: () => {
+          wx.hideLoading()
+          wx.showToast({ title: '文件下载失败', icon: 'none' })
+        }
+      })
+      return
+    }
+    wx.previewImage({
+      urls: this.data.generatedMaterials
+        .filter(mat => mat.previewUrl && !/\.docx?$/i.test(mat.name || ''))
+        .map(mat => mat.previewUrl),
+      current: item.previewUrl
+    })
+  },
+
+  openMaterialAdjust(e) {
+    const index = Number(e.currentTarget.dataset.index)
+    const material = this.data.generatedMaterials[index]
+    if (!material || !material.materialType) return
+    const panels = this.buildAdjustPanels(material.materialType)
+    if (!panels.length) {
+      wx.showToast({ title: '未找到原始附件', icon: 'none' })
+      return
+    }
+    this.setData({
+      materialModal: {
+        visible: true,
+        title: `调整${MATERIAL_LABELS[material.materialType] || '报名材料'}`,
+        materialType: material.materialType,
+        panels,
+        activeKey: panels[0].key,
+        activePanel: panels[0],
+        submitting: false
+      }
+    }, () => {
+      this.prepareActiveCropPanel()
+    })
+  },
+
+  closeMaterialAdjust() {
+    if (this.data.materialModal.submitting) return
+    this.hideMaterialAdjust()
+  },
+
+  hideMaterialAdjust() {
+    this.setData({
+      materialModal: {
+        visible: false,
+        title: '',
+        materialType: '',
+        panels: [],
+        activeKey: '',
+        activePanel: null,
+        submitting: false
+      }
+    })
+  },
+
+  buildAdjustPanels(materialType) {
+    const files = (this.data.editStudent && this.data.editStudent.files) || {}
+    const toUrl = value => {
+      const raw = String(value || '').trim()
+      if (!raw) return ''
+      if (/^https?:\/\//i.test(raw) || /^wxfile:\/\//i.test(raw)) return raw
+      try {
+        return api.toAbsoluteFileUrl(raw)
+      } catch (err) {
+        return ''
+      }
+    }
+    const makePanel = (key, label, source, fixedRatio) => ({
+      key,
+      label,
+      sourceUrl: toUrl(source),
+      fixedRatio: fixedRatio || 0,
+      imageWidth: 0,
+      imageHeight: 0,
+      stageWidth: 0,
+      stageHeight: 0,
+      displayWidth: 0,
+      displayHeight: 0,
+      offsetX: 0,
+      offsetY: 0,
+      rotation: 0,
+      points: [],
+      cropRect: null,
+      touched: false,
+      ready: false,
+      imageStyle: '',
+      frameStyle: '',
+      lines: [],
+      handles: []
+    })
+
+    if (materialType === 'photo') {
+      return files.photo ? [makePanel('points', '个人照片', files.photo, 5 / 7)] : []
+    }
+    if (materialType === 'id_card') {
+      return [
+        files.id_card_front ? makePanel('front_points', '正面', files.id_card_front) : null,
+        files.id_card_back ? makePanel('back_points', '反面', files.id_card_back) : null
+      ].filter(Boolean)
+    }
+    if (materialType === 'hukou') {
+      return [
+        files.hukou_residence ? makePanel('home_points', '首页', files.hukou_residence) : null,
+        files.hukou_personal ? makePanel('personal_points', '个人页', files.hukou_personal) : null
+      ].filter(Boolean)
+    }
+    if (materialType === 'diploma') {
+      return files.diploma ? [makePanel('points', '学历证书', files.diploma)] : []
+    }
+    return []
+  },
+
+  switchAdjustPanel(e) {
+    const key = e.currentTarget.dataset.key
+    const panel = this.data.materialModal.panels.find(item => item.key === key)
+    if (!panel) return
+    this.setData({
+      'materialModal.activeKey': key,
+      'materialModal.activePanel': panel
+    }, () => {
+      this.prepareActiveCropPanel()
+    })
+  },
+
+  prepareActiveCropPanel() {
+    const panel = this.data.materialModal.activePanel
+    if (!panel || !panel.sourceUrl) return
+    const panelIndex = this.getPanelIndex(panel.key)
+    if (panel.ready) return
+
+    Promise.all([
+      new Promise((resolve, reject) => {
+        wx.getImageInfo({
+          src: panel.sourceUrl,
+          success: resolve,
+          fail: reject
+        })
+      }),
+      new Promise(resolve => {
+        wx.createSelectorQuery()
+          .in(this)
+          .select('#materialCropStage')
+          .boundingClientRect(rect => resolve(rect || {}))
+          .exec()
+      })
+    ]).then(([info, rect]) => {
+      this._lastStageRect = rect || {}
+      const imageWidth = info.width || 1
+      const imageHeight = info.height || 1
+      const stageWidth = rect.width || 300
+      const stageHeight = rect.height || 360
+      const scale = Math.min(stageWidth / imageWidth, stageHeight / imageHeight)
+      const displayWidth = imageWidth * scale
+      const displayHeight = imageHeight * scale
+      const offsetX = (stageWidth - displayWidth) / 2
+      const offsetY = (stageHeight - displayHeight) / 2
+      const nextPanel = {
+        ...panel,
+        imageWidth,
+        imageHeight,
+        stageWidth,
+        stageHeight,
+        displayWidth,
+        displayHeight,
+        offsetX,
+        offsetY,
+        ready: true
+      }
+
+      if (nextPanel.fixedRatio) {
+        nextPanel.cropRect = this.createDefaultCropRect(nextPanel)
+        nextPanel.points = this.rectToPoints(nextPanel.cropRect)
+      } else {
+        nextPanel.points = [
+          [0, 0],
+          [imageWidth, 0],
+          [imageWidth, imageHeight],
+          [0, imageHeight]
+        ]
+      }
+      this.refreshPanelStyles(nextPanel)
+      this.updatePanelAt(panelIndex, nextPanel)
+    }).catch(err => {
+      console.warn('准备调整图片失败:', err)
+      wx.showToast({ title: '图片加载失败', icon: 'none' })
+    })
+  },
+
+  createDefaultCropRect(panel) {
+    const ratio = panel.fixedRatio || 1
+    let width = panel.imageWidth * 0.82
+    let height = width / ratio
+    if (height > panel.imageHeight * 0.9) {
+      height = panel.imageHeight * 0.9
+      width = height * ratio
+    }
+    return {
+      x: Math.round((panel.imageWidth - width) / 2),
+      y: Math.round((panel.imageHeight - height) / 2),
+      w: Math.round(width),
+      h: Math.round(height)
+    }
+  },
+
+  rectToPoints(rect) {
+    if (!rect) return []
+    return [
+      [rect.x, rect.y],
+      [rect.x + rect.w, rect.y],
+      [rect.x + rect.w, rect.y + rect.h],
+      [rect.x, rect.y + rect.h]
+    ]
+  },
+
+  pointToDisplay(panel, point) {
+    const scale = panel.displayWidth / panel.imageWidth
+    const rad = (panel.rotation || 0) * Math.PI / 180
+    const cx = panel.offsetX + panel.displayWidth / 2
+    const cy = panel.offsetY + panel.displayHeight / 2
+    const dx = (point[0] - panel.imageWidth / 2) * scale
+    const dy = (point[1] - panel.imageHeight / 2) * scale
+    return {
+      x: cx + dx * Math.cos(rad) - dy * Math.sin(rad),
+      y: cy + dx * Math.sin(rad) + dy * Math.cos(rad)
+    }
+  },
+
+  displayToPoint(panel, x, y) {
+    const scale = panel.imageWidth / panel.displayWidth
+    const rad = -((panel.rotation || 0) * Math.PI / 180)
+    const cx = panel.offsetX + panel.displayWidth / 2
+    const cy = panel.offsetY + panel.displayHeight / 2
+    const dx = x - cx
+    const dy = y - cy
+    const px = Math.max(0, Math.min(panel.imageWidth, Math.round((dx * Math.cos(rad) - dy * Math.sin(rad)) * scale + panel.imageWidth / 2)))
+    const py = Math.max(0, Math.min(panel.imageHeight, Math.round((dx * Math.sin(rad) + dy * Math.cos(rad)) * scale + panel.imageHeight / 2)))
+    return [px, py]
+  },
+
+  refreshPanelStyles(panel) {
+    panel.imageStyle = [
+      `width:${panel.displayWidth}px`,
+      `height:${panel.displayHeight}px`,
+      `left:${panel.offsetX}px`,
+      `top:${panel.offsetY}px`,
+      `transform:rotate(${panel.rotation || 0}deg)`
+    ].join(';')
+
+    if (panel.fixedRatio && panel.cropRect) {
+      const tl = this.pointToDisplay(panel, [panel.cropRect.x, panel.cropRect.y])
+      const br = this.pointToDisplay(panel, [panel.cropRect.x + panel.cropRect.w, panel.cropRect.y + panel.cropRect.h])
+      panel.frameStyle = [
+        `left:${tl.x}px`,
+        `top:${tl.y}px`,
+        `width:${br.x - tl.x}px`,
+        `height:${br.y - tl.y}px`
+      ].join(';')
+      panel.points = this.rectToPoints(panel.cropRect)
+    }
+
+    const displayPoints = (panel.points || []).map(point => this.pointToDisplay(panel, point))
+    panel.lines = displayPoints.length === 4 ? displayPoints.map((point, index) => {
+      const next = displayPoints[(index + 1) % displayPoints.length]
+      const dx = next.x - point.x
+      const dy = next.y - point.y
+      const length = Math.sqrt(dx * dx + dy * dy)
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI
+      return {
+        index,
+        style: `left:${point.x}px;top:${point.y}px;width:${length}px;transform:rotate(${angle}deg);`
+      }
+    }) : []
+
+    panel.handles = displayPoints.map((display, index) => {
+      return {
+        index,
+        text: String(index + 1),
+        style: `left:${display.x}px;top:${display.y}px;`
+      }
+    })
+  },
+
+  getPanelIndex(key) {
+    return this.data.materialModal.panels.findIndex(item => item.key === key)
+  },
+
+  updatePanelAt(index, panel) {
+    if (index < 0) return
+    const panels = this.data.materialModal.panels.slice()
+    panels[index] = panel
+    this.setData({
+      'materialModal.panels': panels,
+      'materialModal.activePanel': panel
+    })
+  },
+
+  onCropHandleStart(e) {
+    this.refreshStageRect()
+    const index = Number(e.currentTarget.dataset.index)
+    const touch = e.touches && e.touches[0]
+    if (!touch) return
+    this._cropDrag = {
+      type: 'handle',
+      index,
+      startX: touch.clientX,
+      startY: touch.clientY
+    }
+  },
+
+  onCropFrameStart(e) {
+    this.refreshStageRect()
+    const touch = e.touches && e.touches[0]
+    const panel = this.data.materialModal.activePanel
+    if (!touch || !panel || !panel.cropRect) return
+    this._cropDrag = {
+      type: 'frame',
+      startX: touch.clientX,
+      startY: touch.clientY,
+      rect: { ...panel.cropRect }
+    }
+  },
+
+  onCropTouchMove(e) {
+    const drag = this._cropDrag
+    const touch = e.touches && e.touches[0]
+    const panel = this.data.materialModal.activePanel
+    if (!drag || !touch || !panel || !panel.ready) return
+    const panelIndex = this.getPanelIndex(panel.key)
+    const nextPanel = { ...panel }
+
+    if (nextPanel.fixedRatio && nextPanel.cropRect) {
+      const scale = nextPanel.imageWidth / nextPanel.displayWidth
+      if (drag.type === 'frame') {
+        const dx = Math.round((touch.clientX - drag.startX) * scale)
+        const dy = Math.round((touch.clientY - drag.startY) * scale)
+        nextPanel.cropRect = this.clampCropRect(nextPanel, {
+          ...drag.rect,
+          x: drag.rect.x + dx,
+          y: drag.rect.y + dy
+        })
+      } else {
+        nextPanel.cropRect = this.resizeFixedCropRect(nextPanel, drag.index, touch.clientX, touch.clientY)
+      }
+      nextPanel.touched = true
+      this.refreshPanelStyles(nextPanel)
+      this.updatePanelAt(panelIndex, nextPanel)
+      return
+    }
+
+    if (drag.type !== 'handle') return
+    const stage = this.getTouchInStage(touch)
+    const points = (nextPanel.points || []).map(item => item.slice())
+    points[drag.index] = this.displayToPoint(nextPanel, stage.x, stage.y)
+    nextPanel.points = points
+    nextPanel.touched = true
+    this.refreshPanelStyles(nextPanel)
+    this.updatePanelAt(panelIndex, nextPanel)
+  },
+
+  onCropTouchEnd() {
+    this._cropDrag = null
+  },
+
+  getTouchInStage(touch) {
+    const rect = this._lastStageRect || {}
+    return {
+      x: touch.clientX - (rect.left || 0),
+      y: touch.clientY - (rect.top || 0)
+    }
+  },
+
+  refreshStageRect() {
+    wx.createSelectorQuery()
+      .in(this)
+      .select('#materialCropStage')
+      .boundingClientRect(rect => {
+        this._lastStageRect = rect || {}
+      })
+      .exec()
+  },
+
+  resizeFixedCropRect(panel, handleIndex, clientX, clientY) {
+    this.refreshStageRect()
+    const stage = this.getTouchInStage({ clientX, clientY })
+    const point = this.displayToPoint(panel, stage.x, stage.y)
+    const rect = panel.cropRect
+    const ratio = panel.fixedRatio || 1
+    let x = rect.x
+    let y = rect.y
+    let w = rect.w
+    let h = rect.h
+
+    if (handleIndex === 0 || handleIndex === 3) {
+      w = Math.max(40, rect.x + rect.w - point[0])
+      x = rect.x + rect.w - w
+    } else {
+      w = Math.max(40, point[0] - rect.x)
+    }
+    h = Math.round(w / ratio)
+    if (handleIndex === 0 || handleIndex === 1) {
+      y = rect.y + rect.h - h
+    }
+    return this.clampCropRect(panel, { x, y, w, h })
+  },
+
+  clampCropRect(panel, rect) {
+    let w = Math.min(rect.w, panel.imageWidth)
+    let h = Math.min(rect.h, panel.imageHeight)
+    if (panel.fixedRatio) {
+      const ratio = panel.fixedRatio
+      if (h > panel.imageHeight) {
+        h = panel.imageHeight
+        w = Math.round(h * ratio)
+      }
+      if (w > panel.imageWidth) {
+        w = panel.imageWidth
+        h = Math.round(w / ratio)
+      }
+    }
+    const x = Math.max(0, Math.min(panel.imageWidth - w, rect.x))
+    const y = Math.max(0, Math.min(panel.imageHeight - h, rect.y))
+    return { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) }
+  },
+
+  rotateActivePanel(e) {
+    const direction = e.currentTarget.dataset.direction
+    const panel = this.data.materialModal.activePanel
+    if (!panel) return
+    const panelIndex = this.getPanelIndex(panel.key)
+    const delta = direction === 'left' ? -90 : 90
+    const nextPanel = {
+      ...panel,
+      rotation: (panel.rotation + delta + 360) % 360
+    }
+    this.fitPanelToStage(nextPanel)
+    this.refreshPanelStyles(nextPanel)
+    this.updatePanelAt(panelIndex, nextPanel)
+  },
+
+  fitPanelToStage(panel) {
+    const rotated = Math.abs((panel.rotation || 0) % 180) === 90
+    const sourceWidth = rotated ? panel.imageHeight : panel.imageWidth
+    const sourceHeight = rotated ? panel.imageWidth : panel.imageHeight
+    const scale = Math.min(panel.stageWidth / sourceWidth, panel.stageHeight / sourceHeight)
+    panel.displayWidth = panel.imageWidth * scale
+    panel.displayHeight = panel.imageHeight * scale
+    panel.offsetX = (panel.stageWidth - panel.displayWidth) / 2
+    panel.offsetY = (panel.stageHeight - panel.displayHeight) / 2
+  },
+
+  resetActivePanel() {
+    const panel = this.data.materialModal.activePanel
+    if (!panel || !panel.ready) return
+    const panelIndex = this.getPanelIndex(panel.key)
+    const nextPanel = {
+      ...panel,
+      touched: false,
+      rotation: 0
+    }
+    if (nextPanel.fixedRatio) {
+      nextPanel.cropRect = this.createDefaultCropRect(nextPanel)
+      nextPanel.points = this.rectToPoints(nextPanel.cropRect)
+    } else {
+      nextPanel.points = [
+        [0, 0],
+        [nextPanel.imageWidth, 0],
+        [nextPanel.imageWidth, nextPanel.imageHeight],
+        [0, nextPanel.imageHeight]
+      ]
+    }
+    this.refreshPanelStyles(nextPanel)
+    this.updatePanelAt(panelIndex, nextPanel)
+  },
+
+  async confirmMaterialAdjust() {
+    const modal = this.data.materialModal
+    if (!modal.materialType || modal.submitting) return
+    const state = {}
+    modal.panels.forEach(panel => {
+      const rotateKey = this.getRotationKey(modal.materialType, panel.key)
+      if (rotateKey) state[rotateKey] = panel.rotation
+      if (panel.touched) state[panel.key] = panel.points
+    })
+    const payload = buildManualCropPayload(modal.materialType, state)
+    this.setData({ 'materialModal.submitting': true })
+    wx.showLoading({ title: '生成中...' })
+    try {
+      const result = await api.manualCropMaterial(this.data.studentId, payload)
+      wx.hideLoading()
+      wx.showToast({ title: result.message || '已重新生成', icon: 'success' })
+      this.hideMaterialAdjust()
+      await this.loadGeneratedMaterials()
+    } catch (err) {
+      wx.hideLoading()
+      wx.showToast({ title: err.message || '调整失败', icon: 'none' })
+      this.setData({ 'materialModal.submitting': false })
+    }
+  },
+
+  getRotationKey(materialType, panelKey) {
+    if (materialType === 'photo' || materialType === 'diploma') return 'rotate'
+    if (materialType === 'id_card') {
+      return panelKey === 'front_points' ? 'front_rotate' : 'back_rotate'
+    }
+    if (materialType === 'hukou') {
+      return panelKey === 'home_points' ? 'home_rotate' : 'personal_rotate'
+    }
+    return ''
   },
 
   confirmAction(title, content) {

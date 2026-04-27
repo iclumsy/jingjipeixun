@@ -24,7 +24,7 @@ API 端点:
     不易被猜测，且文件内容为学员自行上传的资料。
     /api/files/browse 系列端点受 session 认证保护。
 """
-from flask import Blueprint, current_app, jsonify, redirect, send_from_directory
+from flask import Blueprint, current_app, jsonify, redirect, request, send_from_directory
 from models.student import get_db_connection
 from services import storage_service
 import os
@@ -59,6 +59,9 @@ def serve_students(filename):
             # COS/双写模式：重定向到 COS 公网 URL（COS 对象已设置 inline 元数据）
             url = storage_service.get_url(f'students/{filename}')
             if url.startswith('https://'):
+                if request.query_string:
+                    separator = '&' if '?' in url else '?'
+                    url = f"{url}{separator}{request.query_string.decode('utf-8', errors='ignore')}"
                 return redirect(url, code=302)
 
         # local 模式（或 COS 未配置降级）：本地服务 + 强制内联预览

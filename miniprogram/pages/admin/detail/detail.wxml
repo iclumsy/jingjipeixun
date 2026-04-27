@@ -42,6 +42,123 @@
       bind:fileuploaded="onFileUploaded"
       bind:filedeleted="onFileDeleted"
     />
+
+    <view class="section-card materials-card fade-enter">
+      <view class="card-header">
+        <view>
+          <view class="card-title">报名材料</view>
+          <view class="card-subtitle">审核通过后系统自动生成，可预览并手工调整</view>
+        </view>
+      </view>
+
+      <view class="materials-loading" wx:if="{{materialsLoading}}">报名材料加载中...</view>
+      <view class="materials-empty" wx:elif="{{!generatedMaterialsExists}}">
+        暂无报名材料，审核通过后系统会自动生成
+      </view>
+      <view class="materials-grid" wx:else>
+        <view class="material-item" wx:for="{{generatedMaterials}}" wx:key="url">
+          <view class="material-preview" bindtap="previewGeneratedMaterial" data-index="{{index}}">
+            <image
+              wx:if="{{item.previewUrl && !item.isDocument}}"
+              class="material-image"
+              src="{{item.previewUrl}}"
+              mode="aspectFill"
+            />
+            <view wx:else class="material-doc">文件</view>
+          </view>
+          <view class="material-title">{{item.title}}</view>
+          <view class="material-actions">
+            <button class="material-btn" size="mini" bindtap="previewGeneratedMaterial" data-index="{{index}}">预览</button>
+            <button
+              wx:if="{{item.adjustable}}"
+              class="material-btn primary"
+              size="mini"
+              bindtap="openMaterialAdjust"
+              data-index="{{index}}"
+            >调整</button>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="material-modal-mask" wx:if="{{materialModal.visible}}">
+    <view class="material-modal">
+      <view class="material-modal-head">
+        <view>
+          <view class="material-modal-title">{{materialModal.title}}</view>
+          <view class="material-modal-sub">拖动裁剪框或角点，旋转角度会在确认后应用</view>
+        </view>
+        <view class="modal-close" bindtap="closeMaterialAdjust">×</view>
+      </view>
+
+      <view class="adjust-tabs" wx:if="{{materialModal.panels.length > 1}}">
+        <view
+          wx:for="{{materialModal.panels}}"
+          wx:key="key"
+          class="adjust-tab {{materialModal.activeKey === item.key ? 'active' : ''}}"
+          bindtap="switchAdjustPanel"
+          data-key="{{item.key}}"
+        >{{item.label}}</view>
+      </view>
+
+      <view class="crop-stage-wrap">
+        <view
+          id="materialCropStage"
+          class="crop-stage"
+          catchtouchmove="onCropTouchMove"
+          catchtouchend="onCropTouchEnd"
+          catchtouchcancel="onCropTouchEnd"
+        >
+          <image
+            wx:if="{{materialModal.activePanel && materialModal.activePanel.sourceUrl}}"
+            class="crop-image"
+            src="{{materialModal.activePanel.sourceUrl}}"
+            mode="aspectFit"
+            style="{{materialModal.activePanel.imageStyle}}"
+          />
+          <view
+            wx:if="{{materialModal.activePanel && materialModal.activePanel.fixedRatio && materialModal.activePanel.frameStyle}}"
+            class="crop-frame fixed-ratio"
+            style="{{materialModal.activePanel.frameStyle}}"
+            catchtouchstart="onCropFrameStart"
+          >
+            <view class="crop-frame-label">1寸比例</view>
+          </view>
+          <view
+            wx:for="{{materialModal.activePanel.lines}}"
+            wx:key="index"
+            class="crop-line"
+            style="{{item.style}}"
+          ></view>
+          <view
+            wx:for="{{materialModal.activePanel.handles}}"
+            wx:key="index"
+            class="crop-handle"
+            style="{{item.style}}"
+            data-index="{{item.index}}"
+            catchtouchstart="onCropHandleStart"
+          >{{item.text}}</view>
+        </view>
+        <view class="crop-status">
+          当前旋转：{{materialModal.activePanel.rotation || 0}}°
+        </view>
+      </view>
+
+      <view class="material-modal-actions">
+        <view class="modal-tools-row">
+          <button class="modal-tool-btn" data-direction="left" bindtap="rotateActivePanel">左转90°</button>
+          <button class="modal-tool-btn spaced" data-direction="right" bindtap="rotateActivePanel">右转90°</button>
+          <button class="modal-tool-btn spaced danger" bindtap="resetActivePanel">重置</button>
+        </view>
+        <button
+          class="modal-confirm-btn"
+          bindtap="confirmMaterialAdjust"
+          loading="{{materialModal.submitting}}"
+          disabled="{{materialModal.submitting}}"
+        >确认调整</button>
+      </view>
+    </view>
   </view>
 
   <view class="bottom-actions" wx:if="{{student}}">

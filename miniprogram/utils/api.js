@@ -627,6 +627,40 @@ async function getStudentDetail(studentId) {
 }
 
 /**
+ * 获取审核通过后生成的报名材料预览列表。
+ *
+ * @param {number|string} studentId - 学员 ID
+ * @returns {Promise<Object>} { exists, materials }
+ */
+async function getGeneratedMaterials(studentId) {
+  const id = encodeURIComponent(String(studentId || '').trim())
+  if (!id) {
+    throw new Error('学员ID不能为空')
+  }
+  return await requestApi(`/api/students/${id}/generated_materials`, {
+    method: 'GET'
+  })
+}
+
+/**
+ * 手工裁剪并重新生成单个报名材料。
+ *
+ * @param {number|string} studentId - 学员 ID
+ * @param {Object} payload - material_type、adjustments 与手工点位
+ * @returns {Promise<Object>} 生成结果
+ */
+async function manualCropMaterial(studentId, payload = {}) {
+  const id = encodeURIComponent(String(studentId || '').trim())
+  if (!id) {
+    throw new Error('学员ID不能为空')
+  }
+  return await requestApi(`/api/students/${id}/manual_crop_material`, {
+    method: 'POST',
+    data: payload
+  })
+}
+
+/**
  * 审核学员记录（通过/驳回）。
  *
  * @param {number|string} studentId - 学员 ID
@@ -1077,6 +1111,8 @@ module.exports = {
   syncStudent,          // 同步/查询当前用户的学员记录
   getStudents,          // 获取学员列表
   getStudentDetail,     // 获取学员详情
+  getGeneratedMaterials, // 获取已生成报名材料
+  manualCropMaterial,   // 手工裁剪并重新生成报名材料
   reviewStudent,        // 审核学员
   updateStudent,        // 更新学员
   deleteStudent,        // 删除学员

@@ -3266,7 +3266,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // ── Modal 框架 ───────────────────────────────────────────────────
         const modal = document.createElement('div');
-        modal.style.cssText = 'background:#fff;border-radius:14px;width:100%;max-width:1100px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;';
+        modal.style.cssText = 'background:#fff;border-radius:14px;width:100%;max-width:1100px;min-height:60vh;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;';
 
         const header = document.createElement('div');
         header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid #e5e7eb;flex-shrink:0;';
@@ -3284,7 +3284,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         rightPane.style.cssText = 'flex:1;min-width:0;padding:16px 20px;overflow:hidden;display:flex;flex-direction:column;';
         const rightTitle = document.createElement('div');
         rightTitle.style.cssText = 'font-size:12px;color:#6b7280;margin-bottom:10px;flex-shrink:0;';
-        rightTitle.textContent = '可选：拖动角点调整裁剪区域（直接点「重新生成」则按左侧参数自动裁剪）';
+        rightTitle.textContent = matType === 'photo'
+            ? '拖动矩形框调整裁剪范围（固定 1 寸照片 5:7 比例）'
+            : '可选：拖动角点调整裁剪区域（直接点「重新生成」则按左侧参数自动裁剪）';
         rightContent.style.flex = '1';
         rightContent.style.minHeight = '0';
         rightPane.appendChild(rightTitle);
