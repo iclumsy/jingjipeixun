@@ -117,6 +117,7 @@ Page({
     actionType: '',
     canReview: false,
     materialsLoading: false,
+    regenFormLoading: false,
     generatedMaterials: [],
     generatedMaterialsExists: false,
     materialModal: {
@@ -1195,6 +1196,23 @@ Page({
       wx.hideLoading()
       wx.showToast({ title: err.message || '调整失败', icon: 'none' })
       this.setData({ 'materialModal.submitting': false })
+    }
+  },
+
+  async regenTrainingForm() {
+    if (this.data.regenFormLoading) return
+    this.setData({ regenFormLoading: true })
+    wx.showLoading({ title: '生成中...' })
+    try {
+      const result = await api.regenerateTrainingForm(this.data.studentId)
+      wx.hideLoading()
+      wx.showToast({ title: result.message || '已重新生成', icon: 'success' })
+      await this.loadGeneratedMaterials()
+    } catch (err) {
+      wx.hideLoading()
+      wx.showToast({ title: err.message || '重新生成失败', icon: 'none' })
+    } finally {
+      this.setData({ regenFormLoading: false })
     }
   },
 

@@ -1834,6 +1834,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             healthCheckWrapper.appendChild(healthCheckBox);
             healthCheckWrapper.appendChild(downloadBtn);
+
+            const regenBtn = document.createElement('button');
+            regenBtn.textContent = '重新生成';
+            regenBtn.style.cssText = 'margin-top:4px;font-size:12px;padding:2px 8px;border:1px solid #6366f1;border-radius:4px;background:#eef2ff;color:#4338ca;cursor:pointer;font-weight:500;';
+            regenBtn.onclick = async (e) => {
+                e.stopPropagation();
+                regenBtn.textContent = '生成中...';
+                regenBtn.disabled = true;
+                try {
+                    const res = await fetch(`/api/students/${student.id}/regenerate_training_form`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    });
+                    const result = await res.json();
+                    if (!res.ok) throw new Error(result.error || '重新生成失败');
+                    showMessage('体检表已重新生成', 'success');
+                    if (reloadFn) reloadFn();
+                } catch (err) {
+                    showMessage(err.message, 'error');
+                    regenBtn.textContent = '重新生成';
+                    regenBtn.disabled = false;
+                }
+            };
+            healthCheckWrapper.appendChild(regenBtn);
             filesContainer.appendChild(healthCheckWrapper);
         }
 

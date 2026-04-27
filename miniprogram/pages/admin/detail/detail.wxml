@@ -56,7 +56,7 @@
         暂无报名材料，审核通过后系统会自动生成
       </view>
       <view class="materials-grid" wx:else>
-        <view class="material-item" wx:for="{{generatedMaterials}}" wx:key="url">
+        <view class="material-item {{item.materialType === 'training_form' ? 'full-width' : ''}}" wx:for="{{generatedMaterials}}" wx:key="url">
           <view class="material-preview" bindtap="previewGeneratedMaterial" data-index="{{index}}">
             <image
               wx:if="{{item.previewUrl && !item.isDocument}}"
@@ -76,6 +76,14 @@
               bindtap="openMaterialAdjust"
               data-index="{{index}}"
             >调整</button>
+            <button
+              wx:if="{{item.canRegenForm}}"
+              class="material-btn primary"
+              size="mini"
+              bindtap="regenTrainingForm"
+              loading="{{regenFormLoading}}"
+              disabled="{{regenFormLoading}}"
+            >重新生成</button>
           </view>
         </view>
       </view>
