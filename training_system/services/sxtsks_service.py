@@ -60,7 +60,8 @@ EDUCATION_MAP = {
     '博士': '0412',
 }
 
-# 项目代号 → 平台 XMID 映射
+# 项目代号 → 平台 XMID 映射（仅作为动态获取失败时的 fallback）
+# 正常流程会从平台 HTML 页面动态解析 XMID，此表不再作为唯一来源
 PROJECT_CODE_TO_XMID = {
     'A':  '0195',   # 特种设备安全管理
     'G1': '0295',   # 工业锅炉司炉
@@ -516,6 +517,73 @@ class SxtsksClient:
             self._log_step('上传照片-结果', 'fail', f'响应: {resp.text[:300]}', resp)
             raise RuntimeError(f'照片上传失败，响应: {resp.text[:200]}')
 
+    def _fetch_project_xmid(self, exam_project):
+        """
+        动态从平台报名页面解析 <select name="zyxm"> 的下拉选项，
+        通过学员的 exam_project 名称匹配获取对应的 XMID。
+
+        匹配策略：精确匹配 → 包含匹配
+
+        参数:
+            exam_project: 学员的操作项目名称，如 "叉车司机"、"工业锅炉司炉"
+
+        返回:
+            str: 平台 XMID，如 "1095"；匹配失败返回 None
+        """
+        self._ensure_login()
+
+        try:
+            # 访问报名入口页面获取 HTML
+            resp = self.session.get(
+                f'{BASE_URL}/dwbm_kzbm.do',
+                params={
+                    'jgdm': JGDM,
+                    'jglb': JGLB,
+                    'sfzh': '',
+                    'processStatus': 'undefined',
+                    'zyxm': '',
+                    'userid': self.userid or '',
+                    'ksjg_dm': KSJGDM,
+                },
+                timeout=15,
+            )
+
+            # 从 HTML 中解析 <select name="zyxm"> 内所有 <option>，提取 value（XMID）和 text（项目名）
+            options = re.findall(
+                r'<option[^>]+value=["\']([^"\']+)["\'][^>]*>\s*([^<]+?)\s*</option>',
+                resp.text
+            )
+
+            if not options:
+                self._log_step('动态获取XMID', 'warning', f'未在页面中解析到任何 <option>，页面长度={len(resp.text)}')
+                return None
+
+            # 构建 {项目名: XMID} 映射并记录日志
+            project_map = {text.strip(): value for value, text in options if value.strip()}
+            available_names = list(project_map.keys())
+            self._log_step('动态获取XMID', 'ok', f'平台共 {len(project_map)} 个项目: {available_names}')
+
+            target = exam_project.strip()
+
+            # 精确匹配
+            if target in project_map:
+                xmid = project_map[target]
+                self._log_step('动态获取XMID-匹配', 'ok', f'精确匹配: {target} → XMID={xmid}')
+                return xmid
+
+            # 包含匹配：平台名包含本地名 或 本地名包含平台名
+            for name, xmid in project_map.items():
+                if target in name or name in target:
+                    self._log_step('动态获取XMID-匹配', 'ok', f'模糊匹配: {target} ≈ {name} → XMID={xmid}')
+                    return xmid
+
+            self._log_step('动态获取XMID-匹配', 'fail', f'未找到匹配: {target}（平台可用: {available_names}）')
+            return None
+
+        except Exception as e:
+            self._log_step('动态获取XMID', 'fail', f'异常: {str(e)}')
+            return None
+
     def _get_form_token(self, sfzh, zyxm_id):
         """
         获取报名表单页面中的 bmVerriToken 防重 token。
@@ -714,10 +782,20 @@ class SxtsksClient:
             return {'success': False, 'message': '缺少学员身份证号'}
         self._log_step('使用真实身份证', 'ok', f'平台提交使用学员真实身份证: {sfzh}')
 
+        exam_project = student.get('exam_project', '')
         project_code = student.get('project_code', '')
-        zyxm_id = PROJECT_CODE_TO_XMID.get(project_code)
+
+        # 优先从平台动态获取 XMID（通过 exam_project 名称匹配）
+        zyxm_id = self._fetch_project_xmid(exam_project) if exam_project else None
+
+        # 动态获取失败时，降级使用本地硬编码映射
         if not zyxm_id:
-            return {'success': False, 'message': f'未知的项目代号: {project_code}'}
+            zyxm_id = PROJECT_CODE_TO_XMID.get(project_code)
+            if zyxm_id:
+                self._log_step('XMID降级', 'warning', f'动态获取失败，使用本地映射: {project_code} → {zyxm_id}')
+
+        if not zyxm_id:
+            return {'success': False, 'message': f'无法确定作业项目代号: exam_project={exam_project}, project_code={project_code}'}
 
         gender_code = GENDER_MAP.get(student.get('gender', ''), '1')
         education_code = EDUCATION_MAP.get(student.get('education', ''), '0405')

@@ -116,10 +116,12 @@ def submit_registration(student_id):
         result = client.submit_registration(student, photo_path)
         result.pop('form_content', None)
         
-        # 附带完整的步骤日志供前端展示
+        # 附带步骤日志：steps 为格式化字符串（小程序用），step_details 为原始对象（网页端 buildStepsHtml 用）
+        raw_steps = list(getattr(client, '_steps', []))
+        result['step_details'] = raw_steps
         result['steps'] = [
             f"[{s.get('status','').upper()}] {s.get('step','')}: {s.get('detail','')}"
-            for s in getattr(client, '_steps', [])
+            for s in raw_steps
         ]
         
         if result.get('success'):

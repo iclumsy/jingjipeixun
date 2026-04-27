@@ -2177,7 +2177,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 
                                 <!-- Log Body -->
                                 <div id="sxtsks-log-container" style="flex:1; overflow-y:auto; padding:0; background:#111827; scroll-behavior: smooth;">
-                                    ${data.steps ? buildStepsHtml(data.steps) : ''}
+                                    ${data.step_details ? buildStepsHtml(data.step_details) : ''}
                                     <div style="height: 40px;"></div> <!-- 占位确保滚动彻底 -->
                                 </div>
                                 
@@ -2258,9 +2258,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                             }
                             showLogOverlay(titleText, titleColor, data);
 
-                            if (data.steps) {
+                            if (data.step_details) {
                                 console.group('📤 报名提交日志');
-                                data.steps.forEach(s => console.log(`[${s.status}] ${s.step}:`, s));
+                                data.step_details.forEach(s => console.log(`[${s.status}] ${s.step}:`, s));
                                 console.groupEnd();
                             }
                         } catch (e) {
