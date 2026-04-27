@@ -539,7 +539,7 @@ class SxtsksClient:
 
     def _fetch_project_xmid(self, exam_project):
         """
-        动态从平台报名页面解析 <select name="zyxm"> 的下拉选项，
+        动态从平台报名页面解析作业项目下拉选项，
         通过学员的 exam_project 名称匹配获取对应的 XMID。
 
         匹配策略：精确匹配 → 包含匹配
@@ -568,14 +568,53 @@ class SxtsksClient:
                 timeout=15,
             )
 
-            # 从 HTML 中解析 <select name="zyxm"> 内所有 <option>，提取 value（XMID）和 text（项目名）
-            options = re.findall(
-                r'<option[^>]+value=["\']([^"\']+)["\'][^>]*>\s*([^<]+?)\s*</option>',
-                resp.text
+            html = resp.text
+
+            # 调试日志：输出 zyxm 附近的 HTML 片段，便于远程排查格式
+            zyxm_pos = html.find('zyxm')
+            if zyxm_pos >= 0:
+                snippet = html[max(0, zyxm_pos - 50):zyxm_pos + 500]
+                self._log_step('动态获取XMID-HTML', 'ok', f'zyxm 附近片段: {snippet[:300]}...')
+            else:
+                self._log_step('动态获取XMID-HTML', 'warning', f'HTML 中未找到 zyxm 关键字，页面长度={len(html)}')
+                return None
+
+            # 策略1：先定位 <select name="zyxm"> 块，只解析其内部的 option
+            select_pattern = re.search(
+                r'<select[^>]*name\s*=\s*["\']?zyxm["\']?[^>]*>(.*?)</select>',
+                html, re.S | re.I
             )
 
+            options = []
+            if select_pattern:
+                select_html = select_pattern.group(1)
+                self._log_step('动态获取XMID-select', 'ok', f'找到 zyxm <select> 块，长度={len(select_html)}')
+                # 匹配 <option value="xxx">text</option> 各种变体
+                options = re.findall(
+                    r'<option[^>]*\bvalue\s*=\s*["\']?(\w+)["\']?[^>]*>\s*([^<]+?)\s*</option>',
+                    select_html, re.I
+                )
+
+            # 策略2：全页面搜索所有 option（有些平台用 JS 拼接，option 不在 select 块内）
             if not options:
-                self._log_step('动态获取XMID', 'warning', f'未在页面中解析到任何 <option>，页面长度={len(resp.text)}')
+                options = re.findall(
+                    r'<option[^>]*\bvalue\s*=\s*["\']?(\w+)["\']?[^>]*>\s*([^<]+?)\s*</option>',
+                    html, re.I
+                )
+
+            # 策略3：搜索 JS 数组/对象中的项目数据（如 {value:"0195", text:"特种设备安全管理"}）
+            if not options:
+                js_options = re.findall(
+                    r'["\']?value["\']?\s*[:=]\s*["\'](\d{4})["\'].*?["\']?(?:text|name|label)["\']?\s*[:=]\s*["\']([^"\']+)["\']',
+                    html
+                )
+                if js_options:
+                    options = js_options
+                    self._log_step('动态获取XMID-JS', 'ok', f'从 JS 中解析到 {len(options)} 个项目')
+
+            if not options:
+                self._log_step('动态获取XMID', 'warning',
+                               f'所有解析策略均未找到项目选项，页面长度={len(html)}')
                 return None
 
             # 构建 {项目名: XMID} 映射并记录日志
