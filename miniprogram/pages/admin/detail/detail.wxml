@@ -76,6 +76,14 @@
               bindtap="openMaterialAdjust"
               data-index="{{index}}"
             >调整</button>
+            <button
+              wx:if="{{item.canRegenForm}}"
+              class="material-btn primary"
+              size="mini"
+              bindtap="regenTrainingForm"
+              loading="{{regenFormLoading}}"
+              disabled="{{regenFormLoading}}"
+            >重新生成</button>
           </view>
         </view>
       </view>
@@ -146,23 +154,23 @@
       </view>
 
       <view class="material-modal-actions">
-        <view class="modal-tools-row" wx:if="{{materialModal.materialType === 'photo'}}">
-          <view class="white-bg-switch">
-            <text class="white-bg-label">白底处理</text>
-            <switch checked="{{materialModal.whiteBg !== false}}" bindchange="toggleWhiteBg" color="#4F46E5" />
-          </view>
-        </view>
         <view class="modal-tools-row">
           <button class="modal-tool-btn" data-direction="left" bindtap="rotateActivePanel">左转90°</button>
           <button class="modal-tool-btn spaced" data-direction="right" bindtap="rotateActivePanel">右转90°</button>
           <button class="modal-tool-btn spaced danger" bindtap="resetActivePanel">重置</button>
         </view>
-        <button
-          class="modal-confirm-btn"
-          bindtap="confirmMaterialAdjust"
-          loading="{{materialModal.submitting}}"
-          disabled="{{materialModal.submitting}}"
-        >确认调整</button>
+        <view class="modal-confirm-row">
+          <view class="white-bg-switch" wx:if="{{materialModal.materialType === 'photo'}}">
+            <text class="white-bg-label">白底</text>
+            <switch checked="{{materialModal.whiteBg !== false}}" bindchange="toggleWhiteBg" color="#4F46E5" style="zoom:0.7;" />
+          </view>
+          <button
+            class="modal-confirm-btn"
+            bindtap="confirmMaterialAdjust"
+            loading="{{materialModal.submitting}}"
+            disabled="{{materialModal.submitting}}"
+          >确认调整</button>
+        </view>
       </view>
     </view>
   </view>

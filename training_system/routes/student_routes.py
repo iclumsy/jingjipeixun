@@ -1509,6 +1509,49 @@ def download_training_form_route(id):
         return build_internal_error_response('下载体检表失败，请稍后重试')
 
 
+@student_bp.route('/api/students/<int:id>/regenerate_training_form', methods=['POST'])
+@mini_admin_required
+def regenerate_training_form_route(id):
+    """
+    重新生成体检表，使用最新的报名材料个人照片。
+    仅对已审核/已报名学员可用。
+    """
+    try:
+        student = get_student_by_id(id)
+        if student.get('status') not in ('reviewed', 'registered'):
+            return jsonify({'error': '仅支持已审核学员重新生成体检表'}), 400
+
+        health_check_path = generate_health_check_form(
+            student,
+            current_app.config['BASE_DIR'],
+            current_app.config['STUDENTS_FOLDER']
+        )
+
+        if not health_check_path:
+            return jsonify({'error': '该学员不支持生成体检表（仅支持叉车司机N1/锅炉水处理G3）'}), 400
+
+        updated = update_student(id, {'training_form_path': health_check_path})
+        current_app.logger.info(f'[体检表重新生成] 学员ID={id} 姓名={student.get("name","")} 路径={health_check_path}')
+
+        # 同步到 COS
+        try:
+            base_dir = current_app.config['BASE_DIR']
+            abs_path = os.path.join(base_dir, health_check_path)
+            if os.path.exists(abs_path):
+                from services.cos_service import upload_to_cos
+                upload_to_cos(abs_path, health_check_path)
+        except Exception as cos_err:
+            current_app.logger.warning(f'[体检表重新生成] COS同步失败: {cos_err}')
+
+        return jsonify({'message': '体检表已重新生成', 'training_form_path': health_check_path})
+
+    except NotFoundError as e:
+        return jsonify(e.to_dict()), e.status_code
+    except Exception as e:
+        current_app.logger.exception('Error regenerating training form for student %s', id)
+        return build_internal_error_response('重新生成体检表失败')
+
+
 @student_bp.route('/api/students/<int:id>/generate_materials', methods=['POST'])
 @mini_admin_required
 def generate_materials_route(id):

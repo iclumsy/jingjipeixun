@@ -2,7 +2,8 @@ const MATERIAL_LABELS = {
   photo: '个人照片',
   id_card: '身份证',
   hukou: '户口本',
-  diploma: '学历证书'
+  diploma: '学历证书',
+  training_form: '体检表'
 }
 
 function stripGeneratedPrefix(filename = '') {
@@ -22,6 +23,7 @@ function detectMaterialType(filename = '') {
   if (/身份证/.test(name)) return 'id_card'
   if (/户口/.test(name)) return 'hukou'
   if (/学历|毕业证/.test(name)) return 'diploma'
+  if (/体检表/.test(name)) return 'training_form'
   return ''
 }
 
@@ -49,11 +51,13 @@ function normalizeGeneratedMaterials(materials = [], toAbsoluteFileUrl) {
     const title = MATERIAL_LABELS[materialType] || stripExtension(stripGeneratedPrefix(name)) || '报名材料'
     const url = toPreviewUrl(item && item.url, toAbsoluteFileUrl)
     const isDocument = /\.docx?$/i.test(name)
+    const adjustableTypes = ['photo', 'id_card', 'hukou', 'diploma']
     return {
       ...item,
       title,
       materialType,
-      adjustable: !!materialType,
+      adjustable: adjustableTypes.includes(materialType),
+      canRegenForm: materialType === 'training_form',
       isDocument,
       previewUrl: appendCacheBust(url, item && item.mtime)
     }
