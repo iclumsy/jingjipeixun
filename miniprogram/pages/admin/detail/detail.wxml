@@ -76,14 +76,6 @@
               bindtap="openMaterialAdjust"
               data-index="{{index}}"
             >调整</button>
-            <button
-              wx:if="{{item.canRegenForm}}"
-              class="material-btn primary"
-              size="mini"
-              bindtap="regenTrainingForm"
-              loading="{{regenFormLoading}}"
-              disabled="{{regenFormLoading}}"
-            >重新生成</button>
           </view>
         </view>
       </view>

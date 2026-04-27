@@ -1131,8 +1131,44 @@ def approve_student_route(id):
     try:
 
         current_student = get_student_by_id(id)
+        student_name = current_student.get('name', '未命名')
         
-        # 尝试为特定项目的学员生成体检表
+        # ---- 1. 先自动生成报名材料（人脸会被裁剪/白底处理，并在本地生成结果） ----
+        materials_ok = False
+        try:
+            from services.material_service import generate_student_materials
+            import io as _io
+            import contextlib
+
+            base_dir = current_app.config['BASE_DIR']
+            output_root = current_app.config['STUDENTS_FOLDER']
+            training_type = current_student.get('training_type', 'special_operation')
+            company = current_student.get('company', '')
+            training_type_map = {
+                'special_operation': '特种作业',
+                'special_equipment': '特种设备'
+            }
+            training_type_name = training_type_map.get(training_type, '特种作业')
+            student_folder_name = f"{training_type_name}-{company}-{student_name}"
+            actual_output_root = os.path.join(output_root, student_folder_name)
+
+            log_buffer = _io.StringIO()
+            with contextlib.redirect_stdout(log_buffer):
+                report = generate_student_materials(current_student, base_dir, actual_output_root)
+
+            for line in log_buffer.getvalue().splitlines():
+                if line.strip():
+                    current_app.logger.info(line)
+
+            materials_ok = bool(report.get('success'))
+            if materials_ok:
+                current_app.logger.info(f'[自动生成材料] 学员ID={id} 姓名={student_name} 成功')
+            else:
+                current_app.logger.warning(f'[自动生成材料] 学员ID={id} 姓名={student_name} 未完全成功')
+        except Exception as mat_err:
+            current_app.logger.warning(f'[自动生成材料] 学员ID={id} 异常(不影响审核): {mat_err}')
+
+        # ---- 2. 再尝试为特定项目的学员生成体检表（可使用刚生成的个人照片） ----
         health_check_path = generate_health_check_form(
             current_student,
             current_app.config['BASE_DIR'],
@@ -1147,48 +1183,12 @@ def approve_student_route(id):
 
         # 发送微信推送消息
         submitter_openid = student.get('submitter_openid')
-        student_name = student.get('name')
         if submitter_openid:
             send_review_result_message(submitter_openid, student_name, '已通过', remark="请点击前往小程序查看详情")
 
         if health_check_path:
             current_app.logger.info(f'Health check form generated for student ID={id}')
-
-        # ---- 自动生成报名材料 ----
-        materials_ok = False
-        try:
-            from services.material_service import generate_student_materials
-            import io as _io
-            import contextlib
-
-            base_dir = current_app.config['BASE_DIR']
-            output_root = current_app.config['STUDENTS_FOLDER']
-            training_type = student.get('training_type', 'special_operation')
-            company = student.get('company', '')
-            training_type_map = {
-                'special_operation': '特种作业',
-                'special_equipment': '特种设备'
-            }
-            training_type_name = training_type_map.get(training_type, '特种作业')
-            student_folder_name = f"{training_type_name}-{company}-{student_name}"
-            actual_output_root = os.path.join(output_root, student_folder_name)
-
-            log_buffer = _io.StringIO()
-            with contextlib.redirect_stdout(log_buffer):
-                report = generate_student_materials(student, base_dir, actual_output_root)
-
-            for line in log_buffer.getvalue().splitlines():
-                if line.strip():
-                    current_app.logger.info(line)
-
-            materials_ok = bool(report.get('success'))
-            if materials_ok:
-                current_app.logger.info(f'[自动生成材料] 学员ID={id} 姓名={student_name} 成功')
-            else:
-                current_app.logger.warning(f'[自动生成材料] 学员ID={id} 姓名={student_name} 未完全成功')
-        except Exception as mat_err:
-            current_app.logger.warning(f'[自动生成材料] 学员ID={id} 异常(不影响审核): {mat_err}')
-
+            
         # 记录操作者信息：管理员账号 + 客户端 IP + 提交人 openid 映射
         operator = session.get('auth_user', 'unknown')
         client_ip = get_client_ip(request)

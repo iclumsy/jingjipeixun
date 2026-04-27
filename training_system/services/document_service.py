@@ -121,15 +121,28 @@ def generate_health_check_form(student, base_dir, students_folder):
     )
     
     # 获取学员照片的本地绝对路径（用于插入体检表）
-    # dual 模式下本地有文件，直接使用；cos-only 模式下为 None，由 _insert_photo_into_doc 负责从 COS 拉取
     photo_abs_path = None
-    if student.get('photo_path'):
+    skip_bg_remove = False
+
+    # 优先查找「已经生成的报名材料中的个人照片」（此时必定已经处理过白底和裁剪）
+    try:
+        from services.material_service import MATERIAL_OUTPUT_LABELS
+        generated_photo_rel = f"students/{student_folder_name}/{student_folder_name}-{MATERIAL_OUTPUT_LABELS['photo']}.jpg"
+        generated_photo_abs = os.path.join(base_dir, generated_photo_rel)
+        if os.path.exists(generated_photo_abs):
+            photo_abs_path = generated_photo_abs
+            skip_bg_remove = True
+    except Exception as photo_err:
+        current_app.logger.warning(f"无法查找已生成的个人照片: {photo_err}")
+
+    # 如果未找到生成的材料，降级使用原始照片
+    if not photo_abs_path and student.get('photo_path'):
         candidate = os.path.join(base_dir, student['photo_path'])
         if os.path.exists(candidate):
             photo_abs_path = candidate
         else:
             # 本地不存在（cos-only 模式），传入 key 让函数自行下载
-            photo_abs_path = student['photo_path']  # 传相对 key，下方函数识别处理
+            photo_abs_path = student['photo_path']
     
     # 准备模板填充数据
     data = {
@@ -139,7 +152,7 @@ def generate_health_check_form(student, base_dir, students_folder):
     }
     
     # 生成 Word 文档
-    generate_word_doc(template_path, doc_path, data, photo_abs_path)
+    generate_word_doc(template_path, doc_path, data, photo_path=photo_abs_path, skip_bg_remove=skip_bg_remove)
     
     # 返回相对路径（用于数据库存储）
     rel_path = f"students/{student_folder_name}/{os.path.basename(doc_path)}"
@@ -150,15 +163,16 @@ def generate_health_check_form(student, base_dir, students_folder):
     return rel_path
 
 
-def generate_word_doc(template_path, output_path, data, photo_path=None):
+def generate_word_doc(template_path, output_path, data, photo_path=None, skip_bg_remove=False):
     """
-    根据模板生成填写学员数据的 Word 文档。
+    根据模板生成目标 Word 文档。
 
     参数:
-        template_path: 模板文档路径
-        output_path: 输出文档保存路径
-        data: 包含学员数据的字典
+        template_path: 模板文件路径
+        output_path: 输出文件路径
+        data: 字典格式的数据
         photo_path: 学员照片路径（可选）
+        skip_bg_remove: 是否跳过体检表内部强制白底处理
     """
     try:
         doc = Document(template_path)
@@ -227,7 +241,7 @@ def generate_word_doc(template_path, output_path, data, photo_path=None):
                     effective_photo_path = None
             if effective_photo_path and os.path.exists(effective_photo_path):
                 try:
-                    _insert_photo_into_doc(doc, effective_photo_path)
+                    _insert_photo_into_doc(doc, effective_photo_path, skip_bg_remove)
                 finally:
                     if _tmp_photo and os.path.exists(_tmp_photo):
                         try:
@@ -243,27 +257,33 @@ def generate_word_doc(template_path, output_path, data, photo_path=None):
         raise
 
 
-def _insert_photo_into_doc(doc, photo_path):
+def _insert_photo_into_doc(doc, photo_path, skip_bg_remove=False):
     """
     将照片插入到 Word 文档中。
 
     参数:
         doc: Document 对象
         photo_path: 照片文件路径
+        skip_bg_remove: 是否跳过白底处理
     """
     try:
         # 尝试将照片背景替换为白色（体检表要求白底证件照）
-        # 如果背景替换失败（依赖库未安装等），降级使用原始照片
+        # 如果已经有白底或跳过，直接使用
         temp_photo_path = None
-        try:
-            temp_fd, temp_photo_path = tempfile.mkstemp(suffix='.jpg')
-            os.close(temp_fd)
-            processed_photo_path = change_id_photo_bg(photo_path, temp_photo_path)
-            photo_to_use = processed_photo_path if processed_photo_path == temp_photo_path else photo_path
-        except Exception as e:
-            current_app.logger.warning(f'Background processing failed, using original: {str(e)}')
+        if skip_bg_remove:
             photo_to_use = photo_path
-            temp_photo_path = None
+        else:
+            try:
+                from services.image_service import change_id_photo_bg
+                import tempfile
+                temp_fd, temp_photo_path = tempfile.mkstemp(suffix='.jpg')
+                os.close(temp_fd)
+                processed_photo_path = change_id_photo_bg(photo_path, temp_photo_path)
+                photo_to_use = processed_photo_path if processed_photo_path == temp_photo_path else photo_path
+            except Exception as e:
+                current_app.logger.warning(f'Background processing failed, using original: {str(e)}')
+                photo_to_use = photo_path
+                temp_photo_path = None
 
         # 加载照片
         with open(photo_to_use, 'rb') as f:

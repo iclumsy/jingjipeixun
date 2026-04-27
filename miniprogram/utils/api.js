@@ -658,22 +658,7 @@ async function manualCropMaterial(studentId, payload = {}) {
     method: 'POST',
     data: payload
   })
-}
 
-/**
- * 重新生成体检表（使用最新报名材料个人照片）。
- *
- * @param {number|string} studentId - 学员 ID
- * @returns {Promise<Object>} 生成结果
- */
-async function regenerateTrainingForm(studentId) {
-  const id = encodeURIComponent(String(studentId || '').trim())
-  if (!id) {
-    throw new Error('学员ID不能为空')
-  }
-  return await requestApi(`/api/students/${id}/regenerate_training_form`, {
-    method: 'POST'
-  })
 }
 
 /**
@@ -1129,7 +1114,6 @@ module.exports = {
   getStudentDetail,     // 获取学员详情
   getGeneratedMaterials, // 获取已生成报名材料
   manualCropMaterial,   // 手工裁剪并重新生成报名材料
-  regenerateTrainingForm, // 重新生成体检表
   reviewStudent,        // 审核学员
   updateStudent,        // 更新学员
   deleteStudent,        // 删除学员
