@@ -478,6 +478,24 @@
   align-items: center;
 }
 
+.white-bg-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6rpx 12rpx;
+  background: #f8fafc;
+  border-radius: 10rpx;
+  border: 1rpx solid #e2e8f0;
+  box-sizing: border-box;
+}
+
+.white-bg-label {
+  font-size: 24rpx;
+  color: #334155;
+  font-weight: 600;
+}
+
 .modal-tool-btn,
 .modal-confirm-btn {
   height: 52rpx;

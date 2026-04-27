@@ -718,6 +718,7 @@ Page({
         panels,
         activeKey: panels[0].key,
         activePanel: panels[0],
+        whiteBg: true,
         submitting: false
       }
     }, () => {
@@ -739,6 +740,7 @@ Page({
         panels: [],
         activeKey: '',
         activePanel: null,
+        whiteBg: true,
         submitting: false
       }
     })
@@ -811,6 +813,10 @@ Page({
     }, () => {
       this.prepareActiveCropPanel()
     })
+  },
+
+  toggleWhiteBg(e) {
+    this.setData({ 'materialModal.whiteBg': e.detail.value })
   },
 
   prepareActiveCropPanel() {
@@ -1173,6 +1179,10 @@ Page({
       if (panel.touched) state[panel.key] = panel.points
     })
     const payload = buildManualCropPayload(modal.materialType, state)
+    // photo 白底开关
+    if (modal.materialType === 'photo' && modal.whiteBg === false) {
+      payload.adjustments.skip_white_bg = true
+    }
     this.setData({ 'materialModal.submitting': true })
     wx.showLoading({ title: '生成中...' })
     try {

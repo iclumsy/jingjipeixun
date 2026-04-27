@@ -146,6 +146,12 @@
       </view>
 
       <view class="material-modal-actions">
+        <view class="modal-tools-row" wx:if="{{materialModal.materialType === 'photo'}}">
+          <view class="white-bg-switch">
+            <text class="white-bg-label">白底处理</text>
+            <switch checked="{{materialModal.whiteBg !== false}}" bindchange="toggleWhiteBg" color="#4F46E5" />
+          </view>
+        </view>
         <view class="modal-tools-row">
           <button class="modal-tool-btn" data-direction="left" bindtap="rotateActivePanel">左转90°</button>
           <button class="modal-tool-btn spaced" data-direction="right" bindtap="rotateActivePanel">右转90°</button>
