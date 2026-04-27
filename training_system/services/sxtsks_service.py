@@ -844,18 +844,24 @@ class SxtsksClient:
         exam_project = student.get('exam_project', '')
         project_code = student.get('project_code', '')
 
-        # 优先从平台动态获取 XMID（通过 exam_project 名称匹配）
-        zyxm_id = self._fetch_project_xmid(exam_project) if exam_project else None
+        # XMID 查找优先级：本地映射（零延迟）→ 动态从平台获取（有网络开销）
+        zyxm_id = None
 
-        # 动态获取失败时，降级使用本地硬编码映射
-        if not zyxm_id:
-            # 先尝试 project_code 精确匹配
-            zyxm_id = PROJECT_CODE_TO_XMID.get(project_code)
-            # 再尝试按 exam_project 名称匹配
-            if not zyxm_id and exam_project:
-                zyxm_id = EXAM_PROJECT_TO_XMID.get(exam_project.strip())
+        # 1. 优先按 exam_project 名称查本地映射（最快，覆盖面最广）
+        if exam_project:
+            zyxm_id = EXAM_PROJECT_TO_XMID.get(exam_project.strip())
             if zyxm_id:
-                self._log_step('XMID降级', 'warning', f'动态获取失败，使用本地映射: exam_project={exam_project}, project_code={project_code} → {zyxm_id}')
+                self._log_step('XMID查找', 'ok', f'本地名称映射: {exam_project} → XMID={zyxm_id}')
+
+        # 2. 再按 project_code 查本地映射
+        if not zyxm_id and project_code:
+            zyxm_id = PROJECT_CODE_TO_XMID.get(project_code)
+            if zyxm_id:
+                self._log_step('XMID查找', 'ok', f'本地代号映射: {project_code} → XMID={zyxm_id}')
+
+        # 3. 都失败时才动态从平台获取（会增加一次 HTTP 请求的延迟）
+        if not zyxm_id and exam_project:
+            zyxm_id = self._fetch_project_xmid(exam_project)
 
         if not zyxm_id:
             return {'success': False, 'message': f'无法确定作业项目代号: exam_project={exam_project}, project_code={project_code}'}

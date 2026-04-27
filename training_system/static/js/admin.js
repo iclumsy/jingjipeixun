@@ -2110,19 +2110,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (student.training_type === 'special_equipment') {
 
                     // ---------- 日志弹窗公共方法 ----------
+                    const _esc = t => String(t || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
                     const buildStepsHtml = (steps) => {
                         if (!steps || !steps.length) return '<div class="log-empty" style="padding:20px; color:#6B7280; text-align:center;">没有记录到执行日志</div>';
                         return steps.map((s, index) => {
+                            const stepText = s.step || '';
                             const isSuccess = s.status === 'ok';
                             const isFail = s.status === 'fail';
                             const isWarn = s.status === 'warning';
                             
                             let icon = isSuccess ? `<span style="color:#10B981;">✓</span>` : isFail ? `<span style="color:#EF4444;">✗</span>` : `<span style="color:#F59E0B;">⚠</span>`;
-                            if (s.step.includes('登录')) icon = '🔑';
-                            if (s.step.includes('照片') || s.step.includes('附件')) icon = '🖼️';
-                            if (s.step.includes('提交')) icon = '📤';
+                            if (stepText.includes('登录')) icon = '🔑';
+                            if (stepText.includes('照片') || stepText.includes('附件')) icon = '🖼️';
+                            if (stepText.includes('提交')) icon = '📤';
                             
-                            const timeStr = s.time ? `<span style="color:#6B7280;font-family:monospace;font-size:12px;">[${s.time}]</span>` : '';
+                            const timeStr = s.time ? `<span style="color:#6B7280;font-family:monospace;font-size:12px;">[${_esc(s.time)}]</span>` : '';
                             const indexStr = `<span style="color:#4B5563;font-family:monospace;font-size:12px;margin-right:6px;">${String(index + 1).padStart(2, '0')}</span>`;
                             
                             let html = `
@@ -2133,18 +2135,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 6px;">
                                             ${indexStr}
                                             ${timeStr}
-                                            <strong style="color: ${isFail ? '#FCA5A5' : isWarn ? '#FDE047' : '#D1D5DB'}; font-size: 14px;">${s.step}</strong>
+                                            <strong style="color: ${isFail ? '#FCA5A5' : isWarn ? '#FDE047' : '#D1D5DB'}; font-size: 14px;">${_esc(stepText)}</strong>
                                         </div>
-                                        ${s.detail ? `<div style="color: #9CA3AF; font-size: 13px; line-height: 1.5; word-wrap: break-word;">${s.detail}</div>` : ''}
+                                        ${s.detail ? `<div style="color: #9CA3AF; font-size: 13px; line-height: 1.5; word-wrap: break-word;">${_esc(s.detail)}</div>` : ''}
                                         
                                         ${s.http_status ? `<div style="display: inline-block; margin-top: 8px; padding: 2px 8px; border-radius: 4px; background: rgba(55, 65, 81, 0.5); color: #9CA3AF; font-size: 11px; font-family: monospace;">HTTP ${s.http_status}</div>` : ''}
                                         
-                                        ${s.alerts && s.alerts.length ? `<div style="margin-top: 10px; padding: 8px 12px; border-left: 3px solid #F59E0B; background: rgba(245, 158, 11, 0.1); color: #FCD34D; font-size: 12px; border-radius: 0 4px 4px 0;">拦截警报：<br/>${s.alerts.join('<br/>')}</div>` : ''}
+                                        ${s.alerts && s.alerts.length ? `<div style="margin-top: 10px; padding: 8px 12px; border-left: 3px solid #F59E0B; background: rgba(245, 158, 11, 0.1); color: #FCD34D; font-size: 12px; border-radius: 0 4px 4px 0;">拦截警报：<br/>${s.alerts.map(a => _esc(a)).join('<br/>')}</div>` : ''}
                                         
                                         ${s.response ? `<details style="margin-top: 8px; cursor: pointer;">
                                             <summary style="font-size: 12px; color: #6B7280; user-select: none;">查看响应详情 (Trace)</summary>
-                                            <div style="margin-top: 8px; padding: 12px; background: rgba(17, 24, 39, 0.8); border: 1px solid #374151; border-radius: 6px; color: #A78BFA; font-family: monospace; font-size: 11px; max-height: 120px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;">${s.response}</div>
-                                        </details>` : ''}
+                                            <div style="margin-top: 8px; padding: 12px; background: rgba(17, 24, 39, 0.8); border: 1px solid #374151; border-radius: 6px; color: #A78BFA; font-family: monospace; font-size: 11px; max-height: 120px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;">${_esc(s.response)}</div>
+                                        </details>` : ''}}
                                     </div>
                                 </div>
                             </div>`;
