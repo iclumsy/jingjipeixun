@@ -1649,7 +1649,7 @@ def manual_crop_material_route(id):
 
         data = request.get_json(silent=True) or {}
         material_type = data.get('material_type', '')
-        if material_type not in ('diploma', 'id_card', 'hukou'):
+        if material_type not in ('diploma', 'id_card', 'hukou', 'photo'):
             return jsonify({'error': '无效的 material_type'}), 400
 
         base_dir = current_app.config['BASE_DIR']
@@ -1696,7 +1696,15 @@ def manual_crop_material_route(id):
 
         student_copy = dict(student)
 
-        if material_type == 'id_card':
+        if material_type == 'photo':
+            # photo 固定比例矩形裁剪（前端已转为4点格式）使用 rect_only 模式
+            p, is_tmp = resolve('photo_path', 'points', 'rect_only')
+            if is_tmp and p:
+                tmp_files.append(p)
+                student_copy['photo_path'] = os.path.relpath(p, base_dir)
+                adjustments['manual_crop_applied'] = True
+
+        elif material_type == 'id_card':
             front_path, front_tmp = resolve('id_card_front_path', 'front_points', crop_mode)
             back_path,  back_tmp  = resolve('id_card_back_path',  'back_points', crop_mode)
             if front_tmp and front_path:
@@ -1775,7 +1783,7 @@ def regenerate_material_route(id):
 
         data = request.get_json(silent=True) or {}
         material_type = data.get('material_type', '')
-        if material_type not in ('diploma', 'id_card', 'hukou'):
+        if material_type not in ('diploma', 'id_card', 'hukou', 'photo'):
             return jsonify({'error': '无效的 material_type'}), 400
 
         adjustments = data.get('adjustments', {})

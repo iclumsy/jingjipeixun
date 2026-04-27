@@ -1632,33 +1632,62 @@ def _size_details(image, key_prefix="size"):
     }
 
 
-def process_personal_photo(input_path, output_dir, name_prefix, logger=None):
-    """个人照片处理为白底并压缩到 1MB 以下"""
+def process_personal_photo(input_path, output_dir, name_prefix, logger=None, adjustments=None):
+    """个人照片处理：可选白底替换、旋转、压缩到 1MB 以下
+
+    adjustments 可包含:
+        skip_white_bg (bool): 跳过白底替换
+        rotate (int): 手动旋转角度 0/90/180/270
+        manual_crop_applied (bool): 是否已手动裁剪
+    """
+    adjustments = adjustments or {}
     scope = "photo"
     temp_bg_path = None
+    skip_white_bg = adjustments.get("skip_white_bg", False)
+    extra_rotate = int(adjustments.get("rotate", 0) or 0)
     try:
         if logger is not None:
             logger.emit("info", scope, "start", "开始处理个人照片", os.path.basename(input_path))
 
-        # 先用 rembg 将背景替换为白色
+        # 旋转原图（如果指定了旋转角度）
         effective_path = input_path
-        try:
-            from services.image_service import change_id_photo_bg
-            import tempfile as _tf
-            temp_fd, temp_bg_path = _tf.mkstemp(suffix='.jpg')
-            os.close(temp_fd)
-            result_path = change_id_photo_bg(input_path, temp_bg_path)
-            if result_path == temp_bg_path and os.path.exists(temp_bg_path):
-                effective_path = temp_bg_path
+        if extra_rotate:
+            try:
+                img_cv = read_cv_image(input_path)
+                if img_cv is not None:
+                    img_cv = rotate_image_by_degrees(img_cv, extra_rotate)
+                    import tempfile as _tf2
+                    temp_rot_fd, temp_rot_path = _tf2.mkstemp(suffix='.jpg')
+                    os.close(temp_rot_fd)
+                    write_cv_image(temp_rot_path, img_cv)
+                    effective_path = temp_rot_path
+                    if logger is not None:
+                        logger.emit("info", scope, "rotate", f"照片已旋转 {extra_rotate}°", "")
+            except Exception as rot_exc:
+                print(f"[photo] 旋转失败，使用原图: {rot_exc}")
+
+        # 白底替换（可选）
+        if not skip_white_bg:
+            try:
+                from services.image_service import change_id_photo_bg
+                import tempfile as _tf
+                temp_fd, temp_bg_path = _tf.mkstemp(suffix='.jpg')
+                os.close(temp_fd)
+                result_path = change_id_photo_bg(effective_path, temp_bg_path)
+                if result_path == temp_bg_path and os.path.exists(temp_bg_path):
+                    effective_path = temp_bg_path
+                    if logger is not None:
+                        logger.emit("info", scope, "bg_remove", "个人照片已替换为白底", "使用 rembg 完成背景白色替换")
+                else:
+                    if logger is not None:
+                        logger.emit("warning", scope, "bg_remove", "白底替换跳过", "rembg 依赖不可用，使用原图")
+            except Exception as bg_exc:
+                print(f"[photo] 白底处理失败，使用原图: {bg_exc}")
                 if logger is not None:
-                    logger.emit("info", scope, "bg_remove", "个人照片已替换为白底", "使用 rembg 完成背景白色替换")
-            else:
-                if logger is not None:
-                    logger.emit("warning", scope, "bg_remove", "白底替换跳过", "rembg 依赖不可用，使用原图")
-        except Exception as bg_exc:
-            print(f"[photo] 白底处理失败，使用原图: {bg_exc}")
+                    logger.emit("warning", scope, "bg_remove", "白底替换失败", f"降级使用原图: {bg_exc}")
+        else:
             if logger is not None:
-                logger.emit("warning", scope, "bg_remove", "白底替换失败", f"降级使用原图: {bg_exc}")
+                logger.emit("info", scope, "bg_remove", "白底处理已跳过", "用户手动关闭了白底处理功能")
 
         img = Image.open(effective_path)
         if img.mode != "RGB":
@@ -2419,7 +2448,7 @@ def generate_student_materials(student, base_dir, output_root):
 def regenerate_single_material(student, base_dir, output_root, material_type, adjustments=None):
     """
     重新生成单个材料文件。
-    material_type: "diploma" | "id_card" | "hukou"
+    material_type: "diploma" | "id_card" | "hukou" | "photo"
     adjustments: dict，可选调整参数
     """
     adjustments = adjustments or {}
@@ -2476,6 +2505,11 @@ def regenerate_single_material(student, base_dir, output_root, material_type, ad
         records_page_path = get_abs_path("certificate_records_page_path")
         if (info_page_path and os.path.exists(info_page_path)) or (records_page_path and os.path.exists(records_page_path)):
             results.append(process_renewal_certificate_pages(info_page_path, records_page_path, output_dir, name_prefix, logger=logger))
+
+    elif material_type == "photo":
+        photo_path = get_abs_path("photo_path")
+        if photo_path and os.path.exists(photo_path):
+            results.append(process_personal_photo(photo_path, output_dir, name_prefix, adjustments=adjustments, logger=logger))
 
     if not results:
         logger.emit("error", "global", "finish", "未找到可重新生成的原始材料", f"没有找到 {material_type} 对应的原始附件")

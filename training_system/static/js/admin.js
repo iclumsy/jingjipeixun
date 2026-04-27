@@ -2559,6 +2559,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     function detectMaterialType(filename) {
+        if (filename.includes('个人照片')) return 'photo';
         if (filename.includes('学历证书')) return 'diploma';
         if (filename.includes('身份证')) return 'id_card';
         if (filename.includes('户口本')) return 'hukou';
@@ -2575,6 +2576,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // ── 数据：各 material 类型对应的调整字段 & 图片面板 ─────────────────
         const configs = {
+            photo: {
+                title: '个人照片调整',
+                rotateFields: [{
+                    key: 'rotate', label: '旋转',
+                    hint: '<span style="color:#6366f1;font-size:12px">📌 照片方向不对时旋转，每次 90°</span>'
+                }],
+                rotateKeyToPanel: { rotate: 'points' },
+                imagePanels: [{ label: '个人照片', pathKey: 'photo_path', pointsKey: 'points' }],
+                fixedRatio: 5 / 7,      // 1寸照片比例锁定 (25×35mm)
+                cropMode: 'rect_fixed', // 固定比例矩形模式
+            },
             diploma: {
                 title: '学历证书调整',
                 rotateFields: [{
@@ -2638,26 +2650,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         const expandOptions = [{ value:'tight',label:'紧凑'},{value:'normal',label:'标准'},{value:'loose',label:'宽松'},{value:'x-loose',label:'超宽松'}];
         const trimOptions   = [{ value:'on',label:'开启'},{value:'off',label:'关闭'}];
         const rotateOptions = [{ value:'0',label:'0°'},{value:'90',label:'90°'},{value:'180',label:'180°'},{value:'270',label:'270°'}];
+        const whiteOptions  = [{ value:'on',label:'开启'},{value:'off',label:'关闭'}];
 
         const tip = t => `<span style="color:#6366f1;font-size:12px">${t}</span>`;
         const cropDesc   = tip('📌 裁出来变形/拉伸 → 改用「仅矩形」｜全部失败/背景极复杂 → 选「不裁剪」');
         const expandDesc = tip('📌 角落被截断/内容丢失 → 选「宽松」或「超宽松」｜包含大量背景 → 选「紧凑」');
         const ratioDesc  = tip('📌 比例明显异常（过扁或过高）→ 尝试「关闭」｜多数情况保持「开启」');
+        const whiteBgDesc = tip('📌 使用 AI 去除背景并替换为纯白色｜如照片已是白底可关闭');
 
-        let leftHtml = fieldRow('裁剪模式', cropDesc, 'crop_mode', cropOptions, 'auto')
+        let leftHtml;
+        if (matType === 'photo') {
+            // photo 简化版：只有白底开关 + 旋转
+            leftHtml = fieldRow('白底处理', whiteBgDesc, 'white_bg', whiteOptions, 'on');
+            cfg.rotateFields.forEach(f => {
+                leftHtml += fieldRow(f.label, f.hint || tip('📌 方向颠倒或横置时使用，每次旋转 90°'), f.key, rotateOptions, '0');
+            });
+        } else {
+            leftHtml = fieldRow('裁剪模式', cropDesc, 'crop_mode', cropOptions, 'auto')
                      + fieldRow('裁剪边距', expandDesc, 'expand_level', expandOptions, 'normal')
                      + fieldRow('比例修剪', ratioDesc, 'ratio_trim', trimOptions, 'on');
 
-        if (matType === 'id_card' || matType === 'hukou') {
-            const cannyOptions = [{value:'1.5',label:'低灵敏'},{value:'1.0',label:'标准'},{value:'0.6',label:'高灵敏'},{value:'0.35',label:'极高灵敏'}];
-            const cannyDesc = matType === 'id_card'
-                ? tip('📌 纯黑背景+白色卡片 → 极高灵敏｜深色背景/边缘模糊 → 高灵敏｜被误识到背景纹理噪点 → 低灵敏｜不确定先试「高灵敏」')
-                : tip('📌 户口本放在深色桌面上拍 → 高灵敏｜扫描件/白底书页 → 标准｜识别到装订线等多余边缘 → 低灵敏');
-            leftHtml += fieldRow('边缘灵敏度', cannyDesc, 'canny_scale', cannyOptions, '1.0');
+            if (matType === 'id_card' || matType === 'hukou') {
+                const cannyOptions = [{value:'1.5',label:'低灵敏'},{value:'1.0',label:'标准'},{value:'0.6',label:'高灵敏'},{value:'0.35',label:'极高灵敏'}];
+                const cannyDesc = matType === 'id_card'
+                    ? tip('📌 纯黑背景+白色卡片 → 极高灵敏｜深色背景/边缘模糊 → 高灵敏｜被误识到背景纹理噪点 → 低灵敏｜不确定先试「高灵敏」')
+                    : tip('📌 户口本放在深色桌面上拍 → 高灵敏｜扫描件/白底书页 → 标准｜识别到装订线等多余边缘 → 低灵敏');
+                leftHtml += fieldRow('边缘灵敏度', cannyDesc, 'canny_scale', cannyOptions, '1.0');
+            }
+            cfg.rotateFields.forEach(f => {
+                leftHtml += fieldRow(f.label, f.hint || tip('📌 方向颠倒或横置时使用，每次旋转 90°'), f.key, rotateOptions, '0');
+            });
         }
-        cfg.rotateFields.forEach(f => {
-            leftHtml += fieldRow(f.label, f.hint || tip('📌 方向颠倒或横置时使用，每次旋转 90°'), f.key, rotateOptions, '0');
-        });
 
         // ── 画框区：状态和 canvas 数据 ────────────────────────────────────
         const cropState = {}; // pointsKey → { displayPts[], originalPts[] }
@@ -2708,6 +2731,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             let hasConfirmedPoints = false; // 仅用户确认过的点位才参与提交
             let rotationDeg = 0;     // 当前旋转角度（0/90/180/270）
 
+            // ── photo 固定比例矩形框状态 ──────────────────────────────────
+            const isFixedRatio = !!cfg.fixedRatio;
+            const FIXED_RATIO = cfg.fixedRatio || 1;  // w/h，例如 5/7≈0.714
+            // cropRect: {x, y, w, h} 原图像素坐标
+            let cropRect = null;
+            let dispRect = null;  // canvas 坐标
+            let dragMode = null;  // 'move' | 'resize-tl' | 'resize-tr' | 'resize-br' | 'resize-bl'
+            let dragStart = null; // {mx, my, rect: {...cropRect}}
+
             // ── 坐标变换（含旋转矩阵）──────────────────────────────────────
             function getTransform() {
                 const W = cvs.clientWidth  || 1;
@@ -2747,15 +2779,55 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // 从 originalPts 重新计算 dispPts（旋转改变或图像尺寸改变后调用）
             function refreshDispPts() {
+                if (isFixedRatio && cropRect) {
+                    refreshDispRect();
+                    return;
+                }
                 if (originalPts) dispPts = originalPts.map(p => origToDisp(p));
             }
 
-            // 用整张图的四角初始化 originalPts
+            // ── 固定比例矩形：坐标刷新 ─────────────────────────────────────
+            function refreshDispRect() {
+                if (!cropRect) return;
+                const tl = origToDisp([cropRect.x, cropRect.y]);
+                const br = origToDisp([cropRect.x + cropRect.w, cropRect.y + cropRect.h]);
+                dispRect = { x: tl[0], y: tl[1], w: br[0] - tl[0], h: br[1] - tl[1] };
+                // 同步到 originalPts/dispPts 以兼容提交流程
+                originalPts = [
+                    [cropRect.x, cropRect.y],
+                    [cropRect.x + cropRect.w, cropRect.y],
+                    [cropRect.x + cropRect.w, cropRect.y + cropRect.h],
+                    [cropRect.x, cropRect.y + cropRect.h],
+                ];
+                dispPts = originalPts.map(p => origToDisp(p));
+            }
+
+            // 用整张图的四角初始化 originalPts（自由角点模式）
+            // 或用最大内切矩形初始化 cropRect（固定比例模式）
             function initRect() {
                 const nw = img.naturalWidth, nh = img.naturalHeight;
                 if (!nw) return;
-                originalPts = [[0, 0], [nw, 0], [nw, nh], [0, nh]];
-                refreshDispPts();
+                if (isFixedRatio) {
+                    // 在原图中心放置最大的固定比例矩形
+                    let rw, rh;
+                    if (nw / nh > FIXED_RATIO) {
+                        rh = nh * 0.85;
+                        rw = rh * FIXED_RATIO;
+                    } else {
+                        rw = nw * 0.85;
+                        rh = rw / FIXED_RATIO;
+                    }
+                    cropRect = {
+                        x: Math.round((nw - rw) / 2),
+                        y: Math.round((nh - rh) / 2),
+                        w: Math.round(rw),
+                        h: Math.round(rh),
+                    };
+                    refreshDispRect();
+                } else {
+                    originalPts = [[0, 0], [nw, 0], [nw, nh], [0, nh]];
+                    refreshDispPts();
+                }
                 syncCropState();
             }
 
@@ -2785,6 +2857,52 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ctx.rotate(rad);
                     ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
                     ctx.restore();
+                }
+
+                if (isFixedRatio) {
+                    // ── 固定比例矩形渲染 ──
+                    if (!dispRect) return;
+                    const { x: rx, y: ry, w: rw, h: rh } = dispRect;
+
+                    // 2. 半透明遮罩
+                    ctx.fillStyle = 'rgba(0,0,0,0.42)';
+                    ctx.fillRect(0, 0, W, H);
+                    // 3. 镂空矩形
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.fillRect(rx, ry, rw, rh);
+                    ctx.restore();
+                    // 4. 矩形边框
+                    ctx.strokeStyle = '#6366f1';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([]);
+                    ctx.strokeRect(rx, ry, rw, rh);
+
+                    // 5. 四角缩放手柄（方形）
+                    const corners = [[rx, ry], [rx + rw, ry], [rx + rw, ry + rh], [rx, ry + rh]];
+                    corners.forEach(([hx, hy]) => {
+                        ctx.fillStyle = '#fff';
+                        ctx.fillRect(hx - 6, hy - 6, 12, 12);
+                        ctx.strokeStyle = '#6366f1';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(hx - 6, hy - 6, 12, 12);
+                    });
+                    // 6. 中心移动提示
+                    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                    ctx.beginPath();
+                    ctx.arc(rx + rw / 2, ry + rh / 2, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#4f46e5';
+                    ctx.font = 'bold 14px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('✛', rx + rw / 2, ry + rh / 2);
+                    // 7. 比例提示
+                    ctx.fillStyle = 'rgba(99,102,241,0.85)';
+                    ctx.font = '11px sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.fillText('1寸 (5:7)', rx + 4, ry - 6);
+                    return;
                 }
 
                 if (!dispPts) return;
@@ -2840,52 +2958,181 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return best;
             }
 
+            // ── 固定比例矩形：命中测试 ─────────────────────────────────────
+            function hitTestRect(mx, my) {
+                if (!dispRect) return null;
+                const { x, y, w, h } = dispRect;
+                const HR = 10;
+                // 四角
+                if (Math.hypot(mx - x, my - y) < HR) return 'resize-tl';
+                if (Math.hypot(mx - (x + w), my - y) < HR) return 'resize-tr';
+                if (Math.hypot(mx - (x + w), my - (y + h)) < HR) return 'resize-br';
+                if (Math.hypot(mx - x, my - (y + h)) < HR) return 'resize-bl';
+                // 框内
+                if (mx >= x && mx <= x + w && my >= y && my <= y + h) return 'move';
+                return null;
+            }
+
+            function getCursorForMode(mode) {
+                if (!mode) return 'default';
+                if (mode === 'move') return 'move';
+                if (mode === 'resize-tl' || mode === 'resize-br') return 'nwse-resize';
+                return 'nesw-resize';
+            }
+
+            // 限制 cropRect 不超出原图边界
+            function clampCropRect() {
+                const nw = img.naturalWidth, nh = img.naturalHeight;
+                if (cropRect.x < 0) cropRect.x = 0;
+                if (cropRect.y < 0) cropRect.y = 0;
+                if (cropRect.x + cropRect.w > nw) cropRect.x = nw - cropRect.w;
+                if (cropRect.y + cropRect.h > nh) cropRect.y = nh - cropRect.h;
+            }
+
             // ── 鼠标事件 ──────────────────────────────────────────────────
-            cvs.addEventListener('mousedown', e => {
-                if (!dispPts) { initRect(); redraw(); }
-                const rect = cvs.getBoundingClientRect();
-                const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-                dragging = hitTest(mx, my);
-                if (dragging >= 0) { e.preventDefault(); cvs.style.cursor = 'grabbing'; }
-            });
+            if (isFixedRatio) {
+                // ── photo 固定比例矩形交互 ──
+                cvs.addEventListener('mousedown', e => {
+                    if (!cropRect) { initRect(); redraw(); }
+                    const rect = cvs.getBoundingClientRect();
+                    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+                    dragMode = hitTestRect(mx, my);
+                    if (dragMode) {
+                        e.preventDefault();
+                        dragStart = { mx, my, rect: { ...cropRect } };
+                        cvs.style.cursor = getCursorForMode(dragMode);
+                    }
+                });
 
-            cvs.addEventListener('mousemove', e => {
-                const rect = cvs.getBoundingClientRect();
-                const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-                if (dragging >= 0) {
-                    dispPts[dragging]    = [mx, my];
-                    originalPts[dragging] = dispToOrig([mx, my]); // 同步回原图坐标
-                    syncCropState();
+                cvs.addEventListener('mousemove', e => {
+                    const bRect = cvs.getBoundingClientRect();
+                    const mx = e.clientX - bRect.left, my = e.clientY - bRect.top;
+                    if (dragMode && dragStart) {
+                        const { scale } = getTransform();
+                        const dxPx = (mx - dragStart.mx) / scale;
+                        const dyPx = (my - dragStart.my) / scale;
+                        const s = dragStart.rect;
+
+                        if (dragMode === 'move') {
+                            cropRect.x = Math.round(s.x + dxPx);
+                            cropRect.y = Math.round(s.y + dyPx);
+                            clampCropRect();
+                        } else {
+                            // 角缩放：保持比例，根据拖动距离决定大小
+                            let newW, newH;
+                            if (dragMode === 'resize-br') {
+                                newW = Math.max(40, Math.round(s.w + dxPx));
+                            } else if (dragMode === 'resize-bl') {
+                                newW = Math.max(40, Math.round(s.w - dxPx));
+                            } else if (dragMode === 'resize-tr') {
+                                newW = Math.max(40, Math.round(s.w + dxPx));
+                            } else { // resize-tl
+                                newW = Math.max(40, Math.round(s.w - dxPx));
+                            }
+                            newH = Math.round(newW / FIXED_RATIO);
+                            const nw = img.naturalWidth, nh = img.naturalHeight;
+                            // 限制不超出图片
+                            if (newW > nw) { newW = nw; newH = Math.round(newW / FIXED_RATIO); }
+                            if (newH > nh) { newH = nh; newW = Math.round(newH * FIXED_RATIO); }
+
+                            if (dragMode === 'resize-br') {
+                                cropRect.w = newW; cropRect.h = newH;
+                            } else if (dragMode === 'resize-bl') {
+                                cropRect.x = Math.round(s.x + s.w - newW);
+                                cropRect.w = newW; cropRect.h = newH;
+                            } else if (dragMode === 'resize-tr') {
+                                cropRect.y = Math.round(s.y + s.h - newH);
+                                cropRect.w = newW; cropRect.h = newH;
+                            } else { // resize-tl
+                                cropRect.x = Math.round(s.x + s.w - newW);
+                                cropRect.y = Math.round(s.y + s.h - newH);
+                                cropRect.w = newW; cropRect.h = newH;
+                            }
+                            clampCropRect();
+                        }
+                        refreshDispRect();
+                        syncCropState();
+                        redraw();
+                    } else {
+                        cvs.style.cursor = getCursorForMode(hitTestRect(mx, my));
+                    }
+                });
+
+                const stopDragRect = () => {
+                    if (dragMode) {
+                        userDragged = true;
+                        hasConfirmedPoints = true;
+                        syncCropState();
+                        statusEl.style.color = '#059669';
+                        statusEl.textContent = '✓ 已手动调整裁剪区域，点击「重新生成」确认';
+                    }
+                    dragMode = null;
+                    dragStart = null;
+                    cvs.style.cursor = 'default';
+                };
+                cvs.addEventListener('mouseup', stopDragRect);
+                cvs.addEventListener('mouseleave', stopDragRect);
+
+                resetBtn.onclick = () => {
+                    userDragged = false;
+                    hasConfirmedPoints = false;
+                    cropRect = null;
+                    dispRect = null;
+                    originalPts = null;
+                    dispPts = null;
+                    initRect();
                     redraw();
-                } else {
-                    cvs.style.cursor = hitTest(mx, my) >= 0 ? 'grab' : 'default';
-                }
-            });
+                    statusEl.textContent = '拖动框选区域或角手柄调整裁剪范围';
+                    statusEl.style.color = '#6b7280';
+                };
+            } else {
+                // ── 现有4角点自由交互 ──
+                cvs.addEventListener('mousedown', e => {
+                    if (!dispPts) { initRect(); redraw(); }
+                    const rect = cvs.getBoundingClientRect();
+                    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+                    dragging = hitTest(mx, my);
+                    if (dragging >= 0) { e.preventDefault(); cvs.style.cursor = 'grabbing'; }
+                });
 
-            const stopDrag = () => {
-                if (dragging >= 0) {
-                    userDragged = true;
-                    hasConfirmedPoints = true;
-                    syncCropState();
-                    statusEl.style.color   = '#059669';
-                    statusEl.textContent   = '✓ 已手动调整裁剪区域，点击「重新生成」确认';
-                }
-                dragging = -1;
-                cvs.style.cursor = 'default';
-            };
-            cvs.addEventListener('mouseup', stopDrag);
-            cvs.addEventListener('mouseleave', stopDrag);
+                cvs.addEventListener('mousemove', e => {
+                    const rect = cvs.getBoundingClientRect();
+                    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+                    if (dragging >= 0) {
+                        dispPts[dragging]    = [mx, my];
+                        originalPts[dragging] = dispToOrig([mx, my]); // 同步回原图坐标
+                        syncCropState();
+                        redraw();
+                    } else {
+                        cvs.style.cursor = hitTest(mx, my) >= 0 ? 'grab' : 'default';
+                    }
+                });
 
-            resetBtn.onclick = () => {
-                userDragged = false;
-                hasConfirmedPoints = false;
-                originalPts = null;
-                dispPts     = null;
-                initRect();
-                redraw();
-                statusEl.textContent = '拖动角点调整裁剪区域';
-                statusEl.style.color = '#6b7280';
-            };
+                const stopDrag = () => {
+                    if (dragging >= 0) {
+                        userDragged = true;
+                        hasConfirmedPoints = true;
+                        syncCropState();
+                        statusEl.style.color   = '#059669';
+                        statusEl.textContent   = '✓ 已手动调整裁剪区域，点击「重新生成」确认';
+                    }
+                    dragging = -1;
+                    cvs.style.cursor = 'default';
+                };
+                cvs.addEventListener('mouseup', stopDrag);
+                cvs.addEventListener('mouseleave', stopDrag);
+
+                resetBtn.onclick = () => {
+                    userDragged = false;
+                    hasConfirmedPoints = false;
+                    originalPts = null;
+                    dispPts     = null;
+                    initRect();
+                    redraw();
+                    statusEl.textContent = '拖动角点调整裁剪区域';
+                    statusEl.style.color = '#6b7280';
+                };
+            }
 
             // ── 暴露接口 ──────────────────────────────────────────────────
             wrap.applyServerPoints = (pts_orig) => {
@@ -2933,7 +3180,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             function onImgReady() {
                 if (!img.complete || img.naturalWidth === 0) return;
                 if (cvs.clientWidth === 0) return;
-                if (!hasConfirmedPoints && !originalPts) {
+                if (isFixedRatio) {
+                    initRect();
+                    statusEl.textContent = '拖动选框调整裁剪范围（不标记默认处理整张图）';
+                    statusEl.style.color = '#6b7280';
+                } else if (!hasConfirmedPoints && !originalPts) {
                     initRect();
                     statusEl.textContent = '拖动角点调整裁剪区域（不标记默认按左侧参数运行自动处理）';
                     statusEl.style.color = '#6b7280';
@@ -3119,8 +3370,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             _reanalyzeTimer = setTimeout(() => reanalyzePoints(buildCurrentAdjustments()), 400);
         }
 
-        // 打开面板后立即分析一次
-        reanalyzePoints({});
+        // 打开面板后立即分析一次（photo 不需要后端角点分析）
+        if (matType !== 'photo') {
+            reanalyzePoints({});
+        }
 
         // ── Pill 交互（区分旋转 vs 裁剪参数）────────────────────────────────
         const rotateFieldKeySet = new Set(cfg.rotateFields.map(f => f.key));
@@ -3161,13 +3414,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         panel.querySelector('#adj-submit').onclick = async () => {
             const adjustments = {};
-            const cropMode = getGroupVal('crop_mode');
-            if (cropMode) adjustments.crop_mode = cropMode;
-            const expandLevel = getGroupVal('expand_level');
-            if (expandLevel && expandLevel !== 'normal') adjustments.expand_level = expandLevel;
-            if (getGroupVal('ratio_trim') === 'off') adjustments.skip_ratio_trim = true;
-            const cannyVal = getGroupVal('canny_scale');
-            if (cannyVal && parseFloat(cannyVal) !== 1.0) adjustments.canny_scale = parseFloat(cannyVal);
+
+            if (matType === 'photo') {
+                // photo 专属参数
+                if (getGroupVal('white_bg') === 'off') adjustments.skip_white_bg = true;
+            } else {
+                // 文档类材料参数
+                const cropMode = getGroupVal('crop_mode');
+                if (cropMode) adjustments.crop_mode = cropMode;
+                const expandLevel = getGroupVal('expand_level');
+                if (expandLevel && expandLevel !== 'normal') adjustments.expand_level = expandLevel;
+                if (getGroupVal('ratio_trim') === 'off') adjustments.skip_ratio_trim = true;
+                const cannyVal = getGroupVal('canny_scale');
+                if (cannyVal && parseFloat(cannyVal) !== 1.0) adjustments.canny_scale = parseFloat(cannyVal);
+            }
             cfg.rotateFields.forEach(f => {
                 const val = parseInt(getGroupVal(f.key) || '0', 10);
                 if (val) adjustments[f.key] = val;
