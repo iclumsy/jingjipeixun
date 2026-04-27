@@ -671,8 +671,9 @@ async function regenerateTrainingForm(studentId) {
   if (!id) {
     throw new Error('学员ID不能为空')
   }
-  return await requestApi(`/api/students/${id}/regenerate_training_form`, {
-    method: 'POST'
+  return await requestApi(`/api/students/${id}/regenerate_material`, {
+    method: 'POST',
+    data: { material_type: 'training_form' }
   })
 }
 

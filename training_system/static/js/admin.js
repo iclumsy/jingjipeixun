@@ -1843,8 +1843,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 regenBtn.textContent = '生成中...';
                 regenBtn.disabled = true;
                 try {
-                    const res = await fetch(`/api/students/${student.id}/regenerate_training_form`, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    const res = await fetch(`/api/students/${student.id}/regenerate_material`, {
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ material_type: 'training_form' })
                     });
                     const result = await res.json();
                     if (!res.ok) throw new Error(result.error || '重新生成失败');

@@ -1564,12 +1564,22 @@ def generate_materials_route(id):
         if student.get('status') != 'reviewed':
             return jsonify({'error': '仅支持已审核学员生成报名材料'}), 400
             
-        from services.material_service import generate_student_materials
+        from services.material_service import generate_student_materials, generate_health_check_form
         import io as _io
         import contextlib
         base_dir = current_app.config['BASE_DIR']
         output_root = current_app.config['STUDENTS_FOLDER']
         
+        data = request.get_json(silent=True) or {}
+        material_type = data.get('material_type')
+
+        if material_type == 'training_form':
+            health_check_path = generate_health_check_form(student, base_dir, output_root)
+            if not health_check_path:
+                return jsonify({'error': '该学员不支持生成体检表'}), 400
+            update_student(id, {'training_form_path': health_check_path})
+            return jsonify({'message': '体检表已重新生成', 'training_form_path': health_check_path})
+
         training_type = student.get('training_type', 'special_operation')
         company = student.get('company', '')
         name = student.get('name', '')
@@ -1826,8 +1836,30 @@ def regenerate_material_route(id):
 
         data = request.get_json(silent=True) or {}
         material_type = data.get('material_type', '')
-        if material_type not in ('diploma', 'id_card', 'hukou', 'photo'):
+        if material_type not in ('diploma', 'id_card', 'hukou', 'photo', 'training_form'):
             return jsonify({'error': '无效的 material_type'}), 400
+            
+        base_dir = current_app.config['BASE_DIR']
+        output_root = current_app.config['STUDENTS_FOLDER']
+        
+        # ==== 特殊处理：如果是重新生成体检表 ====
+        if material_type == 'training_form':
+            from services.document_service import generate_health_check_form
+            health_check_path = generate_health_check_form(student, base_dir, output_root)
+            if health_check_path:
+                updates = {'training_form_path': health_check_path}
+                update_student(id, updates)
+                try:
+                    from services.cos_service import upload_file
+                    abs_path = os.path.join(base_dir, health_check_path)
+                    if os.path.exists(abs_path):
+                        with open(abs_path, 'rb') as f:
+                            upload_file(health_check_path, f.read())
+                except Exception as e:
+                    current_app.logger.warning(f"重新生成体检表同步COS失败: {e}")
+                return jsonify({'message': '体检表重新生成成功'})
+            else:
+                return jsonify({'error': '体检表重新生成失败'}), 500
 
         adjustments = data.get('adjustments', {})
 
