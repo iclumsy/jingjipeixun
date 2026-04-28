@@ -1936,16 +1936,18 @@ def get_generated_materials_route(id):
                         "mtime": mtime
                     })
 
-        # 追加位于父目录的体检表（不在报名材料文件夹中）
+        # 追加位于父目录的体检表（即使本地由于缓存被清未命中，只要 DB 有记录也返回给前端去拉取 COS）
         training_form_rel = student.get('training_form_path')
         if training_form_rel:
             abs_form_path = os.path.join(current_app.config['BASE_DIR'], training_form_rel)
+            mtime = 0
             if os.path.exists(abs_form_path):
-                materials.append({
-                    "name": os.path.basename(abs_form_path),
-                    "url": training_form_rel,
-                    "mtime": int(os.path.getmtime(abs_form_path))
-                })
+                mtime = int(os.path.getmtime(abs_form_path))
+            materials.append({
+                "name": os.path.basename(training_form_rel),
+                "url": training_form_rel,
+                "mtime": mtime
+            })
 
         return jsonify({'exists': len(materials) > 0, 'materials': materials}), 200
 
