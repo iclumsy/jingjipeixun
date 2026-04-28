@@ -145,9 +145,6 @@ def generate_health_check_form(student, base_dir, students_folder):
         candidate = os.path.join(base_dir, student['photo_path'])
         if os.path.exists(candidate):
             photo_abs_path = candidate
-        else:
-            # 本地不存在（cos-only 模式），传入 key 让函数自行下载
-            photo_abs_path = student['photo_path']
     
     # 准备模板填充数据
     data = {
@@ -227,32 +224,12 @@ def generate_word_doc(template_path, output_path, data, photo_path=None, skip_bg
                                 target_cell.text = new_val
 
         # ---- 第二步：将学员证件照插入文档中的照片区域 ----
-        # photo_path 可能是本地绝对路径（dual/local 模式）或相对 key（cos-only 模式）
-        if photo_path:
-            # 若是相对 key（不以 / 开头且本地不存在），尝试从 COS 下载到临时文件
-            effective_photo_path = photo_path
-            _tmp_photo = None
-            if not os.path.isabs(photo_path) and not os.path.exists(photo_path):
-                try:
-                    import tempfile as _tf
-                    tmp_fd, _tmp_photo = _tf.mkstemp(suffix=os.path.splitext(photo_path)[1] or '.jpg')
-                    os.close(tmp_fd)
-                    if storage_service.download_to_file(photo_path, _tmp_photo):
-                        effective_photo_path = _tmp_photo
-                    else:
-                        effective_photo_path = None
-                except Exception as _e:
-                    current_app.logger.warning(f'Failed to download photo from COS: {_e}')
-                    effective_photo_path = None
-            if effective_photo_path and os.path.exists(effective_photo_path):
-                try:
-                    _insert_photo_into_doc(doc, effective_photo_path, skip_bg_remove)
-                finally:
-                    if _tmp_photo and os.path.exists(_tmp_photo):
-                        try:
-                            os.remove(_tmp_photo)
-                        except Exception:
-                            pass
+        # photo_path 应当是本地绝对路径。严格遵循“所有基础操作均在服务端本地执行”的架构约束
+        if photo_path and os.path.isabs(photo_path) and os.path.exists(photo_path):
+            try:
+                _insert_photo_into_doc(doc, photo_path, skip_bg_remove)
+            except Exception as _e:
+                current_app.logger.warning(f'Failed to insert photo into doc: {_e}')
 
         doc.save(output_path)
         current_app.logger.info(f'Document generated: {output_path}')
