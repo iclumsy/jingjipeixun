@@ -185,7 +185,8 @@ def browse_folders():
     items = []
 
     try:
-        for entry in sorted(os.scandir(students_dir), key=lambda e: e.name):
+        # 按修改时间倒序排列（最新的在前面）
+        for entry in sorted(os.scandir(students_dir), key=lambda e: e.stat(follow_symlinks=False).st_mtime, reverse=True):
             if entry.is_dir(follow_symlinks=False):
                 full_path = entry.path
                 size = _get_dir_size(full_path)

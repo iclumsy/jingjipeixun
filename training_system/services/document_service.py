@@ -127,7 +127,12 @@ def generate_health_check_form(student, base_dir, students_folder):
     # 优先查找「已经生成的报名材料中的个人照片」（此时必定已经处理过白底和裁剪）
     try:
         from services.material_service import MATERIAL_OUTPUT_LABELS
-        generated_photo_rel = f"students/{student_folder_name}/{student_folder_name}-{MATERIAL_OUTPUT_LABELS['photo']}.jpg"
+        id_card = student.get('id_card', '')
+        name = student.get('name', '')
+        name_prefix = f"{id_card}-{name}"
+        material_folder_name = f"{name_prefix}-报名材料"
+        
+        generated_photo_rel = f"students/{student_folder_name}/{material_folder_name}/{name_prefix}-{MATERIAL_OUTPUT_LABELS['photo']}.jpg"
         generated_photo_abs = os.path.join(base_dir, generated_photo_rel)
         if os.path.exists(generated_photo_abs):
             photo_abs_path = generated_photo_abs
