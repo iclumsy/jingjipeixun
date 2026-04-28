@@ -1256,6 +1256,12 @@ Page({
     }
   },
 
+  onSwapFromForm(e) {
+    const pair = (e.detail && e.detail.pair) || ''
+    if (!pair) return
+    this.onSwapMaterials({ currentTarget: { dataset: { pair } } })
+  },
+
   getRotationKey(materialType, panelKey) {
     if (materialType === 'photo' || materialType === 'diploma') return 'rotate'
     if (materialType === 'id_card') {
