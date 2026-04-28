@@ -2352,15 +2352,7 @@ def generate_student_materials(student, base_dir, output_root):
 
     def get_abs_path(key):
         rel = student.get(key)
-        if not rel:
-            return None
-        abs_p = os.path.join(base_dir, rel)
-        if not os.path.exists(abs_p) and not os.path.isabs(rel):
-            from services import storage_service
-            # 日志告警并主动补偿
-            logger.emit("warning", "global", "sync", "本地文件缺失", f"正在尝试从云端拉取 {rel} 以继续处理")
-            storage_service.pull_from_cos(rel)
-        return abs_p
+        return os.path.join(base_dir, rel) if rel else None
 
     results = []
     photo_path = get_abs_path("photo_path")
@@ -2488,14 +2480,7 @@ def regenerate_single_material(student, base_dir, output_root, material_type, ad
 
     def get_abs_path(key):
         rel = student.get(key)
-        if not rel:
-            return None
-        abs_p = os.path.join(base_dir, rel)
-        if not os.path.exists(abs_p) and not os.path.isabs(rel):
-            from services import storage_service
-            logger.emit("warning", "global", "sync", "本地文件缺失", f"正在尝试从云端拉取 {rel} 以继续处理")
-            storage_service.pull_from_cos(rel)
-        return abs_p
+        return os.path.join(base_dir, rel) if rel else None
 
     results = []
     if material_type == "diploma":
