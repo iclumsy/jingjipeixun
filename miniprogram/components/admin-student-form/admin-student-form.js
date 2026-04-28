@@ -69,6 +69,28 @@ Component({
     }
   },
 
+  observers: {
+    'enabledAttachments': function (attachments) {
+      if (!attachments) return
+      
+      const idCardAttachments = attachments.filter(a => a.key === 'id_card_front' || a.key === 'id_card_back')
+      const hukouAttachments = attachments.filter(a => a.key === 'hukou_residence' || a.key === 'hukou_personal')
+      const educationAttachments = attachments.filter(a => a.key === 'diploma')
+      const otherAttachments = attachments.filter(a => 
+        a.key !== 'id_card_front' && a.key !== 'id_card_back' && 
+        a.key !== 'hukou_residence' && a.key !== 'hukou_personal' && 
+        a.key !== 'diploma'
+      )
+
+      this.setData({
+        idCardAttachments,
+        hukouAttachments,
+        educationAttachments,
+        otherAttachments
+      })
+    }
+  },
+
   methods: {
     onSelectTrainingType(e) {
       if (this.data.disableTrainingType) return
