@@ -1538,8 +1538,8 @@ def regenerate_training_form_route(id):
             base_dir = current_app.config['BASE_DIR']
             abs_path = os.path.join(base_dir, health_check_path)
             if os.path.exists(abs_path):
-                from services.cos_service import upload_to_cos
-                upload_to_cos(abs_path, health_check_path)
+                from services.storage_service import save_from_local
+                save_from_local(abs_path, health_check_path)
         except Exception as cos_err:
             current_app.logger.warning(f'[体检表重新生成] COS同步失败: {cos_err}')
 
@@ -1850,11 +1850,10 @@ def regenerate_material_route(id):
                 updates = {'training_form_path': health_check_path}
                 update_student(id, updates)
                 try:
-                    from services.cos_service import upload_file
+                    from services.storage_service import save_from_local
                     abs_path = os.path.join(base_dir, health_check_path)
                     if os.path.exists(abs_path):
-                        with open(abs_path, 'rb') as f:
-                            upload_file(health_check_path, f.read())
+                        save_from_local(abs_path, health_check_path)
                 except Exception as e:
                     current_app.logger.warning(f"重新生成体检表同步COS失败: {e}")
                 return jsonify({'message': '体检表重新生成成功'})
