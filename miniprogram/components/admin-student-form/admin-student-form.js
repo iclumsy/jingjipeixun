@@ -142,6 +142,11 @@ Component({
       this.triggerEvent('openprivacy')
     },
 
+    onSwapTap(e) {
+      const pair = e.currentTarget?.dataset?.pair || ''
+      this.triggerEvent('swapmaterials', { pair })
+    },
+
     onSubmitTap() {
       this.triggerEvent('submit')
     }

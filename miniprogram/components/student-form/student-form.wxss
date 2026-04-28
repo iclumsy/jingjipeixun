@@ -5,22 +5,3 @@
 .application-options {
   margin-top: 12rpx;
 }
-
-.swap-inline-row {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  padding: 8rpx 0 16rpx;
-}
-
-.swap-inline-btn {
-  height: 48rpx;
-  margin: 0;
-  padding: 0 24rpx;
-  border-radius: 8rpx;
-  border: 1rpx solid #c7d2fe;
-  background: #eef2ff;
-  color: #4f46e5;
-  font-size: 22rpx;
-  line-height: 48rpx;
-}

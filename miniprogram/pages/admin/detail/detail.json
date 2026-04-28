@@ -1,6 +1,6 @@
 {
   "navigationBarTitleText": "审核详情",
   "usingComponents": {
-    "student-form": "/components/student-form/student-form"
+    "admin-student-form": "/components/admin-student-form/admin-student-form"
   }
 }

@@ -18,7 +18,7 @@
       </view>
     </view>
 
-    <student-form
+    <admin-student-form
       trainingType="{{trainingType}}"
       applicationType="{{editStudent.application_type}}"
       formData="{{editStudent}}"

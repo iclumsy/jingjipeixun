@@ -122,17 +122,25 @@
   </view>
   <view class="attachments-tip">{{attachmentsTip}}</view>
   <view class="attachments-grid">
-    <view class="attachment-item" wx:for="{{enabledAttachments}}" wx:key="key">
-      <file-uploader
-        compact="{{true}}"
-        fileType="{{item.key}}"
-        label="{{item.label}}"
-        required="{{true}}"
-        value="{{(formData.files && formData.files[item.key]) || ''}}"
-        bind:uploaded="onFileUploaded"
-        bind:deleted="onFileDeleted"
-      />
-    </view>
+    <block wx:for="{{enabledAttachments}}" wx:key="key">
+      <view class="attachment-item">
+        <file-uploader
+          compact="{{true}}"
+          fileType="{{item.key}}"
+          label="{{item.label}}"
+          required="{{true}}"
+          value="{{(formData.files && formData.files[item.key]) || ''}}"
+          bind:uploaded="onFileUploaded"
+          bind:deleted="onFileDeleted"
+        />
+      </view>
+      <view wx:if="{{item.key === 'id_card_back'}}" class="swap-inline-row">
+        <button class="swap-inline-btn" size="mini" bindtap="onSwapTap" data-pair="id_card">↔ 互换身份证正反面</button>
+      </view>
+      <view wx:if="{{item.key === 'hukou_personal'}}" class="swap-inline-row">
+        <button class="swap-inline-btn" size="mini" bindtap="onSwapTap" data-pair="hukou">↔ 互换户口本首页/本人页</button>
+      </view>
+    </block>
   </view>
 </view>
 
