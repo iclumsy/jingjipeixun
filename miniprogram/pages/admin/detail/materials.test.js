@@ -2,16 +2,17 @@ const assert = require('assert')
 const {
   detectMaterialType,
   normalizeGeneratedMaterials,
-  buildManualCropPayload
+  buildManualCropPayload,
+  getOffsetTouchPoint
 } = require('./materials')
 
 function run() {
   const raw = [
-    { name: '110101199001010011-张三-个人照片.jpg', url: 'students/a/photo.jpg', mtime: 10 },
+    { name: '110101199001010011-张三-个人照片.jpg', url: 'students/a/photo.jpg', mtime: 10, version: 'photo-v2' },
     { name: '110101199001010011-张三-身份证.jpg', url: 'students/a/id.jpg', mtime: 20 },
     { name: '110101199001010011-张三-户口本.jpg', url: 'students/a/hukou.jpg', mtime: 30 },
     { name: '110101199001010011-张三-学历证书.jpg', url: 'students/a/diploma.jpg', mtime: 40 },
-    { name: '110101199001010011-张三-报名表.docx', url: 'students/a/form.docx', mtime: 50 }
+    { name: '110101199001010011-张三-报名表.docx', url: 'students/a/form.docx', mtime: 50, material_type: 'training_form' }
   ]
 
   assert.strictEqual(detectMaterialType('110101199001010011-张三-身份证.jpg'), 'id_card')
@@ -25,13 +26,13 @@ function run() {
     normalized.map(item => ({ title: item.title, materialType: item.materialType, adjustable: item.adjustable })),
     [
       { title: '个人照片', materialType: 'photo', adjustable: true },
+      { title: '学历证书', materialType: 'diploma', adjustable: true },
       { title: '身份证', materialType: 'id_card', adjustable: true },
       { title: '户口本', materialType: 'hukou', adjustable: true },
-      { title: '学历证书', materialType: 'diploma', adjustable: true },
-      { title: '报名表', materialType: '', adjustable: false }
+      { title: '体检表', materialType: 'training_form', adjustable: false }
     ]
   )
-  assert.strictEqual(normalized[0].previewUrl, '/api/students/a/photo.jpg?v=10')
+  assert.strictEqual(normalized[0].previewUrl, '/api/students/a/photo.jpg?v=photo-v2')
 
   assert.deepStrictEqual(
     buildManualCropPayload('id_card', {
@@ -56,6 +57,11 @@ function run() {
       adjustments: { rotate: 270 },
       points: [[10, 10], [60, 10], [60, 80], [10, 80]]
     }
+  )
+
+  assert.deepStrictEqual(
+    getOffsetTouchPoint({ clientX: 160, clientY: 260 }, { left: 20, top: 40 }, 70),
+    { x: 140, y: 150 }
   )
 }
 

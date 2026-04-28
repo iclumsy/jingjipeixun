@@ -18,6 +18,8 @@
     TRAINING_SYSTEM_ADMIN_USER          : 管理员用户名（默认 admin）
     TRAINING_SYSTEM_ADMIN_PASSWORD      : 管理员明文密码
     TRAINING_SYSTEM_ADMIN_PASSWORD_HASH : 管理员密码的 Werkzeug 哈希值（优先级更高）
+    TRAINING_SYSTEM_ADMIN_NAME          : 单管理员真实姓名（日志显示用）
+    TRAINING_SYSTEM_ADMIN_DISPLAY_NAMES : 多管理员真实姓名映射，如 admin=程超,reviewer=单利亚
     TRAINING_SYSTEM_API_KEY             : API 访问密钥
 """
 import hmac
@@ -36,6 +38,8 @@ ADMIN_USER_ENV = 'TRAINING_SYSTEM_ADMIN_USER'
 ADMIN_PASSWORD_ENV = 'TRAINING_SYSTEM_ADMIN_PASSWORD'
 ADMIN_PASSWORD_HASH_ENV = 'TRAINING_SYSTEM_ADMIN_PASSWORD_HASH'
 API_KEY_ENV = 'TRAINING_SYSTEM_API_KEY'
+ADMIN_DISPLAY_NAMES_ENV = 'TRAINING_SYSTEM_ADMIN_DISPLAY_NAMES'
+ADMIN_NAME_ENV = 'TRAINING_SYSTEM_ADMIN_NAME'
 
 
 def get_admin_user():
@@ -194,6 +198,85 @@ def resolve_openid_name(openid: str) -> str:
     if name:
         return f'{name}({openid})'
     return openid
+
+
+def _parse_admin_display_names(raw: str) -> dict:
+    """
+    解析网页端管理员账号到真实姓名的映射。
+
+    支持格式:
+        admin=程超,reviewer=单利亚
+        admin:程超;reviewer:单利亚
+    """
+    mapping = {}
+    for item in str(raw or '').replace(';', ',').split(','):
+        item = item.strip()
+        if not item:
+            continue
+        if '=' in item:
+            key, value = item.split('=', 1)
+        elif ':' in item:
+            key, value = item.split(':', 1)
+        else:
+            continue
+        key = key.strip()
+        value = value.strip()
+        if key and value:
+            mapping[key] = value
+    return mapping
+
+
+def resolve_web_admin_name(username: str) -> str:
+    """
+    将网页端管理员用户名解析为可读姓名。
+
+    生产环境可通过 TRAINING_SYSTEM_ADMIN_DISPLAY_NAMES 配置多账号映射，
+    或通过 TRAINING_SYSTEM_ADMIN_NAME 配置单账号真实姓名。未配置时回退用户名。
+    """
+    username = str(username or '').strip()
+    if not username:
+        return '-'
+
+    mapping = _parse_admin_display_names(os.environ.get(ADMIN_DISPLAY_NAMES_ENV, ''))
+    display_name = mapping.get(username)
+    if display_name:
+        return f'{display_name}({username})'
+
+    single_name = os.environ.get(ADMIN_NAME_ENV, '').strip()
+    configured_user = os.environ.get(ADMIN_USER_ENV, DEFAULT_ADMIN_USER).strip()
+    if single_name and username == configured_user:
+        return f'{single_name}({username})'
+
+    return username
+
+
+def get_current_actor_name() -> str:
+    """返回当前请求的操作人可读名称。"""
+    try:
+        from flask import g, has_request_context, session
+        if not has_request_context():
+            return '-'
+        mini_user = getattr(g, 'mini_user', None)
+        if mini_user and mini_user.get('openid'):
+            return resolve_openid_name(mini_user.get('openid'))
+        return resolve_web_admin_name(session.get('auth_user', ''))
+    except Exception:
+        return '-'
+
+
+def get_current_actor_source() -> str:
+    """返回当前请求来源：小程序、网页端或系统。"""
+    try:
+        from flask import g, has_request_context, request, session
+        if not has_request_context():
+            return '系统'
+        if getattr(g, 'mini_user', None) or request.path.startswith('/api/miniprogram/'):
+            return '小程序'
+        if session.get('auth_verified') is True or session.get('auth_user'):
+            return '网页端'
+        return '系统'
+    except Exception:
+        return '系统'
 
 
 def get_client_ip(request) -> str:

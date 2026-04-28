@@ -2012,7 +2012,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     imgBox.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;background:#f9fafb;">📄</div>';
                                     imgBox.onclick = () => window.open(toFileUrl(mat.url), '_blank');
                                 } else {
-                                    const imgUrl = toFileUrl(mat.url) + '?v=' + (mat.mtime || '');
+                                    const version = mat.version || mat.mtime || '';
+                                    const imgUrl = toFileUrl(mat.url) + (version ? ('?v=' + encodeURIComponent(version)) : '');
                                     imgBox.innerHTML = `<img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover;">`;
                                     imgBox.onclick = () => showImagePreview(imgUrl, mat.name.replace(/^[^-]+-[^-]+-/, ''));
                                 }
@@ -2028,8 +2029,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 wrapper.appendChild(imgBox);
                                 wrapper.appendChild(caption);
 
-                                const matType = detectMaterialType(mat.name);
-                                if (matType) {
+                                const matType = detectMaterialType(mat);
+                                if (['photo', 'diploma', 'id_card', 'hukou'].includes(matType)) {
                                     const adjustBtn = document.createElement('button');
                                     adjustBtn.textContent = '调整';
                                     adjustBtn.style.cssText = 'font-size:11px;padding:2px 8px;border:1px solid #CBD5E1;border-radius:4px;background:#fff;color:#475569;cursor:pointer;';
@@ -2038,6 +2039,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         showAdjustPanel(student, matType, adjustBtn, loadMaterials);
                                     };
                                     wrapper.appendChild(adjustBtn);
+                                }
+                                if (mat.adjusted) {
+                                    const adjustedText = document.createElement('div');
+                                    adjustedText.textContent = `已调整${mat.adjusted_by ? '：' + mat.adjusted_by : ''}`;
+                                    adjustedText.style.cssText = 'font-size:11px;color:#2563EB;text-align:center;max-width:100px;word-break:break-all;';
+                                    wrapper.appendChild(adjustedText);
                                 }
 
                                 materialsContainer.appendChild(wrapper);
@@ -2583,11 +2590,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    function detectMaterialType(filename) {
+    function detectMaterialType(material) {
+        const serverType = material && typeof material === 'object'
+            ? (material.material_type || material.materialType)
+            : '';
+        if (serverType) return serverType;
+        const filename = typeof material === 'string' ? material : ((material && material.name) || '');
         if (filename.includes('个人照片')) return 'photo';
         if (filename.includes('学历证书')) return 'diploma';
         if (filename.includes('身份证')) return 'id_card';
         if (filename.includes('户口本')) return 'hukou';
+        if (filename.includes('体检表')) return 'training_form';
         return null;
     }
 

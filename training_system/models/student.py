@@ -250,6 +250,22 @@ def init_db(database_path):
             )
         ''')
 
+        # 报名材料手工调整参数表：保存每个学员每类材料的最后一次调整
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS material_adjustments (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id       INTEGER NOT NULL,
+                material_type    TEXT NOT NULL,
+                adjustments_json TEXT DEFAULT '{}',
+                points_json      TEXT DEFAULT '{}',
+                operator_name    TEXT,
+                operator_source  TEXT,
+                created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(student_id, material_type)
+            )
+        ''')
+
         # 写入默认数据（已存在则忽略，不会覆盖管理员的修改）
         default_attachments = [
             ('special_equipment', 'photo',           '个人照片',     1, 1),
@@ -326,11 +342,117 @@ def init_db(database_path):
             "CREATE INDEX IF NOT EXISTS idx_students_created_at_desc "
             "ON students(created_at DESC)"
         )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_material_adjustments_student "
+            "ON material_adjustments(student_id)"
+        )
         conn.commit()
     except sqlite3.Error as e:
         raise DatabaseError(f'Failed to initialize database: {str(e)}')
     finally:
         conn.close()
+
+
+def _dump_json(value):
+    return json.dumps(value or {}, ensure_ascii=False, separators=(',', ':'))
+
+
+def _load_json(value):
+    try:
+        decoded = json.loads(value or '{}')
+        return decoded if isinstance(decoded, dict) else {}
+    except (TypeError, ValueError):
+        return {}
+
+
+def save_material_adjustment(
+    student_id,
+    material_type,
+    adjustments=None,
+    points=None,
+    operator_name='',
+    operator_source=''
+):
+    """
+    保存某个学员某类报名材料的最后一次手工调整参数。
+
+    参数:
+        student_id: 学员 ID
+        material_type: photo / diploma / id_card / hukou 等标准类型
+        adjustments: 旋转、裁剪模式等调整参数
+        points: 前端手工标记的点位
+        operator_name: 操作人姓名
+        operator_source: 操作来源（网页端/小程序）
+    """
+    with get_db_connection() as conn:
+        existing = conn.execute(
+            'SELECT id FROM material_adjustments WHERE student_id = ? AND material_type = ?',
+            (student_id, material_type)
+        ).fetchone()
+        payload = (
+            _dump_json(adjustments),
+            _dump_json(points),
+            operator_name or '',
+            operator_source or '',
+        )
+        if existing:
+            conn.execute(
+                '''
+                UPDATE material_adjustments
+                SET adjustments_json = ?,
+                    points_json = ?,
+                    operator_name = ?,
+                    operator_source = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                ''',
+                payload + (existing['id'],)
+            )
+            return existing['id']
+
+        cursor = conn.execute(
+            '''
+            INSERT INTO material_adjustments
+                (student_id, material_type, adjustments_json, points_json, operator_name, operator_source)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ''',
+            (student_id, material_type) + payload
+        )
+        return cursor.lastrowid
+
+
+def get_material_adjustments(student_id):
+    """
+    获取某个学员所有报名材料的最后一次调整参数。
+
+    返回值按 material_type 建立索引，方便接口合并到预览列表。
+    """
+    with get_db_connection() as conn:
+        rows = conn.execute(
+            '''
+            SELECT *
+            FROM material_adjustments
+            WHERE student_id = ?
+            ORDER BY material_type
+            ''',
+            (student_id,)
+        ).fetchall()
+
+    result = {}
+    for row in rows:
+        item = dict(row)
+        material_type = item.get('material_type')
+        if not material_type:
+            continue
+        result[material_type] = {
+            'material_type': material_type,
+            'adjustments': _load_json(item.get('adjustments_json')),
+            'points': _load_json(item.get('points_json')),
+            'operator_name': item.get('operator_name') or '',
+            'operator_source': item.get('operator_source') or '',
+            'updated_at': item.get('updated_at') or '',
+        }
+    return result
 
 
 def create_student(data, file_paths):

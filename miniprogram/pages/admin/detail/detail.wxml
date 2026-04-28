@@ -67,6 +67,7 @@
             <view wx:else class="material-doc">文件</view>
           </view>
           <view class="material-title">{{item.title}}</view>
+          <view wx:if="{{item.adjusted}}" class="material-adjusted">已调整 {{item.adjusted_by}}</view>
           <view class="material-actions">
             <button class="material-btn" size="mini" bindtap="previewGeneratedMaterial" data-index="{{index}}">{{item.isDocument ? '下载' : '预览'}}</button>
             <button
@@ -147,7 +148,11 @@
             data-index="{{item.index}}"
             catchtouchstart="onCropHandleStart"
           >
-            <view class="crop-handle-visual">{{item.text}}</view>
+            <view class="crop-handle-visual">
+              <view class="crop-cross-h"></view>
+              <view class="crop-cross-v"></view>
+              <view class="crop-handle-number">{{item.text}}</view>
+            </view>
           </view>
         </view>
         <view class="crop-status">

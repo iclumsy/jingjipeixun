@@ -22,18 +22,26 @@ from logging.handlers import RotatingFileHandler
 
 
 from flask import has_request_context, session, g, request
+from utils.auth import resolve_openid_name, resolve_web_admin_name
 
 class SourceContextFilter(logging.Filter):
     def filter(self, record):
+        if not hasattr(record, 'sys_source'):
+            record.sys_source = '系统'
+        if not hasattr(record, 'actor_name'):
+            record.actor_name = '-'
+
         if has_request_context():
             if getattr(g, 'mini_user', None) or request.path.startswith('/api/miniprogram/'):
                 record.sys_source = '小程序'
+                mini_user = getattr(g, 'mini_user', None) or {}
+                if mini_user.get('openid'):
+                    record.actor_name = resolve_openid_name(mini_user.get('openid'))
             elif session.get('auth_verified') is True or session.get('auth_user'):
                 record.sys_source = '网页端'
+                record.actor_name = resolve_web_admin_name(session.get('auth_user', ''))
             else:
                 record.sys_source = '系统'
-        else:
-            record.sys_source = '系统'
         return True
 
 def setup_logger(app):
@@ -51,9 +59,9 @@ def setup_logger(app):
     log_dir = os.path.join(app.config.get('BASE_DIR', os.path.dirname(os.path.abspath(__file__))), 'logs')
     os.makedirs(log_dir, exist_ok=True)
 
-    # 统一日志格式：[时间] [级别] [来源] 内容
+    # 统一日志格式：[时间] [级别] [来源] [操作人] 内容
     formatter = logging.Formatter(
-        '[%(asctime)s] [%(levelname)s] [%(sys_source)s] %(message)s',
+        '[%(asctime)s] [%(levelname)s] [%(sys_source)s] [%(actor_name)s] %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     

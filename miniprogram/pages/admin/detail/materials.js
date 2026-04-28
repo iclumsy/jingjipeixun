@@ -47,11 +47,12 @@ function toPreviewUrl(rawUrl = '', toAbsoluteFileUrl) {
 function normalizeGeneratedMaterials(materials = [], toAbsoluteFileUrl) {
   const normalized = (Array.isArray(materials) ? materials : []).map(item => {
     const name = String(item && item.name ? item.name : '').trim()
-    const materialType = detectMaterialType(name)
+    const materialType = (item && (item.material_type || item.materialType)) || detectMaterialType(name)
     const title = MATERIAL_LABELS[materialType] || stripExtension(stripGeneratedPrefix(name)) || '报名材料'
     const url = toPreviewUrl(item && item.url, toAbsoluteFileUrl)
     const isDocument = /\.docx?$/i.test(name)
     const adjustableTypes = ['photo', 'id_card', 'hukou', 'diploma']
+    const cacheVersion = item && (item.version || item.mtime)
     return {
       ...item,
       title,
@@ -59,7 +60,7 @@ function normalizeGeneratedMaterials(materials = [], toAbsoluteFileUrl) {
       adjustable: adjustableTypes.includes(materialType),
       canRegenForm: materialType === 'training_form',
       isDocument,
-      previewUrl: appendCacheBust(url, item && item.mtime)
+      previewUrl: appendCacheBust(url, cacheVersion)
     }
   })
 
@@ -118,9 +119,17 @@ function buildManualCropPayload(materialType, state = {}) {
   return payload
 }
 
+function getOffsetTouchPoint(touch = {}, stageRect = {}, offsetY = 0) {
+  return {
+    x: (touch.clientX || 0) - (stageRect.left || 0),
+    y: (touch.clientY || 0) - (stageRect.top || 0) - offsetY
+  }
+}
+
 module.exports = {
   MATERIAL_LABELS,
   detectMaterialType,
   normalizeGeneratedMaterials,
-  buildManualCropPayload
+  buildManualCropPayload,
+  getOffsetTouchPoint
 }

@@ -18,7 +18,13 @@
 - JSON 提交 (application/json) : 前端 AJAX 调用使用
 """
 from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session
-from utils.auth import get_client_ip, resolve_ip_location, sanitize_next_path, verify_admin_credentials
+from utils.auth import (
+    get_client_ip,
+    resolve_ip_location,
+    resolve_web_admin_name,
+    sanitize_next_path,
+    verify_admin_credentials,
+)
 
 
 # 创建认证蓝图，前缀为空（路径在路由装饰器中指定）
@@ -71,8 +77,10 @@ def login():
         
         def _async_log_login(logger, ip, user):
             loc = resolve_ip_location(ip)
-            logger.info(f'[管理员登录] 用户={user} IP={ip} {loc}')
-            logger.info(f"管理员登录成功: 用户名={user}, IP={ip} {loc}")
+            actor = resolve_web_admin_name(user)
+            extra = {'sys_source': '网页端', 'actor_name': actor}
+            logger.info(f'[管理员登录] 用户={actor} IP={ip} {loc}', extra=extra)
+            logger.info(f"管理员登录成功: 用户名={actor}, IP={ip} {loc}", extra=extra)
         import threading
         threading.Thread(target=_async_log_login, args=(current_app.logger, client_ip, username), daemon=True).start()
 
@@ -89,8 +97,10 @@ def login():
     
     def _async_log_fail(logger, ip, user):
         loc = resolve_ip_location(ip)
-        logger.warning(f'[管理员登录失败] 用户={user} IP={ip} {loc}')
-        logger.warning(f"管理员登录失败: 尝试用户名={user}, IP={ip} {loc}")
+        actor = resolve_web_admin_name(user)
+        extra = {'sys_source': '网页端', 'actor_name': actor}
+        logger.warning(f'[管理员登录失败] 用户={actor} IP={ip} {loc}', extra=extra)
+        logger.warning(f"管理员登录失败: 尝试用户名={actor}, IP={ip} {loc}", extra=extra)
     import threading
     threading.Thread(target=_async_log_fail, args=(current_app.logger, client_ip, username), daemon=True).start()
     if request.is_json:
@@ -119,7 +129,11 @@ def logout():
     
     def _async_log_logout(logger, ip, user):
         loc = resolve_ip_location(ip)
-        logger.info(f"管理员安全退出: 用户名={user}, IP={ip} {loc}")
+        actor = resolve_web_admin_name(user)
+        logger.info(
+            f"管理员安全退出: 用户名={actor}, IP={ip} {loc}",
+            extra={'sys_source': '网页端', 'actor_name': actor}
+        )
     import threading
     threading.Thread(target=_async_log_logout, args=(current_app.logger, client_ip, auth_user), daemon=True).start()
     if request.is_json:

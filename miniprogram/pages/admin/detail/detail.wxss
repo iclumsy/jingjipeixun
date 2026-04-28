@@ -271,6 +271,14 @@
   word-break: break-all;
 }
 
+.material-adjusted {
+  margin-top: 4rpx;
+  color: #2563eb;
+  font-size: 20rpx;
+  line-height: 1.3;
+  word-break: break-all;
+}
+
 .material-actions {
   display: flex;
   gap: 10rpx;
@@ -456,20 +464,57 @@
 }
 
 .crop-handle-visual {
-  width: 44rpx;
-  height: 44rpx;
+  position: relative;
+  width: 30rpx;
+  height: 30rpx;
   border-radius: 50%;
-  border: 3rpx solid #2f6af5;
+  border: 2rpx solid #2f6af5;
   background: #ffffff;
   color: #1d4ed8;
-  font-size: 20rpx;
-  font-weight: 800;
+  font-size: 16rpx;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
   box-shadow: 0 6rpx 16rpx rgba(15, 23, 42, 0.25);
-  transform: translateY(-50rpx);
+}
+
+.crop-cross-h,
+.crop-cross-v {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: rgba(29, 78, 216, 0.42);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.crop-cross-h {
+  width: 22rpx;
+  height: 2rpx;
+}
+
+.crop-cross-v {
+  width: 2rpx;
+  height: 22rpx;
+}
+
+.crop-handle-number {
+  position: absolute;
+  left: 50%;
+  top: -30rpx;
+  transform: translateX(-50%);
+  min-width: 24rpx;
+  height: 24rpx;
+  padding: 0 5rpx;
+  border-radius: 999rpx;
+  background: rgba(47, 106, 245, 0.94);
+  color: #ffffff;
+  font-size: 16rpx;
+  line-height: 24rpx;
+  text-align: center;
+  box-sizing: border-box;
 }
 
 .crop-status {

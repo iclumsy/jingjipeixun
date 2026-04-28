@@ -32,7 +32,7 @@ from functools import wraps
 from flask import Blueprint, request, jsonify, current_app, g, session
 from models.student import (
     create_student, get_students, get_student_by_id, update_student,
-    delete_student, get_companies
+    delete_student, get_companies, get_material_adjustments, save_material_adjustment
 )
 from services.wechat_service import send_review_result_message, broadcast_new_student_to_admins
 from services.image_service import process_and_save_file, delete_student_files
@@ -41,7 +41,13 @@ from services import storage_service
 from services.student_serializer import enrich_student, enrich_students
 from utils.validators import validate_student_data, validate_file_upload
 from utils.error_handlers import AppError, ValidationError, NotFoundError
-from utils.auth import get_client_ip, resolve_openid_name
+from utils.auth import (
+    get_client_ip,
+    get_current_actor_name,
+    get_current_actor_source,
+    resolve_openid_name,
+    resolve_web_admin_name,
+)
 import os
 import io
 import zipfile
@@ -80,7 +86,77 @@ REQUIRED_ATTACHMENTS_BY_APPLICATION = {
     ('special_equipment', 'renewal'): ['photo', 'certificate_info_page', 'certificate_records_page'],
 }
 
+MATERIAL_TYPE_ALIASES = {
+    'photo': 'photo',
+    'personal_photo': 'photo',
+    'portrait': 'photo',
+    '个人照片': 'photo',
+    '一寸照片': 'photo',
+    'diploma': 'diploma',
+    'education': 'diploma',
+    'education_certificate': 'diploma',
+    '学历证书': 'diploma',
+    '毕业证': 'diploma',
+    'id_card': 'id_card',
+    'idcard': 'id_card',
+    'identity_card': 'id_card',
+    '身份证': 'id_card',
+    'hukou': 'hukou',
+    'hukou_book': 'hukou',
+    'household_register': 'hukou',
+    '户口本': 'hukou',
+    '户口页': 'hukou',
+    'training_form': 'training_form',
+    'health_check_form': 'training_form',
+    '体检表': 'training_form',
+}
+
 # ======================== 辅助函数 ========================
+
+
+def normalize_material_type(material_type):
+    """将前端、文件名识别或旧字段名统一为后端标准 material_type。"""
+    raw = str(material_type or '').strip()
+    if not raw:
+        return ''
+    normalized = raw.lower().replace('-', '_').replace(' ', '_')
+    return MATERIAL_TYPE_ALIASES.get(raw) or MATERIAL_TYPE_ALIASES.get(normalized, '')
+
+
+def detect_generated_material_type(filename):
+    """根据生成后的报名材料文件名识别标准 material_type。"""
+    name = str(filename or '')
+    if '个人照片' in name:
+        return 'photo'
+    if '身份证' in name:
+        return 'id_card'
+    if '户口' in name:
+        return 'hukou'
+    if '学历' in name or '毕业证' in name:
+        return 'diploma'
+    if '体检表' in name:
+        return 'training_form'
+    return normalize_material_type(name)
+
+
+def collect_material_points(data):
+    """从调整请求中提取手工点位，供持久化保存。"""
+    if not isinstance(data, dict):
+        return {}
+    points = {}
+    for key in ('points', 'front_points', 'back_points', 'home_points', 'personal_points'):
+        value = data.get(key)
+        if isinstance(value, list):
+            points[key] = value
+    return points
+
+
+def log_operator_name():
+    """取当前操作者姓名；兼容网页端 session 和小程序 token。"""
+    actor = get_current_actor_name()
+    if actor and actor != '-':
+        return actor
+    return resolve_web_admin_name(session.get('auth_user', 'unknown'))
 
 
 def normalize_training_type(training_type):
@@ -1066,7 +1142,7 @@ def reject_student_route(id):
             # 彻底删除：先删除数据库记录，再清理附件文件
             student = delete_student(id)
             delete_student_files(student, current_app.config['BASE_DIR'])
-            operator = session.get('auth_user', 'unknown')
+            operator = log_operator_name()
             client_ip = get_client_ip(request)
             submitter = resolve_openid_name(student.get('submitter_openid', ''))
             current_app.logger.info(
@@ -1092,7 +1168,7 @@ def reject_student_route(id):
                 remark = reject_reason[:20] if reject_reason else "请点击前往小程序进行修改"
                 send_review_result_message(submitter_openid, student_name, '已驳回', remark=remark)
                 
-            operator = session.get('auth_user', 'unknown')
+            operator = log_operator_name()
             client_ip = get_client_ip(request)
             submitter = resolve_openid_name(student.get('submitter_openid', ''))
             current_app.logger.info(
@@ -1190,7 +1266,7 @@ def approve_student_route(id):
             current_app.logger.info(f'Health check form generated for student ID={id}')
             
         # 记录操作者信息：管理员账号 + 客户端 IP + 提交人 openid 映射
-        operator = session.get('auth_user', 'unknown')
+        operator = log_operator_name()
         client_ip = get_client_ip(request)
         submitter = resolve_openid_name(submitter_openid or '')
         current_app.logger.info(
@@ -1243,7 +1319,7 @@ def swap_materials_route(id):
         updated = get_student_by_id(id)
         
         # 记录操作者信息：管理员账号 + 客户端 IP + 提交人 openid 映射
-        operator = session.get('auth_user', 'unknown')
+        operator = log_operator_name()
         client_ip = get_client_ip(request)
         submitter = resolve_openid_name(student.get('submitter_openid', ''))
         student_name = student.get('name', '未知')
@@ -1298,17 +1374,7 @@ def activate_card_route(id):
         from services.junrui_service import activate_card_for_student
         from datetime import datetime
         
-        operator_openid = get_mini_openid()
-        if operator_openid:
-            # 常见管理员映射提取
-            mini_admin_names = {
-                'oQRQz3VglMF63fWRtTCX8gbl21jo': '程超',
-                'oQRQz3amHUiSlU5RYNqu-r4GBJlk': '单利亚',
-                'oQRQz3SPn9tEiMy74NxfrzV1ZzJE': '霍玉萍'
-            }
-            operator = f"小程序-{mini_admin_names.get(operator_openid, operator_openid)}"
-        else:
-            operator = session.get('auth_user', 'unknown')
+        operator = log_operator_name()
         client_ip = get_client_ip(request)
         current_app.logger.info(
             f'[开卡请求] 操作人={operator} IP={client_ip} '
@@ -1571,7 +1637,7 @@ def generate_materials_route(id):
         output_root = current_app.config['STUDENTS_FOLDER']
         
         data = request.get_json(silent=True) or {}
-        material_type = data.get('material_type')
+        material_type = normalize_material_type(data.get('material_type'))
 
         if material_type == 'training_form':
             health_check_path = generate_health_check_form(student, base_dir, output_root)
@@ -1630,7 +1696,7 @@ def analyze_material_points_route(id):
             return jsonify({'error': '未找到学员'}), 404
 
         data = request.get_json(silent=True) or {}
-        material_type = data.get('material_type', '')
+        material_type = normalize_material_type(data.get('material_type', ''))
         adjustments = dict(data.get('adjustments', {}))
         
         base_dir = current_app.config['BASE_DIR']
@@ -1701,7 +1767,7 @@ def manual_crop_material_route(id):
             return jsonify({'error': '未找到学员'}), 404
 
         data = request.get_json(silent=True) or {}
-        material_type = data.get('material_type', '')
+        material_type = normalize_material_type(data.get('material_type', ''))
         if material_type not in ('diploma', 'id_card', 'hukou', 'photo'):
             return jsonify({'error': '无效的 material_type'}), 400
 
@@ -1816,6 +1882,20 @@ def manual_crop_material_route(id):
         if not report.get('success'):
             payload['error'] = 'material_generation_failed'
             return jsonify(payload), 500
+        operator_name = log_operator_name()
+        operator_source = get_current_actor_source()
+        save_material_adjustment(
+            id,
+            material_type,
+            adjustments,
+            collect_material_points(data),
+            operator_name=operator_name,
+            operator_source=operator_source,
+        )
+        current_app.logger.info(
+            f'[报名材料调整] 操作人={operator_name} 来源={operator_source} '
+            f'学员ID={id} 姓名={student.get("name","")} 材料={material_type} 方式=手工裁剪'
+        )
         return jsonify(payload)
     except Exception as e:
         current_app.logger.exception('Error in manual_crop_material for student %s', id)
@@ -1835,7 +1915,7 @@ def regenerate_material_route(id):
             return jsonify({'error': '仅支持已审核学员'}), 400
 
         data = request.get_json(silent=True) or {}
-        material_type = data.get('material_type', '')
+        material_type = normalize_material_type(data.get('material_type', ''))
         if material_type not in ('diploma', 'id_card', 'hukou', 'photo', 'training_form'):
             return jsonify({'error': '无效的 material_type'}), 400
             
@@ -1856,6 +1936,12 @@ def regenerate_material_route(id):
                         save_from_local(abs_path, health_check_path)
                 except Exception as e:
                     current_app.logger.warning(f"重新生成体检表同步COS失败: {e}")
+                operator_name = log_operator_name()
+                operator_source = get_current_actor_source()
+                current_app.logger.info(
+                    f'[报名材料调整] 操作人={operator_name} 来源={operator_source} '
+                    f'学员ID={id} 姓名={student.get("name","")} 材料=training_form 方式=重新生成'
+                )
                 return jsonify({'message': '体检表重新生成成功'})
             else:
                 return jsonify({'error': '体检表重新生成失败'}), 500
@@ -1886,6 +1972,20 @@ def regenerate_material_route(id):
         if not report.get('success'):
             payload['error'] = 'material_generation_failed'
             return jsonify(payload), 500
+        operator_name = log_operator_name()
+        operator_source = get_current_actor_source()
+        save_material_adjustment(
+            id,
+            material_type,
+            adjustments,
+            collect_material_points(data),
+            operator_name=operator_name,
+            operator_source=operator_source,
+        )
+        current_app.logger.info(
+            f'[报名材料调整] 操作人={operator_name} 来源={operator_source} '
+            f'学员ID={id} 姓名={student.get("name","")} 材料={material_type} 方式=重新生成'
+        )
         return jsonify(payload)
     except Exception as e:
         current_app.logger.exception('Error regenerating material for student %s', id)
@@ -1917,6 +2017,31 @@ def get_generated_materials_route(id):
         material_folder_name = f"{name_prefix}-报名材料"
         
         output_dir = os.path.join(current_app.config['STUDENTS_FOLDER'], student_folder_name, material_folder_name)
+        adjustment_map = get_material_adjustments(id)
+
+        def build_material_payload(name, url, abs_path=None):
+            mtime = 0
+            version = ''
+            if abs_path and os.path.exists(abs_path):
+                stat = os.stat(abs_path)
+                mtime = int(stat.st_mtime)
+                version = str(getattr(stat, 'st_mtime_ns', int(stat.st_mtime * 1000000000)))
+            material_type = detect_generated_material_type(name)
+            adjustment = adjustment_map.get(material_type) if material_type else None
+            payload = {
+                "name": name,
+                "url": url,
+                "mtime": mtime,
+                "version": version or str(mtime or ''),
+                "material_type": material_type,
+                "adjusted": bool(adjustment),
+            }
+            if adjustment:
+                payload["adjustment"] = adjustment
+                payload["adjusted_at"] = adjustment.get("updated_at", "")
+                payload["adjusted_by"] = adjustment.get("operator_name", "")
+                payload["adjusted_source"] = adjustment.get("operator_source", "")
+            return payload
         
         if not os.path.exists(output_dir) or not os.path.isdir(output_dir):
             materials = []
@@ -1927,26 +2052,14 @@ def get_generated_materials_route(id):
                     continue
                 abs_path = os.path.join(output_dir, filename)
                 if os.path.isfile(abs_path):
-                    mtime = int(os.path.getmtime(abs_path))
                     url = f"students/{student_folder_name}/{material_folder_name}/{filename}"
-                    materials.append({
-                        "name": filename,
-                        "url": url,
-                        "mtime": mtime
-                    })
+                    materials.append(build_material_payload(filename, url, abs_path))
 
         # 追加位于父目录的体检表（即使本地由于缓存被清未命中，只要 DB 有记录也返回给前端去拉取 COS）
         training_form_rel = student.get('training_form_path')
         if training_form_rel:
             abs_form_path = os.path.join(current_app.config['BASE_DIR'], training_form_rel)
-            mtime = 0
-            if os.path.exists(abs_form_path):
-                mtime = int(os.path.getmtime(abs_form_path))
-            materials.append({
-                "name": os.path.basename(training_form_rel),
-                "url": training_form_rel,
-                "mtime": mtime
-            })
+            materials.append(build_material_payload(os.path.basename(training_form_rel), training_form_rel, abs_form_path))
 
         return jsonify({'exists': len(materials) > 0, 'materials': materials}), 200
 

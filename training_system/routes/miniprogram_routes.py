@@ -107,7 +107,10 @@ def miniprogram_login_route():
     # 异步查询 IP 归属地以避免阻塞登录请求
     def _async_log_login(logger, ip, label):
         loc = resolve_ip_location(ip)
-        logger.info(f'[小程序登录] 用户={label} IP={ip} {loc}')
+        logger.info(
+            f'[小程序登录] 用户={label} IP={ip} {loc}',
+            extra={'sys_source': '小程序', 'actor_name': label}
+        )
     import threading
     threading.Thread(target=_async_log_login, args=(current_app.logger, client_ip, user_label), daemon=True).start()
     # 检查当前用户是否在管理员 openid 列表中

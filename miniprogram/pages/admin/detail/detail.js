@@ -16,8 +16,11 @@ const {
 const {
   MATERIAL_LABELS,
   normalizeGeneratedMaterials,
-  buildManualCropPayload
+  buildManualCropPayload,
+  getOffsetTouchPoint
 } = require('./materials')
+
+const HANDLE_TOUCH_OFFSET_RPX = 70
 
 // 编辑表单本地兜底：附件类型与培训类型的映射，仅在后端 attachment 配置接口失败时使用。
 // 真正的附件清单由 /api/config/attachments 下发；状态/能力位由后端 enrich 提供。
@@ -128,7 +131,8 @@ Page({
       activeKey: '',
       activePanel: null,
       submitting: false
-    }
+    },
+    activeCropHandleIndex: -1
   },
 
   async onLoad(options) {
@@ -1005,6 +1009,7 @@ Page({
       startX: touch.clientX,
       startY: touch.clientY
     }
+    this.setData({ activeCropHandleIndex: index })
   },
 
   onCropFrameStart(e) {
@@ -1048,7 +1053,7 @@ Page({
     }
 
     if (drag.type !== 'handle') return
-    const stage = this.getTouchInStage(touch)
+    const stage = this.getHandleTouchInStage(touch)
     const points = (nextPanel.points || []).map(item => item.slice())
     points[drag.index] = this.displayToPoint(nextPanel, stage.x, stage.y)
     nextPanel.points = points
@@ -1059,13 +1064,23 @@ Page({
 
   onCropTouchEnd() {
     this._cropDrag = null
+    this.setData({ activeCropHandleIndex: -1 })
   },
 
   getTouchInStage(touch) {
-    const rect = this._lastStageRect || {}
-    return {
-      x: touch.clientX - (rect.left || 0),
-      y: touch.clientY - (rect.top || 0)
+    return getOffsetTouchPoint(touch, this._lastStageRect || {}, 0)
+  },
+
+  getHandleTouchInStage(touch) {
+    return getOffsetTouchPoint(touch, this._lastStageRect || {}, this.getHandleTouchOffsetPx())
+  },
+
+  getHandleTouchOffsetPx() {
+    try {
+      const info = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
+      return HANDLE_TOUCH_OFFSET_RPX * ((info.windowWidth || 375) / 750)
+    } catch (err) {
+      return 35
     }
   },
 
@@ -1081,7 +1096,7 @@ Page({
 
   resizeFixedCropRect(panel, handleIndex, clientX, clientY) {
     this.refreshStageRect()
-    const stage = this.getTouchInStage({ clientX, clientY })
+    const stage = this.getHandleTouchInStage({ clientX, clientY })
     const point = this.displayToPoint(panel, stage.x, stage.y)
     const rect = panel.cropRect
     const ratio = panel.fixedRatio || 1
