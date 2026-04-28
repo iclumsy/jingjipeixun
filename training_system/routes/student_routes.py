@@ -1291,7 +1291,12 @@ def approve_student_route(id):
 @mini_admin_required
 def swap_materials_route(id):
     """
-    互换两张图片的路径，例如身份证正反面、户口本首页和本人页等。
+    互换两张图片的实际内容（文件路径和数据库不变）。
+    
+    场景：用户上传时把正面照传到了反面的位置（或反之）。
+    做法：交换两个文件的字节内容，路径名保持不变，
+    这样"身份证正面.jpg"里面的图片就从错误的反面照变成了正确的正面照。
+    
     参数: {"pair": "id_card" | "hukou"}
     """
     try:
@@ -1301,24 +1306,51 @@ def swap_materials_route(id):
             return jsonify({'error': '无效的互换类型'}), 400
 
         student = get_student_by_id(id)
-        
-        if pair == 'id_card':
-            val1 = student.get('id_card_front_path')
-            val2 = student.get('id_card_back_path')
-            if not val1 or not val2:
-                return jsonify({'error': '缺少照片，无法互换'}), 400
-            update_student(id, {'id_card_front_path': val2, 'id_card_back_path': val1})
-            
-        elif pair == 'hukou':
-            val1 = student.get('hukou_residence_path')
-            val2 = student.get('hukou_personal_path')
-            if not val1 or not val2:
-                return jsonify({'error': '缺少照片，无法互换'}), 400
-            update_student(id, {'hukou_residence_path': val2, 'hukou_personal_path': val1})
 
+        if pair == 'id_card':
+            key_a, key_b = 'id_card_front_path', 'id_card_back_path'
+        else:
+            key_a, key_b = 'hukou_residence_path', 'hukou_personal_path'
+
+        path_a = student.get(key_a)
+        path_b = student.get(key_b)
+        if not path_a or not path_b:
+            return jsonify({'error': '缺少照片，无法互换'}), 400
+
+        base_dir = current_app.config['BASE_DIR']
+        abs_a = os.path.join(base_dir, path_a)
+        abs_b = os.path.join(base_dir, path_b)
+
+        if not os.path.exists(abs_a) or not os.path.exists(abs_b):
+            return jsonify({'error': '本地文件不完整，无法互换'}), 400
+
+        # ---- 交换两个文件的字节内容（路径/文件名不变） ----
+        try:
+            with open(abs_a, 'rb') as f:
+                bytes_a = f.read()
+            with open(abs_b, 'rb') as f:
+                bytes_b = f.read()
+            with open(abs_a, 'wb') as f:
+                f.write(bytes_b)
+            with open(abs_b, 'wb') as f:
+                f.write(bytes_a)
+            current_app.logger.info(f'[图片互换] 文件内容已互换: {path_a} <-> {path_b}')
+        except Exception as swap_err:
+            current_app.logger.error(f'[图片互换] 文件内容互换失败: {swap_err}')
+            return jsonify({'error': '文件互换失败，请稍后重试'}), 500
+
+        # ---- COS 同步（文件内容已变，重新上传到同一 key） ----
+        try:
+            from services.storage_service import save_from_local
+            save_from_local(abs_a, path_a)
+            save_from_local(abs_b, path_b)
+        except Exception as cos_err:
+            current_app.logger.warning(f'[图片互换] COS同步失败（本地已完成）: {cos_err}')
+
+        # DB 路径不需要改动，文件名和路径保持一致
         updated = get_student_by_id(id)
-        
-        # 记录操作者信息：管理员账号 + 客户端 IP + 提交人 openid 映射
+
+        # 记录操作者信息
         operator = log_operator_name()
         client_ip = get_client_ip(request)
         submitter = resolve_openid_name(student.get('submitter_openid', ''))
