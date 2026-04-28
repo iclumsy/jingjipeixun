@@ -1324,19 +1324,21 @@ def swap_materials_route(id):
         if not os.path.exists(abs_a) or not os.path.exists(abs_b):
             return jsonify({'error': '本地文件不完整，无法互换'}), 400
 
-        # ---- 交换两个文件的字节内容（路径/文件名不变） ----
+        # ---- 通过 rename 三步中转互换文件（O(1) 元数据操作，不拷贝字节） ----
+        tmp_path = abs_a + '.swap_tmp'
         try:
-            with open(abs_a, 'rb') as f:
-                bytes_a = f.read()
-            with open(abs_b, 'rb') as f:
-                bytes_b = f.read()
-            with open(abs_a, 'wb') as f:
-                f.write(bytes_b)
-            with open(abs_b, 'wb') as f:
-                f.write(bytes_a)
-            current_app.logger.info(f'[图片互换] 文件内容已互换: {path_a} <-> {path_b}')
+            os.rename(abs_a, tmp_path)    # A → 临时
+            os.rename(abs_b, abs_a)       # B → A 的路径
+            os.rename(tmp_path, abs_b)    # 临时(原A) → B 的路径
+            current_app.logger.info(f'[图片互换] 文件已互换: {path_a} <-> {path_b}')
         except Exception as swap_err:
-            current_app.logger.error(f'[图片互换] 文件内容互换失败: {swap_err}')
+            current_app.logger.error(f'[图片互换] 文件互换失败: {swap_err}')
+            # 尝试回滚
+            if os.path.exists(tmp_path) and not os.path.exists(abs_a):
+                try:
+                    os.rename(tmp_path, abs_a)
+                except Exception:
+                    pass
             return jsonify({'error': '文件互换失败，请稍后重试'}), 500
 
         # ---- COS 同步（文件内容已变，重新上传到同一 key） ----
