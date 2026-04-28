@@ -1920,25 +1920,34 @@ def get_generated_materials_route(id):
         output_dir = os.path.join(current_app.config['STUDENTS_FOLDER'], student_folder_name, material_folder_name)
         
         if not os.path.exists(output_dir) or not os.path.isdir(output_dir):
-            return jsonify({'exists': False, 'materials': []}), 200
-            
-        materials = []
-        for filename in sorted(os.listdir(output_dir)):
-            if filename.startswith('.'):
-                continue
-            abs_path = os.path.join(output_dir, filename)
-            if os.path.isfile(abs_path):
-                mtime = int(os.path.getmtime(abs_path))
-                # 返回相对路径（前端会加 / 前缀变成 /students/...）
-                # serve_students 会自动重定向到 COS URL，前端无需感知
-                url = f"students/{student_folder_name}/{material_folder_name}/{filename}"
+            materials = []
+        else:
+            materials = []
+            for filename in sorted(os.listdir(output_dir)):
+                if filename.startswith('.'):
+                    continue
+                abs_path = os.path.join(output_dir, filename)
+                if os.path.isfile(abs_path):
+                    mtime = int(os.path.getmtime(abs_path))
+                    url = f"students/{student_folder_name}/{material_folder_name}/{filename}"
+                    materials.append({
+                        "name": filename,
+                        "url": url,
+                        "mtime": mtime
+                    })
+
+        # 追加位于父目录的体检表（不在报名材料文件夹中）
+        training_form_rel = student.get('training_form_path')
+        if training_form_rel:
+            abs_form_path = os.path.join(current_app.config['BASE_DIR'], training_form_rel)
+            if os.path.exists(abs_form_path):
                 materials.append({
-                    "name": filename,
-                    "url": url,
-                    "mtime": mtime
+                    "name": os.path.basename(abs_form_path),
+                    "url": training_form_rel,
+                    "mtime": int(os.path.getmtime(abs_form_path))
                 })
 
-        return jsonify({'exists': True, 'materials': materials}), 200
+        return jsonify({'exists': len(materials) > 0, 'materials': materials}), 200
 
     except NotFoundError as e:
         return jsonify(e.to_dict()), e.status_code

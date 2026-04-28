@@ -444,20 +444,32 @@
 
 .crop-handle {
   position: absolute;
-  width: 42rpx;
-  height: 42rpx;
-  margin-left: -21rpx;
-  margin-top: -21rpx;
+  width: 120rpx;
+  height: 120rpx;
+  margin-left: -60rpx;
+  margin-top: -60rpx;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.crop-handle-visual {
+  width: 44rpx;
+  height: 44rpx;
   border-radius: 50%;
   border: 3rpx solid #2f6af5;
   background: #ffffff;
   color: #1d4ed8;
   font-size: 20rpx;
   font-weight: 800;
-  line-height: 38rpx;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   box-sizing: border-box;
   box-shadow: 0 6rpx 16rpx rgba(15, 23, 42, 0.25);
+  transform: translateY(-50rpx);
 }
 
 .crop-status {

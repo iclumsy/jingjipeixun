@@ -869,11 +869,13 @@ Page({
         nextPanel.cropRect = this.createDefaultCropRect(nextPanel)
         nextPanel.points = this.rectToPoints(nextPanel.cropRect)
       } else {
+        const insetX = imageWidth * 0.05
+        const insetY = imageHeight * 0.05
         nextPanel.points = [
-          [0, 0],
-          [imageWidth, 0],
-          [imageWidth, imageHeight],
-          [0, imageHeight]
+          [insetX, insetY],
+          [imageWidth - insetX, insetY],
+          [imageWidth - insetX, imageHeight - insetY],
+          [insetX, imageHeight - insetY]
         ]
       }
       this.refreshPanelStyles(nextPanel)
@@ -1159,11 +1161,14 @@ Page({
       nextPanel.cropRect = this.createDefaultCropRect(nextPanel)
       nextPanel.points = this.rectToPoints(nextPanel.cropRect)
     } else {
+      // 默认非固定比例收缩 5% 留出边距
+      const insetX = nextPanel.imageWidth * 0.05
+      const insetY = nextPanel.imageHeight * 0.05
       nextPanel.points = [
-        [0, 0],
-        [nextPanel.imageWidth, 0],
-        [nextPanel.imageWidth, nextPanel.imageHeight],
-        [0, nextPanel.imageHeight]
+        [insetX, insetY],
+        [nextPanel.imageWidth - insetX, insetY],
+        [nextPanel.imageWidth - insetX, nextPanel.imageHeight - insetY],
+        [insetX, nextPanel.imageHeight - insetY]
       ]
     }
     this.refreshPanelStyles(nextPanel)

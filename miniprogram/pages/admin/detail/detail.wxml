@@ -146,7 +146,9 @@
             style="{{item.style}}"
             data-index="{{item.index}}"
             catchtouchstart="onCropHandleStart"
-          >{{item.text}}</view>
+          >
+            <view class="crop-handle-visual">{{item.text}}</view>
+          </view>
         </view>
         <view class="crop-status">
           当前旋转：{{materialModal.activePanel.rotation || 0}}°
