@@ -285,6 +285,27 @@
   margin-top: 10rpx;
 }
 
+.swap-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 24rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #e2e8f0;
+  justify-content: center;
+}
+
+.swap-btn {
+  height: 56rpx;
+  margin: 0;
+  padding: 0 28rpx;
+  border-radius: 10rpx;
+  border: 1rpx solid #c7d2fe;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 22rpx;
+  line-height: 56rpx;
+}
+
 .material-btn {
   flex: 1;
   height: 54rpx;

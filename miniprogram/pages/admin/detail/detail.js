@@ -1236,6 +1236,26 @@ Page({
     }
   },
 
+  async onSwapMaterials(e) {
+    const pair = e.currentTarget.dataset.pair
+    if (!pair) return
+    const pairName = pair === 'id_card' ? '身份证正反面' : '户口本首页/本人页'
+    const confirmed = await this.confirmAction('确认互换', `确定互换${pairName}吗？`)
+    if (!confirmed) return
+    wx.showLoading({ title: '互换中...' })
+    try {
+      const result = await api.swapMaterials(this.data.studentId, pair)
+      wx.hideLoading()
+      wx.showToast({ title: result.message || '互换成功', icon: 'success' })
+      // 刷新学员详情和材料列表
+      await this.loadStudent()
+      await this.loadGeneratedMaterials()
+    } catch (err) {
+      wx.hideLoading()
+      wx.showToast({ title: err.message || '互换失败', icon: 'none' })
+    }
+  },
+
   getRotationKey(materialType, panelKey) {
     if (materialType === 'photo' || materialType === 'diploma') return 'rotate'
     if (materialType === 'id_card') {

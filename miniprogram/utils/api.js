@@ -678,6 +678,23 @@ async function regenerateTrainingForm(studentId) {
 }
 
 /**
+ * 互换学员的两张图片路径（身份证正反面 / 户口本首页与本人页）。
+ *
+ * @param {number|string} studentId - 学员 ID
+ * @param {string} pair - 互换类型: 'id_card' 或 'hukou'
+ * @returns {Promise<Object>} { message, student }
+ */
+async function swapMaterials(studentId, pair) {
+  const id = encodeURIComponent(String(studentId || '').trim())
+  if (!id) throw new Error('学员ID不能为空')
+  if (!['id_card', 'hukou'].includes(pair)) throw new Error('无效的互换类型')
+  return await requestApi(`/api/students/${id}/swap_materials`, {
+    method: 'POST',
+    data: { pair }
+  })
+}
+
+/**
  * 审核学员记录（通过/驳回）。
  *
  * @param {number|string} studentId - 学员 ID
@@ -1131,6 +1148,7 @@ module.exports = {
   getGeneratedMaterials, // 获取已生成报名材料
   manualCropMaterial,   // 手工裁剪并重新生成报名材料
   regenerateTrainingForm, // 重新生成体检表
+  swapMaterials,          // 互换身份证正反面/户口本首页本人页
   reviewStudent,        // 审核学员
   updateStudent,        // 更新学员
   deleteStudent,        // 删除学员

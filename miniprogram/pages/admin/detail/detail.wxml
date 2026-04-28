@@ -88,6 +88,11 @@
           </view>
         </view>
       </view>
+
+      <view wx:if="{{generatedMaterialsExists}}" class="swap-actions">
+        <button class="swap-btn" size="mini" bindtap="onSwapMaterials" data-pair="id_card">互换身份证</button>
+        <button class="swap-btn" size="mini" bindtap="onSwapMaterials" data-pair="hukou">互换户口页</button>
+      </view>
     </view>
   </view>
 
