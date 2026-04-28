@@ -1341,11 +1341,29 @@ def swap_materials_route(id):
                     pass
             return jsonify({'error': '文件互换失败，请稍后重试'}), 500
 
-        # ---- COS 同步（文件内容已变，重新上传到同一 key） ----
+        # ---- COS 同步（服务端 copy 互换，数据不经过本机网络） ----
         try:
-            from services.storage_service import save_from_local
-            save_from_local(abs_a, path_a)
-            save_from_local(abs_b, path_b)
+            from services.storage_service import _get_backend, _get_cos_client, _full_cos_key
+            backend = _get_backend()
+            if backend in ('cos', 'dual'):
+                client, config = _get_cos_client()
+                bucket = config['bucket']
+                key_cos_a = _full_cos_key(path_a, config)
+                key_cos_b = _full_cos_key(path_b, config)
+                tmp_key = key_cos_a + '.swap_tmp'
+                copy_src = {'Bucket': bucket, 'Region': config['region']}
+                # A → tmp
+                client.copy_object(Bucket=bucket, Key=tmp_key,
+                                   CopySource={**copy_src, 'Key': key_cos_a})
+                # B → A
+                client.copy_object(Bucket=bucket, Key=key_cos_a,
+                                   CopySource={**copy_src, 'Key': key_cos_b})
+                # tmp → B
+                client.copy_object(Bucket=bucket, Key=key_cos_b,
+                                   CopySource={**copy_src, 'Key': tmp_key})
+                # 删除临时
+                client.delete_object(Bucket=bucket, Key=tmp_key)
+                current_app.logger.info(f'[图片互换] COS 服务端 copy 互换完成')
         except Exception as cos_err:
             current_app.logger.warning(f'[图片互换] COS同步失败（本地已完成）: {cos_err}')
 
