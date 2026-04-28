@@ -1,125 +1,146 @@
-<!-- 1. 报名意向专区卡片 -->
-<view class="admin-section-card fade-enter" style="{{disableTrainingType ? 'opacity:0.6;pointer-events:none;' : ''}}">
-  <view class="card-header">
-    <view class="card-title">报名意向 ({{trainingCardTitle}})</view>
-    <text wx:if="{{disableTrainingType}}" style="font-size:22rpx;color:#e53e3e;">驳回记录不可更换项目</text>
+<!-- 1. 报名意向 -->
+<view class="admin-panel" style="{{disableTrainingType ? 'opacity:0.8;pointer-events:none;' : ''}}">
+  <view class="admin-cell">
+    <view class="cell-label required">培训类型</view>
+    <view class="cell-body right">
+      <view class="btn-group">
+        <view class="btn-item {{trainingType === 'special_equipment' ? 'active' : ''}}" bindtap="onSelectTrainingType" data-type="special_equipment">特种设备</view>
+        <view class="btn-item {{trainingType === 'special_operation' ? 'active' : ''}}" bindtap="onSelectTrainingType" data-type="special_operation">特种作业</view>
+      </view>
+    </view>
   </view>
-  <view class="admin-readonly-group">
-    <!-- Training Type -->
-    <view class="form-item admin-inline-item">
-      <view class="label required">培训类型</view>
-      <view class="type-options" style="margin-top:0">
-        <view class="type-option {{trainingType === 'special_equipment' ? 'active' : ''}}" bindtap="onSelectTrainingType" data-type="special_equipment"><text>特种设备</text></view>
-        <view class="type-option {{trainingType === 'special_operation' ? 'active' : ''}}" bindtap="onSelectTrainingType" data-type="special_operation"><text>特种作业</text></view>
+
+  <view class="admin-cell" wx:if="{{trainingType === 'special_equipment'}}">
+    <view class="cell-label required">报名类型</view>
+    <view class="cell-body right">
+      <view class="btn-group">
+        <view class="btn-item {{applicationType === 'new_exam' ? 'active' : ''}}" bindtap="onSelectApplicationType" data-type="new_exam">新考证</view>
+        <view class="btn-item {{applicationType === 'renewal' ? 'active' : ''}}" bindtap="onSelectApplicationType" data-type="renewal">复审</view>
       </view>
     </view>
-    <!-- Application Type -->
-    <view class="form-item admin-inline-item" wx:if="{{trainingType === 'special_equipment'}}">
-      <view class="label required">报名类型</view>
-      <view class="type-options" style="margin-top:0">
-        <view class="type-option {{applicationType === 'new_exam' ? 'active' : ''}}" bindtap="onSelectApplicationType" data-type="new_exam"><text>新考证</text></view>
-        <view class="type-option {{applicationType === 'renewal' ? 'active' : ''}}" bindtap="onSelectApplicationType" data-type="renewal"><text>复审</text></view>
-      </view>
-    </view>
-    <!-- Job Category -->
-    <view class="form-item admin-inline-item">
-      <view class="label required">作业类别</view>
+  </view>
+
+  <view class="admin-cell">
+    <view class="cell-label required">作业类别</view>
+    <view class="cell-body right">
       <picker mode="selector" range="{{jobCategoryNames}}" value="{{formData.jobCategoryIndex}}" bindchange="onJobCategoryChange" disabled="{{disableTrainingType}}">
-        <view class="picker-input"><text class="{{formData.job_category ? '' : 'placeholder'}}">{{formData.job_category || '请选择作业类别'}}</text><text class="arrow">›</text></view>
+        <view class="picker-inner">
+          <text class="{{formData.job_category ? 'val' : 'plc'}}">{{formData.job_category || '请选择作业类别'}}</text>
+          <text class="arrow">›</text>
+        </view>
       </picker>
     </view>
-    <!-- Exam Project -->
-    <view class="form-item admin-inline-item" wx:if="{{formData.examProjects && formData.examProjects.length > 0}}">
-      <view class="label required">操作项目</view>
+  </view>
+
+  <view class="admin-cell" wx:if="{{formData.examProjects && formData.examProjects.length > 0}}">
+    <view class="cell-label required">操作项目</view>
+    <view class="cell-body right">
       <picker mode="selector" range="{{formData.examProjects}}" range-key="name" value="{{formData.examProjectIndex}}" bindchange="onExamProjectChange" disabled="{{disableTrainingType}}">
-        <view class="picker-input"><text class="{{formData.exam_project ? '' : 'placeholder'}}">{{formData.exam_project || '请选择操作项目'}}</text><text class="arrow">›</text></view>
+        <view class="picker-inner">
+          <text class="{{formData.exam_project ? 'val' : 'plc'}}">{{formData.exam_project || '请选择操作项目'}}</text>
+          <text class="arrow">›</text>
+        </view>
       </picker>
     </view>
   </view>
 </view>
 
-<!-- 2. 身份与户口审核专区 (文字+照片紧密结构) -->
-<view class="admin-section-card fade-enter" wx:if="{{formData.job_category && formData.exam_project}}">
-  <view class="card-header"><view class="card-title">身份核对</view></view>
-  <view class="admin-fields-grid">
-    <view class="form-item admin-compact-input" style="flex: 1 1 45%;">
-      <view class="label required">姓名</view>
-      <input class="input" placeholder="请输入姓名" value="{{formData.name}}" bindinput="onInputChange" data-field="name" />
+<!-- 2. 身份核对 -->
+<view class="admin-panel" wx:if="{{formData.job_category && formData.exam_project}}">
+  <view class="admin-cell">
+    <view class="cell-label required">姓名</view>
+    <view class="cell-body" style="flex:1;">
+      <input class="cell-input" placeholder="姓名" value="{{formData.name}}" bindinput="onInputChange" data-field="name" />
     </view>
-    <view class="form-item admin-compact-input" style="flex: 1 1 45%;">
-      <view class="label required">性别</view>
-      <view class="gender-selector">
-        <view class="gender-option {{formData.gender === '男' ? 'active' : ''}}" bindtap="onSelectGender" data-gender="男"><text>男</text></view>
-        <view class="gender-option {{formData.gender === '女' ? 'active' : ''}}" bindtap="onSelectGender" data-gender="女"><text>女</text></view>
+    <view class="cell-label required" style="width: 70rpx; margin-left: 10rpx;">性别</view>
+    <view class="cell-body right">
+      <view class="btn-group">
+        <view class="btn-item {{formData.gender === '男' ? 'active' : ''}}" bindtap="onSelectGender" data-gender="男">男</view>
+        <view class="btn-item {{formData.gender === '女' ? 'active' : ''}}" bindtap="onSelectGender" data-gender="女">女</view>
       </view>
-    </view>
-    <view class="form-item admin-compact-input" style="flex: 1 1 100%;">
-      <view class="label required">身份证号</view>
-      <input class="input" placeholder="请输入18位身份证号" value="{{formData.id_card}}" bindinput="onInputChange" bindblur="onIdCardBlur" data-field="id_card" maxlength="18" />
-      <view class="field-error" wx:if="{{fieldErrors.id_card}}">{{fieldErrors.id_card}}</view>
     </view>
   </view>
 
-  <view class="admin-attachments-zone" wx:if="{{idCardAttachments.length > 0 || hukouAttachments.length > 0}}">
+  <view class="admin-cell">
+    <view class="cell-label required">手机号</view>
+    <view class="cell-body">
+      <input class="cell-input" type="number" placeholder="请输入手机号" value="{{formData.phone}}" bindinput="onInputChange" bindblur="onPhoneBlur" data-field="phone" maxlength="11" />
+    </view>
+  </view>
+
+  <view class="admin-cell">
+    <view class="cell-label required">身份证号</view>
+    <view class="cell-body">
+      <input class="cell-input" placeholder="请输入18位身份证号" value="{{formData.id_card}}" bindinput="onInputChange" bindblur="onIdCardBlur" data-field="id_card" maxlength="18" />
+    </view>
+  </view>
+
+  <!-- 照片附件无缝拼接到底部 -->
+  <view class="admin-photo-zone" wx:if="{{idCardAttachments.length > 0 || hukouAttachments.length > 0}}">
     <!-- 身份证照片子区 -->
-    <view class="admin-attachment-pair" wx:if="{{idCardAttachments.length > 0}}">
-      <view class="admin-pair-title">辅助核对材料：身份证</view>
-      <view class="attachments-grid">
+    <view class="photo-pair" wx:if="{{idCardAttachments.length > 0}}">
+      <view class="photo-grid">
         <block wx:for="{{idCardAttachments}}" wx:key="key">
-          <view class="attachment-item">
-            <file-uploader compact="{{true}}" fileType="{{item.key}}" label="{{item.label}}" required="{{true}}" value="{{(formData.files && formData.files[item.key]) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
+          <view class="photo-item">
+            <file-uploader compact="{{true}}" fileType="{{item.key}}" label="{{item.label}}" value="{{(formData.files && formData.files[item.key]) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
           </view>
         </block>
       </view>
-      <view class="admin-swap-bar">
-        <button class="swap-inline-btn" size="mini" bindtap="onSwapTap" data-pair="id_card">↔ 互换证件正反面</button>
+      <view class="swap-bar">
+        <view class="swap-btn-pill" bindtap="onSwapTap" data-pair="id_card">↔ 互换身份证正、反面</view>
       </view>
     </view>
     
     <!-- 户口本照片子区 -->
-    <view class="admin-attachment-pair" wx:if="{{hukouAttachments.length > 0}}">
-      <view class="admin-pair-title">辅助核对材料：户口本页</view>
-      <view class="attachments-grid">
+    <view class="photo-pair" wx:if="{{hukouAttachments.length > 0}}">
+      <view class="photo-grid">
         <block wx:for="{{hukouAttachments}}" wx:key="key">
-          <view class="attachment-item">
-            <file-uploader compact="{{true}}" fileType="{{item.key}}" label="{{item.label}}" required="{{true}}" value="{{(formData.files && formData.files[item.key]) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
+          <view class="photo-item">
+            <file-uploader compact="{{true}}" fileType="{{item.key}}" label="{{item.label}}" value="{{(formData.files && formData.files[item.key]) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
           </view>
         </block>
       </view>
-      <view class="admin-swap-bar">
-        <button class="swap-inline-btn" size="mini" bindtap="onSwapTap" data-pair="hukou">↔ 互换首页与本人页</button>
+      <view class="swap-bar">
+        <view class="swap-btn-pill" bindtap="onSwapTap" data-pair="hukou">↔ 互换首页、个人页</view>
       </view>
     </view>
   </view>
 </view>
 
-<!-- 3. 学历资质审核专区 -->
-<view class="admin-section-card fade-enter" wx:if="{{formData.job_category && formData.exam_project}}">
-  <view class="card-header"><view class="card-title">学历审核</view></view>
-  <view class="admin-fields-grid">
-    <view class="form-item admin-compact-input" style="flex: 1 1 100%;">
-      <view class="label required">文化程度</view>
+<!-- 3. 学历审核 -->
+<view class="admin-panel" wx:if="{{formData.job_category && formData.exam_project}}">
+  <view class="admin-cell">
+    <view class="cell-label required">文化程度</view>
+    <view class="cell-body right">
       <picker mode="selector" range="{{educationOptions}}" value="{{formData.educationIndex}}" bindchange="onEducationChange">
-        <view class="picker-input"><text class="{{formData.education ? '' : 'placeholder'}}">{{formData.education || '请选择文化程度'}}</text><text class="arrow">›</text></view>
+        <view class="picker-inner">
+          <text class="{{formData.education ? 'val' : 'plc'}}">{{formData.education || '请选择'}}</text>
+          <text class="arrow">›</text>
+        </view>
       </picker>
     </view>
-    <view class="form-item admin-compact-input" style="flex: 1 1 45%;">
-      <view class="label">毕业学校</view>
-      <input class="input" placeholder="选填" value="{{formData.school}}" bindinput="onInputChange" data-field="school" />
-    </view>
-    <view class="form-item admin-compact-input" style="flex: 1 1 45%;">
-      <view class="label">所学专业</view>
-      <input class="input" placeholder="选填" value="{{formData.major}}" bindinput="onInputChange" data-field="major" />
+  </view>
+
+  <view class="admin-cell">
+    <view class="cell-label">毕业学校</view>
+    <view class="cell-body">
+      <input class="cell-input" placeholder="选填" value="{{formData.school}}" bindinput="onInputChange" data-field="school" />
     </view>
   </view>
 
-  <view class="admin-attachments-zone" wx:if="{{educationAttachments.length > 0}}">
-    <view class="admin-attachment-pair">
-      <view class="admin-pair-title">辅助核对材料：学历证书</view>
-      <view class="attachments-grid">
+  <view class="admin-cell">
+    <view class="cell-label">所学专业</view>
+    <view class="cell-body">
+      <input class="cell-input" placeholder="选填" value="{{formData.major}}" bindinput="onInputChange" data-field="major" />
+    </view>
+  </view>
+
+  <view class="admin-photo-zone" wx:if="{{educationAttachments.length > 0}}">
+    <view class="photo-pair">
+      <view class="photo-grid">
         <block wx:for="{{educationAttachments}}" wx:key="key">
-          <view class="attachment-item">
-            <file-uploader compact="{{true}}" fileType="{{item.key}}" label="{{item.label}}" required="{{true}}" value="{{(formData.files && formData.files[item.key]) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
+          <view class="photo-item">
+            <file-uploader compact="{{true}}" fileType="{{item.key}}" label="{{item.label}}" value="{{(formData.files && formData.files[item.key]) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
           </view>
         </block>
       </view>
@@ -127,36 +148,34 @@
   </view>
 </view>
 
-<!-- 4. 联系与单位情况 -->
-<view class="admin-section-card fade-enter">
-  <view class="card-header"><view class="card-title">联系与单位绑定</view></view>
-  <view class="admin-fields-grid">
-    <view class="form-item admin-compact-input" style="flex: 1 1 100%;">
-      <view class="label required">手机号</view>
-      <input class="input" type="number" placeholder="请输入11位手机号" value="{{formData.phone}}" bindinput="onInputChange" bindblur="onPhoneBlur" data-field="phone" maxlength="11" />
-      <view class="field-error" wx:if="{{fieldErrors.phone}}">{{fieldErrors.phone}}</view>
+<!-- 4. 单位绑定 -->
+<view class="admin-panel" wx:if="{{formData.job_category && formData.exam_project}}">
+  <view class="admin-cell">
+    <view class="cell-label required">单位名称</view>
+    <view class="cell-body">
+      <input class="cell-input" placeholder="请输入单位名称" value="{{formData.company}}" bindinput="onInputChange" data-field="company" />
     </view>
-    <view class="form-item admin-compact-input" style="flex: 1 1 100%;">
-      <view class="label required">单位名称</view>
-      <input class="input" placeholder="请输入单位名称" value="{{formData.company}}" bindinput="onInputChange" data-field="company" />
-    </view>
-    <view class="form-item admin-compact-input" style="flex: 1 1 100%;">
-      <view class="label required">单位地址</view>
-      <input class="input" placeholder="请输入单位地址" value="{{formData.company_address}}" bindinput="onInputChange" data-field="company_address" />
+  </view>
+
+  <view class="admin-cell">
+    <view class="cell-label required">单位地址</view>
+    <view class="cell-body">
+      <input class="cell-input" placeholder="请输入单位地址" value="{{formData.company_address}}" bindinput="onInputChange" data-field="company_address" />
     </view>
   </view>
 </view>
 
-<!-- 5. 附加其它材料 (照片等) -->
-<view class="admin-section-card fade-enter" wx:if="{{otherAttachments.length > 0 && formData.job_category && formData.exam_project}}">
-  <view class="card-header"><view class="card-title">附加审核材料</view></view>
-  <view class="admin-attachments-zone" style="padding-top: 10rpx;">
-    <view class="attachments-grid">
-      <block wx:for="{{otherAttachments}}" wx:key="key">
-        <view class="attachment-item">
-          <file-uploader compact="{{true}}" fileType="{{item.key}}" label="{{item.label}}" required="{{true}}" value="{{(formData.files && formData.files[item.key]) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
-        </view>
-      </block>
+<!-- 5. 其他证明材料 -->
+<view class="admin-panel" style="padding-top: 16rpx;" wx:if="{{otherAttachments.length > 0 && formData.job_category && formData.exam_project}}">
+  <view class="admin-photo-zone" style="border-top:none;">
+    <view class="photo-pair">
+      <view class="photo-grid">
+        <block wx:for="{{otherAttachments}}" wx:key="key">
+          <view class="photo-item">
+            <file-uploader compact="{{true}}" fileType="{{item.key}}" label="{{item.label}}" value="{{(formData.files && formData.files[item.key]) || ''}}" bind:uploaded="onFileUploaded" bind:deleted="onFileDeleted" />
+          </view>
+        </block>
+      </view>
     </view>
   </view>
 </view>

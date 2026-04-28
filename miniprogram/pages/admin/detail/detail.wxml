@@ -204,6 +204,6 @@
     >驳回</button>
   </view>
 
-  <view class="readonly-hint" wx:if="{{student && !canReview}}">当前不是待审核状态，仅支持保存</view>
+
   <view class="loading" wx:if="{{loading}}">加载中...</view>
 </view>

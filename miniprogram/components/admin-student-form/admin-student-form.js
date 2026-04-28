@@ -75,11 +75,11 @@ Component({
       
       const idCardAttachments = attachments.filter(a => a.key === 'id_card_front' || a.key === 'id_card_back')
       const hukouAttachments = attachments.filter(a => a.key === 'hukou_residence' || a.key === 'hukou_personal')
-      const educationAttachments = attachments.filter(a => a.key === 'diploma')
+      const educationAttachments = attachments.filter(a => a.key === 'diploma' || a.key === 'photo')
       const otherAttachments = attachments.filter(a => 
         a.key !== 'id_card_front' && a.key !== 'id_card_back' && 
         a.key !== 'hukou_residence' && a.key !== 'hukou_personal' && 
-        a.key !== 'diploma'
+        a.key !== 'diploma' && a.key !== 'photo'
       )
 
       this.setData({
