@@ -5,7 +5,7 @@ API 端点:
     POST /api/sxtsks/submit/<student_id>    - 仅提交报名（不下载申请表）
     GET  /api/sxtsks/registrations          - 查询已报名列表
     GET  /api/sxtsks/bmid/<student_id>      - 根据学员提交的身份证查询平台 BMID
-    GET  /api/sxtsks/form/<bmid>            - 下载指定报名的申请表并保存到学员目录
+    GET  /api/sxtsks/form/<bmid>            - 下载指定报名的申请表
 """
 import os
 import io
@@ -68,6 +68,20 @@ def _get_student_output_dir(student, base_dir):
     """根据学员信息构建学员目录路径。"""
     student_folder_name = f"特种设备-{student.get('company', '')}-{student['name']}"
     return os.path.join(base_dir, 'students', student_folder_name)
+
+
+def _send_pdf_no_store(file_obj, filename):
+    """返回不允许缓存的 PDF 下载响应。"""
+    response = send_file(
+        file_obj,
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=filename,
+    )
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 @sxtsks_bp.route('/api/sxtsks/submit', methods=['POST'])
@@ -211,7 +225,6 @@ def download_form(bmid):
         student = get_student_by_id(student_id) if student_id else None
         
         pdf_filename = f'申请表-{bmid}.pdf'
-        form_path = None
         
         student_label = f"[{student['id_card']}] {student['name']}" if student else f"未知学员"
         step_logs.append(f'开始获取 {student_label} 的报名申请表')
@@ -223,30 +236,11 @@ def download_form(bmid):
             if id_card and name:
                 pdf_filename = f"{id_card}-{name}-报名申请表.pdf"
 
-            base_dir = _get_base_dir()
-            material_folder = f"{id_card}-{name}-报名材料" if id_card and name else '报名材料'
-            output_dir = os.path.join(_get_student_output_dir(student, base_dir), material_folder)
-            os.makedirs(output_dir, exist_ok=True)
-            form_path = os.path.join(output_dir, pdf_filename)
-            
-            # 如果申请表已在本地缓存，直接返回下载
-            if os.path.exists(form_path):
-                current_app.logger.info(f'{student_label} 命中本地已生成的 PDF 申请表缓存: {pdf_filename}')
-                step_logs.append('命中本地缓存，直接使用已生成的 PDF')
-                if mode == 'generate':
-                    return jsonify({'success': True, 'logs': step_logs, 'cached': True, 'filename': pdf_filename})
-                return send_file(
-                    form_path,
-                    mimetype='application/pdf',
-                    as_attachment=True,
-                    download_name=pdf_filename,
-                )
-
         # ----------------------------
-        # 缓存未命中，前往网站获取 HTML 处理
+        # 每次下载都前往网站获取 HTML 处理，不读取或写入本地 PDF 缓存
         # ----------------------------
-        step_logs.append('本地无缓存，正在连接省平台抓取数据...')
-        current_app.logger.info(f'{student_label} 本地无缓存，前往平台抓取核心数据 (BMID: {bmid})...')
+        step_logs.append('正在连接省平台抓取最新报名申请表数据...')
+        current_app.logger.info(f'{student_label} 前往平台抓取最新报名申请表数据 (BMID: {bmid})...')
         client = _get_client()
         content, content_type, filename = client.download_application_form(bmid)
         step_logs.append('平台数据获取成功，正在注入排版规则...')
@@ -359,34 +353,10 @@ div[align="left"] {{ font-size:9pt; text-align:left; margin-left:10px; }}
         step_logs.append(f'PDF 渲染完成，文件大小 {pdf_size_kb} KB')
         current_app.logger.info(f'{student_label} PDF 转换生成完毕，最终大小缩略约为 {pdf_size_kb} KB')
 
-        # 保存并返回
-        if form_path:
-            try:
-                with open(form_path, 'wb') as f:
-                    f.write(pdf_bytes)
-                step_logs.append('PDF 已保存到服务器')
-                current_app.logger.info(f'{student_label} PDF 文件已成功冷备份到设备持久化层: {form_path}')
-                if mode == 'generate':
-                    return jsonify({'success': True, 'logs': step_logs, 'cached': False, 'filename': pdf_filename})
-                return send_file(
-                    form_path,
-                    mimetype='application/pdf',
-                    as_attachment=True,
-                    download_name=pdf_filename,
-                )
-            except Exception as save_err:
-                current_app.logger.warning(f'保存申请表失败: {save_err}')
-
-        # 降级: 放内存处理
         if mode == 'generate':
-            step_logs.append('PDF 生成完毕（内存模式）')
+            step_logs.append('PDF 生成完毕（未缓存）')
             return jsonify({'success': True, 'logs': step_logs, 'cached': False, 'filename': pdf_filename})
-        return send_file(
-            io.BytesIO(pdf_bytes),
-            mimetype='application/pdf',
-            as_attachment=True,
-            download_name=pdf_filename,
-        )
+        return _send_pdf_no_store(io.BytesIO(pdf_bytes), pdf_filename)
     except Exception as e:
         current_app.logger.error(f'下载申请表异常: {e}', exc_info=True)
         return jsonify({'success': False, 'message': str(e)}), 500

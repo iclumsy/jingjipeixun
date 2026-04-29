@@ -1921,8 +1921,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             regDownloadBtn.style.cursor = 'pointer';
             regDownloadBtn.style.fontWeight = '500';
 
-            // 下载流程：先查 BMID，再触发文件下载
-            // 后端 /api/sxtsks/form/<bmid> 命中本地缓存秒返，未命中则现抓平台
+            // 下载流程：先查 BMID，再触发文件下载；申请表每次从平台刷新，不使用本地 PDF 缓存
             const triggerDownload = async () => {
                 regDownloadBtn.disabled = true;
                 regDownloadBtn.textContent = '查询中...';
@@ -1934,7 +1933,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         return;
                     }
                     regDownloadBtn.textContent = '下载中...';
-                    window.open(`/api/sxtsks/form/${bmidData.bmid}?student_id=${student.id}`, '_blank');
+                    window.open(`/api/sxtsks/form/${bmidData.bmid}?student_id=${student.id}&no_cache=${Date.now()}`, '_blank');
                     showMessage(`申请表下载已开始（BMID: ${bmidData.bmid}）`, 'success');
                 } catch (e) {
                     showMessage('下载异常: ' + e.message, 'error');
@@ -2328,8 +2327,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                             }
                             const bmid = bmidData.bmid;
                             downloadFormBtn.textContent = '⏳ 下载中...';
-                            // 下载申请表（同时保存到学员目录）
-                            window.open(`/api/sxtsks/form/${bmid}?student_id=${student.id}`, '_blank');
+                            // 下载申请表：每次从平台刷新，不使用本地 PDF 缓存
+                            window.open(`/api/sxtsks/form/${bmid}?student_id=${student.id}&no_cache=${Date.now()}`, '_blank');
                             showMessage(`申请表下载已开始（BMID: ${bmid}）`, 'success');
                         } catch (e) {
                             showMessage('下载异常: ' + e.message, 'error');
