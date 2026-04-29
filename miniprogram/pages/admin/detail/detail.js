@@ -319,10 +319,12 @@ Page({
     this.setData({ materialsLoading: true })
     try {
       const result = await api.getGeneratedMaterials(this.data.studentId)
-      const materials = normalizeGeneratedMaterials(result.materials || [], api.toAbsoluteFileUrl)
+      const materials = normalizeGeneratedMaterials(result.materials || [], api.toAbsoluteFileUrl, {
+        student: this.data.student || {}
+      })
       this.setData({
         generatedMaterials: materials,
-        generatedMaterialsExists: !!result.exists && materials.length > 0,
+        generatedMaterialsExists: materials.length > 0,
         materialsLoading: false
       })
     } catch (err) {
@@ -675,11 +677,37 @@ Page({
   previewGeneratedMaterial(e) {
     const index = Number(e.currentTarget.dataset.index)
     const item = this.data.generatedMaterials[index]
-    if (!item || !item.previewUrl) {
+    if (!item) {
       wx.showToast({ title: '材料地址不可用', icon: 'none' })
       return
     }
-    if (/\.docx?$/i.test(item.name || '')) {
+    if (item.materialType === 'registration_form') {
+      const student = this.data.student || {}
+      wx.showLoading({ title: '下载中...' })
+      api.downloadRegForm(this.data.studentId, student.name, student.id_card).then(() => {
+        wx.hideLoading()
+      }).catch(err => {
+        wx.hideLoading()
+        wx.showToast({ title: err.message || '下载失败', icon: 'none' })
+      })
+      return
+    }
+    if (item.materialType === 'training_form') {
+      const student = this.data.student || {}
+      wx.showLoading({ title: '下载中...' })
+      api.downloadTrainingForm(this.data.studentId, student.name, student.id_card).then(() => {
+        wx.hideLoading()
+      }).catch(err => {
+        wx.hideLoading()
+        wx.showToast({ title: err.message || '下载失败', icon: 'none' })
+      })
+      return
+    }
+    if (!item.previewUrl) {
+      wx.showToast({ title: '材料地址不可用', icon: 'none' })
+      return
+    }
+    if (item.isDocument || /\.(docx?|pdf)$/i.test(item.name || '')) {
       wx.showLoading({ title: '打开中...' })
       wx.downloadFile({
         url: item.previewUrl,
@@ -700,10 +728,29 @@ Page({
     }
     wx.previewImage({
       urls: this.data.generatedMaterials
-        .filter(mat => mat.previewUrl && !/\.docx?$/i.test(mat.name || ''))
+        .filter(mat => mat.previewUrl && !mat.isDocument && !/\.(docx?|pdf)$/i.test(mat.name || ''))
         .map(mat => mat.previewUrl),
       current: item.previewUrl
     })
+  },
+
+  async regenTrainingForm() {
+    if (this.data.regenFormLoading) return
+    
+    const confirmed = await this.confirmAction('重新生成', '确认要重新生成体检表吗？这将基于当前的个人照片重新合成文档。')
+    if (!confirmed) return
+
+    this.setData({ regenFormLoading: true })
+    wx.showLoading({ title: '生成中...' })
+    try {
+      await api.regenerateTrainingForm(this.data.studentId)
+      wx.showToast({ title: '已生成', icon: 'success' })
+      await this.loadGeneratedMaterials()
+    } catch (err) {
+      wx.showToast({ title: err.message || '生成失败', icon: 'none' })
+    } finally {
+      this.setData({ regenFormLoading: false })
+    }
   },
 
   openMaterialAdjust(e) {

@@ -57,8 +57,12 @@
         暂无报名材料，审核通过后系统会自动生成
       </view>
       <view class="materials-grid" wx:else>
-        <view class="material-item {{item.materialType === 'training_form' ? 'full-width' : ''}}" wx:for="{{generatedMaterials}}" wx:key="url">
-          <view class="material-preview" bindtap="previewGeneratedMaterial" data-index="{{index}}">
+        <view class="material-item {{item.fullWidth ? 'full-width' : ''}} {{item.isDownloadCard ? 'download-only' : ''}}" wx:for="{{generatedMaterials}}" wx:key="name">
+          <view wx:if="{{item.isDownloadCard}}" class="material-download-card {{item.downloadCardTone}}" bindtap="previewGeneratedMaterial" data-index="{{index}}">
+            <view class="material-download-icon">{{item.downloadIcon}}</view>
+            <view class="material-download-title">{{item.title}}</view>
+          </view>
+          <view wx:else class="material-preview" bindtap="previewGeneratedMaterial" data-index="{{index}}">
             <image
               wx:if="{{item.previewUrl && !item.isDocument}}"
               class="material-image"
@@ -67,22 +71,30 @@
             />
             <view wx:else class="material-doc">文件</view>
           </view>
-          <view class="material-title">{{item.title}}</view>
+          <view wx:if="{{!item.isDownloadCard}}" class="material-title">{{item.title}}</view>
           <view wx:if="{{item.adjusted}}" class="material-adjusted">已调整 {{item.adjusted_by}}</view>
-          <view class="material-actions">
+          
+          <!-- 常规预览型材料的操作 -->
+          <view wx:if="{{!item.isDownloadCard}}" class="material-actions">
             <button class="material-btn" size="mini" bindtap="previewGeneratedMaterial" data-index="{{index}}">{{item.isDocument ? '下载' : '预览'}}</button>
             <button
               wx:if="{{item.adjustable}}"
-              class="material-btn primary"
+              class="material-btn btn-adjust"
               size="mini"
               bindtap="openMaterialAdjust"
               data-index="{{index}}"
             >调整</button>
+          </view>
+
+          <!-- 下载型卡片的操作 (报名表、体检表) -->
+          <view wx:else class="material-actions download-actions">
+            <button class="material-btn" size="mini" bindtap="previewGeneratedMaterial" data-index="{{index}}">下载</button>
             <button
               wx:if="{{item.canRegenForm}}"
-              class="material-btn primary"
+              class="material-btn btn-adjust"
               size="mini"
               bindtap="regenTrainingForm"
+              data-index="{{index}}"
               loading="{{regenFormLoading}}"
               disabled="{{regenFormLoading}}"
             >重新生成</button>

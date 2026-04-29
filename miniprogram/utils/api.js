@@ -1110,7 +1110,8 @@ async function downloadRegForm(studentId, name, idCard) {
 
   // 2. 组装下载 URL
   const bmid = encodeURIComponent(bmidResult.bmid)
-  const url = `${baseUrl}/api/sxtsks/form/${bmid}?student_id=${id}` + (token ? `&mini_token=${encodeURIComponent(token)}` : '')
+  const url = `${baseUrl}/api/sxtsks/form/${bmid}?student_id=${id}&no_cache=${Date.now()}`
+    + (token ? `&mini_token=${encodeURIComponent(token)}` : '')
 
   return new Promise((resolve, reject) => {
     wx.downloadFile({

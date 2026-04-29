@@ -3,7 +3,13 @@ const MATERIAL_LABELS = {
   id_card: '身份证',
   hukou: '户口本',
   diploma: '学历证书',
-  training_form: '体检表'
+  training_form: '体检表',
+  registration_form: '报名表'
+}
+
+const DOWNLOAD_CARD_META = {
+  registration_form: { tone: 'blue', icon: '✏️' },
+  training_form: { tone: 'purple', icon: '📄' }
 }
 
 function stripGeneratedPrefix(filename = '') {
@@ -24,6 +30,7 @@ function detectMaterialType(filename = '') {
   if (/户口/.test(name)) return 'hukou'
   if (/学历|毕业证/.test(name)) return 'diploma'
   if (/体检表/.test(name)) return 'training_form'
+  if (/报名申请表|报名表|申请表/.test(name)) return 'registration_form'
   return ''
 }
 
@@ -44,33 +51,60 @@ function toPreviewUrl(rawUrl = '', toAbsoluteFileUrl) {
   return `${base}${value}`
 }
 
-function normalizeGeneratedMaterials(materials = [], toAbsoluteFileUrl) {
-  const normalized = (Array.isArray(materials) ? materials : []).map(item => {
+function appendRegistrationFormMaterial(materials = [], student = {}) {
+  const list = Array.isArray(materials) ? materials.slice() : []
+  const hasRegistrationForm = list.some(item => {
+    const materialType = (item && (item.material_type || item.materialType)) || detectMaterialType(item && item.name)
+    return materialType === 'registration_form'
+  })
+  if (student && student.status === 'registered' && !hasRegistrationForm) {
+    const name = `${student.id_card || 'id'}-${student.name || '学员'}-报名申请表.pdf`
+    list.push({
+      name,
+      url: '',
+      material_type: 'registration_form',
+      dynamicDownload: true
+    })
+  }
+  return list
+}
+
+function normalizeGeneratedMaterials(materials = [], toAbsoluteFileUrl, options = {}) {
+  const source = appendRegistrationFormMaterial(materials, options.student || {})
+  const normalized = source.map(item => {
     const name = String(item && item.name ? item.name : '').trim()
     const materialType = (item && (item.material_type || item.materialType)) || detectMaterialType(name)
     const title = MATERIAL_LABELS[materialType] || stripExtension(stripGeneratedPrefix(name)) || '报名材料'
     const url = toPreviewUrl(item && item.url, toAbsoluteFileUrl)
-    const isDocument = /\.docx?$/i.test(name)
+    const isDocument = /\.(docx?|pdf)$/i.test(name) || materialType === 'registration_form'
     const adjustableTypes = ['photo', 'id_card', 'hukou', 'diploma']
     const cacheVersion = item && (item.version || item.mtime)
+    const isDownloadCard = materialType === 'training_form' || materialType === 'registration_form'
+    const downloadMeta = DOWNLOAD_CARD_META[materialType] || { tone: '', icon: '' }
     return {
       ...item,
       title,
       materialType,
       adjustable: adjustableTypes.includes(materialType),
       canRegenForm: materialType === 'training_form',
+      canDownloadRegForm: materialType === 'registration_form',
       isDocument,
-      previewUrl: appendCacheBust(url, cacheVersion)
+      isDownloadCard,
+      downloadCardTone: downloadMeta.tone,
+      downloadIcon: downloadMeta.icon,
+      fullWidth: false,
+      previewUrl: isDocument ? url : appendCacheBust(url, cacheVersion)
     }
   })
 
-  // 按类型强制排序，保证固定顺序：个人照片(0) -> 学历证书(1) -> 身份证(2) -> 户口本(3) -> 体检表(4)
+  // 按类型强制排序，保证固定顺序：个人照片 -> 学历证书 -> 身份证 -> 户口本 -> 报名表 -> 体检表
   const orderMap = {
     'photo': 0,
     'diploma': 1,
     'id_card': 2,
     'hukou': 3,
-    'training_form': 4
+    'registration_form': 4,
+    'training_form': 5
   }
   normalized.sort((a, b) => {
     const orderA = orderMap[a.materialType] !== undefined ? orderMap[a.materialType] : 99
