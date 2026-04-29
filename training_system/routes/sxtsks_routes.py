@@ -268,6 +268,9 @@ def download_form(bmid):
         # 去掉固定像素宽度，交给 CSS 自动布局（避免右边框被截断和身份证折行）
         html = html.replace('width="650"', '')
         html = html.replace('width="650px"', '')
+        
+        # 核心修复：将平台原始表格类名替换为下方 CSS 定义的类名
+        html = html.replace('class="blodside"', 'class="tbsd"')
 
         # 构建字体文件的绝对路径（用于 @font-face url()）
         base_dir = _get_base_dir()
@@ -301,7 +304,7 @@ def download_form(bmid):
 body {{ font-size:12pt; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; margin:0; padding:0; }}
 .tit1 {{ padding:0 0 10px 0; line-height:36pt; text-align:center; font-size:18pt; font-weight:normal;
         font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; }}
-.tbsd {{ border:2px solid #000; width:100%; max-width:100%; border-collapse:collapse; margin:0 auto; table-layout:fixed; box-sizing:border-box; overflow:hidden; }}
+.tbsd {{ border:2px solid #000; width:100%; max-width:100%; border-collapse:collapse; margin:0 auto; table-layout:fixed; box-sizing:border-box; }}
 .tbsd tr:first-child td:nth-child(1) {{ width: 20%; }}
 .tbsd tr:first-child td:nth-child(2) {{ width: 32%; }}
 .tbsd tr:first-child td:nth-child(3) {{ width: 15%; }}
@@ -309,8 +312,7 @@ body {{ font-size:12pt; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei"
 .tbsd tr:first-child td:nth-child(5) {{ width: 18%; }}
 .tbsd td {{ font-size:12pt; padding:6px 4px; line-height:16pt; border:1px solid #000;
            font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; word-break:break-all; vertical-align:middle; box-sizing:border-box; }}
-.tbsd td[colspan] {{ border-right:2px solid #000 !important; }}
-.tbsd td:last-child {{ border-right:2px solid #000 !important; }}
+.tbsd td[colspan], .tbsd td:last-child {{ border-right:2px solid #000 !important; }}
 .tbsd td p {{ font-size:12pt; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; margin:0; }}
 td[height="84"] {{ height:64pt; }}
 td[height="115"] {{ height:85pt; }}
