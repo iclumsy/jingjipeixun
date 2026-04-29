@@ -257,6 +257,56 @@ document.addEventListener('DOMContentLoaded', async () => {
             .replace(/'/g, '&#39;');
     }
 
+    function formatOperationTime(value) {
+        if (!value) return '-';
+        const normalized = String(value).replace(' ', 'T');
+        const date = new Date(normalized);
+        if (Number.isNaN(date.getTime())) return String(value);
+        const pad = n => String(n).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
+    function renderOperationLogs(container, logs) {
+        if (!container) return;
+        if (!Array.isArray(logs) || logs.length === 0) {
+            container.innerHTML = '<div style="padding:14px 0;color:#94A3B8;font-size:13px;">暂无操作记录</div>';
+            return;
+        }
+        container.innerHTML = logs.map(log => {
+            const status = log.status || 'success';
+            const statusColor = status === 'fail' ? '#DC2626' : (status === 'warning' ? '#D97706' : '#059669');
+            const actor = log.actor_name || '-';
+            const source = log.actor_source || '';
+            const message = log.message || '';
+            return `
+                <div style="display:grid;grid-template-columns:120px 1fr;gap:14px;padding:12px 0;border-bottom:1px solid #E2E8F0;">
+                    <div style="color:#64748B;font-size:12px;line-height:1.5;">${escapeHtml(formatOperationTime(log.created_at))}</div>
+                    <div style="min-width:0;">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <span style="font-size:13px;font-weight:700;color:#0F172A;">${escapeHtml(log.action_label || log.action || '-')}</span>
+                            <span style="font-size:11px;color:${statusColor};background:${status === 'fail' ? '#FEF2F2' : (status === 'warning' ? '#FFFBEB' : '#ECFDF5')};border-radius:999px;padding:1px 8px;">${escapeHtml(status)}</span>
+                        </div>
+                        <div style="margin-top:4px;color:#64748B;font-size:12px;line-height:1.5;">${escapeHtml(actor)}${source ? ` · ${escapeHtml(source)}` : ''}</div>
+                        ${message ? `<div style="margin-top:5px;color:#334155;font-size:12px;line-height:1.55;word-break:break-word;">${escapeHtml(message)}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async function loadOperationLogs(studentId, container) {
+        if (!studentId || !container) return;
+        container.innerHTML = '<div style="padding:14px 0;color:#94A3B8;font-size:13px;">操作记录加载中...</div>';
+        try {
+            const res = await fetch(`/api/students/${studentId}/operation_logs?limit=80`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || data.error || '加载失败');
+            renderOperationLogs(container, data.logs || []);
+        } catch (err) {
+            container.innerHTML = `<div style="padding:14px 0;color:#DC2626;font-size:13px;">${escapeHtml(err.message || '操作记录加载失败')}</div>`;
+        }
+    }
+
     function storeMaterialLog(student, payload) {
         student._lastMaterialLog = {
             logs: payload.logs || '',
@@ -2065,6 +2115,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const actionBar = clone.querySelector('.action-bar');
         if (actionBar) {
+            const operationSection = document.createElement('div');
+            operationSection.style.cssText = 'margin-top:18px;border-top:1px solid #E2E8F0;padding-top:16px;';
+            operationSection.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px;">
+                    <h4 style="margin:0;color:#0F172A;font-size:15px;">操作记录</h4>
+                    <button type="button" class="btn" style="padding:4px 12px;font-size:12px;background:#F8FAFC;color:#334155;border:1px solid #CBD5E1;">刷新</button>
+                </div>
+                <div class="operation-log-list"></div>
+            `;
+            const operationList = operationSection.querySelector('.operation-log-list');
+            const refreshLogBtn = operationSection.querySelector('button');
+            refreshLogBtn.onclick = () => loadOperationLogs(student.id, operationList);
+            actionBar.parentNode.insertBefore(operationSection, actionBar);
+
             const saveFormBtn = document.createElement('button');
             saveFormBtn.id = '_save_student_btn';
             saveFormBtn.className = 'btn primary';
@@ -2356,6 +2420,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         mainContent.innerHTML = '';
         mainContent.appendChild(clone);
+        const operationList = mainContent.querySelector('.operation-log-list');
+        if (operationList) {
+            loadOperationLogs(student.id, operationList);
+        }
     }
 
     async function uploadFile(studentId, fieldName, file, dbKey, previewImg, originalSrc) {

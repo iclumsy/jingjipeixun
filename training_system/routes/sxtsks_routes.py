@@ -12,6 +12,7 @@ import io
 from flask import Blueprint, jsonify, request, current_app, send_file
 from services.sxtsks_service import SxtsksClient
 from services import storage_service
+from services.operation_log_service import log_student_operation
 
 sxtsks_bp = Blueprint('sxtsks', __name__)
 
@@ -46,7 +47,8 @@ def _get_student_photo_path(student, base_dir):
     id_card = student.get('id_card', '')
     name = student.get('name', '')
 
-    processed_photo = os.path.join(base_dir, student_folder, f"{id_card}-{name}-个人照片.jpg")
+    name_prefix = f"{id_card}-{name}"
+    processed_photo = os.path.join(base_dir, student_folder, f"{name_prefix}-报名材料", f"{name_prefix}-个人照片.jpg")
     if os.path.exists(processed_photo):
         return processed_photo
 
@@ -141,11 +143,45 @@ def submit_registration(student_id):
         if result.get('success'):
             from models.student import update_student
             update_student(student_id, {'status': 'registered'})
+            log_student_operation(
+                student_id,
+                'platform_registration_submitted',
+                '提交省网报名',
+                message=result.get('message', '') or '省网报名提交成功',
+                after={'status': 'registered'},
+                metadata={
+                    'name': student.get('name', ''),
+                    'submitted_id_card': result.get('submitted_id_card', ''),
+                    'step_count': len(raw_steps),
+                }
+            )
+        else:
+            log_student_operation(
+                student_id,
+                'platform_registration_submitted',
+                '提交省网报名',
+                status='fail',
+                message=result.get('message', '') or '省网报名提交失败',
+                metadata={
+                    'name': student.get('name', ''),
+                    'step_count': len(raw_steps),
+                }
+            )
             
         return jsonify(result)
 
     except Exception as e:
         current_app.logger.error(f'报名平台提交异常: {e}', exc_info=True)
+        log_student_operation(
+            student_id,
+            'platform_registration_submitted',
+            '提交省网报名',
+            status='fail',
+            message=f'提交异常: {str(e)}',
+            metadata={
+                'name': student.get('name', '') if isinstance(student, dict) else '',
+            }
+        )
         return jsonify({'success': False, 'message': f'提交异常: {str(e)}'}), 500
 
 
@@ -190,6 +226,18 @@ def query_bmid(student_id):
         
         if matched:
             reg = matched[0]  # 第一条即最新
+            log_student_operation(
+                student_id,
+                'platform_bmid_queried',
+                '查询报名流水号',
+                message='已查询到省网报名流水号',
+                metadata={
+                    'name': reg.get('name', ''),
+                    'bmid': reg.get('bmid', ''),
+                    'status': reg.get('status', ''),
+                    'apply_date': reg.get('apply_date', ''),
+                }
+            )
             return jsonify({
                 'success': True,
                 'bmid': reg['bmid'],
@@ -199,10 +247,30 @@ def query_bmid(student_id):
                 'apply_date': reg['apply_date'],
             })
         else:
+            log_student_operation(
+                student_id,
+                'platform_bmid_queried',
+                '查询报名流水号',
+                status='fail',
+                message=f'未找到「{student_name}」的报名记录',
+                metadata={
+                    'name': student_name,
+                }
+            )
             return jsonify({'success': False, 'message': f'未找到「{student_name}」（{student_id_card}）的报名记录'})
 
     except Exception as e:
         current_app.logger.error(f'查询 BMID 异常: {e}', exc_info=True)
+        log_student_operation(
+            student_id,
+            'platform_bmid_queried',
+            '查询报名流水号',
+            status='fail',
+            message=str(e),
+            metadata={
+                'name': student_name,
+            }
+        )
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
@@ -357,8 +425,43 @@ div[align="left"] {{ font-size:9pt; text-align:left; margin-left:10px; }}
 
         if mode == 'generate':
             step_logs.append('PDF 生成完毕（未缓存）')
+            if student_id:
+                log_student_operation(
+                    student_id,
+                    'registration_form_generated',
+                    '生成报名申请表',
+                    message='报名申请表 PDF 已生成',
+                    metadata={
+                        'bmid': bmid,
+                        'filename': pdf_filename,
+                        'name': student.get('name', '') if student else '',
+                    }
+                )
             return jsonify({'success': True, 'logs': step_logs, 'cached': False, 'filename': pdf_filename})
+        if student_id:
+            log_student_operation(
+                student_id,
+                'registration_form_downloaded',
+                '下载报名申请表',
+                message='报名申请表已下载',
+                metadata={
+                    'bmid': bmid,
+                    'filename': pdf_filename,
+                    'name': student.get('name', '') if student else '',
+                }
+            )
         return _send_pdf_no_store(io.BytesIO(pdf_bytes), pdf_filename)
     except Exception as e:
         current_app.logger.error(f'下载申请表异常: {e}', exc_info=True)
+        if student_id:
+            log_student_operation(
+                student_id,
+                'registration_form_downloaded',
+                '下载报名申请表',
+                status='fail',
+                message=str(e),
+                metadata={
+                    'bmid': bmid,
+                }
+            )
         return jsonify({'success': False, 'message': str(e)}), 500

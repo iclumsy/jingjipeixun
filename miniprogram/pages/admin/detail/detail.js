@@ -123,6 +123,8 @@ Page({
     regenFormLoading: false,
     generatedMaterials: [],
     generatedMaterialsExists: false,
+    operationLogs: [],
+    operationLogsLoading: false,
     materialModal: {
       visible: false,
       title: '',
@@ -155,6 +157,7 @@ Page({
     await this.loadJobCategories()
     await this.loadDetail()
     await this.loadGeneratedMaterials()
+    await this.loadOperationLogs()
   },
 
   async loadAttachmentConfig() {
@@ -333,6 +336,37 @@ Page({
         generatedMaterials: [],
         generatedMaterialsExists: false,
         materialsLoading: false
+      })
+    }
+  },
+
+  mapOperationLog(item = {}) {
+    const status = item.status || 'success'
+    return {
+      ...item,
+      timeText: formatDateTime(item.created_at),
+      actionText: item.action_label || item.action || '-',
+      actorText: [item.actor_name || '-', item.actor_source || ''].filter(Boolean).join(' · '),
+      statusClass: status === 'fail' ? 'fail' : (status === 'warning' ? 'warning' : 'success'),
+      statusText: status === 'fail' ? '失败' : (status === 'warning' ? '提醒' : '成功')
+    }
+  },
+
+  async loadOperationLogs() {
+    if (!this.data.studentId) return
+    this.setData({ operationLogsLoading: true })
+    try {
+      const result = await api.getStudentOperationLogs(this.data.studentId)
+      const logs = Array.isArray(result.logs) ? result.logs.map(item => this.mapOperationLog(item)) : []
+      this.setData({
+        operationLogs: logs,
+        operationLogsLoading: false
+      })
+    } catch (err) {
+      console.warn('加载操作记录失败:', err)
+      this.setData({
+        operationLogs: [],
+        operationLogsLoading: false
       })
     }
   },
@@ -567,6 +601,7 @@ Page({
       }
 
       await this.loadDetail()
+      await this.loadOperationLogs()
 
       if (!silent) {
         wx.showToast({ title: '已保存', icon: 'success' })
@@ -616,6 +651,7 @@ Page({
       this.silentRequestSubscription()
       await this.loadDetail()
       await this.loadGeneratedMaterials()
+      await this.loadOperationLogs()
     } catch (err) {
       wx.hideLoading()
       wx.showToast({ title: err.message || '操作失败', icon: 'none' })
@@ -663,6 +699,7 @@ Page({
       wx.showToast({ title: '已驳回', icon: 'success' })
       this.silentRequestSubscription()
       await this.loadDetail()
+      await this.loadOperationLogs()
     } catch (err) {
       wx.hideLoading()
       wx.showToast({ title: err.message || '操作失败', icon: 'none' })
@@ -746,6 +783,7 @@ Page({
       await api.regenerateTrainingForm(this.data.studentId)
       wx.showToast({ title: '已生成', icon: 'success' })
       await this.loadGeneratedMaterials()
+      await this.loadOperationLogs()
     } catch (err) {
       wx.showToast({ title: err.message || '生成失败', icon: 'none' })
     } finally {
@@ -1259,6 +1297,7 @@ Page({
       wx.showToast({ title: result.message || '已重新生成', icon: 'success' })
       this.hideMaterialAdjust()
       await this.loadGeneratedMaterials()
+      await this.loadOperationLogs()
     } catch (err) {
       wx.hideLoading()
       wx.showToast({ title: err.message || '调整失败', icon: 'none' })
@@ -1275,6 +1314,7 @@ Page({
       wx.hideLoading()
       wx.showToast({ title: result.message || '已重新生成', icon: 'success' })
       await this.loadGeneratedMaterials()
+      await this.loadOperationLogs()
     } catch (err) {
       wx.hideLoading()
       wx.showToast({ title: err.message || '重新生成失败', icon: 'none' })
@@ -1295,8 +1335,9 @@ Page({
       wx.hideLoading()
       wx.showToast({ title: result.message || '互换成功', icon: 'success' })
       // 刷新学员详情和材料列表
-      await this.loadStudent()
+      await this.loadDetail()
       await this.loadGeneratedMaterials()
+      await this.loadOperationLogs()
     } catch (err) {
       wx.hideLoading()
       wx.showToast({ title: err.message || '互换失败', icon: 'none' })

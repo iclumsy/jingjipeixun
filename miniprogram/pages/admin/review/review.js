@@ -54,6 +54,18 @@ function mapRecord(item) {
   }
 }
 
+function mapOperationLog(item = {}) {
+  const status = item.status || 'success'
+  return {
+    ...item,
+    timeText: formatDateTime(item.created_at),
+    actionText: item.action_label || item.action || '-',
+    actorText: [item.actor_name || '-', item.actor_source || ''].filter(Boolean).join(' · '),
+    statusClass: status === 'fail' ? 'fail' : (status === 'warning' ? 'warning' : 'success'),
+    statusText: status === 'fail' ? '失败' : (status === 'warning' ? '提醒' : '成功')
+  }
+}
+
 Page({
   data: {
     statusFilters: FALLBACK_STATUS_FILTERS,
@@ -83,7 +95,13 @@ Page({
     regFormLoading: false,
     regFormError: false,
     regFormLogAnchor: '',
-    regFormLogTitle: ''
+    regFormLogTitle: '',
+
+    showOperationLogModal: false,
+    operationLogStudent: {},
+    operationLogs: [],
+    operationLogsLoading: false,
+    operationLogsError: ''
   },
 
   async onLoad() {
@@ -482,6 +500,59 @@ Page({
 
   closeCardInfoModal() {
     this.setData({ showCardInfoModal: false, cardInfo: {} })
+  },
+
+  async onOperationLogTap(e) {
+    const { id } = e.currentTarget.dataset
+    if (!id) {
+      wx.showToast({ title: '记录ID不存在', icon: 'none' })
+      return
+    }
+
+    const student = this.data.records.find(item => String(item._id) === String(id)) || { _id: id }
+    this.setData({
+      showOperationLogModal: true,
+      operationLogStudent: student,
+      operationLogs: [],
+      operationLogsError: '',
+      operationLogsLoading: true
+    })
+    await this.loadOperationLogsForStudent(id)
+  },
+
+  async loadOperationLogsForStudent(id) {
+    this.setData({ operationLogsLoading: true, operationLogsError: '' })
+    try {
+      const result = await api.getStudentOperationLogs(id)
+      const logs = Array.isArray(result.logs) ? result.logs.map(mapOperationLog) : []
+      this.setData({
+        operationLogs: logs,
+        operationLogsLoading: false,
+        operationLogsError: ''
+      })
+    } catch (err) {
+      console.warn('加载操作记录失败:', err)
+      this.setData({
+        operationLogs: [],
+        operationLogsLoading: false,
+        operationLogsError: err.message || '操作记录加载失败'
+      })
+    }
+  },
+
+  async refreshOperationLogs() {
+    const student = this.data.operationLogStudent || {}
+    if (!student._id || this.data.operationLogsLoading) return
+    await this.loadOperationLogsForStudent(student._id)
+  },
+
+  closeOperationLogModal() {
+    this.setData({
+      showOperationLogModal: false,
+      operationLogStudent: {},
+      operationLogs: [],
+      operationLogsError: ''
+    })
   },
 
   onActivateCardTap(e) {

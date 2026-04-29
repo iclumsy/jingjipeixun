@@ -98,7 +98,7 @@ class LogActorContextTests(unittest.TestCase):
             SourceContextFilter().filter(record)
 
         self.assertEqual(record.sys_source, "网页端")
-        self.assertEqual(record.actor_name, "admin")
+        self.assertEqual(record.actor_name, "单利亚(admin)")
 
     def test_web_admin_display_name_can_be_configured(self):
         with patch.dict(os.environ, {"TRAINING_SYSTEM_ADMIN_DISPLAY_NAMES": "admin=程超"}):

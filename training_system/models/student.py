@@ -266,6 +266,27 @@ def init_db(database_path):
             )
         ''')
 
+        # 学员业务操作日志：用于按学员展示报名、审核、材料、下载、省网等操作时间线
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS operation_logs (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id    INTEGER,
+                action        TEXT NOT NULL,
+                action_label  TEXT NOT NULL,
+                actor_name    TEXT,
+                actor_source  TEXT,
+                actor_openid  TEXT,
+                ip            TEXT,
+                user_agent    TEXT,
+                status        TEXT DEFAULT 'success',
+                message       TEXT,
+                before_json   TEXT DEFAULT '{}',
+                after_json    TEXT DEFAULT '{}',
+                metadata_json TEXT DEFAULT '{}',
+                created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
         # 写入默认数据（已存在则忽略，不会覆盖管理员的修改）
         default_attachments = [
             ('special_equipment', 'photo',           '个人照片',     1, 1),
@@ -345,6 +366,14 @@ def init_db(database_path):
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_material_adjustments_student "
             "ON material_adjustments(student_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_operation_logs_student_created "
+            "ON operation_logs(student_id, created_at DESC, id DESC)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_operation_logs_action_created "
+            "ON operation_logs(action, created_at DESC, id DESC)"
         )
         conn.commit()
     except sqlite3.Error as e:

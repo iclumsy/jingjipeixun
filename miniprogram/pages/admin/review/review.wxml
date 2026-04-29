@@ -166,6 +166,13 @@
             data-id="{{item._id}}"
             disabled="{{!item.actions.canSubmitReg}}"
           >🚀 提交报名</button>
+
+          <button
+            class="action-btn btn-operation-log"
+            size="mini"
+            catchtap="onOperationLogTap"
+            data-id="{{item._id}}"
+          >📋 操作记录</button>
         </view>
       </view>
 
@@ -310,6 +317,57 @@
       </view>
     </view>
   </view>
+
+  <!-- 操作记录弹窗 -->
+  <view class="custom-modal-mask fade-enter" wx:if="{{showOperationLogModal}}" catchtap="closeOperationLogModal">
+    <view class="operation-modal" catchtap="preventD">
+      <view class="operation-modal-header">
+        <view class="operation-modal-heading">
+          <view class="operation-modal-title">📋 操作记录</view>
+          <view class="operation-modal-sub">{{operationLogStudent.name || '-'}} · {{operationLogStudent.statusText || '-'}}</view>
+        </view>
+        <view class="operation-modal-close" catchtap="closeOperationLogModal">×</view>
+      </view>
+
+      <view class="operation-modal-info">
+        <view class="operation-info-item">
+          <text class="operation-info-label">单位</text>
+          <text class="operation-info-value">{{operationLogStudent.company || '-'}}</text>
+        </view>
+        <view class="operation-info-item">
+          <text class="operation-info-label">手机</text>
+          <text class="operation-info-value">{{operationLogStudent.phone || '-'}}</text>
+        </view>
+      </view>
+
+      <scroll-view class="operation-modal-scroll" scroll-y enhanced show-scrollbar="{{true}}">
+        <view class="operation-modal-state" wx:if="{{operationLogsLoading}}">操作记录加载中...</view>
+        <view class="operation-modal-state error" wx:elif="{{operationLogsError}}">{{operationLogsError}}</view>
+        <view class="operation-modal-state" wx:elif="{{!operationLogs.length}}">暂无操作记录</view>
+        <view class="operation-timeline" wx:else>
+          <view class="operation-log-item" wx:for="{{operationLogs}}" wx:key="id">
+            <view class="operation-log-rail">
+              <view class="operation-log-dot status-{{item.statusClass}}"></view>
+            </view>
+            <view class="operation-log-body">
+              <view class="operation-log-main">
+                <text class="operation-log-action">{{item.actionText}}</text>
+                <text class="operation-log-status status-{{item.statusClass}}">{{item.statusText}}</text>
+              </view>
+              <view class="operation-log-meta">{{item.timeText}} · {{item.actorText}}</view>
+              <view class="operation-log-message" wx:if="{{item.message}}">{{item.message}}</view>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+
+      <view class="operation-modal-footer">
+        <button class="operation-modal-btn ghost" catchtap="refreshOperationLogs" loading="{{operationLogsLoading}}" disabled="{{operationLogsLoading}}">刷新</button>
+        <button class="operation-modal-btn primary" catchtap="closeOperationLogModal">关闭</button>
+      </view>
+    </view>
+  </view>
+
   <!-- 报名表下载进度弹窗 -->
   <view class="log-overlay" wx:if="{{showRegFormLogModal}}" catchtap="">
     <view class="log-modal">

@@ -19,7 +19,7 @@
     TRAINING_SYSTEM_ADMIN_PASSWORD      : 管理员明文密码
     TRAINING_SYSTEM_ADMIN_PASSWORD_HASH : 管理员密码的 Werkzeug 哈希值（优先级更高）
     TRAINING_SYSTEM_ADMIN_NAME          : 单管理员真实姓名（日志显示用）
-    TRAINING_SYSTEM_ADMIN_DISPLAY_NAMES : 多管理员真实姓名映射，如 admin=程超,reviewer=单利亚
+    TRAINING_SYSTEM_ADMIN_DISPLAY_NAMES : 多管理员真实姓名映射，如 admin=单利亚,cc=程超
     TRAINING_SYSTEM_API_KEY             : API 访问密钥
 """
 import hmac
@@ -40,11 +40,27 @@ ADMIN_PASSWORD_HASH_ENV = 'TRAINING_SYSTEM_ADMIN_PASSWORD_HASH'
 API_KEY_ENV = 'TRAINING_SYSTEM_API_KEY'
 ADMIN_DISPLAY_NAMES_ENV = 'TRAINING_SYSTEM_ADMIN_DISPLAY_NAMES'
 ADMIN_NAME_ENV = 'TRAINING_SYSTEM_ADMIN_NAME'
+DEFAULT_ADMIN_DISPLAY_NAMES = {
+    'admin': '单利亚',
+    'cc': '程超',
+}
 
 
 def get_admin_user():
     """获取配置的管理员用户名，优先从环境变量读取。"""
     return (os.getenv(ADMIN_USER_ENV, DEFAULT_ADMIN_USER) or DEFAULT_ADMIN_USER).strip()
+
+
+def get_admin_users():
+    """获取允许登录的管理员用户名列表，支持逗号或分号分隔。"""
+    raw = get_admin_user()
+    normalized = raw.replace('，', ',').replace(';', ',')
+    users = [
+        item.strip()
+        for item in normalized.split(',')
+        if item.strip()
+    ]
+    return users or [DEFAULT_ADMIN_USER]
 
 
 def get_admin_password_hash():
@@ -80,9 +96,10 @@ def verify_admin_credentials(username, password):
     返回:
         bool: 验证是否通过
     """
-    # 时间安全比较用户名，防止通过响应时间推断用户名
-    expected_user = get_admin_user()
-    if not hmac.compare_digest(str(username or ''), expected_user):
+    # 时间安全比较用户名，防止通过响应时间推断用户名。
+    # TRAINING_SYSTEM_ADMIN_USER 支持 "admin,cc" 形式，多账号共用密码配置。
+    candidate_user = str(username or '')
+    if not any(hmac.compare_digest(candidate_user, expected_user) for expected_user in get_admin_users()):
         return False
 
     raw_password = str(password or '')
@@ -242,9 +259,12 @@ def resolve_web_admin_name(username: str) -> str:
     if display_name:
         return f'{display_name}({username})'
 
+    default_display_name = DEFAULT_ADMIN_DISPLAY_NAMES.get(username)
+    if default_display_name:
+        return f'{default_display_name}({username})'
+
     single_name = os.environ.get(ADMIN_NAME_ENV, '').strip()
-    configured_user = os.environ.get(ADMIN_USER_ENV, DEFAULT_ADMIN_USER).strip()
-    if single_name and username == configured_user:
+    if single_name and username in get_admin_users():
         return f'{single_name}({username})'
 
     return username

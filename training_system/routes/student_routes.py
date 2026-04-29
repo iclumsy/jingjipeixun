@@ -38,6 +38,7 @@ from services.wechat_service import send_review_result_message, broadcast_new_st
 from services.image_service import process_and_save_file, delete_student_files
 from services.document_service import generate_health_check_form
 from services import storage_service
+from services.operation_log_service import get_student_operation_logs, log_student_operation
 from services.student_serializer import enrich_student, enrich_students
 from utils.validators import validate_student_data, validate_file_upload
 from utils.error_handlers import AppError, ValidationError, NotFoundError
@@ -573,10 +574,34 @@ def create_student_route():
             update_student(rejected_id, updates)
             student_id = rejected_id
             current_app.logger.info(f'重新提交学员(覆盖被驳回记录): ID={student_id}, 姓名={student_payload.get("name")}')
+            log_student_operation(
+                student_id,
+                'student_resubmitted',
+                '重新提交报名',
+                message='驳回记录已重新提交',
+                metadata={
+                    'name': student_payload.get('name', ''),
+                    'training_type': student_payload.get('training_type', ''),
+                    'application_type': student_payload.get('application_type', ''),
+                    'company': student_payload.get('company', ''),
+                }
+            )
         else:
             # 创建数据库记录
             student_id = create_student(student_payload, file_paths)
             current_app.logger.info(f'新增学员: ID={student_id}, 姓名={student_payload.get("name")}')
+            log_student_operation(
+                student_id,
+                'student_created',
+                '提交报名',
+                message='学员报名已提交',
+                metadata={
+                    'name': student_payload.get('name', ''),
+                    'training_type': student_payload.get('training_type', ''),
+                    'application_type': student_payload.get('application_type', ''),
+                    'company': student_payload.get('company', ''),
+                }
+            )
         
         # 异步/非阻塞方式发送给所有管理员（基于小程序订阅消息）
         broadcast_new_student_to_admins(student_name=student_payload.get('name', ''))
@@ -673,6 +698,23 @@ def get_student_route(id):
     except Exception as e:
         current_app.logger.exception('Error getting student %s', id)
         return build_internal_error_response('加载学员详情失败，请稍后重试')
+
+
+@student_bp.route('/api/students/<int:id>/operation_logs', methods=['GET'])
+@mini_admin_required
+def get_student_operation_logs_route(id):
+    """获取某个学员的业务操作时间线。"""
+    try:
+        limit = request.args.get('limit', 100)
+        return jsonify({
+            'success': True,
+            'logs': get_student_operation_logs(id, limit=limit)
+        })
+    except AppError as e:
+        return jsonify(e.to_dict()), e.status_code
+    except Exception as e:
+        current_app.logger.exception('Error getting operation logs for student %s', id)
+        return build_internal_error_response('加载操作记录失败，请稍后重试')
 
 
 @student_bp.route('/api/students/<int:id>', methods=['PUT', 'PATCH'])
@@ -901,6 +943,20 @@ def update_student_route(id):
             student_name_for_notice = updates.get('name', current_student.get('name', ''))
             broadcast_new_student_to_admins(student_name_for_notice)
 
+        changed_fields = sorted([key for key in updates.keys() if key not in ('reject_reason',)])
+        log_student_operation(
+            id,
+            'student_resubmitted' if is_resubmitted else 'student_updated',
+            '重新提交报名' if is_resubmitted else '修改学员资料',
+            message='驳回记录已修改并重新提交' if is_resubmitted else '学员资料已修改',
+            before={'status': current_student.get('status', '')},
+            after={'status': updated_student.get('status', '')},
+            metadata={
+                'changed_fields': changed_fields,
+                'name': updated_student.get('name', ''),
+            }
+        )
+
         return jsonify(enrich_student(updated_student))
 
     except (ValidationError, NotFoundError, AppError) as e:
@@ -982,6 +1038,18 @@ def upload_student_attachment_route(id):
         # 成功更新数据库后，清理因改名导致路径变更产生的孤儿旧文件
         if old_rel and old_rel != rel:
             delete_student_files({db_key: old_rel}, current_app.config['BASE_DIR'])
+
+        log_student_operation(
+            id,
+            'attachment_uploaded',
+            '上传附件',
+            message='学员附件已更新',
+            metadata={
+                'field': upload_field,
+                'db_field': db_key,
+                'name': student.get('name', ''),
+            }
+        )
 
         return jsonify({
             'message': '上传成功',
@@ -1149,6 +1217,17 @@ def reject_student_route(id):
                 f'[驱回并删除] 操作人={operator} IP={client_ip} '
                 f'学员ID={id} 姓名={student.get("name","")} 提交人={submitter}'
             )
+            log_student_operation(
+                id,
+                'student_deleted',
+                '删除学员',
+                message='学员记录已删除',
+                before={'status': student.get('status', '')},
+                metadata={
+                    'name': student.get('name', ''),
+                    'submitter': submitter,
+                }
+            )
             return jsonify({'message': 'Student rejected and deleted'})
         else:
             # 保存状态和驳回原因
@@ -1174,6 +1253,18 @@ def reject_student_route(id):
             current_app.logger.info(
                 f'[驱回] 操作人={operator} IP={client_ip} 目标状态={target_status} '
                 f'学员ID={id} 姓名={student_name} 提交人={submitter}'
+            )
+            log_student_operation(
+                id,
+                'student_rejected' if target_status == 'rejected' else 'student_status_reset',
+                '驳回学员' if target_status == 'rejected' else '恢复待审核',
+                message=reject_reason if target_status == 'rejected' else '学员状态已恢复待审核',
+                after={'status': target_status},
+                metadata={
+                    'name': student_name,
+                    'reject_reason': reject_reason,
+                    'submitter': submitter,
+                }
             )
             return jsonify({'message': f'Student moved to {target_status}', 'student': enrich_student(student)})
 
@@ -1272,6 +1363,31 @@ def approve_student_route(id):
         current_app.logger.info(
             f'[审核通过] 操作人={operator} IP={client_ip} '
             f'学员ID={id} 姓名={student_name} 提交人={submitter}'
+        )
+        log_student_operation(
+            id,
+            'student_approved',
+            '审核通过',
+            message='学员审核已通过',
+            before={'status': current_student.get('status', '')},
+            after={'status': student.get('status', '')},
+            metadata={
+                'name': student_name,
+                'materials_auto_generated': materials_ok,
+                'training_form_generated': bool(health_check_path),
+                'submitter': submitter,
+            }
+        )
+        log_student_operation(
+            id,
+            'materials_auto_generated',
+            '自动生成报名材料',
+            status='success' if materials_ok else 'warning',
+            message='报名材料已自动生成' if materials_ok else '报名材料自动生成未完全成功',
+            metadata={
+                'name': student_name,
+                'training_form_path': health_check_path or '',
+            }
         )
 
         result = dict(student)
@@ -1381,6 +1497,17 @@ def swap_materials_route(id):
             f'[图片互换] 操作人={operator} IP={client_ip} 互换目标={pair_name} '
             f'学员ID={id} 姓名={student_name} 提交人={submitter}'
         )
+        log_student_operation(
+            id,
+            'materials_swapped',
+            '互换材料图片',
+            message=f'{pair_name}已互换',
+            metadata={
+                'pair': pair,
+                'pair_name': pair_name,
+                'name': student_name,
+            }
+        )
         
         return jsonify({'message': '互换成功', 'student': enrich_student(updated)})
 
@@ -1446,6 +1573,16 @@ def activate_card_route(id):
         })
 
         current_app.logger.info(f'[开卡完成] 学员ID={id} 成功')
+        log_student_operation(
+            id,
+            'card_activated',
+            '开学习卡',
+            message=result.get("message", "开卡成功"),
+            metadata={
+                'name': student.get('name', ''),
+                'exam_project': student.get('exam_project', ''),
+            }
+        )
         return jsonify({'message': result.get("message", "开卡成功"), 'student': enrich_student(updated_student)})
 
     except NotFoundError as e:
@@ -1474,6 +1611,16 @@ def query_card_route(id):
         if result.get("success"):
             current_app.logger.info(
                 f'[查询学习卡] 学员ID={id} 卡号={result.get("card_id", "")} 成功'
+            )
+            log_student_operation(
+                id,
+                'card_queried',
+                '查询学习卡',
+                message='学习卡信息查询成功',
+                metadata={
+                    'name': student.get('name', ''),
+                    'state': result.get('state', ''),
+                }
             )
             return jsonify(result)
         else:
@@ -1552,6 +1699,17 @@ def download_attachments_zip_route(id):
         # 生成安全的文件名（移除路径分隔符）
         safe_name = f"{student.get('id_card','')}-{student.get('name','')}".replace('/', '-').replace('\\', '-')
         current_app.logger.info(f'Attachments ZIP generated for student ID={id}')
+        log_student_operation(
+            id,
+            'attachments_zip_downloaded',
+            '下载附件包',
+            message='学员原始附件包已下载',
+            metadata={
+                'filename': f"{safe_name}.zip",
+                'file_count': len(files_to_zip),
+                'name': student.get('name', ''),
+            }
+        )
 
         return send_file(
             buffer,
@@ -1611,6 +1769,16 @@ def download_training_form_route(id):
 
         filename = os.path.basename(abs_path)
         current_app.logger.info(f'[体检表下载] 学员ID={id} 姓名={student.get("name","")} 文件={filename}')
+        log_student_operation(
+            id,
+            'training_form_downloaded',
+            '下载体检表',
+            message='体检表已下载',
+            metadata={
+                'filename': filename,
+                'name': student.get('name', ''),
+            }
+        )
         return send_file(
             abs_path,
             mimetype='application/octet-stream',
@@ -1650,6 +1818,16 @@ def regenerate_training_form_route(id):
 
         updated = update_student(id, {'training_form_path': health_check_path})
         current_app.logger.info(f'[体检表重新生成] 学员ID={id} 姓名={student.get("name","")} 路径={health_check_path}')
+        log_student_operation(
+            id,
+            'training_form_regenerated',
+            '重新生成体检表',
+            message='体检表已重新生成',
+            metadata={
+                'training_form_path': health_check_path,
+                'name': student.get('name', ''),
+            }
+        )
 
         # 同步到 COS
         try:
@@ -1696,6 +1874,16 @@ def generate_materials_route(id):
             if not health_check_path:
                 return jsonify({'error': '该学员不支持生成体检表'}), 400
             update_student(id, {'training_form_path': health_check_path})
+            log_student_operation(
+                id,
+                'training_form_regenerated',
+                '重新生成体检表',
+                message='体检表已重新生成',
+                metadata={
+                    'training_form_path': health_check_path,
+                    'name': student.get('name', ''),
+                }
+            )
             return jsonify({'message': '体检表已重新生成', 'training_form_path': health_check_path})
 
         training_type = student.get('training_type', 'special_operation')
@@ -1728,7 +1916,28 @@ def generate_materials_route(id):
         }
         if not report.get('success'):
             payload['error'] = 'material_generation_failed'
+            log_student_operation(
+                id,
+                'materials_generated',
+                '生成报名材料',
+                status='fail',
+                message='报名材料生成未完全成功',
+                metadata={
+                    'name': name,
+                    'log_summary': report.get('log_summary', {}),
+                }
+            )
             return jsonify(payload), 500
+        log_student_operation(
+            id,
+            'materials_generated',
+            '生成报名材料',
+            message='报名材料生成成功',
+            metadata={
+                'name': name,
+                'log_summary': report.get('log_summary', {}),
+            }
+        )
         return jsonify(payload)
     except Exception as e:
         current_app.logger.exception('Error generating materials for student %s', id)
@@ -1948,6 +2157,17 @@ def manual_crop_material_route(id):
             f'[报名材料调整] 操作人={operator_name} 来源={operator_source} '
             f'学员ID={id} 姓名={student.get("name","")} 材料={material_type} 方式=手工裁剪'
         )
+        log_student_operation(
+            id,
+            'material_manual_cropped',
+            '手工裁剪报名材料',
+            message='报名材料已手工裁剪并重新生成',
+            metadata={
+                'material_type': material_type,
+                'name': student.get('name', ''),
+                'log_summary': report.get('log_summary', {}),
+            }
+        )
         return jsonify(payload)
     except Exception as e:
         current_app.logger.exception('Error in manual_crop_material for student %s', id)
@@ -1994,6 +2214,16 @@ def regenerate_material_route(id):
                     f'[报名材料调整] 操作人={operator_name} 来源={operator_source} '
                     f'学员ID={id} 姓名={student.get("name","")} 材料=training_form 方式=重新生成'
                 )
+                log_student_operation(
+                    id,
+                    'training_form_regenerated',
+                    '重新生成体检表',
+                    message='体检表已重新生成',
+                    metadata={
+                        'training_form_path': health_check_path,
+                        'name': student.get('name', ''),
+                    }
+                )
                 return jsonify({'message': '体检表重新生成成功'})
             else:
                 return jsonify({'error': '体检表重新生成失败'}), 500
@@ -2037,6 +2267,17 @@ def regenerate_material_route(id):
         current_app.logger.info(
             f'[报名材料调整] 操作人={operator_name} 来源={operator_source} '
             f'学员ID={id} 姓名={student.get("name","")} 材料={material_type} 方式=重新生成'
+        )
+        log_student_operation(
+            id,
+            'material_regenerated',
+            '重新生成报名材料',
+            message='报名材料已重新生成',
+            metadata={
+                'material_type': material_type,
+                'name': student.get('name', ''),
+                'log_summary': report.get('log_summary', {}),
+            }
         )
         return jsonify(payload)
     except Exception as e:
@@ -2177,6 +2418,17 @@ def download_materials_zip_route(id):
 
         from flask import send_file
         safe_name = f"{name_prefix}-报名材料".replace('/', '-').replace('\\', '-')
+        log_student_operation(
+            id,
+            'materials_zip_downloaded',
+            '下载报名材料包',
+            message='报名材料包已下载',
+            metadata={
+                'filename': f"{safe_name}.zip",
+                'file_count': len(files_to_zip),
+                'name': name,
+            }
+        )
 
         return send_file(
             buffer,

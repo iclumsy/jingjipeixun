@@ -102,6 +102,33 @@
         </view>
       </view>
     </view>
+
+    <view class="section-card operation-card fade-enter">
+      <view class="card-header">
+        <view>
+          <view class="card-title">操作记录</view>
+        </view>
+        <button class="log-refresh-btn" size="mini" bindtap="loadOperationLogs" loading="{{operationLogsLoading}}">刷新</button>
+      </view>
+
+      <view class="materials-loading" wx:if="{{operationLogsLoading}}">操作记录加载中...</view>
+      <view class="materials-empty" wx:elif="{{!operationLogs.length}}">
+        暂无操作记录
+      </view>
+      <view class="operation-list" wx:else>
+        <view class="operation-item" wx:for="{{operationLogs}}" wx:key="id">
+          <view class="operation-dot status-{{item.statusClass}}"></view>
+          <view class="operation-body">
+            <view class="operation-main">
+              <text class="operation-action">{{item.actionText}}</text>
+              <text class="operation-status status-{{item.statusClass}}">{{item.statusText}}</text>
+            </view>
+            <view class="operation-meta">{{item.timeText}} · {{item.actorText}}</view>
+            <view class="operation-message" wx:if="{{item.message}}">{{item.message}}</view>
+          </view>
+        </view>
+      </view>
+    </view>
   </view>
 
   <view class="material-modal-mask" wx:if="{{materialModal.visible}}">
