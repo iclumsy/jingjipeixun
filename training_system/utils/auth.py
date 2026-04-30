@@ -213,8 +213,8 @@ def resolve_openid_name(openid: str) -> str:
         return '-'
     name = OPENID_NAME_MAP.get(openid)
     if name:
-        return f'{name}({openid})'
-    return openid
+        return name
+    return '未知用户'
 
 
 def _parse_admin_display_names(raw: str) -> dict:
@@ -257,15 +257,15 @@ def resolve_web_admin_name(username: str) -> str:
     mapping = _parse_admin_display_names(os.environ.get(ADMIN_DISPLAY_NAMES_ENV, ''))
     display_name = mapping.get(username)
     if display_name:
-        return f'{display_name}({username})'
+        return display_name
 
     default_display_name = DEFAULT_ADMIN_DISPLAY_NAMES.get(username)
     if default_display_name:
-        return f'{default_display_name}({username})'
+        return default_display_name
 
     single_name = os.environ.get(ADMIN_NAME_ENV, '').strip()
     if single_name and username in get_admin_users():
-        return f'{single_name}({username})'
+        return single_name
 
     return username
 
