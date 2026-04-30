@@ -735,21 +735,8 @@ Page({
       }
       this._addRegLog(`流水号获取成功: BMID=${bmidResult.bmid}`, { done: true })
 
-      // 步骤 2: 调用 generate 模式生成 PDF
-      this._addRegLog('正在连接省平台获取申请表数据...')
-      const genResult = await api.requestApi(`/api/sxtsks/form/${bmidResult.bmid}?student_id=${id}&mode=generate`, { method: 'GET' })
-      if (!genResult || !genResult.success) {
-        throw new Error(genResult.message || 'PDF 生成失败')
-      }
-      // 将服务端返回的日志依次展示
-      if (genResult.logs && genResult.logs.length) {
-        genResult.logs.forEach(log => {
-          this._addRegLog(log, { done: true })
-        })
-      }
-
-      // 步骤 3: 下载已生成的 PDF 文件
-      this._addRegLog('正在下载 PDF 文件到本地...')
+      // 步骤 2: 直接下载 PDF（后端实时从省平台抓取最新数据并生成）
+      this._addRegLog('正在从省平台获取最新数据并生成 PDF...')
       await api.downloadRegForm(id, name, idCard)
       this._addRegLog('报名申请表下载完成！', { done: true })
 
