@@ -214,7 +214,7 @@ def resolve_openid_name(openid: str) -> str:
     name = OPENID_NAME_MAP.get(openid)
     if name:
         return name
-    return '未知用户'
+    return openid
 
 
 def _parse_admin_display_names(raw: str) -> dict:
