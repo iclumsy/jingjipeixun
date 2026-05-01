@@ -739,22 +739,41 @@ Page({
       }
       this._addRegLog(`流水号获取成功: BMID=${bmidResult.bmid}`, { done: true })
 
-      // 步骤 2: 调用 generate 模式生成 PDF
-      this._addRegLog('正在连接省平台获取申请表数据...')
-      const genResult = await api.requestApi(`/api/sxtsks/form/${bmidResult.bmid}?student_id=${id}&mode=generate`, { method: 'GET' })
-      if (!genResult || !genResult.success) {
-        throw new Error(genResult.message || 'PDF 生成失败')
-      }
-      // 将服务端返回的日志依次展示
-      if (genResult.logs && genResult.logs.length) {
-        genResult.logs.forEach(log => {
-          this._addRegLog(log, { done: true })
-        })
-      }
+      // 步骤 2: 使用已获取的 BMID 直接下载 PDF（不再重复查询 BMID）
+      this._addRegLog('正在从省平台获取最新数据并生成 PDF...')
+      const bmid = encodeURIComponent(bmidResult.bmid)
+      const baseUrl = api.getBaseUrl()
+      const token = api.getToken()
+      const cleanName = (name || '').trim()
+      const cleanIdCard = (idCard || '').trim()
+      const filename = `${cleanIdCard || 'id'}-${cleanName || '学员'}-报名申请表.pdf`
+      const filePath = `${wx.env.USER_DATA_PATH}/${filename}`
+      const url = `${baseUrl}/api/sxtsks/form/${bmid}?student_id=${id}&no_cache=${Date.now()}`
+        + (token ? `&mini_token=${encodeURIComponent(token)}` : '')
 
-      // 步骤 3: 下载已生成的 PDF 文件
-      this._addRegLog('正在下载 PDF 文件到本地...')
-      await api.downloadRegForm(id, name, idCard)
+      await new Promise((resolve, reject) => {
+        wx.downloadFile({
+          url,
+          filePath,
+          header: token ? { Authorization: `Bearer ${token}`, 'X-Mini-Token': token } : {},
+          success(res) {
+            const finalPath = res.filePath || res.tempFilePath
+            if (res.statusCode !== 200 && !finalPath) {
+              reject(new Error(`下载失败（${res.statusCode}）`))
+              return
+            }
+            wx.openDocument({
+              filePath: finalPath,
+              showMenu: true,
+              success() { resolve() },
+              fail(err) { reject(new Error(err.errMsg || '保存文档失败')) }
+            })
+          },
+          fail(err) {
+            reject(new Error(err.errMsg || '下载失败'))
+          }
+        })
+      })
       this._addRegLog('报名申请表下载完成！', { done: true })
 
       this.setData({ regFormLoading: false })
