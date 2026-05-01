@@ -133,46 +133,102 @@
           <text class="reject-text">{{item.reject_reason}}</text>
         </view>
 
-        <view class="record-actions">
-          <button
-            wx:if="{{item.actions.canApprove}}"
-            class="action-btn btn-approve"
-            size="mini"
-            catchtap="onApproveTap"
-            data-id="{{item._id}}"
-          >✅ 审核通过</button>
+        <view class="record-actions actions-status-{{item.status}}">
+          <!-- 待审核 -->
+          <block wx:if="{{item.status === 'unreviewed'}}">
+            <button
+              wx:if="{{item.actions.canApprove}}"
+              class="action-btn btn-approve"
+              size="mini"
+              catchtap="onApproveTap"
+              data-id="{{item._id}}"
+            >✅ 审核通过</button>
 
-          <button
-            class="action-btn btn-reject {{!item.actions.canReject ? 'disabled' : ''}}"
-            size="mini"
-            catchtap="onRejectTap"
-            data-id="{{item._id}}"
-            disabled="{{!item.actions.canReject}}"
-          >↩️ 驳回</button>
+            <button
+              wx:if="{{item.actions.canReject}}"
+              class="action-btn btn-reject"
+              size="mini"
+              catchtap="onRejectTap"
+              data-id="{{item._id}}"
+            >↩️ 驳回</button>
 
-          <button
-            wx:if="{{item.actions.canDelete}}"
-            class="action-btn btn-delete"
-            size="mini"
-            catchtap="onDeleteTap"
-            data-id="{{item._id}}"
-          >🗑️ 删除</button>
+            <button
+              wx:if="{{item.actions.canDelete}}"
+              class="action-btn btn-delete"
+              size="mini"
+              catchtap="onDeleteTap"
+              data-id="{{item._id}}"
+            >🗑️ 删除</button>
 
-          <button
-            wx:if="{{item.actions.canSubmitReg || item.actions.canDownloadRegForm}}"
-            class="action-btn btn-secondary {{!item.actions.canSubmitReg ? 'disabled' : ''}}"
-            size="mini"
-            catchtap="onSubmitRegisterTap"
-            data-id="{{item._id}}"
-            disabled="{{!item.actions.canSubmitReg}}"
-          >🚀 提交报名</button>
+            <button
+              class="action-btn btn-operation-log"
+              size="mini"
+              catchtap="onOperationLogTap"
+              data-id="{{item._id}}"
+            >📋 操作记录</button>
+          </block>
 
-          <button
-            class="action-btn btn-operation-log"
-            size="mini"
-            catchtap="onOperationLogTap"
-            data-id="{{item._id}}"
-          >📋 操作记录</button>
+          <!-- 已通过：主操作 + 更多操作 -->
+          <block wx:elif="{{item.status === 'reviewed'}}">
+            <button
+              wx:if="{{item.actions.canSubmitReg}}"
+              class="action-btn btn-secondary"
+              size="mini"
+              catchtap="onSubmitRegisterTap"
+              data-id="{{item._id}}"
+            >🚀 提交报名</button>
+
+            <button
+              class="action-btn btn-more"
+              size="mini"
+              catchtap="onMoreActionsTap"
+              data-id="{{item._id}}"
+            >⋯ 更多操作</button>
+          </block>
+
+          <!-- 已报名：仅保留可执行项 -->
+          <block wx:elif="{{item.status === 'registered'}}">
+            <button
+              wx:if="{{item.actions.canDelete}}"
+              class="action-btn btn-delete"
+              size="mini"
+              catchtap="onDeleteTap"
+              data-id="{{item._id}}"
+            >🗑️ 删除</button>
+
+            <button
+              class="action-btn btn-operation-log"
+              size="mini"
+              catchtap="onOperationLogTap"
+              data-id="{{item._id}}"
+            >📋 操作记录</button>
+          </block>
+
+          <!-- 已驳回（默认） -->
+          <block wx:else>
+            <button
+              wx:if="{{item.actions.canReject}}"
+              class="action-btn btn-reject"
+              size="mini"
+              catchtap="onRejectTap"
+              data-id="{{item._id}}"
+            >↩️ 驳回</button>
+
+            <button
+              wx:if="{{item.actions.canDelete}}"
+              class="action-btn btn-delete"
+              size="mini"
+              catchtap="onDeleteTap"
+              data-id="{{item._id}}"
+            >🗑️ 删除</button>
+
+            <button
+              class="action-btn btn-operation-log"
+              size="mini"
+              catchtap="onOperationLogTap"
+              data-id="{{item._id}}"
+            >📋 操作记录</button>
+          </block>
         </view>
       </view>
 
@@ -384,6 +440,60 @@
       </scroll-view>
       <view class="log-modal-footer" wx:if="{{regFormError}}">
         <button class="log-retry-btn" catchtap="onRetryRegForm">重新尝试</button>
+      </view>
+    </view>
+  </view>
+  <!-- 更多操作弹窗 -->
+  <view class="custom-modal-mask fade-enter" wx:if="{{showMoreActionsModal}}" catchtap="closeMoreActionsModal">
+    <view class="more-actions-sheet" catchtap="preventD">
+      <view class="more-actions-header">
+        <view class="more-actions-title">更多操作</view>
+        <view class="more-actions-sub">{{moreActionsStudent.name || '-'}} · {{moreActionsStudent.statusText || '-'}}</view>
+      </view>
+      <view class="more-actions-list">
+        <view
+          wx:if="{{moreActionsStudent.actions.canReject}}"
+          class="more-action-item more-action-reject"
+          hover-class="more-action-hover"
+          catchtap="onMoreReject"
+        >
+          <view class="more-action-icon">↩️</view>
+          <view class="more-action-text">
+            <text class="more-action-label">驳回</text>
+            <text class="more-action-desc">退回该学员，需填写原因</text>
+          </view>
+          <text class="more-action-arrow">›</text>
+        </view>
+
+        <view
+          class="more-action-item more-action-log"
+          hover-class="more-action-hover"
+          catchtap="onMoreOperationLog"
+        >
+          <view class="more-action-icon">📋</view>
+          <view class="more-action-text">
+            <text class="more-action-label">操作记录</text>
+            <text class="more-action-desc">查看该学员所有操作历史</text>
+          </view>
+          <text class="more-action-arrow">›</text>
+        </view>
+
+        <view
+          wx:if="{{moreActionsStudent.actions.canDelete}}"
+          class="more-action-item more-action-delete"
+          hover-class="more-action-hover"
+          catchtap="onMoreDelete"
+        >
+          <view class="more-action-icon">🗑️</view>
+          <view class="more-action-text">
+            <text class="more-action-label">删除记录</text>
+            <text class="more-action-desc">删除后不可恢复，请谨慎操作</text>
+          </view>
+          <text class="more-action-arrow">›</text>
+        </view>
+      </view>
+      <view class="more-actions-footer">
+        <button class="more-actions-cancel" catchtap="closeMoreActionsModal">取消</button>
       </view>
     </view>
   </view>

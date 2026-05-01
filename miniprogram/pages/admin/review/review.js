@@ -101,7 +101,11 @@ Page({
     operationLogStudent: {},
     operationLogs: [],
     operationLogsLoading: false,
-    operationLogsError: ''
+    operationLogsError: '',
+
+    // 更多操作弹窗
+    showMoreActionsModal: false,
+    moreActionsStudent: {}
   },
 
   async onLoad() {
@@ -762,5 +766,48 @@ Page({
       this._addRegLog(`失败: ${err.message || '未知错误'}`, { error: true })
       this.setData({ regFormLoading: false, regFormError: true })
     }
+  },
+
+  // ========== 更多操作弹窗 ==========
+  onMoreActionsTap(e) {
+    const { id } = e.currentTarget.dataset
+    if (!id) return
+    const record = this.data.records.find(r => String(r._id) === String(id))
+    if (!record) {
+      wx.showToast({ title: '记录不存在', icon: 'none' })
+      return
+    }
+    this.setData({
+      showMoreActionsModal: true,
+      moreActionsStudent: record
+    })
+  },
+
+  closeMoreActionsModal() {
+    this.setData({
+      showMoreActionsModal: false,
+      moreActionsStudent: {}
+    })
+  },
+
+  onMoreReject() {
+    const id = this.data.moreActionsStudent && this.data.moreActionsStudent._id
+    if (!id) return
+    this.closeMoreActionsModal()
+    this.onRejectTap({ currentTarget: { dataset: { id } } })
+  },
+
+  onMoreDelete() {
+    const id = this.data.moreActionsStudent && this.data.moreActionsStudent._id
+    if (!id) return
+    this.closeMoreActionsModal()
+    this.onDeleteTap({ currentTarget: { dataset: { id } } })
+  },
+
+  onMoreOperationLog() {
+    const id = this.data.moreActionsStudent && this.data.moreActionsStudent._id
+    if (!id) return
+    this.closeMoreActionsModal()
+    this.onOperationLogTap({ currentTarget: { dataset: { id } } })
   }
 })
