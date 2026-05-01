@@ -2869,7 +2869,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const effW = nw * cos + nh * sin;
                 const effH = nw * sin + nh * cos;
                 // 自由角点模式留白（让把手能拖到图外，处理缺角）
-                const padding = isFixedRatio ? 1.0 : 0.78;
+                const padding = isFixedRatio ? 1.0 : 0.88;
                 const scale = Math.min(W / effW, H / effH) * padding;
                 return { W, H, rad, scale, nw, nh, cx: W / 2, cy: H / 2 };
             }

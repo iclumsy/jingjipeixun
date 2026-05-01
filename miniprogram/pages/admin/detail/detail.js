@@ -1014,7 +1014,7 @@ Page({
     const rotated = Math.abs((panel.rotation || 0) % 180) === 90
     const sw = rotated ? panel.imageHeight : panel.imageWidth
     const sh = rotated ? panel.imageWidth : panel.imageHeight
-    const padding = panel.fixedRatio ? 0.95 : 0.78
+    const padding = panel.fixedRatio ? 0.95 : 0.88
     const scale = Math.min(W / sw, H / sh) * padding
     return { W, H, scale, cx: W / 2, cy: H / 2 }
   },
@@ -1070,7 +1070,8 @@ Page({
     ctx.clearRect(0, 0, W, H)
 
     const img = this._panelImages && this._panelImages[panel.key]
-    if (img) {
+    const drawImageCentered = () => {
+      if (!img) return
       const drawW = panel.imageWidth * scale
       const drawH = panel.imageHeight * scale
       ctx.save()
@@ -1080,9 +1081,12 @@ Page({
       ctx.restore()
     }
 
+    drawImageCentered()
+
     if (!panel.points || panel.points.length !== 4) return
     const dispPts = panel.points.map(p => this.pointToCanvas(panel, p, layout))
 
+    // 半透明黑色遮罩 + 4 角点 clip 内重画图（覆盖遮罩 → 裁剪区内清晰可见）
     ctx.fillStyle = 'rgba(0,0,0,0.45)'
     ctx.fillRect(0, 0, W, H)
 
@@ -1091,8 +1095,8 @@ Page({
     ctx.moveTo(dispPts[0].x, dispPts[0].y)
     dispPts.slice(1).forEach(p => ctx.lineTo(p.x, p.y))
     ctx.closePath()
-    ctx.globalCompositeOperation = 'destination-out'
-    ctx.fill()
+    ctx.clip()
+    drawImageCentered()
     ctx.restore()
 
     if (!panel.fixedRatio) {
