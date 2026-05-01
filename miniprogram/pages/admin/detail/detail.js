@@ -16,11 +16,23 @@ const {
 const {
   MATERIAL_LABELS,
   normalizeGeneratedMaterials,
-  buildManualCropPayload,
-  getOffsetTouchPoint
+  buildManualCropPayload
 } = require('./materials')
 
-const HANDLE_TOUCH_OFFSET_RPX = 70
+const HANDLE_HIT_RADIUS_PX = 32
+const HANDLE_VISUAL_RADIUS_PX = 12
+
+function pointInPolygon(px, py, polygon) {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y
+    const xj = polygon[j].x, yj = polygon[j].y
+    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) {
+      inside = !inside
+    }
+  }
+  return inside
+}
 
 // 编辑表单本地兜底：附件类型与培训类型的映射，仅在后端 attachment 配置接口失败时使用。
 // 真正的附件清单由 /api/config/attachments 下发；状态/能力位由后端 enrich 提供。
@@ -822,6 +834,12 @@ Page({
   },
 
   hideMaterialAdjust() {
+    this._cropDrag = null
+    this._panelImages = {}
+    this._canvas = null
+    this._canvasCtx = null
+    this._canvasRect = null
+    this._panelLayout = null
     this.setData({
       materialModal: {
         visible: false,
@@ -855,21 +873,11 @@ Page({
       fixedRatio: fixedRatio || 0,
       imageWidth: 0,
       imageHeight: 0,
-      stageWidth: 0,
-      stageHeight: 0,
-      displayWidth: 0,
-      displayHeight: 0,
-      offsetX: 0,
-      offsetY: 0,
       rotation: 0,
       points: [],
       cropRect: null,
       touched: false,
-      ready: false,
-      imageStyle: '',
-      frameStyle: '',
-      lines: [],
-      handles: []
+      ready: false
     })
 
     if (materialType === 'photo') {
@@ -913,65 +921,239 @@ Page({
     const panel = this.data.materialModal.activePanel
     if (!panel || !panel.sourceUrl) return
     const panelIndex = this.getPanelIndex(panel.key)
-    if (panel.ready) return
+    if (panel.ready) {
+      this.ensureCanvasContext().then(() => this.redrawCanvas(panel)).catch(() => {})
+      return
+    }
 
-    Promise.all([
-      new Promise((resolve, reject) => {
-        wx.getImageInfo({
-          src: panel.sourceUrl,
-          success: resolve,
-          fail: reject
+    this.ensureCanvasContext()
+      .then(() => Promise.all([
+        this.loadPanelImage(panel),
+        new Promise((resolve, reject) => {
+          wx.getImageInfo({ src: panel.sourceUrl, success: resolve, fail: reject })
         })
-      }),
-      new Promise(resolve => {
-        wx.createSelectorQuery()
-          .in(this)
-          .select('#materialCropStage')
-          .boundingClientRect(rect => resolve(rect || {}))
-          .exec()
+      ]))
+      .then(([img, info]) => {
+        const imageWidth = info.width || 1
+        const imageHeight = info.height || 1
+        const nextPanel = {
+          ...panel,
+          imageWidth,
+          imageHeight,
+          ready: true
+        }
+        if (nextPanel.fixedRatio) {
+          nextPanel.cropRect = this.createDefaultCropRect(nextPanel)
+          nextPanel.points = this.rectToPoints(nextPanel.cropRect)
+        } else {
+          const insetX = imageWidth * 0.05
+          const insetY = imageHeight * 0.05
+          nextPanel.points = [
+            [insetX, insetY],
+            [imageWidth - insetX, insetY],
+            [imageWidth - insetX, imageHeight - insetY],
+            [insetX, imageHeight - insetY]
+          ]
+        }
+        this.updatePanelAt(panelIndex, nextPanel)
+        this.redrawCanvas(nextPanel)
       })
-    ]).then(([info, rect]) => {
-      this._lastStageRect = rect || {}
-      const imageWidth = info.width || 1
-      const imageHeight = info.height || 1
-      const stageWidth = rect.width || 300
-      const stageHeight = rect.height || 360
-      const scale = Math.min(stageWidth / imageWidth, stageHeight / imageHeight)
-      const displayWidth = imageWidth * scale
-      const displayHeight = imageHeight * scale
-      const offsetX = (stageWidth - displayWidth) / 2
-      const offsetY = (stageHeight - displayHeight) / 2
-      const nextPanel = {
-        ...panel,
-        imageWidth,
-        imageHeight,
-        stageWidth,
-        stageHeight,
-        displayWidth,
-        displayHeight,
-        offsetX,
-        offsetY,
-        ready: true
-      }
+      .catch(err => {
+        console.warn('准备调整图片失败:', err)
+        wx.showToast({ title: '图片加载失败', icon: 'none' })
+      })
+  },
 
-      if (nextPanel.fixedRatio) {
-        nextPanel.cropRect = this.createDefaultCropRect(nextPanel)
-        nextPanel.points = this.rectToPoints(nextPanel.cropRect)
-      } else {
-        const insetX = imageWidth * 0.05
-        const insetY = imageHeight * 0.05
-        nextPanel.points = [
-          [insetX, insetY],
-          [imageWidth - insetX, insetY],
-          [imageWidth - insetX, imageHeight - insetY],
-          [insetX, imageHeight - insetY]
-        ]
+  ensureCanvasContext() {
+    if (this._canvasCtx && this._canvas) return Promise.resolve()
+    return new Promise((resolve, reject) => {
+      wx.createSelectorQuery()
+        .in(this)
+        .select('#materialCropCanvas')
+        .fields({ node: true, size: true, rect: true })
+        .exec(res => {
+          if (!res || !res[0] || !res[0].node) {
+            reject(new Error('canvas not ready'))
+            return
+          }
+          const item = res[0]
+          const canvas = item.node
+          const ctx = canvas.getContext('2d')
+          const info = (wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()) || {}
+          const dpr = info.pixelRatio || 1
+          canvas.width = item.width * dpr
+          canvas.height = item.height * dpr
+          ctx.scale(dpr, dpr)
+          this._canvas = canvas
+          this._canvasCtx = ctx
+          this._canvasDpr = dpr
+          this._canvasRect = { left: item.left, top: item.top, width: item.width, height: item.height }
+          resolve()
+        })
+    })
+  },
+
+  loadPanelImage(panel) {
+    this._panelImages = this._panelImages || {}
+    if (this._panelImages[panel.key]) return Promise.resolve(this._panelImages[panel.key])
+    return new Promise((resolve, reject) => {
+      if (!this._canvas) { reject(new Error('canvas not ready')); return }
+      const img = this._canvas.createImage()
+      img.onload = () => {
+        this._panelImages[panel.key] = img
+        resolve(img)
       }
-      this.refreshPanelStyles(nextPanel)
-      this.updatePanelAt(panelIndex, nextPanel)
-    }).catch(err => {
-      console.warn('准备调整图片失败:', err)
-      wx.showToast({ title: '图片加载失败', icon: 'none' })
+      img.onerror = () => reject(new Error('image load failed'))
+      img.src = panel.sourceUrl
+    })
+  },
+
+  computePanelLayout(panel) {
+    const W = (this._canvasRect && this._canvasRect.width) || 1
+    const H = (this._canvasRect && this._canvasRect.height) || 1
+    const rotated = Math.abs((panel.rotation || 0) % 180) === 90
+    const sw = rotated ? panel.imageHeight : panel.imageWidth
+    const sh = rotated ? panel.imageWidth : panel.imageHeight
+    const padding = panel.fixedRatio ? 0.95 : 0.78
+    const scale = Math.min(W / sw, H / sh) * padding
+    return { W, H, scale, cx: W / 2, cy: H / 2 }
+  },
+
+  pointToCanvas(panel, point, layout) {
+    const lay = layout || this._panelLayout
+    if (!lay) return { x: 0, y: 0 }
+    const rad = (panel.rotation || 0) * Math.PI / 180
+    const dx = (point[0] - panel.imageWidth / 2) * lay.scale
+    const dy = (point[1] - panel.imageHeight / 2) * lay.scale
+    return {
+      x: lay.cx + dx * Math.cos(rad) - dy * Math.sin(rad),
+      y: lay.cy + dx * Math.sin(rad) + dy * Math.cos(rad)
+    }
+  },
+
+  canvasToPoint(panel, x, y) {
+    const lay = this._panelLayout
+    if (!lay) return [0, 0]
+    const rad = -((panel.rotation || 0) * Math.PI / 180)
+    const dx = x - lay.cx
+    const dy = y - lay.cy
+    let ox = (dx * Math.cos(rad) - dy * Math.sin(rad)) / lay.scale + panel.imageWidth / 2
+    let oy = (dx * Math.sin(rad) + dy * Math.cos(rad)) / lay.scale + panel.imageHeight / 2
+    if (panel.fixedRatio) {
+      ox = Math.max(0, Math.min(panel.imageWidth, ox))
+      oy = Math.max(0, Math.min(panel.imageHeight, oy))
+    }
+    return [Math.round(ox), Math.round(oy)]
+  },
+
+  hitTestPanel(panel, x, y) {
+    if (!panel.points || panel.points.length !== 4) return null
+    const dispPts = panel.points.map(p => this.pointToCanvas(panel, p))
+    let bestIdx = -1, bestD = HANDLE_HIT_RADIUS_PX
+    dispPts.forEach((d, i) => {
+      const dist = Math.hypot(x - d.x, y - d.y)
+      if (dist < bestD) { bestD = dist; bestIdx = i }
+    })
+    if (bestIdx >= 0) return { type: 'handle', index: bestIdx }
+    if (panel.fixedRatio && pointInPolygon(x, y, dispPts)) {
+      return { type: 'frame' }
+    }
+    return null
+  },
+
+  redrawCanvas(panel) {
+    const ctx = this._canvasCtx
+    if (!ctx || !panel) return
+    const layout = this.computePanelLayout(panel)
+    this._panelLayout = layout
+    const { W, H, scale, cx, cy } = layout
+    ctx.clearRect(0, 0, W, H)
+
+    const img = this._panelImages && this._panelImages[panel.key]
+    if (img) {
+      const drawW = panel.imageWidth * scale
+      const drawH = panel.imageHeight * scale
+      ctx.save()
+      ctx.translate(cx, cy)
+      ctx.rotate((panel.rotation || 0) * Math.PI / 180)
+      ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH)
+      ctx.restore()
+    }
+
+    if (!panel.points || panel.points.length !== 4) return
+    const dispPts = panel.points.map(p => this.pointToCanvas(panel, p, layout))
+
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'
+    ctx.fillRect(0, 0, W, H)
+
+    ctx.save()
+    ctx.beginPath()
+    ctx.moveTo(dispPts[0].x, dispPts[0].y)
+    dispPts.slice(1).forEach(p => ctx.lineTo(p.x, p.y))
+    ctx.closePath()
+    ctx.globalCompositeOperation = 'destination-out'
+    ctx.fill()
+    ctx.restore()
+
+    if (!panel.fixedRatio) {
+      const corners = [[0, 0], [panel.imageWidth, 0], [panel.imageWidth, panel.imageHeight], [0, panel.imageHeight]]
+        .map(p => this.pointToCanvas(panel, p, layout))
+      ctx.save()
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'
+      ctx.lineWidth = 1
+      ctx.setLineDash([5, 4])
+      ctx.beginPath()
+      ctx.moveTo(corners[0].x, corners[0].y)
+      corners.slice(1).forEach(p => ctx.lineTo(p.x, p.y))
+      ctx.closePath()
+      ctx.stroke()
+      ctx.restore()
+    }
+
+    ctx.beginPath()
+    ctx.moveTo(dispPts[0].x, dispPts[0].y)
+    dispPts.slice(1).forEach(p => ctx.lineTo(p.x, p.y))
+    ctx.closePath()
+    ctx.strokeStyle = '#3b82f6'
+    ctx.lineWidth = 2
+    ctx.setLineDash([])
+    ctx.stroke()
+
+    if (!panel.fixedRatio) {
+      ctx.save()
+      ctx.strokeStyle = 'rgba(59,130,246,0.7)'
+      ctx.lineWidth = 1.5
+      ctx.setLineDash([6, 4])
+      const ext = 0.25
+      for (let i = 0; i < 4; i++) {
+        const a = dispPts[i]
+        const b = dispPts[(i + 1) % 4]
+        const dx = b.x - a.x, dy = b.y - a.y
+        ctx.beginPath()
+        ctx.moveTo(a.x - dx * ext, a.y - dy * ext)
+        ctx.lineTo(a.x, a.y)
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.moveTo(b.x, b.y)
+        ctx.lineTo(b.x + dx * ext, b.y + dy * ext)
+        ctx.stroke()
+      }
+      ctx.restore()
+    }
+
+    dispPts.forEach((p, i) => {
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, HANDLE_VISUAL_RADIUS_PX, 0, Math.PI * 2)
+      ctx.fillStyle = '#fff'
+      ctx.fill()
+      ctx.strokeStyle = '#3b82f6'
+      ctx.lineWidth = 2
+      ctx.stroke()
+      ctx.fillStyle = '#1e40af'
+      ctx.font = 'bold 13px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(String(i + 1), p.x, p.y)
     })
   },
 
@@ -1001,74 +1183,6 @@ Page({
     ]
   },
 
-  pointToDisplay(panel, point) {
-    const scale = panel.displayWidth / panel.imageWidth
-    const rad = (panel.rotation || 0) * Math.PI / 180
-    const cx = panel.offsetX + panel.displayWidth / 2
-    const cy = panel.offsetY + panel.displayHeight / 2
-    const dx = (point[0] - panel.imageWidth / 2) * scale
-    const dy = (point[1] - panel.imageHeight / 2) * scale
-    return {
-      x: cx + dx * Math.cos(rad) - dy * Math.sin(rad),
-      y: cy + dx * Math.sin(rad) + dy * Math.cos(rad)
-    }
-  },
-
-  displayToPoint(panel, x, y) {
-    const scale = panel.imageWidth / panel.displayWidth
-    const rad = -((panel.rotation || 0) * Math.PI / 180)
-    const cx = panel.offsetX + panel.displayWidth / 2
-    const cy = panel.offsetY + panel.displayHeight / 2
-    const dx = x - cx
-    const dy = y - cy
-    const px = Math.max(0, Math.min(panel.imageWidth, Math.round((dx * Math.cos(rad) - dy * Math.sin(rad)) * scale + panel.imageWidth / 2)))
-    const py = Math.max(0, Math.min(panel.imageHeight, Math.round((dx * Math.sin(rad) + dy * Math.cos(rad)) * scale + panel.imageHeight / 2)))
-    return [px, py]
-  },
-
-  refreshPanelStyles(panel) {
-    panel.imageStyle = [
-      `width:${panel.displayWidth}px`,
-      `height:${panel.displayHeight}px`,
-      `left:${panel.offsetX}px`,
-      `top:${panel.offsetY}px`,
-      `transform:rotate(${panel.rotation || 0}deg)`
-    ].join(';')
-
-    if (panel.fixedRatio && panel.cropRect) {
-      const tl = this.pointToDisplay(panel, [panel.cropRect.x, panel.cropRect.y])
-      const br = this.pointToDisplay(panel, [panel.cropRect.x + panel.cropRect.w, panel.cropRect.y + panel.cropRect.h])
-      panel.frameStyle = [
-        `left:${tl.x}px`,
-        `top:${tl.y}px`,
-        `width:${br.x - tl.x}px`,
-        `height:${br.y - tl.y}px`
-      ].join(';')
-      panel.points = this.rectToPoints(panel.cropRect)
-    }
-
-    const displayPoints = (panel.points || []).map(point => this.pointToDisplay(panel, point))
-    panel.lines = displayPoints.length === 4 ? displayPoints.map((point, index) => {
-      const next = displayPoints[(index + 1) % displayPoints.length]
-      const dx = next.x - point.x
-      const dy = next.y - point.y
-      const length = Math.sqrt(dx * dx + dy * dy)
-      const angle = Math.atan2(dy, dx) * 180 / Math.PI
-      return {
-        index,
-        style: `left:${point.x}px;top:${point.y}px;width:${length}px;transform:rotate(${angle}deg);`
-      }
-    }) : []
-
-    panel.handles = displayPoints.map((display, index) => {
-      return {
-        index,
-        text: String(index + 1),
-        style: `left:${display.x}px;top:${display.y}px;`
-      }
-    })
-  },
-
   getPanelIndex(key) {
     return this.data.materialModal.panels.findIndex(item => item.key === key)
   },
@@ -1083,124 +1197,84 @@ Page({
     })
   },
 
-  onCropHandleStart(e) {
-    this.refreshStageRect()
-    const index = Number(e.currentTarget.dataset.index)
+  onCropTouchStart(e) {
+    const panel = this.data.materialModal.activePanel
+    if (!panel || !panel.ready || !this._canvasRect) return
     const touch = e.touches && e.touches[0]
     if (!touch) return
-    this._cropDrag = {
-      type: 'handle',
-      index,
-      startX: touch.clientX,
-      startY: touch.clientY
-    }
-    this.setData({ activeCropHandleIndex: index })
-  },
-
-  onCropFrameStart(e) {
-    this.refreshStageRect()
-    const touch = e.touches && e.touches[0]
-    const panel = this.data.materialModal.activePanel
-    if (!touch || !panel || !panel.cropRect) return
-    this._cropDrag = {
-      type: 'frame',
-      startX: touch.clientX,
-      startY: touch.clientY,
-      rect: { ...panel.cropRect }
+    const x = touch.clientX - this._canvasRect.left
+    const y = touch.clientY - this._canvasRect.top
+    const hit = this.hitTestPanel(panel, x, y)
+    if (!hit) return
+    if (hit.type === 'handle') {
+      this._cropDrag = { type: 'handle', index: hit.index }
+      this.setData({ activeCropHandleIndex: hit.index })
+    } else if (hit.type === 'frame') {
+      this._cropDrag = {
+        type: 'frame',
+        startX: touch.clientX,
+        startY: touch.clientY,
+        rect: { ...panel.cropRect }
+      }
     }
   },
 
   onCropTouchMove(e) {
     const drag = this._cropDrag
-    const touch = e.touches && e.touches[0]
     const panel = this.data.materialModal.activePanel
-    if (!drag || !touch || !panel || !panel.ready) return
+    if (!drag || !panel || !panel.ready || !this._canvasRect) return
+    const touch = e.touches && e.touches[0]
+    if (!touch) return
+    const x = touch.clientX - this._canvasRect.left
+    const y = touch.clientY - this._canvasRect.top
     const panelIndex = this.getPanelIndex(panel.key)
     const nextPanel = { ...panel }
 
-    if (nextPanel.fixedRatio && nextPanel.cropRect) {
-      const scale = nextPanel.imageWidth / nextPanel.displayWidth
-      if (drag.type === 'frame') {
-        const dx = Math.round((touch.clientX - drag.startX) * scale)
-        const dy = Math.round((touch.clientY - drag.startY) * scale)
-        nextPanel.cropRect = this.clampCropRect(nextPanel, {
-          ...drag.rect,
-          x: drag.rect.x + dx,
-          y: drag.rect.y + dy
-        })
+    if (drag.type === 'handle') {
+      if (panel.fixedRatio && panel.cropRect) {
+        const ratio = panel.fixedRatio
+        const newPoint = this.canvasToPoint(panel, x, y)
+        const rect = panel.cropRect
+        let nx = rect.x, ny = rect.y, nw = rect.w, nh = rect.h
+        if (drag.index === 0 || drag.index === 3) {
+          nw = Math.max(40, rect.x + rect.w - newPoint[0])
+          nx = rect.x + rect.w - nw
+        } else {
+          nw = Math.max(40, newPoint[0] - rect.x)
+        }
+        nh = Math.round(nw / ratio)
+        if (drag.index === 0 || drag.index === 1) {
+          ny = rect.y + rect.h - nh
+        }
+        const nextRect = this.clampCropRect(panel, { x: nx, y: ny, w: nw, h: nh })
+        nextPanel.cropRect = nextRect
+        nextPanel.points = this.rectToPoints(nextRect)
       } else {
-        nextPanel.cropRect = this.resizeFixedCropRect(nextPanel, drag.index, touch.clientX, touch.clientY)
+        const points = panel.points.map(p => p.slice())
+        points[drag.index] = this.canvasToPoint(panel, x, y)
+        nextPanel.points = points
       }
-      nextPanel.touched = true
-      this.refreshPanelStyles(nextPanel)
-      this.updatePanelAt(panelIndex, nextPanel)
-      return
+    } else if (drag.type === 'frame' && panel.fixedRatio && panel.cropRect && this._panelLayout) {
+      const dx = (touch.clientX - drag.startX) / this._panelLayout.scale
+      const dy = (touch.clientY - drag.startY) / this._panelLayout.scale
+      const nextRect = this.clampCropRect(panel, {
+        x: drag.rect.x + dx,
+        y: drag.rect.y + dy,
+        w: drag.rect.w,
+        h: drag.rect.h
+      })
+      nextPanel.cropRect = nextRect
+      nextPanel.points = this.rectToPoints(nextRect)
     }
 
-    if (drag.type !== 'handle') return
-    const stage = this.getHandleTouchInStage(touch)
-    const points = (nextPanel.points || []).map(item => item.slice())
-    points[drag.index] = this.displayToPoint(nextPanel, stage.x, stage.y)
-    nextPanel.points = points
     nextPanel.touched = true
-    this.refreshPanelStyles(nextPanel)
+    this.redrawCanvas(nextPanel)
     this.updatePanelAt(panelIndex, nextPanel)
   },
 
   onCropTouchEnd() {
     this._cropDrag = null
     this.setData({ activeCropHandleIndex: -1 })
-  },
-
-  getTouchInStage(touch) {
-    return getOffsetTouchPoint(touch, this._lastStageRect || {}, 0)
-  },
-
-  getHandleTouchInStage(touch) {
-    return getOffsetTouchPoint(touch, this._lastStageRect || {}, this.getHandleTouchOffsetPx())
-  },
-
-  getHandleTouchOffsetPx() {
-    try {
-      const info = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
-      return HANDLE_TOUCH_OFFSET_RPX * ((info.windowWidth || 375) / 750)
-    } catch (err) {
-      return 35
-    }
-  },
-
-  refreshStageRect() {
-    wx.createSelectorQuery()
-      .in(this)
-      .select('#materialCropStage')
-      .boundingClientRect(rect => {
-        this._lastStageRect = rect || {}
-      })
-      .exec()
-  },
-
-  resizeFixedCropRect(panel, handleIndex, clientX, clientY) {
-    this.refreshStageRect()
-    const stage = this.getHandleTouchInStage({ clientX, clientY })
-    const point = this.displayToPoint(panel, stage.x, stage.y)
-    const rect = panel.cropRect
-    const ratio = panel.fixedRatio || 1
-    let x = rect.x
-    let y = rect.y
-    let w = rect.w
-    let h = rect.h
-
-    if (handleIndex === 0 || handleIndex === 3) {
-      w = Math.max(40, rect.x + rect.w - point[0])
-      x = rect.x + rect.w - w
-    } else {
-      w = Math.max(40, point[0] - rect.x)
-    }
-    h = Math.round(w / ratio)
-    if (handleIndex === 0 || handleIndex === 1) {
-      y = rect.y + rect.h - h
-    }
-    return this.clampCropRect(panel, { x, y, w, h })
   },
 
   clampCropRect(panel, rect) {
@@ -1230,22 +1304,10 @@ Page({
     const delta = direction === 'left' ? -90 : 90
     const nextPanel = {
       ...panel,
-      rotation: (panel.rotation + delta + 360) % 360
+      rotation: ((panel.rotation || 0) + delta + 360) % 360
     }
-    this.fitPanelToStage(nextPanel)
-    this.refreshPanelStyles(nextPanel)
+    this.redrawCanvas(nextPanel)
     this.updatePanelAt(panelIndex, nextPanel)
-  },
-
-  fitPanelToStage(panel) {
-    const rotated = Math.abs((panel.rotation || 0) % 180) === 90
-    const sourceWidth = rotated ? panel.imageHeight : panel.imageWidth
-    const sourceHeight = rotated ? panel.imageWidth : panel.imageHeight
-    const scale = Math.min(panel.stageWidth / sourceWidth, panel.stageHeight / sourceHeight)
-    panel.displayWidth = panel.imageWidth * scale
-    panel.displayHeight = panel.imageHeight * scale
-    panel.offsetX = (panel.stageWidth - panel.displayWidth) / 2
-    panel.offsetY = (panel.stageHeight - panel.displayHeight) / 2
   },
 
   resetActivePanel() {
@@ -1261,7 +1323,6 @@ Page({
       nextPanel.cropRect = this.createDefaultCropRect(nextPanel)
       nextPanel.points = this.rectToPoints(nextPanel.cropRect)
     } else {
-      // 默认非固定比例收缩 5% 留出边距
       const insetX = nextPanel.imageWidth * 0.05
       const insetY = nextPanel.imageHeight * 0.05
       nextPanel.points = [
@@ -1271,7 +1332,7 @@ Page({
         [insetX, nextPanel.imageHeight - insetY]
       ]
     }
-    this.refreshPanelStyles(nextPanel)
+    this.redrawCanvas(nextPanel)
     this.updatePanelAt(panelIndex, nextPanel)
   },
 

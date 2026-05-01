@@ -2751,6 +2751,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>`;
         }
 
+        function advancedBlock(rowsHtml) {
+            return `<div style="margin-bottom:14px;">
+                <div class="adj-advanced-toggle" data-collapsed="1" style="cursor:pointer;font-size:13px;color:#555;font-weight:500;padding:9px 12px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:6px;display:flex;align-items:center;justify-content:space-between;user-select:none;">
+                    <span>高级选项（裁剪模式 / 边距 / 比例 / 灵敏度）</span>
+                    <span class="adj-advanced-arrow" style="transition:transform 0.2s;display:inline-block;">▶</span>
+                </div>
+                <div class="adj-advanced-body" style="display:none;padding-top:14px;">${rowsHtml}</div>
+            </div>`;
+        }
+
         const cropOptions   = [{ value:'auto',label:'自动'},{value:'rect_only',label:'仅矩形'},{value:'none',label:'不裁剪'}];
         const expandOptions = [{ value:'tight',label:'紧凑'},{value:'normal',label:'标准'},{value:'loose',label:'宽松'},{value:'x-loose',label:'超宽松'}];
         const trimOptions   = [{ value:'on',label:'开启'},{value:'off',label:'关闭'}];
@@ -2771,17 +2781,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 leftHtml += fieldRow(f.label, f.hint || tip('📌 方向颠倒或横置时使用，每次旋转 90°'), f.key, rotateOptions, '0');
             });
         } else {
-            leftHtml = fieldRow('裁剪模式', cropDesc, 'crop_mode', cropOptions, 'auto')
-                     + fieldRow('裁剪边距', expandDesc, 'expand_level', expandOptions, 'normal')
-                     + fieldRow('比例修剪', ratioDesc, 'ratio_trim', trimOptions, 'on');
+            let advancedHtml = fieldRow('裁剪模式', cropDesc, 'crop_mode', cropOptions, 'auto')
+                             + fieldRow('裁剪边距', expandDesc, 'expand_level', expandOptions, 'normal')
+                             + fieldRow('比例修剪', ratioDesc, 'ratio_trim', trimOptions, 'on');
 
             if (matType === 'id_card' || matType === 'hukou') {
                 const cannyOptions = [{value:'1.5',label:'低灵敏'},{value:'1.0',label:'标准'},{value:'0.6',label:'高灵敏'},{value:'0.35',label:'极高灵敏'}];
                 const cannyDesc = matType === 'id_card'
                     ? tip('📌 纯黑背景+白色卡片 → 极高灵敏｜深色背景/边缘模糊 → 高灵敏｜被误识到背景纹理噪点 → 低灵敏｜不确定先试「高灵敏」')
                     : tip('📌 户口本放在深色桌面上拍 → 高灵敏｜扫描件/白底书页 → 标准｜识别到装订线等多余边缘 → 低灵敏');
-                leftHtml += fieldRow('边缘灵敏度', cannyDesc, 'canny_scale', cannyOptions, '1.0');
+                advancedHtml += fieldRow('边缘灵敏度', cannyDesc, 'canny_scale', cannyOptions, '1.0');
             }
+            leftHtml = advancedBlock(advancedHtml);
             cfg.rotateFields.forEach(f => {
                 leftHtml += fieldRow(f.label, f.hint || tip('📌 方向颠倒或横置时使用，每次旋转 90°'), f.key, rotateOptions, '0');
             });
@@ -2857,7 +2868,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // 旋转后图像的有效边界尺寸
                 const effW = nw * cos + nh * sin;
                 const effH = nw * sin + nh * cos;
-                const scale = Math.min(W / effW, H / effH);
+                // 自由角点模式留白（让把手能拖到图外，处理缺角）
+                const padding = isFixedRatio ? 1.0 : 0.78;
+                const scale = Math.min(W / effW, H / effH) * padding;
                 return { W, H, rad, scale, nw, nh, cx: W / 2, cy: H / 2 };
             }
 
@@ -2872,14 +2885,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ];
             }
 
-            // canvas 坐标 → 原图像素坐标（逆旋转）
+            // canvas 坐标 → 原图像素坐标（逆旋转；自由角点模式不再钳制到图像内，
+            // 允许把手拖到图外，配合后端 inpaint 做缺角补全）
             function dispToOrig([mx, my]) {
                 const { rad, scale, nw, nh, cx, cy } = getTransform();
                 const dx = mx - cx, dy = my - cy;
-                return [
-                    Math.max(0, Math.min(nw, Math.round((dx * Math.cos(-rad) - dy * Math.sin(-rad)) / scale + nw / 2))),
-                    Math.max(0, Math.min(nh, Math.round((dx * Math.sin(-rad) + dy * Math.cos(-rad)) / scale + nh / 2))),
-                ];
+                const ox = Math.round((dx * Math.cos(-rad) - dy * Math.sin(-rad)) / scale + nw / 2);
+                const oy = Math.round((dx * Math.sin(-rad) + dy * Math.cos(-rad)) / scale + nh / 2);
+                if (isFixedRatio) {
+                    return [Math.max(0, Math.min(nw, ox)), Math.max(0, Math.min(nh, oy))];
+                }
+                return [ox, oy];
             }
 
             // 从 originalPts 重新计算 dispPts（旋转改变或图像尺寸改变后调用）
@@ -3026,7 +3042,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ctx.fill();
                 ctx.restore();
 
-                // 4. 裁剪框边线
+                // 3.5 原图边界淡虚线（提示哪是图外区，缺角补全区）
+                ctx.save();
+                const imgTL = origToDisp([0, 0]);
+                const imgTR = origToDisp([nw, 0]);
+                const imgBR = origToDisp([nw, nh]);
+                const imgBL = origToDisp([0, nh]);
+                ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 4]);
+                ctx.beginPath();
+                ctx.moveTo(imgTL[0], imgTL[1]);
+                ctx.lineTo(imgTR[0], imgTR[1]);
+                ctx.lineTo(imgBR[0], imgBR[1]);
+                ctx.lineTo(imgBL[0], imgBL[1]);
+                ctx.closePath();
+                ctx.stroke();
+                ctx.restore();
+
+                // 4. 裁剪框边线（实线）
                 ctx.beginPath();
                 ctx.moveTo(dispPts[0][0], dispPts[0][1]);
                 dispPts.slice(1).forEach(([x, y]) => ctx.lineTo(x, y));
@@ -3035,6 +3069,28 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ctx.lineWidth = 2;
                 ctx.setLineDash([]);
                 ctx.stroke();
+
+                // 4.5 每条边向两端延长虚线（帮助对齐图外的缺角 — 让用户调整把手时
+                // 看着延长线和材料真实边贴合，即使把手在图外也能拖准）
+                ctx.save();
+                ctx.strokeStyle = 'rgba(99,102,241,0.65)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([6, 4]);
+                const ext = 0.25;
+                for (let i = 0; i < 4; i++) {
+                    const [x1, y1] = dispPts[i];
+                    const [x2, y2] = dispPts[(i + 1) % 4];
+                    const dx = x2 - x1, dy = y2 - y1;
+                    ctx.beginPath();
+                    ctx.moveTo(x1 - dx * ext, y1 - dy * ext);
+                    ctx.lineTo(x1, y1);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(x2, y2);
+                    ctx.lineTo(x2 + dx * ext, y2 + dy * ext);
+                    ctx.stroke();
+                }
+                ctx.restore();
 
                 // 5. 角点把手
                 dispPts.forEach(([x, y], i) => {
@@ -3486,6 +3542,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         const rotateFieldKeySet = new Set(cfg.rotateFields.map(f => f.key));
 
         panel.addEventListener('click', e => {
+            const advToggle = e.target.closest('.adj-advanced-toggle');
+            if (advToggle) {
+                const body = advToggle.nextElementSibling;
+                const arrow = advToggle.querySelector('.adj-advanced-arrow');
+                const collapsed = advToggle.dataset.collapsed === '1';
+                body.style.display = collapsed ? '' : 'none';
+                arrow.style.transform = collapsed ? 'rotate(90deg)' : '';
+                advToggle.dataset.collapsed = collapsed ? '0' : '1';
+                return;
+            }
             const pill = e.target.closest('.adj-pill');
             if (!pill) return;
             const group = pill.dataset.group;

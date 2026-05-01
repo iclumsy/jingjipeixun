@@ -163,7 +163,7 @@ def crop_image_with_points(image, points, mode="perspective"):
         x2 = int(np.clip(x2, x1 + 1, w))
         y2 = int(np.clip(y2, y1 + 1, h))
         return image[y1:y2, x1:x2].copy()
-    return four_point_transform(image, points_array)
+    return four_point_transform(image, points_array, inpaint=True)
 
 
 def cleanup_generated_outputs(output_dir, name_prefix, material_type=None):
@@ -248,7 +248,7 @@ def order_points(pts):
     return rect
 
 
-def four_point_transform(image, pts):
+def four_point_transform(image, pts, inpaint=False):
     rect = order_points(pts.astype("float32"))
     (tl, tr, br, bl) = rect
 
@@ -274,7 +274,21 @@ def four_point_transform(image, pts):
     )
 
     transform = cv2.getPerspectiveTransform(rect, dst)
-    return cv2.warpPerspective(image, transform, (max_width, max_height))
+    warped = cv2.warpPerspective(image, transform, (max_width, max_height))
+
+    if inpaint:
+        src_mask = np.full(image.shape[:2], 255, dtype=np.uint8)
+        warped_mask = cv2.warpPerspective(src_mask, transform, (max_width, max_height))
+        inpaint_mask = cv2.bitwise_not(warped_mask)
+        # 边界向内膨胀几像素，避免 inpaint 残留 warp 时的边缘黑线
+        kernel = np.ones((3, 3), np.uint8)
+        inpaint_mask = cv2.dilate(inpaint_mask, kernel, iterations=1)
+        if inpaint_mask.any():
+            missing_ratio = float(inpaint_mask.sum()) / (max_width * max_height * 255)
+            print(f"[four_point_transform] inpaint missing ratio={missing_ratio:.3f}")
+            warped = cv2.inpaint(warped, inpaint_mask, 5, cv2.INPAINT_TELEA)
+
+    return warped
 
 
 def resize_for_analysis(image, max_side=ANALYSIS_MAX_SIDE):

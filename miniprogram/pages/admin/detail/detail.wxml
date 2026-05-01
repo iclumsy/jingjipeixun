@@ -152,51 +152,21 @@
       </view>
 
       <view class="crop-stage-wrap">
-        <view
-          id="materialCropStage"
-          class="crop-stage"
-          catchtouchmove="onCropTouchMove"
-          catchtouchend="onCropTouchEnd"
-          catchtouchcancel="onCropTouchEnd"
-        >
-          <image
-            wx:if="{{materialModal.activePanel && materialModal.activePanel.sourceUrl}}"
-            class="crop-image"
-            src="{{materialModal.activePanel.sourceUrl}}"
-            mode="aspectFit"
-            style="{{materialModal.activePanel.imageStyle}}"
+        <view class="crop-stage">
+          <canvas
+            type="2d"
+            id="materialCropCanvas"
+            class="crop-canvas"
+            catchtouchstart="onCropTouchStart"
+            catchtouchmove="onCropTouchMove"
+            catchtouchend="onCropTouchEnd"
+            catchtouchcancel="onCropTouchEnd"
+            disable-scroll="true"
           />
-          <view
-            wx:if="{{materialModal.activePanel && materialModal.activePanel.fixedRatio && materialModal.activePanel.frameStyle}}"
-            class="crop-frame fixed-ratio"
-            style="{{materialModal.activePanel.frameStyle}}"
-            catchtouchstart="onCropFrameStart"
-          >
-            <view class="crop-frame-label">1寸比例</view>
-          </view>
-          <view
-            wx:for="{{materialModal.activePanel.lines}}"
-            wx:key="index"
-            class="crop-line"
-            style="{{item.style}}"
-          ></view>
-          <view
-            wx:for="{{materialModal.activePanel.handles}}"
-            wx:key="index"
-            class="crop-handle"
-            style="{{item.style}}"
-            data-index="{{item.index}}"
-            catchtouchstart="onCropHandleStart"
-          >
-            <view class="crop-handle-visual">
-              <view class="crop-cross-h"></view>
-              <view class="crop-cross-v"></view>
-              <view class="crop-handle-number">{{item.text}}</view>
-            </view>
-          </view>
         </view>
         <view class="crop-status">
-          当前旋转：{{materialModal.activePanel.rotation || 0}}°
+          <block wx:if="{{materialModal.activePanel && !materialModal.activePanel.fixedRatio}}">拖动角点对齐材料边线（可拖出图外，缺角部分将自动补全）</block>
+          <block wx:else>当前旋转：{{materialModal.activePanel.rotation || 0}}°</block>
         </view>
       </view>
 
