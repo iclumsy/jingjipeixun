@@ -152,17 +152,78 @@
       </view>
 
       <view class="crop-stage-wrap">
-        <view class="crop-stage">
-          <canvas
-            type="2d"
-            id="materialCropCanvas"
-            class="crop-canvas"
-            catchtouchstart="onCropTouchStart"
-            catchtouchmove="onCropTouchMove"
-            catchtouchend="onCropTouchEnd"
-            catchtouchcancel="onCropTouchEnd"
-            disable-scroll="true"
+        <view
+          id="materialCropStage"
+          class="crop-stage"
+          catchtouchmove="onCropTouchMove"
+          catchtouchend="onCropTouchEnd"
+          catchtouchcancel="onCropTouchEnd"
+        >
+          <image
+            wx:if="{{materialModal.activePanel && materialModal.activePanel.sourceUrl}}"
+            class="crop-image"
+            src="{{materialModal.activePanel.sourceUrl}}"
+            mode="aspectFit"
+            style="{{materialModal.activePanel.imageStyle}}"
           />
+          <view
+            wx:if="{{materialModal.activePanel && !materialModal.activePanel.fixedRatio && materialModal.activePanel.imageBorderStyle}}"
+            class="crop-image-border"
+            style="{{materialModal.activePanel.imageBorderStyle}}"
+          ></view>
+          <view
+            wx:for="{{materialModal.activePanel.extLines}}"
+            wx:key="index"
+            class="crop-line crop-line-ext"
+            style="{{item.style}}"
+          ></view>
+          <view
+            wx:if="{{materialModal.activePanel && materialModal.activePanel.fixedRatio && materialModal.activePanel.frameStyle}}"
+            class="crop-frame fixed-ratio"
+            style="{{materialModal.activePanel.frameStyle}}"
+            catchtouchstart="onCropFrameStart"
+          >
+            <view class="crop-frame-label">1寸比例</view>
+          </view>
+          <view
+            wx:for="{{materialModal.activePanel.lines}}"
+            wx:key="index"
+            class="crop-line"
+            style="{{item.style}}"
+          ></view>
+          <view
+            wx:for="{{materialModal.activePanel.handles}}"
+            wx:key="index"
+            class="crop-handle"
+            style="{{item.style}}"
+            data-index="{{item.index}}"
+            catchtouchstart="onCropHandleStart"
+          >
+            <view class="crop-handle-visual {{activeCropHandleIndex === item.index ? 'active' : ''}}">
+              <view class="crop-cross-h"></view>
+              <view class="crop-cross-v"></view>
+              <view class="crop-handle-number">{{item.text}}</view>
+            </view>
+          </view>
+
+          <view
+            wx:if="{{materialModal.magnifier}}"
+            class="crop-magnifier"
+            style="left:{{materialModal.magnifier.cx - materialModal.magnifier.R}}px;top:{{materialModal.magnifier.cy - materialModal.magnifier.R}}px;width:{{materialModal.magnifier.R * 2}}px;height:{{materialModal.magnifier.R * 2}}px;"
+          >
+            <view
+              class="crop-magnifier-stage"
+              style="width:{{materialModal.magnifier.stageWidth}}px;height:{{materialModal.magnifier.stageHeight}}px;transform:translate({{materialModal.magnifier.innerLeft}}px, {{materialModal.magnifier.innerTop}}px) scale({{materialModal.magnifier.zoom}});"
+            >
+              <image
+                class="crop-magnifier-image"
+                src="{{materialModal.magnifier.sourceUrl}}"
+                mode="aspectFit"
+                style="width:{{materialModal.magnifier.imageWidth}}px;height:{{materialModal.magnifier.imageHeight}}px;left:{{materialModal.magnifier.offsetX}}px;top:{{materialModal.magnifier.offsetY}}px;transform:rotate({{materialModal.magnifier.rotation}}deg);"
+              />
+            </view>
+            <view class="crop-magnifier-cross"></view>
+          </view>
         </view>
         <view class="crop-status">
           <block wx:if="{{materialModal.activePanel && !materialModal.activePanel.fixedRatio}}">拖动角点对齐材料边线（可拖出图外，缺角部分将自动补全）</block>

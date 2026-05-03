@@ -596,10 +596,186 @@
   border: 1rpx solid #2b3246;
 }
 
-.crop-canvas {
-  width: 100%;
-  height: 100%;
+.crop-image {
+  position: absolute;
   display: block;
+  transform-origin: center center;
+}
+
+.crop-image-border {
+  position: absolute;
+  border: 2rpx dashed rgba(255, 255, 255, 0.55);
+  box-sizing: border-box;
+  pointer-events: none;
+  transform-origin: center center;
+}
+
+.crop-frame {
+  position: absolute;
+  border: 3rpx solid #2f6af5;
+  box-sizing: border-box;
+  background: rgba(47, 106, 245, 0.08);
+}
+
+.crop-frame-label {
+  position: absolute;
+  left: 8rpx;
+  top: -34rpx;
+  height: 28rpx;
+  padding: 0 8rpx;
+  border-radius: 6rpx;
+  background: rgba(47, 106, 245, 0.92);
+  color: #ffffff;
+  font-size: 18rpx;
+  line-height: 28rpx;
+}
+
+.crop-line {
+  position: absolute;
+  height: 4rpx;
+  background: #2f6af5;
+  transform-origin: 0 50%;
+  pointer-events: none;
+  box-shadow: 0 0 0 1rpx rgba(255, 255, 255, 0.6);
+}
+
+.crop-line-ext {
+  height: 2rpx;
+  background: rgba(59, 130, 246, 0.55);
+  box-shadow: none;
+  opacity: 0.85;
+}
+
+.crop-handle {
+  position: absolute;
+  width: 120rpx;
+  height: 120rpx;
+  margin-left: -60rpx;
+  margin-top: -60rpx;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.crop-handle-visual {
+  position: relative;
+  width: 30rpx;
+  height: 30rpx;
+  border-radius: 50%;
+  border: 2rpx solid #2f6af5;
+  background: #ffffff;
+  color: #1d4ed8;
+  font-size: 16rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  box-shadow: 0 6rpx 16rpx rgba(15, 23, 42, 0.25);
+}
+
+.crop-handle-visual.active {
+  background: #1d4ed8;
+  border-color: #ffffff;
+}
+
+.crop-cross-h,
+.crop-cross-v {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: rgba(29, 78, 216, 0.42);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.crop-cross-h {
+  width: 22rpx;
+  height: 2rpx;
+}
+
+.crop-cross-v {
+  width: 2rpx;
+  height: 22rpx;
+}
+
+.crop-handle-number {
+  position: absolute;
+  left: 50%;
+  top: -30rpx;
+  transform: translateX(-50%);
+  min-width: 24rpx;
+  height: 24rpx;
+  padding: 0 5rpx;
+  border-radius: 999rpx;
+  background: rgba(47, 106, 245, 0.94);
+  color: #ffffff;
+  font-size: 16rpx;
+  line-height: 24rpx;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.crop-magnifier {
+  position: absolute;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #141826;
+  box-shadow: 0 6rpx 18rpx rgba(0, 0, 0, 0.55), 0 0 0 3rpx rgba(255, 255, 255, 0.95);
+  pointer-events: none;
+  z-index: 20;
+}
+
+.crop-magnifier-stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+.crop-magnifier-image {
+  position: absolute;
+  display: block;
+  transform-origin: center center;
+}
+
+.crop-magnifier-cross {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36rpx;
+  height: 36rpx;
+  margin-left: -18rpx;
+  margin-top: -18rpx;
+  border-radius: 50%;
+  border: 2rpx solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 1rpx rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.crop-magnifier-cross::before,
+.crop-magnifier-cross::after {
+  content: '';
+  position: absolute;
+  background: #ff3b30;
+}
+
+.crop-magnifier-cross::before {
+  left: 50%;
+  top: 4rpx;
+  bottom: 4rpx;
+  width: 2rpx;
+  margin-left: -1rpx;
+}
+
+.crop-magnifier-cross::after {
+  top: 50%;
+  left: 4rpx;
+  right: 4rpx;
+  height: 2rpx;
+  margin-top: -1rpx;
 }
 
 .crop-status {

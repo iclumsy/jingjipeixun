@@ -3427,7 +3427,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // ── Modal 框架 ───────────────────────────────────────────────────
         const modal = document.createElement('div');
-        modal.style.cssText = 'background:#fff;border-radius:14px;width:100%;max-width:1100px;min-height:60vh;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;';
+        modal.style.cssText = 'background:#fff;border-radius:14px;width:100%;max-width:1500px;min-height:60vh;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;';
 
         const header = document.createElement('div');
         header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid #e5e7eb;flex-shrink:0;';
@@ -3438,7 +3438,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         body.style.cssText = 'display:flex;flex:1;min-height:0;overflow:hidden;';
 
         const leftPane = document.createElement('div');
-        leftPane.style.cssText = 'width:380px;flex-shrink:0;border-right:1px solid #f0f0f0;overflow-y:auto;padding:18px 24px;';
+        leftPane.style.cssText = 'width:320px;flex-shrink:0;border-right:1px solid #f0f0f0;overflow-y:auto;padding:18px 20px;';
         leftPane.innerHTML = leftHtml;
 
         const rightPane = document.createElement('div');
