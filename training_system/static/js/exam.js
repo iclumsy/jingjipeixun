@@ -66,9 +66,11 @@ function updateBankUI() {
   document.getElementById('bank-' + currentBank).classList.add('active');
   
   const names = { 
-    'chache': '叉车司机 (N1)', 
-    'dianti': '电梯管理 (A)',
-    'junrui': '君睿叉车司机'
+    'chache': '君睿 叉车司机 (N1)', 
+    'dianti': '君睿 电梯管理 (A)',
+    'water': '君睿 锅炉水处理 (G3)',
+    'boiler': '君睿 工业锅炉司炉 (G1)',
+    'yibaifen': '壹佰分 叉车司机 (N1)'
   };
   document.getElementById('hero-badge').textContent = names[currentBank];
 }
@@ -291,7 +293,7 @@ function renderQuestion() {
   // 图片
   const imgEl = document.getElementById('q-image');
   if (q.question_images && q.question_images.length > 0) {
-    const baseDir = (currentBank === 'junrui') ? '/static/images/junrui/' : '/static/images/yibaifen/';
+    const baseDir = (currentBank === 'yibaifen') ? '/static/images/yibaifen/' : '/static/images/junrui/';
     const imgSrc = baseDir + q.question_images[0];
     imgEl.innerHTML = `<img src="${imgSrc}" alt="题目图片" onerror="this.style.display='none'">`;
   } else {
@@ -602,7 +604,7 @@ function renderMemorizeList() {
       answerText = q.answer.map(a => a.toUpperCase()).join(', ');
     }
 
-    const baseDir = (currentBank === 'junrui') ? '/static/images/junrui/' : '/static/images/yibaifen/';
+    const baseDir = (currentBank === 'yibaifen') ? '/static/images/yibaifen/' : '/static/images/junrui/';
     const imgSrc = (q.question_images && q.question_images.length > 0) 
       ? `<div style="margin:10px 0"><img src="${baseDir}${q.question_images[0]}" style="max-height:150px; border-radius:8px; border:1px solid var(--border)"></div>`
       : '';
