@@ -306,7 +306,7 @@ def create_app():
         if path.startswith('/static/') or path == '/favicon.ico':
             return None
         # 官网首页和报名页公开访问
-        if path in {'/', '/apply'}:
+        if path in {'/', '/apply', '/exam'}:
             return None
         # 登录/登出路由无需认证
         if path.startswith('/auth/'):
@@ -372,6 +372,11 @@ def create_app():
     def apply():
         """渲染学员信息采集页（公开访问，无需登录）。"""
         return render_template('apply.html')
+
+    @app.route('/exam')
+    def exam():
+        """渲染在线练习页面（公开访问，无需登录）。"""
+        return render_template('exam.html')
 
     @app.route('/admin')
     def admin():
