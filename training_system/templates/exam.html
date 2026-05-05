@@ -18,9 +18,13 @@
     <section id="home-view" class="view active">
       <div class="hero">
         <div class="hero-content">
-          <div class="hero-badge">N1 叉车司机</div>
+          <div class="hero-badge" id="hero-badge">叉车司机 (N1)</div>
           <h1>阳泉精技培训在线练习系统</h1>
-          <p class="hero-subtitle">山西省专用 · 1924 道真题</p>
+          <p class="hero-subtitle" id="hero-subtitle">山西省专用 · 1924 道真题</p>
+          <div class="bank-selector">
+            <button class="bank-btn active" id="bank-chache" onclick="switchBank('chache')">叉车司机 (N1)</button>
+            <button class="bank-btn" id="bank-dianti" onclick="switchBank('dianti')">电梯管理 (A)</button>
+          </div>
           <div class="stats-bar">
             <div class="stat-item"><span class="stat-num" id="stat-total">1924</span><span class="stat-label">总题量</span></div>
             <div class="stat-item"><span class="stat-num" id="stat-done">0</span><span class="stat-label">已练习</span></div>

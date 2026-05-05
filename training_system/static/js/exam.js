@@ -1,5 +1,6 @@
 /* ===== 叉车司机N1 在线练习系统 ===== */
 
+let currentBank = 'chache'; // 当前题库: chache, dianti
 let allQuestions = [];
 let currentQuestions = [];
 let currentIndex = 0;
@@ -23,52 +24,105 @@ let examTimeLeft = 3600; // 60分钟
 // ===== 初始化 =====
 document.addEventListener('DOMContentLoaded', async () => {
   try {
+    // 恢复上一次使用的题库
+    currentBank = localStorage.getItem('ex_last_bank') || 'chache';
+    updateBankUI();
+    
     loadStorage();
     await loadQuestions();
     updateHomeStats();
   } catch (err) {
     console.error('初始化失败:', err);
   } finally {
-    // 无论成功失败，都尝试隐藏加载层
     const overlay = document.getElementById('loading-overlay');
     if (overlay) overlay.classList.add('hidden');
   }
 });
 
+async function switchBank(bank) {
+  if (bank === currentBank) return;
+  
+  const overlay = document.getElementById('loading-overlay');
+  if (overlay) overlay.classList.remove('hidden');
+  
+  currentBank = bank;
+  localStorage.setItem('ex_last_bank', bank);
+  updateBankUI();
+  
+  // 重置状态
+  userAnswers = {};
+  answered = {};
+  selectedOptions = [];
+  
+  loadStorage();
+  await loadQuestions();
+  updateHomeStats();
+  
+  if (overlay) overlay.classList.add('hidden');
+}
+
+function updateBankUI() {
+  document.querySelectorAll('.bank-btn').forEach(btn => btn.classList.remove('active'));
+  document.getElementById('bank-' + currentBank).classList.add('active');
+  
+  const names = { 'chache': '叉车司机 (N1)', 'dianti': '电梯管理 (A)' };
+  document.getElementById('hero-badge').textContent = names[currentBank];
+}
+
 async function loadQuestions() {
   try {
-    // 确保路径以 /static/ 开头
-    const resp = await fetch('/static/data/questions.json');
+    const resp = await fetch(`/static/data/${currentBank}.json`);
     if (!resp.ok) throw new Error(`HTTP error! status: ${resp.status}`);
     allQuestions = await resp.json();
     
     const totalEl = document.getElementById('stat-total');
     if (totalEl) totalEl.textContent = allQuestions.length;
     
-    console.log('题库加载成功，共', allQuestions.length, '题');
+    document.getElementById('hero-subtitle').textContent = `专业题库 · ${allQuestions.length} 道真题`;
+    
+    // 更新题型练习里的数字（如果是电梯管理，可能数量不同）
+    updateFilterCounts();
+    
+    console.log(`题库[${currentBank}]加载成功，共`, allQuestions.length, '题');
   } catch (e) {
     console.error('加载题库失败:', e);
-    // 如果加载失败，在控制台显示，但不阻塞页面显示
+  }
+}
+
+function updateFilterCounts() {
+  const counts = { 0: allQuestions.length, 1: 0, 2: 0, 3: 0 };
+  allQuestions.forEach(q => {
+    if (counts[q.type_code] !== undefined) counts[q.type_code]++;
+  });
+  
+  const chips = document.querySelectorAll('.filter-chips .chip span');
+  if (chips.length >= 4) {
+    chips[0].textContent = counts[0];
+    chips[1].textContent = counts[1];
+    chips[2].textContent = counts[2];
+    chips[3].textContent = counts[3];
   }
 }
 
 // ===== localStorage =====
 function loadStorage() {
+  const prefix = `ex_${currentBank}_`;
   try {
-    practiceProgress = parseInt(localStorage.getItem('ex_progress') || '0');
-    wrongSet = new Set(JSON.parse(localStorage.getItem('ex_wrong') || '[]'));
-    totalDone = parseInt(localStorage.getItem('ex_done') || '0');
-    totalCorrect = parseInt(localStorage.getItem('ex_correct') || '0');
-    examHistory = JSON.parse(localStorage.getItem('ex_history') || '[]');
+    practiceProgress = parseInt(localStorage.getItem(prefix + 'progress') || '0');
+    wrongSet = new Set(JSON.parse(localStorage.getItem(prefix + 'wrong') || '[]'));
+    totalDone = parseInt(localStorage.getItem(prefix + 'done') || '0');
+    totalCorrect = parseInt(localStorage.getItem(prefix + 'correct') || '0');
+    examHistory = JSON.parse(localStorage.getItem(prefix + 'history') || '[]');
   } catch(e) { console.warn('读取存储失败'); }
 }
 
 function saveStorage() {
-  localStorage.setItem('ex_progress', practiceProgress);
-  localStorage.setItem('ex_wrong', JSON.stringify([...wrongSet]));
-  localStorage.setItem('ex_done', totalDone);
-  localStorage.setItem('ex_correct', totalCorrect);
-  localStorage.setItem('ex_history', JSON.stringify(examHistory));
+  const prefix = `ex_${currentBank}_`;
+  localStorage.setItem(prefix + 'progress', practiceProgress);
+  localStorage.setItem(prefix + 'wrong', JSON.stringify([...wrongSet]));
+  localStorage.setItem(prefix + 'done', totalDone);
+  localStorage.setItem(prefix + 'correct', totalCorrect);
+  localStorage.setItem(prefix + 'history', JSON.stringify(examHistory));
 }
 
 function updateHomeStats() {
