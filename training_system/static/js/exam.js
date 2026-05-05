@@ -233,14 +233,16 @@ function renderQuestion() {
 
   // 选项
   const optEl = document.getElementById('q-options');
+  const showResult = isSubmitted && currentMode !== 'exam';
+
   if (q.type_code === 3) {
     // 判断题
     const correctAnswer = q.answer === 'true' || q.answer === true;
     const userA = isSubmitted ? userAnswers[currentIndex] : null;
     optEl.innerHTML = `<div class="judge-options">
-      <div class="judge-btn ${selectedOptions.includes(true) ? 'selected' : ''} ${isSubmitted ? (correctAnswer === true ? 'correct' : (userA === true ? 'wrong' : '')) : ''} ${isSubmitted ? 'disabled' : ''}"
+      <div class="judge-btn ${selectedOptions.includes(true) ? 'selected' : ''} ${showResult ? (correctAnswer === true ? 'correct' : (userA === true ? 'wrong' : '')) : ''} ${showResult ? 'disabled' : ''}"
         onclick="selectJudge(true)">✓ 正确</div>
-      <div class="judge-btn ${selectedOptions.includes(false) ? 'selected' : ''} ${isSubmitted ? (correctAnswer === false ? 'correct' : (userA === false ? 'wrong' : '')) : ''} ${isSubmitted ? 'disabled' : ''}"
+      <div class="judge-btn ${selectedOptions.includes(false) ? 'selected' : ''} ${showResult ? (correctAnswer === false ? 'correct' : (userA === false ? 'wrong' : '')) : ''} ${showResult ? 'disabled' : ''}"
         onclick="selectJudge(false)">✗ 错误</div>
     </div>`;
   } else {
@@ -250,7 +252,7 @@ function renderQuestion() {
     optEl.innerHTML = keys.map(k => {
       let cls = 'option-item';
       if (selectedOptions.includes(k)) cls += ' selected';
-      if (isSubmitted) {
+      if (showResult) {
         cls += ' disabled';
         if (correctSet.has(k)) cls += ' correct';
         else if (selectedOptions.includes(k)) cls += ' wrong';
@@ -264,7 +266,7 @@ function renderQuestion() {
 
   // 结果面板
   const resultPanel = document.getElementById('result-panel');
-  if (isSubmitted) {
+  if (showResult) {
     resultPanel.style.display = 'block';
     const isCorrect = answered[currentIndex];
     document.getElementById('result-icon').textContent = isCorrect ? '✅' : '❌';
@@ -289,7 +291,7 @@ function renderQuestion() {
   const isMulti = q.type_code === 2;
   const submitBtn = document.getElementById('btn-submit');
   
-  if (isSubmitted) {
+  if (showResult || currentMode === 'exam') {
     submitBtn.style.display = 'none';
   } else {
     // 只有多选题且未提交时显示确认按钮
@@ -298,12 +300,13 @@ function renderQuestion() {
   }
 
   document.getElementById('btn-prev').style.display = currentIndex > 0 ? 'inline-block' : 'none';
-  document.getElementById('btn-next').style.display = isSubmitted ? 'inline-block' : 'none';
-
-  if (currentMode === 'exam' && isSubmitted) {
+  
+  if (currentMode === 'exam') {
+    document.getElementById('btn-next').style.display = 'inline-block';
     document.getElementById('btn-next').textContent =
       currentIndex < currentQuestions.length - 1 ? '下一题' : '交卷';
   } else {
+    document.getElementById('btn-next').style.display = isSubmitted ? 'inline-block' : 'none';
     document.getElementById('btn-next').textContent =
       currentIndex < currentQuestions.length - 1 ? '下一题' : '完成';
   }
@@ -314,15 +317,26 @@ function renderQuestion() {
 
 // ===== 选项交互 =====
 function selectOption(key) {
-  if (isSubmitted) return;
+  if (isSubmitted && currentMode !== 'exam') return;
   const q = currentQuestions[currentIndex];
 
   if (q.type_code === 2) {
-    // 多选：点击切换选中状态，不自动提交
+    // 多选：点击切换选中状态
     const idx = selectedOptions.indexOf(key);
     if (idx > -1) selectedOptions.splice(idx, 1);
     else selectedOptions.push(key);
-    renderQuestion();
+    
+    if (currentMode === 'exam') {
+        if (selectedOptions.length > 0) submitAnswer();
+        else {
+            delete answered[currentIndex];
+            delete userAnswers[currentIndex];
+            isSubmitted = false;
+            renderQuestion();
+        }
+    } else {
+        renderQuestion();
+    }
   } else {
     // 单选：直接选中并提交
     selectedOptions = [key];
@@ -331,7 +345,7 @@ function selectOption(key) {
 }
 
 function selectJudge(val) {
-  if (isSubmitted) return;
+  if (isSubmitted && currentMode !== 'exam') return;
   selectedOptions = [val];
   submitAnswer();
 }
