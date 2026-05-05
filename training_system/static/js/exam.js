@@ -70,6 +70,9 @@ function updateBankUI() {
     'dianti': '君睿 电梯管理 (A)',
     'water': '君睿 锅炉水处理 (G3)',
     'boiler': '君睿 工业锅炉司炉 (G1)',
+    'zhihui': '君睿 起重机指挥 (Q3)',
+    'menshi': '君睿 门式起重机 (Q2)',
+    'qiaoshi': '君睿 桥式起重机 (Q2)',
     'yibaifen': '壹佰分 叉车司机 (N1)'
   };
   document.getElementById('hero-badge').textContent = names[currentBank];

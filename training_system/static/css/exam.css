@@ -45,8 +45,10 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 .bank-selector {
   display: flex;
   justify-content: center;
-  gap: 12px;
-  margin-bottom: 32px;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 auto 32px;
+  max-width: 800px;
 }
 .bank-btn {
   padding: 10px 24px;
@@ -206,3 +208,26 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 .hi-score.fail { color: var(--red); }
 .hi-date { font-size: 13px; color: var(--text3); }
 
+/* ===== 响应式适配 ===== */
+@media (max-width: 640px) {
+  .hero { padding: 40px 16px 32px; }
+  .bank-selector { gap: 6px; }
+  .bank-btn { padding: 6px 14px; font-size: 12px; border-radius: 16px; }
+  .stats-bar { gap: 15px; justify-content: space-around; }
+  .stat-num { font-size: 20px; }
+  .stat-label { font-size: 11px; }
+  
+  .mode-grid { grid-template-columns: 1fr; margin-top: -20px; }
+  .mode-card { padding: 20px; }
+  
+  .question-container { padding: 20px; margin: 12px 10px; }
+  .question-text { font-size: 16px; }
+  .option-item { padding: 12px 16px; font-size: 14px; gap: 10px; }
+  .option-key { width: 28px; height: 28px; font-size: 12px; }
+  
+  .practice-header { padding: 10px 16px; }
+  .practice-title { font-size: 14px; }
+  
+  .history-item { padding: 12px; }
+  .hi-score { font-size: 16px; }
+}
