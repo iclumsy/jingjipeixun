@@ -204,6 +204,11 @@ function startMode(mode, typeCode) {
     currentIndex = 0;
     document.getElementById('practice-title').textContent = '错题回顾';
   } else if (mode === 'type') {
+    // 更新 UI 状态
+    document.querySelectorAll('.filter-chips .chip').forEach((c, idx) => {
+      c.classList.toggle('active', idx === typeCode);
+    });
+
     if (typeCode === 0) {
       currentQuestions = allQuestions.slice();
     } else {
@@ -359,14 +364,14 @@ function renderQuestion() {
 
   document.getElementById('btn-prev').style.display = currentIndex > 0 ? 'inline-block' : 'none';
   
+  // 始终显示下一题/完成按钮，方便翻页
+  const nextBtn = document.getElementById('btn-next');
+  nextBtn.style.display = 'inline-block';
+  
   if (currentMode === 'exam') {
-    document.getElementById('btn-next').style.display = 'inline-block';
-    document.getElementById('btn-next').textContent =
-      currentIndex < currentQuestions.length - 1 ? '下一题' : '交卷';
+    nextBtn.textContent = currentIndex < currentQuestions.length - 1 ? '下一题' : '交卷';
   } else {
-    document.getElementById('btn-next').style.display = isSubmitted ? 'inline-block' : 'none';
-    document.getElementById('btn-next').textContent =
-      currentIndex < currentQuestions.length - 1 ? '下一题' : '完成';
+    nextBtn.textContent = currentIndex < currentQuestions.length - 1 ? '下一题' : '完成练习';
   }
 
   // 更新答题卡

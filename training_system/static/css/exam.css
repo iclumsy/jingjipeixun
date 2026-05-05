@@ -185,3 +185,24 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 .result-msg { font-size: 18px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
 .correct-msg { color: var(--green); }
 .wrong-msg { color: var(--red); }
+
+/* ===== 筛选区域 ===== */
+.filter-section { margin-top: 40px; padding-top: 30px; border-top: 1px solid var(--border); }
+.filter-section h2 { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 20px; }
+.filter-chips { display: flex; gap: 12px; flex-wrap: wrap; }
+.chip { padding: 10px 20px; background: #fff; border: 1px solid var(--border); border-radius: 12px; font-size: 14px; font-weight: 600; color: var(--text2); transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
+.chip span { background: #f1f5f9; color: var(--text3); padding: 2px 8px; border-radius: 6px; font-size: 12px; }
+.chip:hover { border-color: var(--primary); color: var(--primary); }
+.chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.chip.active span { background: rgba(255,255,255,0.2); color: #fff; }
+
+/* 历史记录样式 */
+.history-section { margin-top: 40px; }
+.history-section h2 { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 20px; }
+.history-list { display: flex; flex-direction: column; gap: 12px; }
+.history-item { display: flex; align-items: center; justify-content: space-between; padding: 16px; background: #fff; border: 1px solid var(--border); border-radius: 12px; }
+.hi-score { font-weight: 800; font-size: 18px; padding-right: 12px; }
+.hi-score.pass { color: var(--green); }
+.hi-score.fail { color: var(--red); }
+.hi-date { font-size: 13px; color: var(--text3); }
+
