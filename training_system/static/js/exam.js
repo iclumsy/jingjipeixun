@@ -65,7 +65,11 @@ function updateBankUI() {
   document.querySelectorAll('.bank-btn').forEach(btn => btn.classList.remove('active'));
   document.getElementById('bank-' + currentBank).classList.add('active');
   
-  const names = { 'chache': '叉车司机 (N1)', 'dianti': '电梯管理 (A)' };
+  const names = { 
+    'chache': '叉车司机 (N1)', 
+    'dianti': '电梯管理 (A)',
+    'junrui': '君睿叉车司机'
+  };
   document.getElementById('hero-badge').textContent = names[currentBank];
 }
 
@@ -287,8 +291,8 @@ function renderQuestion() {
   // 图片
   const imgEl = document.getElementById('q-image');
   if (q.question_images && q.question_images.length > 0) {
-    // 优先使用本地下载的图片
-    const imgSrc = '/static/images/exam/' + q.question_images[0];
+    const baseDir = (currentBank === 'junrui') ? '/static/images/junrui/' : '/static/images/yibaifen/';
+    const imgSrc = baseDir + q.question_images[0];
     imgEl.innerHTML = `<img src="${imgSrc}" alt="题目图片" onerror="this.style.display='none'">`;
   } else {
     imgEl.innerHTML = '';
@@ -329,14 +333,10 @@ function renderQuestion() {
 
   // 结果面板
   const resultPanel = document.getElementById('result-panel');
-  if (showResult) {
+  if (showResult && q.analysis) {
     resultPanel.style.display = 'block';
     const isCorrect = answered[currentIndex];
-    document.getElementById('result-icon').textContent = isCorrect ? '✅' : '❌';
-    const msgEl = document.getElementById('result-msg');
-    msgEl.textContent = isCorrect ? '回答正确！' : '回答错误';
-    msgEl.className = 'result-msg ' + (isCorrect ? 'correct-msg' : 'wrong-msg');
-
+    
     let correctText = '';
     if (q.type_code === 3) {
       correctText = (q.answer === 'true' || q.answer === true) ? '正确' : '错误';
@@ -602,8 +602,9 @@ function renderMemorizeList() {
       answerText = q.answer.map(a => a.toUpperCase()).join(', ');
     }
 
+    const baseDir = (currentBank === 'junrui') ? '/static/images/junrui/' : '/static/images/yibaifen/';
     const imgSrc = (q.question_images && q.question_images.length > 0) 
-      ? `<div style="margin:10px 0"><img src="/static/images/exam/${q.question_images[0]}" style="max-height:150px; border-radius:8px; border:1px solid var(--border)"></div>`
+      ? `<div style="margin:10px 0"><img src="${baseDir}${q.question_images[0]}" style="max-height:150px; border-radius:8px; border:1px solid var(--border)"></div>`
       : '';
 
     return `
