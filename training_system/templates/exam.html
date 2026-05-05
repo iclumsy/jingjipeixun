@@ -81,7 +81,10 @@
       <header class="practice-header">
         <button class="btn-back" onclick="goHome()">返回</button>
         <div class="practice-title" id="practice-title">模式名称</div>
-        <div class="practice-counter" id="practice-counter">1 / 50</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="practice-counter" id="practice-counter">1 / 50</div>
+          <button id="btn-header-finish" class="btn-primary" style="padding: 4px 12px; font-size: 13px; background-color: #ef4444; border:none; border-radius: 6px; display:none;" onclick="finishExam()">交卷</button>
+        </div>
       </header>
       </header>
       <div class="exam-timer" id="exam-timer" style="display:none"><span id="timer-text">60:00</span></div>

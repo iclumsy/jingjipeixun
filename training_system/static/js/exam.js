@@ -109,6 +109,7 @@ function showView(id) {
 function goHome() {
   if (examTimer) { clearInterval(examTimer); examTimer = null; }
   document.getElementById('exam-timer').style.display = 'none';
+  document.getElementById('btn-header-finish').style.display = 'none';
   updateHomeStats();
   showView('home-view');
 }
@@ -162,6 +163,9 @@ function startMode(mode, typeCode) {
 
   if (mode !== 'exam') {
     document.getElementById('exam-timer').style.display = 'none';
+    document.getElementById('btn-header-finish').style.display = 'none';
+  } else {
+    document.getElementById('btn-header-finish').style.display = 'block';
   }
 
   showView('practice-view');
@@ -469,7 +473,9 @@ function finishExam() {
 
 function reviewExam() {
   // 回到练习页查看已答题目
+  currentMode = 'review';
   currentIndex = 0;
+  document.getElementById('btn-header-finish').style.display = 'none';
   showView('practice-view');
   renderQuestion();
   buildAnswerCard();
