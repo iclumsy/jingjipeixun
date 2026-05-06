@@ -16,7 +16,7 @@ class JunruiServiceError(Exception):
 
 # job_category（作业种类）映射：本地名 → 君瑞 category text
 CATEGORY_NAME_MAP = {
-    '特种设备安全管理': '特种设备安全管理',          # category_id=01
+    '特种设备安全管理': '特种设备相关管理',          # category_id=01
     '锅炉作业': '锅炉作业',                         # category_id=02
     '压力容器作业': '压力容器作业',                   # category_id=03
     '起重机作业': '起重机作业',                       # category_id=07
@@ -223,7 +223,7 @@ class JunruiService:
             logger.info(f"外部系统开卡接口原始返回: {data}")
             if data.get("code") != 200:
                 err_msg = data.get("message", "提交开卡申请到外部系统失败")
-                logger.error(f"外部系统拒绝了开卡请求，原因: {err_msg}")
+                logger.error(f"外部系统拒绝了开开请求，原因: {err_msg}")
                 raise JunruiServiceError(err_msg)
             
             success_msg = data.get("message", "外部系统开卡请求已成功受理")
@@ -343,4 +343,3 @@ def query_card_for_student(student_dict):
     except Exception as e:
         logger.exception(f"查询学习卡异常: {e}")
         return {"success": False, "message": "查询异常，请查看后台日志"}
-
