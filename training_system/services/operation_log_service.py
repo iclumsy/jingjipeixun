@@ -5,6 +5,7 @@
 operation_logs 表，并提供按学员查询时间线的接口数据。
 """
 import json
+from datetime import datetime
 
 from flask import g, has_request_context, request
 
@@ -67,15 +68,18 @@ def create_operation_log(
     if not action or not action_label:
         return None
 
+    # 获取本地时间 (GMT+8)
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
     with get_db_connection() as conn:
         cursor = conn.execute(
             '''
             INSERT INTO operation_logs (
                 student_id, action, action_label, actor_name, actor_source,
                 actor_openid, ip, user_agent, status, message,
-                before_json, after_json, metadata_json
+                before_json, after_json, metadata_json, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''',
             (
                 student_id,
@@ -91,6 +95,7 @@ def create_operation_log(
                 _dump_json(before),
                 _dump_json(after),
                 _dump_json(metadata),
+                now_str,
             )
         )
         return cursor.lastrowid

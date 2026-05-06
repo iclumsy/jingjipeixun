@@ -197,7 +197,7 @@ def init_db(database_path):
                 application_type TEXT DEFAULT 'new_exam',
                 status TEXT DEFAULT 'unreviewed',
                 reject_reason TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT (DATETIME(CURRENT_TIMESTAMP, 'localtime')),
                 photo_path TEXT,
                 diploma_path TEXT,
                 id_card_front_path TEXT,
@@ -231,7 +231,7 @@ def init_db(database_path):
                 exam_project TEXT NOT NULL,
                 project_code TEXT NOT NULL,
                 is_active INTEGER DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT (DATETIME(CURRENT_TIMESTAMP, 'localtime')),
                 attachments TEXT DEFAULT '["photo","diploma","id_card_front","id_card_back","hukou_residence","hukou_personal"]'
             )
         ''')
@@ -260,8 +260,8 @@ def init_db(database_path):
                 points_json      TEXT DEFAULT '{}',
                 operator_name    TEXT,
                 operator_source  TEXT,
-                created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at       TIMESTAMP DEFAULT (DATETIME(CURRENT_TIMESTAMP, 'localtime')),
+                updated_at       TIMESTAMP DEFAULT (DATETIME(CURRENT_TIMESTAMP, 'localtime')),
                 UNIQUE(student_id, material_type)
             )
         ''')
@@ -283,7 +283,7 @@ def init_db(database_path):
                 before_json   TEXT DEFAULT '{}',
                 after_json    TEXT DEFAULT '{}',
                 metadata_json TEXT DEFAULT '{}',
-                created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at    TIMESTAMP DEFAULT (DATETIME(CURRENT_TIMESTAMP, 'localtime'))
             )
         ''')
 
@@ -432,7 +432,7 @@ def save_material_adjustment(
                     points_json = ?,
                     operator_name = ?,
                     operator_source = ?,
-                    updated_at = CURRENT_TIMESTAMP
+                    updated_at = DATETIME(CURRENT_TIMESTAMP, 'localtime')
                 WHERE id = ?
                 ''',
                 payload + (existing['id'],)
