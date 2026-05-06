@@ -1539,11 +1539,11 @@ def activate_card_route(id):
     try:
         student = get_student_by_id(id)
 
-        # 仅特种设备且已审核的学员可以开卡
+        # 仅特种设备且已审核或已报名的学员可以开卡
         if student.get('training_type') != 'special_equipment':
             return jsonify({'error': '仅特种设备学员可以开卡'}), 400
-        if student.get('status') != 'reviewed':
-            return jsonify({'error': '仅审核通过的学员可以开卡'}), 400
+        if student.get('status') not in ('reviewed', 'registered'):
+            return jsonify({'error': '仅审核通过或已报名的学员可以开卡'}), 400
 
         # 防止重复开卡
         if student.get('card_activated'):
@@ -1655,9 +1655,9 @@ def download_attachments_zip_route(id):
 
         student = get_student_by_id(id)
 
-        # 仅允许下载已审核学员的附件
-        if student.get('status') != 'reviewed':
-            return jsonify({'error': '仅支持已审核学员打包下载'}), 400
+        # 仅允许下载已审核或已报名学员的附件
+        if student.get('status') not in ('reviewed', 'registered'):
+            return jsonify({'error': '仅支持已审核或已报名学员打包下载'}), 400
 
         # 需要打包的附件字段列表
         attachment_keys = [
@@ -1756,8 +1756,8 @@ def download_training_form_route(id):
         student = get_student_by_id(id)
 
 
-        if student.get('status') != 'reviewed':
-            return jsonify({'error': '仅支持已审核学员下载体检表'}), 400
+        if student.get('status') not in ('reviewed', 'registered'):
+            return jsonify({'error': '仅支持已审核或已报名学员下载体检表'}), 400
 
         rel = student.get('training_form_path', '')
         if not rel:
@@ -1857,8 +1857,8 @@ def generate_materials_route(id):
     try:
 
         student = get_student_by_id(id)
-        if student.get('status') != 'reviewed':
-            return jsonify({'error': '仅支持已审核学员生成报名材料'}), 400
+        if student.get('status') not in ('reviewed', 'registered'):
+            return jsonify({'error': '仅支持已审核或已报名学员生成报名材料'}), 400
             
         from services.material_service import generate_student_materials, generate_health_check_form
         import io as _io
@@ -2183,8 +2183,8 @@ def regenerate_material_route(id):
     try:
 
         student = get_student_by_id(id)
-        if student.get('status') != 'reviewed':
-            return jsonify({'error': '仅支持已审核学员'}), 400
+        if student.get('status') not in ('reviewed', 'registered'):
+            return jsonify({'error': '仅支持已审核或已报名学员'}), 400
 
         data = request.get_json(silent=True) or {}
         material_type = normalize_material_type(data.get('material_type', ''))
@@ -2374,8 +2374,8 @@ def download_materials_zip_route(id):
     try:
 
         student = get_student_by_id(id)
-        if student.get('status') != 'reviewed':
-            return jsonify({'error': '仅支持已审核学员打包下载'}), 400
+        if student.get('status') not in ('reviewed', 'registered'):
+            return jsonify({'error': '仅支持已审核或已报名学员打包下载'}), 400
             
         id_card = student.get('id_card', '')
         name = student.get('name', '')
