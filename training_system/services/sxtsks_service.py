@@ -39,25 +39,18 @@ JGDM = '140300111'       # 发证机构代码
 JGLB = '9002'            # 机构类别
 KSJGDM = '14030001'      # 考试机构代码
 YZBM = '045000'          # 邮编
-GZJL = '从事特种设备工作三个月以上。'  # 工作简历
+MANAGEMENT_GZJL = '从事安全管理工作2年以上。'
+OPERATION_GZJL = '从事特种设备工作三个月以上。'
+GZJL = OPERATION_GZJL  # 兼容旧引用；实际提交时按项目动态生成
 
 # 学历映射：小程序值 → 平台代码
 EDUCATION_MAP = {
     '初中': '0403',
-    '中技': '0406',
-    '中专': '0405',
     '中专或同等学历': '0405',
-    '职高': '0407',
-    '高中': '0408',
     '高中或同等学历': '0408',
-    '高技': '0413',
-    '大专': '0409',
     '专科或同等学历': '0409',
-    '本科': '0410',
     '本科或同等学历': '0410',
-    '硕士': '0411',
     '研究生及以上': '0411',
-    '博士': '0412',
 }
 
 # 项目代号 → 平台 XMID 映射（仅作为动态获取失败时的 fallback）
@@ -96,6 +89,30 @@ EXAM_PROJECT_TO_XMID = {
     '观光车和观光列车司机':   '1096',
 }
 
+# 本地学历门槛：等级越高越满足要求。
+EDUCATION_RANK = {
+    '初中': 1,
+    '高中或同等学历': 2,
+    '中专或同等学历': 2,
+    '专科或同等学历': 3,
+    '本科或同等学历': 4,
+    '研究生及以上': 5,
+}
+
+EDUCATION_REQUIREMENTS = {
+    # 管理类
+    'A': {'min_rank': 2, 'label': '中专或高中及以上'},
+    # 操作类中要求中专或高中及以上的项目
+    'G1': {'min_rank': 2, 'label': '中专或高中及以上'},
+    'G3': {'min_rank': 2, 'label': '中专或高中及以上'},
+    # 操作类中要求初中及以上的项目
+    'R1': {'min_rank': 1, 'label': '初中及以上'},
+    'Q1': {'min_rank': 1, 'label': '初中及以上'},
+    'Q2': {'min_rank': 1, 'label': '初中及以上'},
+    'N1': {'min_rank': 1, 'label': '初中及以上'},
+    'N2': {'min_rank': 1, 'label': '初中及以上'},
+}
+
 # 性别映射
 GENDER_MAP = {
     '男': '1',
@@ -111,6 +128,78 @@ MAX_CAPTCHA_RETRIES = 5
 
 # Cookie 持久化路径
 COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'logs', '.sxtsks_session.json')
+
+
+def _normalize_project_code(project_code):
+    """归一化本地项目代号，兼容 Q2 带限定机型的写法。"""
+    code = (project_code or '').strip()
+    if code.startswith('Q2'):
+        return 'Q2'
+    return code
+
+
+def _resolve_requirement_project_code(student):
+    """根据学员项目解析学历要求使用的项目代号。"""
+    project_code = _normalize_project_code(student.get('project_code', ''))
+    if project_code in EDUCATION_REQUIREMENTS:
+        return project_code
+
+    exam_project = (student.get('exam_project') or '').strip()
+    exam_project_to_code = {
+        '特种设备安全管理': 'A',
+        '电梯安全管理': 'A',
+        '起重机械安全管理': 'A',
+        '锅炉压力容器压力管道安全管理': 'A',
+        '场内机动车安全管理': 'A',
+        '工业锅炉司炉': 'G1',
+        '锅炉水处理': 'G3',
+        '快开门式压力容器操作': 'R1',
+        '起重机指挥': 'Q1',
+        '桥式起重机司机': 'Q2',
+        '门式起重机司机': 'Q2',
+        '叉车司机': 'N1',
+        '观光车和观光列车司机': 'N2',
+    }
+    return exam_project_to_code.get(exam_project, '')
+
+
+def _is_management_project(student):
+    """判断是否为特种设备相关管理项目。"""
+    if _resolve_requirement_project_code(student) == 'A':
+        return True
+    exam_project = (student.get('exam_project') or '').strip()
+    job_category = (student.get('job_category') or '').strip()
+    return '安全管理' in exam_project or '安全管理' in job_category
+
+
+def _resolve_work_resume(student):
+    """按项目类型生成省网提交时使用的工作简历。"""
+    if _is_management_project(student):
+        return MANAGEMENT_GZJL
+    return OPERATION_GZJL
+
+
+def _check_education_requirement(student):
+    """校验学员学历是否满足当前项目的省网报名要求。"""
+    project_code = _resolve_requirement_project_code(student)
+    requirement = EDUCATION_REQUIREMENTS.get(project_code)
+    if not requirement:
+        return {'success': True, 'message': ''}
+
+    education = (student.get('education') or '').strip()
+    rank = EDUCATION_RANK.get(education, 0)
+    if rank >= requirement['min_rank']:
+        return {'success': True, 'message': ''}
+
+    project_name = (student.get('exam_project') or project_code or '该项目').strip()
+    current_education = education or '未填写'
+    return {
+        'success': False,
+        'message': (
+            f'学历要求：{project_name} 需{requirement["label"]}，'
+            f'当前学历为{current_education}，不满足省网报名要求'
+        ),
+    }
 
 
 def _rsa_encrypt(plaintext, public_key_b64=RSA_PUBLIC_KEY):
@@ -406,6 +495,7 @@ class SxtsksClient:
         """构建平台报名表单字段，字段顺序按浏览器 HAR 保持稳定。"""
         company = student.get('company', '')
         company_address = student.get('company_address', '')
+        work_resume = _resolve_work_resume(student) if include_submit_values else ''
 
         return {
             'bmid': '',
@@ -448,7 +538,7 @@ class SxtsksClient:
             'zyxmcode': zyxm_id,
             'dwszdq': '',
             'dwszqx': '',
-            'gzjl': GZJL if include_submit_values else '',
+            'gzjl': work_resume,
             'yrdwyj': '',
             'yrdwrq': time.strftime('%Y-%m-%d'),
             'sqrqzrq': time.strftime('%Y-%m-%d'),
@@ -834,11 +924,16 @@ class SxtsksClient:
         返回:
             dict: {'success': True/False, 'message': str, 'bmid': str}
         """
-        self._ensure_login()
-
         sfzh = student.get('id_card', '')
         if not sfzh:
             return {'success': False, 'message': '缺少学员身份证号'}
+
+        education_check = _check_education_requirement(student)
+        if not education_check['success']:
+            self._log_step('校验学历', 'fail', education_check['message'])
+            return {'success': False, 'message': education_check['message']}
+
+        self._ensure_login()
         self._log_step('使用真实身份证', 'ok', f'平台提交使用学员真实身份证: {sfzh}')
 
         exam_project = student.get('exam_project', '')

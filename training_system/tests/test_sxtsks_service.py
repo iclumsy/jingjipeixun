@@ -10,7 +10,7 @@ PROJECT_DIR = os.path.dirname(TEST_DIR)
 if PROJECT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_DIR)
 
-from services.sxtsks_service import SxtsksClient
+from services.sxtsks_service import EDUCATION_MAP, EDUCATION_RANK, SxtsksClient
 
 
 class FakeResponse:
@@ -28,19 +28,22 @@ class SxtsksSubmitTests(unittest.TestCase):
             "name": "张三",
             "gender": "男",
             "id_card": "110101199001011234",
-            "education": "中专",
+            "education": "中专或同等学历",
             "phone": "13800138000",
             "company": "测试单位",
             "company_address": "测试地址",
             "project_code": "N1",
         }
 
-    def run_submit_with_final_response(self, final_response):
+    def run_submit_with_final_response(self, final_response, student_overrides=None):
         client = SxtsksClient()
         client.logged_in = True
         client.userid = "13253"
         query_must_response = FakeResponse('{"code":"0"}')
         captured = {}
+        student = self.build_student()
+        if student_overrides:
+            student.update(student_overrides)
 
         def post_side_effect(url, **kwargs):
             if url.endswith("/queryKsjgIsMust.do"):
@@ -55,7 +58,7 @@ class SxtsksSubmitTests(unittest.TestCase):
             photo.flush()
             client.session.post = mock.Mock(side_effect=post_side_effect)
 
-            with mock.patch.object(client, "_generate_test_id_card", return_value="140302197508291331"), \
+            with mock.patch.object(client, "_ensure_login", return_value=None), \
                     mock.patch.object(client, "upload_photo", return_value="tmp/photo.jpg"), \
                     mock.patch.object(client, "_get_form_token", return_value="form-token"), \
                     mock.patch.object(client, "_run_pre_checks", return_value={
@@ -63,11 +66,11 @@ class SxtsksSubmitTests(unittest.TestCase):
                         "bmVerriToken": "captcha-token",
                     }), \
                     mock.patch.object(client, "_upload_attachment", return_value=None):
-                result = client.submit_registration(self.build_student(), photo.name)
+                result = client.submit_registration(student, photo.name)
 
         return result, captured["save_kwargs"]
 
-    def test_submit_uses_random_test_id_card_and_returns_it(self):
+    def test_submit_uses_real_student_id_card_and_returns_it(self):
         result, save_kwargs = self.run_submit_with_final_response(
             FakeResponse("保存并上报成功,645199")
         )
@@ -78,8 +81,63 @@ class SxtsksSubmitTests(unittest.TestCase):
             for name, value in save_kwargs["files"]
             if name == "sfzh"
         ]
-        self.assertEqual(sfzh_parts, ["140302197508291331"])
-        self.assertEqual(result["submitted_id_card"], "140302197508291331")
+        self.assertEqual(sfzh_parts, ["110101199001011234"])
+        self.assertEqual(result["submitted_id_card"], "110101199001011234")
+
+    def test_management_projects_use_management_work_resume(self):
+        _, save_kwargs = self.run_submit_with_final_response(
+            FakeResponse("保存并上报成功,645199"),
+            {
+                "exam_project": "电梯安全管理",
+                "project_code": "A",
+                "education": "高中或同等学历",
+            },
+        )
+
+        gzjl_parts = [
+            value[1]
+            for name, value in save_kwargs["files"]
+            if name == "gzjl"
+        ]
+        self.assertEqual(gzjl_parts, ["从事安全管理工作2年以上。"])
+
+    def test_operation_projects_use_operation_work_resume(self):
+        _, save_kwargs = self.run_submit_with_final_response(
+            FakeResponse("保存并上报成功,645199"),
+            {
+                "exam_project": "叉车司机",
+                "project_code": "N1",
+                "education": "初中",
+            },
+        )
+
+        gzjl_parts = [
+            value[1]
+            for name, value in save_kwargs["files"]
+            if name == "gzjl"
+        ]
+        self.assertEqual(gzjl_parts, ["从事特种设备工作三个月以上。"])
+
+    def test_project_blocks_education_below_requirement_before_submit(self):
+        client = SxtsksClient()
+        client.logged_in = True
+        student = self.build_student()
+        student.update({
+            "exam_project": "工业锅炉司炉",
+            "project_code": "G1",
+            "education": "初中",
+        })
+
+        with tempfile.NamedTemporaryFile(suffix=".jpg") as photo:
+            photo.write(b"photo-bytes")
+            photo.flush()
+            client.session.post = mock.Mock(side_effect=AssertionError("should not call platform submit"))
+            with mock.patch.object(client, "_ensure_login", return_value=None):
+                result = client.submit_registration(student, photo.name)
+
+        self.assertFalse(result["success"])
+        self.assertIn("学历要求", result["message"])
+        client.session.post.assert_not_called()
 
     def test_final_save_includes_photo_binary_part(self):
         _, save_kwargs = self.run_submit_with_final_response(
@@ -149,6 +207,23 @@ class SxtsksPreCheckTests(unittest.TestCase):
                 "sfz": "110101199001011234",
             },
         )
+
+
+class SxtsksEducationRuleTests(unittest.TestCase):
+    SUPPORTED_SYSTEM_EDUCATION_OPTIONS = {
+        "初中",
+        "高中或同等学历",
+        "中专或同等学历",
+        "专科或同等学历",
+        "本科或同等学历",
+        "研究生及以上",
+    }
+
+    def test_education_rank_only_contains_supported_system_options(self):
+        self.assertEqual(set(EDUCATION_RANK), self.SUPPORTED_SYSTEM_EDUCATION_OPTIONS)
+
+    def test_education_map_only_contains_supported_system_options(self):
+        self.assertEqual(set(EDUCATION_MAP), self.SUPPORTED_SYSTEM_EDUCATION_OPTIONS)
 
 
 class SxtsksSubmitAndDownloadTests(unittest.TestCase):
