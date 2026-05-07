@@ -1,6 +1,6 @@
 /* ===== 叉车司机N1 在线练习系统 ===== */
 
-let currentBank = 'chache'; // 当前题库: chache, dianti
+let currentBank = 'N1_叉车司机'; // 当前题库
 let allQuestions = [];
 let currentQuestions = [];
 let currentIndex = 0;
@@ -25,9 +25,9 @@ let examTimeLeft = 3600; // 60分钟
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     // 恢复上一次使用的题库
-    currentBank = localStorage.getItem('ex_last_bank') || 'chache';
+    currentBank = localStorage.getItem('ex_last_bank') || 'N1_叉车司机';
     updateBankUI();
-    
+
     loadStorage();
     await loadQuestions();
     updateHomeStats();
@@ -41,39 +41,39 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function switchBank(bank) {
   if (bank === currentBank) return;
-  
+
   const overlay = document.getElementById('loading-overlay');
   if (overlay) overlay.classList.remove('hidden');
-  
+
   currentBank = bank;
   localStorage.setItem('ex_last_bank', bank);
   updateBankUI();
-  
+
   // 重置状态
   userAnswers = {};
   answered = {};
   selectedOptions = [];
-  
+
   loadStorage();
   await loadQuestions();
   updateHomeStats();
-  
+
   if (overlay) overlay.classList.add('hidden');
 }
 
 function updateBankUI() {
   document.querySelectorAll('.bank-btn').forEach(btn => btn.classList.remove('active'));
   document.getElementById('bank-' + currentBank).classList.add('active');
-  
-  const names = { 
-    'chache': '君睿 叉车司机 (N1)', 
-    'dianti': '君睿 电梯管理 (A)',
-    'water': '君睿 锅炉水处理 (G3)',
-    'boiler': '君睿 工业锅炉司炉 (G1)',
-    'zhihui': '君睿 起重机指挥 (Q3)',
-    'menshi': '君睿 门式起重机 (Q2)',
-    'qiaoshi': '君睿 桥式起重机 (Q2)',
-    'yibaifen': '壹佰分 叉车司机 (N1)'
+
+  const names = {
+    'N1_叉车司机': '叉车司机 (N1)',
+    'A_电梯管理': '电梯管理 (A)',
+    'G3_锅炉水处理': '锅炉水处理 (G3)',
+    'G1_工业锅炉司炉': '工业锅炉司炉 (G1)',
+    'Q3_起重机指挥': '起重机指挥 (Q3)',
+    'Q2_门式起重机': '门式起重机 (Q2)',
+    'Q2_桥式起重机': '桥式起重机 (Q2)',
+    'N1_叉车司机_备选': '叉车司机 (备用题库)'
   };
   document.getElementById('hero-badge').textContent = names[currentBank];
 }
@@ -83,15 +83,15 @@ async function loadQuestions() {
     const resp = await fetch(`/static/data/${currentBank}.json`);
     if (!resp.ok) throw new Error(`HTTP error! status: ${resp.status}`);
     allQuestions = await resp.json();
-    
+
     const totalEl = document.getElementById('stat-total');
     if (totalEl) totalEl.textContent = allQuestions.length;
-    
+
     document.getElementById('hero-subtitle').textContent = `专业题库 · ${allQuestions.length} 道真题`;
-    
+
     // 更新题型练习里的数字（如果是电梯管理，可能数量不同）
     updateFilterCounts();
-    
+
     console.log(`题库[${currentBank}]加载成功，共`, allQuestions.length, '题');
   } catch (e) {
     console.error('加载题库失败:', e);
@@ -103,7 +103,7 @@ function updateFilterCounts() {
   allQuestions.forEach(q => {
     if (counts[q.type_code] !== undefined) counts[q.type_code]++;
   });
-  
+
   const chips = document.querySelectorAll('.filter-chips .chip span');
   if (chips.length >= 4) {
     chips[0].textContent = counts[0];
@@ -122,7 +122,7 @@ function loadStorage() {
     totalDone = parseInt(localStorage.getItem(prefix + 'done') || '0');
     totalCorrect = parseInt(localStorage.getItem(prefix + 'correct') || '0');
     examHistory = JSON.parse(localStorage.getItem(prefix + 'history') || '[]');
-  } catch(e) { console.warn('读取存储失败'); }
+  } catch (e) { console.warn('读取存储失败'); }
 }
 
 function saveStorage() {
@@ -225,7 +225,7 @@ function startMode(mode, typeCode) {
     }
     currentQuestions = shuffle(currentQuestions);
     currentIndex = 0;
-    const names = {0:'全部题型', 1:'单选题', 2:'多选题', 3:'判断题'};
+    const names = { 0: '全部题型', 1: '单选题', 2: '多选题', 3: '判断题' };
     document.getElementById('practice-title').textContent = names[typeCode] + ' 练习';
   }
 
@@ -296,7 +296,7 @@ function renderQuestion() {
   // 图片
   const imgEl = document.getElementById('q-image');
   if (q.question_images && q.question_images.length > 0) {
-    const baseDir = (currentBank === 'yibaifen') ? '/static/images/yibaifen/' : '/static/images/junrui/';
+    const baseDir = (currentBank === 'N1_叉车司机_备选') ? '/static/images/yibaifen/' : '/static/images/junrui/';
     const imgSrc = baseDir + q.question_images[0];
     imgEl.innerHTML = `<img src="${imgSrc}" alt="题目图片" onerror="this.style.display='none'">`;
   } else {
@@ -341,7 +341,7 @@ function renderQuestion() {
   if (showResult && q.analysis) {
     resultPanel.style.display = 'block';
     const isCorrect = answered[currentIndex];
-    
+
     let correctText = '';
     if (q.type_code === 3) {
       correctText = (q.answer === 'true' || q.answer === true) ? '正确' : '错误';
@@ -358,7 +358,7 @@ function renderQuestion() {
   // 按钮状态
   const isMulti = q.type_code === 2;
   const submitBtn = document.getElementById('btn-submit');
-  
+
   if (showResult || currentMode === 'exam') {
     submitBtn.style.display = 'none';
   } else {
@@ -368,11 +368,11 @@ function renderQuestion() {
   }
 
   document.getElementById('btn-prev').style.display = currentIndex > 0 ? 'inline-block' : 'none';
-  
+
   // 始终显示下一题/完成按钮，方便翻页
   const nextBtn = document.getElementById('btn-next');
   nextBtn.style.display = 'inline-block';
-  
+
   if (currentMode === 'exam') {
     nextBtn.textContent = currentIndex < currentQuestions.length - 1 ? '下一题' : '交卷';
   } else {
@@ -393,17 +393,17 @@ function selectOption(key) {
     const idx = selectedOptions.indexOf(key);
     if (idx > -1) selectedOptions.splice(idx, 1);
     else selectedOptions.push(key);
-    
+
     if (currentMode === 'exam') {
-        if (selectedOptions.length > 0) submitAnswer();
-        else {
-            delete answered[currentIndex];
-            delete userAnswers[currentIndex];
-            isSubmitted = false;
-            renderQuestion();
-        }
-    } else {
+      if (selectedOptions.length > 0) submitAnswer();
+      else {
+        delete answered[currentIndex];
+        delete userAnswers[currentIndex];
+        isSubmitted = false;
         renderQuestion();
+      }
+    } else {
+      renderQuestion();
     }
   } else {
     // 单选：直接选中并提交
@@ -595,7 +595,7 @@ function renderMemorizeList() {
   listEl.innerHTML = currentQuestions.map((q, idx) => {
     let optionsHtml = '';
     if (q.type_code !== 3) {
-      optionsHtml = Object.keys(q.options).sort().map(k => 
+      optionsHtml = Object.keys(q.options).sort().map(k =>
         `<div style="font-size:14px; margin:4px 0; color:var(--text2)">${k.toUpperCase()}. ${q.options[k]}</div>`
       ).join('');
     }
@@ -607,8 +607,8 @@ function renderMemorizeList() {
       answerText = q.answer.map(a => a.toUpperCase()).join(', ');
     }
 
-    const baseDir = (currentBank === 'yibaifen') ? '/static/images/yibaifen/' : '/static/images/junrui/';
-    const imgSrc = (q.question_images && q.question_images.length > 0) 
+    const baseDir = (currentBank === 'N1_叉车司机_备选') ? '/static/images/yibaifen/' : '/static/images/junrui/';
+    const imgSrc = (q.question_images && q.question_images.length > 0)
       ? `<div style="margin:10px 0"><img src="${baseDir}${q.question_images[0]}" style="max-height:150px; border-radius:8px; border:1px solid var(--border)"></div>`
       : '';
 
