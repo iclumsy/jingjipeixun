@@ -515,8 +515,8 @@ def create_student(data, file_paths):
                 hukou_residence_path, hukou_personal_path,
                 certificate_info_page_path, certificate_records_page_path,
                 training_form_path, submitter_openid,
-                training_project_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                training_project_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data['name'], data['gender'], data['education'], data.get('school', ''),
             data.get('major', ''), data['id_card'], data['phone'], data.get('company', ''),
@@ -528,7 +528,8 @@ def create_student(data, file_paths):
             file_paths.get('hukou_residence_path', ''), file_paths.get('hukou_personal_path', ''),
             file_paths.get('certificate_info_page_path', ''), file_paths.get('certificate_records_page_path', ''),
             file_paths.get('training_form_path', ''), data.get('submitter_openid', ''),
-            data.get('training_project_id')
+            data.get('training_project_id'),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         ))
         # 返回新插入记录的自增 ID
         return cursor.lastrowid
