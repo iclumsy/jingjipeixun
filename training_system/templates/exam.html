@@ -20,19 +20,19 @@
         <div class="hero-content">
           <div class="hero-badge" id="hero-badge">叉车司机 (N1)</div>
           <h1>阳泉精技培训在线练习系统</h1>
-          <p class="hero-subtitle" id="hero-subtitle">山西省专用 · 1924 道真题</p>
+          <p class="hero-subtitle" id="hero-subtitle">正在加载题库…</p>
           <div class="bank-selector">
-            <button class="bank-btn active" id="bank-N1_叉车司机" onclick="switchBank('N1_叉车司机')">叉车司机 (N1)</button>
-            <button class="bank-btn" id="bank-A_电梯管理" onclick="switchBank('A_电梯管理')">电梯管理 (A)</button>
-            <button class="bank-btn" id="bank-G3_锅炉水处理" onclick="switchBank('G3_锅炉水处理')">锅炉水处理 (G3)</button>
-            <button class="bank-btn" id="bank-G1_工业锅炉司炉" onclick="switchBank('G1_工业锅炉司炉')">工业锅炉司炉 (G1)</button>
-            <button class="bank-btn" id="bank-Q3_起重机指挥" onclick="switchBank('Q3_起重机指挥')">起重机指挥 (Q3)</button>
-            <button class="bank-btn" id="bank-Q2_门式起重机" onclick="switchBank('Q2_门式起重机')">门式起重机 (Q2)</button>
-            <button class="bank-btn" id="bank-Q2_桥式起重机" onclick="switchBank('Q2_桥式起重机')">桥式起重机 (Q2)</button>
-            <button class="bank-btn" id="bank-N1_叉车司机_备选" onclick="switchBank('N1_叉车司机_备选')">叉车司机 (备选库)</button>
+            <button class="bank-btn active" data-bank="N1_叉车司机">叉车司机 (N1)</button>
+            <button class="bank-btn" data-bank="A_电梯管理">电梯管理 (A)</button>
+            <button class="bank-btn" data-bank="G3_锅炉水处理">锅炉水处理 (G3)</button>
+            <button class="bank-btn" data-bank="G1_工业锅炉司炉">工业锅炉司炉 (G1)</button>
+            <button class="bank-btn" data-bank="Q3_起重机指挥">起重机指挥 (Q3)</button>
+            <button class="bank-btn" data-bank="Q2_门式起重机">门式起重机 (Q2)</button>
+            <button class="bank-btn" data-bank="Q2_桥式起重机">桥式起重机 (Q2)</button>
+            <button class="bank-btn" data-bank="N1_叉车司机_备选">叉车司机 (备选库)</button>
           </div>
           <div class="stats-bar">
-            <div class="stat-item"><span class="stat-num" id="stat-total">1924</span><span class="stat-label">总题量</span>
+            <div class="stat-item"><span class="stat-num" id="stat-total">0</span><span class="stat-label">总题量</span>
             </div>
             <div class="stat-item"><span class="stat-num" id="stat-done">0</span><span class="stat-label">已练习</span>
             </div>
@@ -41,33 +41,36 @@
             <div class="stat-item"><span class="stat-num" id="stat-wrong">0</span><span class="stat-label">错题数</span>
             </div>
           </div>
+          <div class="bank-actions">
+            <button class="text-btn" id="btn-reset-progress">清空当前题库进度</button>
+          </div>
         </div>
       </div>
 
       <div class="container">
         <div class="mode-grid">
-          <div class="mode-card" onclick="startMode('memorize')">
+          <div class="mode-card" data-mode="memorize">
             <div class="mode-icon">💡</div>
             <h3>背题模式</h3>
             <p>快速浏览 100 道题目及答案</p>
             <span class="mode-detail">高效记忆专用</span>
           </div>
-          <div class="mode-card" onclick="startMode('sequential')">
+          <div class="mode-card" data-mode="sequential">
             <div class="mode-icon">📖</div>
             <h3>顺序练习</h3>
             <p>按顺序逐题练习全部题目</p>
             <div class="mode-progress" id="seq-progress">
               <div class="mode-progress-bar" id="seq-progress-bar"></div>
             </div>
-            <span class="mode-detail" id="seq-detail">0 / 1924</span>
+            <span class="mode-detail" id="seq-detail">0 / 0</span>
           </div>
-          <div class="mode-card" onclick="startMode('exam')">
+          <div class="mode-card" data-mode="exam">
             <div class="mode-icon">📝</div>
             <h3>模拟考试</h3>
-            <p>100题限时60分钟模拟考试</p>
-            <span class="mode-detail">≥80分及格</span>
+            <p>100 题限时 60 分钟模拟考试</p>
+            <span class="mode-detail">≥ 80 分及格</span>
           </div>
-          <div class="mode-card" onclick="startMode('wrong')">
+          <div class="mode-card" data-mode="wrong">
             <div class="mode-icon">❌</div>
             <h3>错题回顾</h3>
             <p>重新练习之前做错的题</p>
@@ -77,16 +80,21 @@
 
         <div class="filter-section">
           <h2>按题型练习</h2>
-          <div class="filter-chips">
-            <button class="chip active" onclick="startMode('type', 0)">全部 <span>1924</span></button>
-            <button class="chip" onclick="startMode('type', 1)">单选题 <span>735</span></button>
-            <button class="chip" onclick="startMode('type', 2)">多选题 <span>359</span></button>
-            <button class="chip" onclick="startMode('type', 3)">判断题 <span>830</span></button>
+          <div class="filter-chips" id="filter-chips">
+            <button class="chip active" data-filter="all">全部 <span data-count="all">0</span></button>
+            <button class="chip" data-filter="single">单选题 <span data-count="single">0</span></button>
+            <button class="chip" data-filter="multi">多选题 <span data-count="multi">0</span></button>
+            <button class="chip" data-filter="judge">判断题 <span data-count="judge">0</span></button>
+            <button class="chip" id="chip-case" data-filter="case" style="display:none">案例分析题 <span data-count="case">0</span></button>
           </div>
+          <p class="filter-hint" id="filter-hint"></p>
         </div>
 
         <div class="history-section" id="history-section" style="display:none">
-          <h2>考试记录</h2>
+          <div class="history-head">
+            <h2>考试记录</h2>
+            <button class="text-btn" id="btn-clear-history">清空记录</button>
+          </div>
           <div id="history-list" class="history-list"></div>
         </div>
       </div>
@@ -95,15 +103,12 @@
     <!-- ========== 练习页 (单题) ========== -->
     <section id="practice-view" class="view">
       <header class="practice-header">
-        <button class="btn-back" onclick="goHome()">返回</button>
+        <button class="btn-back" id="btn-back-home">返回</button>
         <div class="practice-title" id="practice-title">模式名称</div>
-        <div style="display:flex; align-items:center; gap:10px;">
+        <div class="header-actions">
           <div class="practice-counter" id="practice-counter">1 / 50</div>
-          <button id="btn-header-finish" class="btn-primary"
-            style="padding: 4px 12px; font-size: 13px; background-color: #ef4444; border:none; border-radius: 6px; display:none;"
-            onclick="finishExam()">交卷</button>
+          <button id="btn-header-finish" class="btn-finish-header" style="display:none">交卷</button>
         </div>
-      </header>
       </header>
       <div class="exam-timer" id="exam-timer" style="display:none"><span id="timer-text">60:00</span></div>
       <div class="global-progress">
@@ -120,71 +125,73 @@
           <div id="result-analysis" class="mem-analysis"></div>
         </div>
         <div class="action-bar">
-          <button class="btn-action btn-prev btn-back" id="btn-prev" onclick="prevQuestion()">上一题</button>
-          <button class="btn-primary" id="btn-submit" onclick="submitAnswer()">确认答案</button>
-          <button class="btn-primary" id="btn-next" onclick="nextQuestion()">下一题</button>
+          <button class="btn-action btn-back" id="btn-prev">上一题</button>
+          <button class="btn-primary" id="btn-submit">确认答案</button>
+          <button class="btn-primary" id="btn-next">下一题</button>
         </div>
       </div>
-  </div>
 
-  <!-- 答题卡 -->
-  <button class="btn-card-toggle" id="btn-card-toggle" onclick="toggleAnswerCard()">卡</button>
-  <div class="answer-card-overlay" id="answer-card-overlay" onclick="toggleAnswerCard()"></div>
-  <div class="answer-card" id="answer-card">
-    <div class="card-header">
-      <h3>答题卡</h3><button onclick="toggleAnswerCard()">✕</button>
-    </div>
-    <div class="card-legend">
-      <span class="legend-item"><i class="dot dot-correct"></i>正确</span>
-      <span class="legend-item"><i class="dot dot-wrong"></i>错误</span>
-      <span class="legend-item"><i class="dot dot-current"></i>当前</span>
-      <span class="legend-item"><i class="dot dot-todo"></i>未答</span>
-    </div>
-    <div class="card-grid" id="card-grid"></div>
-    <div class="card-footer" id="card-footer"></div>
-  </div>
-  </section>
-
-  <!-- ========== 背题模式视图 (列表) ========== -->
-  <section id="memorize-view" class="view">
-    <header class="practice-header">
-      <button class="btn-back" onclick="goHome()">返回</button>
-      <div class="practice-title">背题模式 (随机100题)</div>
-      <button class="btn-back" onclick="startMode('memorize')">换一批</button>
-    </header>
-    <div class="container">
-      <div id="memorize-list" class="memorize-list"></div>
-      <div style="text-align:center; margin-top:40px;">
-        <button class="btn-primary" onclick="goHome()">已背完，返回首页</button>
+      <!-- 答题卡 -->
+      <button class="btn-card-toggle" id="btn-card-toggle" title="答题卡">卡</button>
+      <div class="answer-card-overlay" id="answer-card-overlay"></div>
+      <div class="answer-card" id="answer-card">
+        <div class="card-header">
+          <h3>答题卡</h3><button id="btn-card-close">✕</button>
+        </div>
+        <div class="card-legend">
+          <span class="legend-item"><i class="dot dot-correct"></i>正确</span>
+          <span class="legend-item"><i class="dot dot-wrong"></i>错误</span>
+          <span class="legend-item"><i class="dot dot-current"></i>当前</span>
+          <span class="legend-item"><i class="dot dot-todo"></i>未答</span>
+        </div>
+        <div class="card-grid" id="card-grid"></div>
+        <div class="card-footer" id="card-footer"></div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ========== 结果页 ========== -->
-  <section id="result-view" class="view">
-    <div class="result-page">
-      <div class="result-circle" id="result-circle">
-        <svg viewBox="0 0 120 120">
-          <circle cx="60" cy="60" r="54" fill="none" stroke="#e2e8f0" stroke-width="8" />
-          <circle id="result-ring" cx="60" cy="60" r="54" fill="none" stroke="#10b981" stroke-width="8"
-            stroke-linecap="round" stroke-dasharray="339.29" stroke-dashoffset="339.29" transform="rotate(-90 60 60)" />
-        </svg>
-        <div class="result-score" id="result-score">0</div>
-        <div class="result-label">分</div>
+    <!-- ========== 背题模式视图 (列表) ========== -->
+    <section id="memorize-view" class="view">
+      <header class="practice-header">
+        <button class="btn-back" data-action="home">返回</button>
+        <div class="practice-title">背题模式 (随机100题)</div>
+        <button class="btn-back" data-action="reroll">换一批</button>
+      </header>
+      <div class="container">
+        <div id="memorize-list" class="memorize-list"></div>
+        <div style="text-align:center; margin-top:40px;">
+          <button class="btn-primary" data-action="home">已背完，返回首页</button>
+        </div>
       </div>
-      <div class="result-verdict" id="result-verdict">及格</div>
-      <div class="result-stats" id="result-stats"></div>
-      <div class="result-actions">
-        <button class="btn-primary" onclick="goHome()">返回首页</button>
-        <button class="btn-back" onclick="reviewExam()">查看解析</button>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <div id="loading-overlay" class="loading-overlay">
-    <div class="loader"></div>
-    <p>正在加载题库...</p>
-  </div>
+    <!-- ========== 结果页 ========== -->
+    <section id="result-view" class="view">
+      <div class="result-page">
+        <div class="result-circle" id="result-circle">
+          <svg viewBox="0 0 120 120">
+            <circle cx="60" cy="60" r="54" fill="none" stroke="#e2e8f0" stroke-width="8" />
+            <circle id="result-ring" cx="60" cy="60" r="54" fill="none" stroke="#10b981" stroke-width="8"
+              stroke-linecap="round" stroke-dasharray="339.29" stroke-dashoffset="339.29"
+              transform="rotate(-90 60 60)" />
+          </svg>
+          <div class="result-score" id="result-score">0</div>
+          <div class="result-label">分</div>
+        </div>
+        <div class="result-verdict" id="result-verdict">及格</div>
+        <div class="result-stats" id="result-stats"></div>
+        <div class="result-actions">
+          <button class="btn-primary" id="btn-result-home">返回首页</button>
+          <button class="btn-back" id="btn-result-review">查看解析</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 全局通知 -->
+    <div id="toast" class="toast"></div>
+    <div id="loading-overlay" class="loading-overlay">
+      <div class="loader"></div>
+      <p>正在加载题库...</p>
+    </div>
   </div>
   <script src="{{ url_for('static', filename='js/exam.js') }}"></script>
 </body>

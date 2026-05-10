@@ -156,9 +156,20 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 10px; margin-bottom: 20px; }
 .card-cell { height: 40px; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: 2px solid transparent; }
 .card-cell:hover { background: #e2e8f0; }
-.card-cell.c-current { border-color: var(--primary); }
+.card-cell.c-current { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(59,130,246,0.18); }
 .card-cell.c-correct { background: #dcfce7; color: #166534; }
 .card-cell.c-wrong { background: #fee2e2; color: #991b1b; }
+.card-cell.c-answered { background: #e0e7ff; color: #3730a3; }
+.card-cell.c-todo { background: #f1f5f9; color: var(--text2); }
+
+/* 答题卡图例 */
+.card-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; font-size: 12px; color: var(--text2); }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 4px; border: 1px solid transparent; }
+.dot-correct { background: #dcfce7; border-color: #86efac; }
+.dot-wrong { background: #fee2e2; border-color: #fca5a5; }
+.dot-current { background: #fff; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
+.dot-todo { background: #f1f5f9; border-color: #cbd5e1; }
 
 /* ===== 结果页 ===== */
 .result-page { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: #fff; padding: 20px; }
@@ -187,6 +198,34 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 .result-msg { font-size: 18px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
 .correct-msg { color: var(--green); }
 .wrong-msg { color: var(--red); }
+
+/* 头部操作区 */
+.header-actions { display: flex; align-items: center; gap: 10px; }
+.practice-counter { font-size: 13px; color: var(--text2); font-weight: 600; }
+.btn-finish-header { padding: 6px 14px; font-size: 13px; background-color: var(--red); color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
+.btn-finish-header:hover { background-color: #dc2626; }
+
+/* 文本按钮 */
+.text-btn { background: transparent; border: none; color: var(--text3); font-size: 13px; cursor: pointer; text-decoration: underline; padding: 4px 8px; }
+.text-btn:hover { color: var(--red); }
+.bank-actions { margin-top: 16px; }
+.history-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.history-head h2 { margin-bottom: 0; }
+.filter-hint { margin-top: 12px; font-size: 12px; color: var(--text3); }
+
+/* Toast 通知 */
+.toast { position: fixed; top: 24px; left: 50%; transform: translateX(-50%) translateY(-120%); background: rgba(15,23,42,0.92); color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 500; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 9999; transition: transform 0.3s ease; max-width: 90vw; pointer-events: none; }
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.success { background: #059669; }
+.toast.error { background: #dc2626; }
+.toast.warn { background: #d97706; }
+
+/* 错题/单选题已答禁用样式 */
+.option-item.disabled { cursor: default; }
+.option-item.disabled:hover { background: #f8fafc; border-color: #e2e8f0; }
+.option-item.disabled.selected:hover { border-color: var(--primary); background: #eff6ff; }
+.option-item.disabled.correct:hover { background: #ecfdf5 !important; border-color: var(--green) !important; }
+.option-item.disabled.wrong:hover { background: #fef2f2 !important; border-color: var(--red) !important; }
 
 /* ===== 筛选区域 ===== */
 .filter-section { margin-top: 40px; padding-top: 30px; border-top: 1px solid var(--border); }
