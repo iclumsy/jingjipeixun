@@ -1846,17 +1846,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        // 体检表和报名申请表单独起一行
-        const docCardsRow = document.createElement('div');
-        docCardsRow.style.display = 'flex';
-        docCardsRow.style.flexWrap = 'wrap';
-        docCardsRow.style.gap = '15px';
-        docCardsRow.style.marginTop = '12px';
-        docCardsRow.style.padding = '10px 0';
-        let hasDocCards = false;
+        // 体检表和报名申请表追加到附件资料行末尾
 
         if ((student.status === 'reviewed' || student.status === 'registered') && student.training_form_path) {
-            hasDocCards = true;
             const healthCheckWrapper = document.createElement('div');
             healthCheckWrapper.className = 'file-item-wrapper';
             healthCheckWrapper.style.display = 'flex';
@@ -1954,7 +1946,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             };
             healthCheckWrapper.appendChild(regenBtn);
-            docCardsRow.appendChild(healthCheckWrapper);
+            filesContainer.appendChild(healthCheckWrapper);
         }
 
         // 已报名学员显示「报名申请表」独立下载卡片，按学员状态显示，不依赖当前筛选 tab
@@ -2046,13 +2038,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             regFormWrapper.appendChild(regFormBox);
             regFormWrapper.appendChild(regDownloadBtn);
-            hasDocCards = true;
-            docCardsRow.appendChild(regFormWrapper);
-        }
-
-        // 如果有文档卡片，将独立行插入到 filesContainer 之后
-        if (hasDocCards) {
-            filesContainer.parentNode.insertBefore(docCardsRow, filesContainer.nextSibling);
+            filesContainer.appendChild(regFormWrapper);
         }
 
         if (student.status === 'reviewed' || student.status === 'registered') {
@@ -2090,9 +2076,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (res.ok) {
                         const data = await res.json();
                         if (data.exists && data.materials && data.materials.length > 0) {
+                            // 过滤掉体检表（已在独立行显示）
+                            const filteredMaterials = data.materials.filter(mat => !mat.name.includes('体检表'));
+                            if (filteredMaterials.length > 0) {
                             materialsSection.style.display = 'block';
                             materialsContainer.innerHTML = '';
-                            data.materials.forEach(mat => {
+                            filteredMaterials.forEach(mat => {
                                 const wrapper = document.createElement('div');
                                 wrapper.style.display = 'flex';
                                 wrapper.style.flexDirection = 'column';
@@ -2149,6 +2138,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                                 materialsContainer.appendChild(wrapper);
                             });
+                            } else {
+                                materialsSection.style.display = 'none';
+                            }
                         } else {
                             materialsSection.style.display = 'none';
                         }

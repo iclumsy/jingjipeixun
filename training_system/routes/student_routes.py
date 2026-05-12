@@ -1020,7 +1020,11 @@ def update_student_route(id):
             student_name_for_notice = updates.get('name', current_student.get('name', ''))
             broadcast_new_student_to_admins(student_name_for_notice)
 
-        changed_fields = sorted([key for key in updates.keys() if key not in ('reject_reason',)])
+        changed_fields = sorted([
+            key for key in updates.keys()
+            if key not in ('reject_reason',) and
+            str(updates[key]).strip() != str(current_student.get(key, '') or '').strip()
+        ])
         log_student_operation(
             id,
             'student_resubmitted' if is_resubmitted else 'student_updated',
