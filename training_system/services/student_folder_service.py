@@ -51,21 +51,36 @@ class MigrationRollbackError(Exception):
 
 # ======================== 路径计算工具函数 ========================
 
+_TRAINING_TYPE_MAP = {
+    'special_operation': '特种作业',
+    'special_equipment': '特种设备',
+}
+
+
+def _training_type_to_chinese(training_type: str) -> str:
+    """将 training_type 英文代码转换为中文名称。
+
+    如果传入的已经是中文（如 '特种作业'），直接返回。
+    """
+    return _TRAINING_TYPE_MAP.get(training_type, training_type)
+
+
 def _compute_dir_name(training_type: str, company: str, name: str) -> str:
     """计算学员主目录名。
 
-    格式: '{培训类型}-{单位名称}-{姓名}'
+    格式: '{培训类型中文}-{单位名称}-{姓名}'
     示例: '特种作业-阳泉市公司-张三'
 
     参数:
-        training_type: 培训类型中文名
+        training_type: 培训类型（英文代码如 'special_operation' 或中文如 '特种作业'）
         company: 单位名称
         name: 学员姓名
 
     返回:
         str: 目录名
     """
-    return f"{training_type}-{company}-{name}"
+    training_type_name = _training_type_to_chinese(training_type)
+    return f"{training_type_name}-{company}-{name}"
 
 
 def _compute_file_prefix(id_card: str, name: str) -> str:
