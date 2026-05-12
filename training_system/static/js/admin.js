@@ -278,6 +278,40 @@ document.addEventListener('DOMContentLoaded', async () => {
             const actor = log.actor_name || '-';
             const source = log.actor_source || '';
             const message = log.message || '';
+
+            // 详情：修改学员资料时显示具体修改了哪些字段
+            let detailHtml = '';
+            const meta = log.metadata || {};
+            if ((log.action === 'student_updated' || log.action === 'student_resubmitted') && meta.changed_fields && meta.changed_fields.length) {
+                const fieldLabels = {
+                    name: '姓名', company: '单位', id_card: '身份证号', phone: '手机号',
+                    training_type: '培训类型', training_project_id: '培训项目',
+                    gender: '性别', education: '学历', school: '毕业院校', major: '专业',
+                    company_address: '单位地址', application_type: '报考类型',
+                    job_category: '作业类别', exam_project: '考试项目', project_code: '项目代码',
+                    photo_path: '个人照片', diploma_path: '学历证书',
+                    id_card_front_path: '身份证正面', id_card_back_path: '身份证反面',
+                    hukou_residence_path: '户口本户籍页', hukou_personal_path: '户口本个人页',
+                    certificate_info_page_path: '原证件信息页', certificate_records_page_path: '原证件记录页',
+                    training_form_path: '体检表',
+                };
+                const labels = meta.changed_fields.map(f => fieldLabels[f] || f);
+                detailHtml = `<div style="margin-top:4px;color:#6366F1;font-size:11px;line-height:1.5;">修改: ${escapeHtml(labels.join('、'))}</div>`;
+            }
+            // 详情：报名材料调整时显示具体调整了哪个材料
+            if ((log.action === 'material_manual_cropped' || log.action === 'material_regenerated') && meta.material_type) {
+                const materialLabels = {
+                    photo: '个人照片', diploma: '学历证书',
+                    id_card_front: '身份证正面', id_card_back: '身份证反面',
+                    id_card: '身份证(合并)', hukou: '户口本(合并)',
+                    hukou_residence: '户口本户籍页', hukou_personal: '户口本个人页',
+                    training_form: '体检表',
+                };
+                const matLabel = materialLabels[meta.material_type] || meta.material_type;
+                const method = log.action === 'material_manual_cropped' ? '手工裁剪' : '重新生成';
+                detailHtml = `<div style="margin-top:4px;color:#6366F1;font-size:11px;line-height:1.5;">材料: ${escapeHtml(matLabel)}（${method}）</div>`;
+            }
+
             return `
                 <div style="display:grid;grid-template-columns:120px 1fr;gap:14px;padding:12px 0;border-bottom:1px solid #E2E8F0;">
                     <div style="color:#64748B;font-size:12px;line-height:1.5;">${escapeHtml(formatOperationTime(log.created_at))}</div>
@@ -287,6 +321,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <span style="font-size:11px;color:${statusColor};background:${status === 'fail' ? '#FEF2F2' : (status === 'warning' ? '#FFFBEB' : '#ECFDF5')};border-radius:999px;padding:1px 8px;">${escapeHtml(status)}</span>
                         </div>
                         <div style="margin-top:4px;color:#64748B;font-size:12px;line-height:1.5;">${escapeHtml(actor)}${source ? ` · ${escapeHtml(source)}` : ''}</div>
+                        ${detailHtml}
                         ${message ? `<div style="margin-top:5px;color:#334155;font-size:12px;line-height:1.55;word-break:break-word;">${escapeHtml(message)}</div>` : ''}
                     </div>
                 </div>
@@ -1811,7 +1846,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
+        // 体检表和报名申请表单独起一行
+        const docCardsRow = document.createElement('div');
+        docCardsRow.style.display = 'flex';
+        docCardsRow.style.flexWrap = 'wrap';
+        docCardsRow.style.gap = '15px';
+        docCardsRow.style.marginTop = '12px';
+        docCardsRow.style.padding = '10px 0';
+        let hasDocCards = false;
+
         if ((student.status === 'reviewed' || student.status === 'registered') && student.training_form_path) {
+            hasDocCards = true;
             const healthCheckWrapper = document.createElement('div');
             healthCheckWrapper.className = 'file-item-wrapper';
             healthCheckWrapper.style.display = 'flex';
@@ -1909,7 +1954,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             };
             healthCheckWrapper.appendChild(regenBtn);
-            filesContainer.appendChild(healthCheckWrapper);
+            docCardsRow.appendChild(healthCheckWrapper);
         }
 
         // 已报名学员显示「报名申请表」独立下载卡片，按学员状态显示，不依赖当前筛选 tab
@@ -2001,7 +2046,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             regFormWrapper.appendChild(regFormBox);
             regFormWrapper.appendChild(regDownloadBtn);
-            filesContainer.appendChild(regFormWrapper);
+            hasDocCards = true;
+            docCardsRow.appendChild(regFormWrapper);
+        }
+
+        // 如果有文档卡片，将独立行插入到 filesContainer 之后
+        if (hasDocCards) {
+            filesContainer.parentNode.insertBefore(docCardsRow, filesContainer.nextSibling);
         }
 
         if (student.status === 'reviewed' || student.status === 'registered') {
@@ -2122,7 +2173,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <h4 style="margin:0;color:#0F172A;font-size:15px;">操作记录</h4>
                     <button type="button" class="btn" style="padding:4px 12px;font-size:12px;background:#F8FAFC;color:#334155;border:1px solid #CBD5E1;">刷新</button>
                 </div>
-                <div class="operation-log-list"></div>
+                <div class="operation-log-list" style="max-height:320px;overflow-y:auto;padding-right:4px;"></div>
             `;
             const operationList = operationSection.querySelector('.operation-log-list');
             const refreshLogBtn = operationSection.querySelector('button');
