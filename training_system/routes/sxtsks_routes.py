@@ -62,6 +62,11 @@ def _get_student_photo_path(student, base_dir):
         os.close(tmp_fd)
         if storage_service.download_to_file(photo_path, tmp_path):
             return tmp_path
+        # 下载失败，清理空临时文件
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
 
     return None
 
@@ -305,167 +310,108 @@ def download_form(bmid):
                 pdf_filename = f"{id_card}-{name}-报名申请表.pdf"
 
         # ----------------------------
-        # 每次下载都前往网站获取 HTML 处理，不读取或写入本地 PDF 缓存
+        # 离线渲染策略：
+        # - 学员已有水印号 → 完全离线（DB 字段 + 本地模板 + 本地照片）
+        # - 没有水印号 → 访问省网一次，提取水印号入库，之后永久离线
         # ----------------------------
-        step_logs.append('正在连接省平台抓取最新报名申请表数据...')
-        current_app.logger.info(f'{student_label} 前往平台抓取最新报名申请表数据 (BMID: {bmid})...')
-        client = _get_client()
-        content, content_type, filename = client.download_application_form(bmid, sfzh=student.get('id_card', '') if student else '')
+        from services.sxtsks_form_renderer import (
+            render_application_form_pdf,
+            extract_watermark_text,
+        )
+        from models.student import update_student
 
-        # 检测平台是否返回了错误页面（session 失效或权限问题）
-        _error_keywords = ['错误，请联系网络管理员', '很抱歉', '请重新登录', '会话已过期', '登录超时', '如有疑问请联系管理员']
-        _content_text = content.decode('utf-8', errors='ignore') if isinstance(content, bytes) else str(content)
-        if any(kw in _content_text for kw in _error_keywords):
-            step_logs.append('平台返回错误页面，尝试重新登录后重试...')
-            current_app.logger.warning(f'{student_label} 平台返回错误页面，内容前500字: {_content_text[:500]}')
-            # 强制重新登录
-            client.logged_in = False
-            login_result = client.login()
-            current_app.logger.info(f'{student_label} 重新登录结果: {login_result}')
-            if not login_result.get('success'):
-                error_msg = f'省平台重新登录失败: {login_result.get("message", "未知原因")}'
-                step_logs.append(error_msg)
-                current_app.logger.error(f'{student_label} {error_msg}')
-                if student_id:
-                    log_student_operation(
-                        student_id,
-                        'registration_form_downloaded',
-                        '下载报名申请表',
-                        status='fail',
-                        message=error_msg,
-                        metadata={'bmid': bmid}
-                    )
-                return jsonify({'success': False, 'message': error_msg}), 502
-            # 重试一次
-            content, content_type, filename = client.download_application_form(bmid, sfzh=student.get('id_card', '') if student else '')
+        watermark_text = (student or {}).get('sxtsks_watermark', '') or ''
+
+        if not watermark_text:
+            step_logs.append('首次生成，连接省网获取水印号...')
+            current_app.logger.info(f'{student_label} 首次生成，前往省网抓取水印号 (BMID: {bmid})...')
+            client = _get_client()
+            content, _content_type, _filename = client.download_application_form(
+                bmid, sfzh=student.get('id_card', '') if student else ''
+            )
+
+            # 检测平台是否返回了错误页面（session 失效或权限问题）
+            _error_keywords = ['错误，请联系网络管理员', '很抱歉', '请重新登录', '会话已过期', '登录超时', '如有疑问请联系管理员']
             _content_text = content.decode('utf-8', errors='ignore') if isinstance(content, bytes) else str(content)
             if any(kw in _content_text for kw in _error_keywords):
-                error_msg = '省平台返回错误页面，重新登录后仍然失败，请稍后重试或联系管理员'
+                step_logs.append('平台返回错误页面，尝试重新登录后重试...')
+                current_app.logger.warning(f'{student_label} 平台返回错误页面，内容前500字: {_content_text[:500]}')
+                client.logged_in = False
+                login_result = client.login()
+                current_app.logger.info(f'{student_label} 重新登录结果: {login_result}')
+                if not login_result.get('success'):
+                    error_msg = f'省平台重新登录失败: {login_result.get("message", "未知原因")}'
+                    step_logs.append(error_msg)
+                    current_app.logger.error(f'{student_label} {error_msg}')
+                    if student_id:
+                        log_student_operation(
+                            student_id,
+                            'registration_form_downloaded',
+                            '下载报名申请表',
+                            status='fail',
+                            message=error_msg,
+                            metadata={'bmid': bmid}
+                        )
+                    return jsonify({'success': False, 'message': error_msg}), 502
+                content, _content_type, _filename = client.download_application_form(
+                    bmid, sfzh=student.get('id_card', '') if student else ''
+                )
+                _content_text = content.decode('utf-8', errors='ignore') if isinstance(content, bytes) else str(content)
+                if any(kw in _content_text for kw in _error_keywords):
+                    error_msg = '省平台返回错误页面，重新登录后仍然失败，请稍后重试或联系管理员'
+                    step_logs.append(error_msg)
+                    current_app.logger.error(f'{student_label} {error_msg}，重试后内容前500字: {_content_text[:500]}')
+                    if student_id:
+                        log_student_operation(
+                            student_id,
+                            'registration_form_downloaded',
+                            '下载报名申请表',
+                            status='fail',
+                            message=error_msg,
+                            metadata={'bmid': bmid}
+                        )
+                    return jsonify({'success': False, 'message': error_msg}), 502
+
+            html_text = content.decode('utf-8', errors='replace')
+            watermark_text = extract_watermark_text(html_text)
+            if not watermark_text:
+                error_msg = '未能从省网申请表中解析到水印号'
                 step_logs.append(error_msg)
-                current_app.logger.error(f'{student_label} {error_msg}，重试后内容前500字: {_content_text[:500]}')
-                if student_id:
-                    log_student_operation(
-                        student_id,
-                        'registration_form_downloaded',
-                        '下载报名申请表',
-                        status='fail',
-                        message=error_msg,
-                        metadata={'bmid': bmid}
-                    )
+                current_app.logger.error(f'{student_label} {error_msg}')
                 return jsonify({'success': False, 'message': error_msg}), 502
 
-        step_logs.append('平台数据获取成功，正在注入排版规则...')
-        current_app.logger.info(f'{student_label} 平台数据源获取成功，准备注入离线排版规则...')
+            step_logs.append(f'水印号已获取并入库: {watermark_text}')
+            current_app.logger.info(f'{student_label} 水印号解析成功: {watermark_text}')
+            if student_id and student is not None:
+                try:
+                    update_student(student_id, {
+                        'sxtsks_bmid': str(bmid),
+                        'sxtsks_watermark': watermark_text,
+                    })
+                    student['sxtsks_watermark'] = watermark_text
+                    student['sxtsks_bmid'] = str(bmid)
+                except Exception as ue:
+                    current_app.logger.warning(f'{student_label} 水印号写入数据库失败: {ue}')
+        else:
+            step_logs.append('使用本地缓存水印号，跳过省网访问')
+            current_app.logger.info(f'{student_label} 使用缓存水印号 {watermark_text}，本地渲染申请表')
 
-        # 解码平台 HTML
-        html = content.decode('utf-8', errors='replace')
-
-        # 修正图片相对路径
-        html = html.replace("src='image.do", "src='http://www.sxtsks.com/image.do")
-        html = html.replace('src="image.do', 'src="http://www.sxtsks.com/image.do')
-
-        # 清理 weasyprint 无法处理的外部引用和 JS
-        import re as _re
-        html = _re.sub(r'<link[^>]+href=["\']css/[^"\']+["\'][^>]*/?\s*>', '', html)
-        html = _re.sub(r'<script[^>]+src=["\'][^"\']+["\'][^>]*>\s*</script>', '', html)
-        html = _re.sub(r'<script[\s\S]*?</script>', '', html)
-        html = html.replace('onLoad="loadpage()"', '')
-        html = html.replace('class="noprint"', 'class="noprint" style="display:none"')
-
-        # 删除原始 style 块，用精准复刻的样式替代
-        html = _re.sub(r'<style type="text/css">\s*body\{.*?</style>', '', html, flags=_re.S)
-        html = _re.sub(r'<style type="text/css" media="print">.*?</style>', '', html, flags=_re.S)
-
-        # 去掉固定像素宽度，交给 CSS 自动布局（避免右边框被截断和身份证折行）
-        html = html.replace('width="650"', '')
-        html = html.replace('width="650px"', '')
-        
-        # 核心修复：将平台原始表格类名替换为下方 CSS 定义的类名
-        html = html.replace('class="blodside"', 'class="tbsd"')
-
-        # 构建字体文件的绝对路径（用于 @font-face url()）
+        # 本地模板渲染 PDF（DB 字段 + 本地照片 + 已记录的水印号）
+        step_logs.append('本地模板正在渲染 PDF...')
         base_dir = _get_base_dir()
-        font_path = os.path.join(base_dir, 'static', 'fonts', 'NotoSansSC-Regular.ttf')
-        font_url = f'file://{font_path}'
+        photo_abs_path = _get_student_photo_path(student, base_dir) if student else None
 
-        # ========== 体检打勾修正 ==========
-        # 平台默认对所有项目都在"体检"栏打勾，但实际只有叉车司机(N1)和锅炉水处理(G3)需要
-        # 与 document_service.HEALTH_CHECK_PROJECT_CODES 保持一致
-        needs_health = False
-        if student:
-            from services.document_service import needs_health_check as _needs_hc
-            needs_health, _ = _needs_hc(
-                student.get('exam_project', ''),
-                student.get('project_code', '')
+        try:
+            pdf_bytes = render_application_form_pdf(
+                student or {}, watermark_text, photo_abs_path=photo_abs_path
             )
-        if not needs_health:
-            # 将体检行的 √/☑/■ 替换为 □（不勾选）
-            html = _re.sub(r'(体检[^<]{0,20})(√|☑|■)', r'\1□', html)
-            step_logs.append('非体检项目，已取消体检栏打勾')
+        except Exception as re_e:
+            current_app.logger.error(f'{student_label} 本地渲染 PDF 失败: {re_e}', exc_info=True)
+            return jsonify({'success': False, 'message': f'渲染 PDF 失败: {re_e}'}), 500
 
-        # 注入精确匹配原版 PDF 的 CSS（含嵌入中文字体）
-        inject_css = f"""<style>
-@font-face {{
-  font-family: "NotoSansSC";
-  src: url("{font_url}") format("truetype");
-  font-weight: normal;
-  font-style: normal;
-}}
-@page {{ size: A4; margin: 15mm 12mm 15mm 15mm; }}
-body {{ font-size:12pt; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; margin:0; padding:0; }}
-.tit1 {{ padding:0 0 10px 0; line-height:36pt; text-align:center; font-size:18pt; font-weight:normal;
-        font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; }}
-.tbsd {{ border:2px solid #000; width:100%; max-width:100%; border-collapse:collapse; margin:0 auto; table-layout:fixed; box-sizing:border-box; overflow:hidden; }}
-.tbsd tr:first-child td:nth-child(1) {{ width: 20%; }}
-.tbsd tr:first-child td:nth-child(2) {{ width: 32%; }}
-.tbsd tr:first-child td:nth-child(3) {{ width: 15%; }}
-.tbsd tr:first-child td:nth-child(4) {{ width: 15%; }}
-.tbsd tr:first-child td:nth-child(5) {{ width: 18%; }}
-.tbsd td {{ font-size:12pt; padding:6px 4px; line-height:16pt; border:1px solid #000;
-           font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; word-break:break-all; vertical-align:middle; box-sizing:border-box; }}
-.tbsd tr td:last-child {{ border-right:none !important; }}
-.tbsd td[colspan] {{ border-right:none !important; }}
-.tbsd td p {{ font-size:12pt; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; margin:0; }}
-td[height="84"] {{ height:64pt; }}
-td[height="115"] {{ height:85pt; }}
-table {{ width:100%; max-width:100%; border-collapse:collapse; box-sizing:border-box; }}
-img {{ max-width:86px; max-height:125px; display:block; margin:0 auto; }}
-.noprint,.Noprint {{ display:none !important; }}
-input[type="hidden"] {{ display:none; }}
-strong {{ font-weight:bold; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; font-size:9pt; }}
-div[align="right"] {{ font-size:9pt; text-align:right; margin-right:20px; }}
-div[align="left"] {{ font-size:9pt; text-align:left; margin-left:10px; }}
-* {{ font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif !important; }}
-</style>"""
-        html = html.replace('</head>', inject_css + '</head>')
-
-        # 从原始 HTML 中提取身份证计算性别，如果原有性别为空则填上
-        id_card_match = _re.search(r'身份证件号\s*</td>\s*<td[^>]*>\s*([0-9X]{18})', html, _re.I)
-        if id_card_match:
-            try:
-                card = id_card_match.group(1)
-                gender_char = card[16:17]
-                gender_str = '女' if int(gender_char) % 2 == 0 else '男'
-                html = _re.sub(r'(>性别\s*</td>\s*<td[^>]*>)\s*&nbsp;\s*</td>', f'\\g<1>{gender_str}</td>', html)
-            except Exception:
-                pass
-
-        # 从原始 HTML 中提取水印文字
-        watermark_match = _re.search(r"watermark\.innerText\s*=\s*'([^']+)'", content.decode('utf-8', errors='replace'))
-        watermark_text = watermark_match.group(1) if watermark_match else '山西省特种设备作业人员考核管理平台'
-
-        # 原版水印：调整为底层显示 (z-index:-10)，从 body 顶部注入使其渲染在文字下方
-        watermark_html = f'<div style="position:fixed; top:105mm; left:15mm; font-size:20pt; font-family:PingFang SC,Microsoft YaHei,sans-serif; color:#a1a1ab; white-space:nowrap; z-index:-10;">{watermark_text}</div>'
-        html = _re.sub(r'(<body[^>]*>)', r'\1' + watermark_html, html, count=1)
-
-        # weasyprint 转 PDF
-        step_logs.append('正在调用 WeasyPrint 渲染 PDF 文件...')
-        current_app.logger.info(f'{student_label} 准备调用 WeasyPrint 将 HTML 排版为保真 PDF 文件...')
-        import weasyprint
-        pdf_bytes = weasyprint.HTML(string=html).write_pdf()
         pdf_size_kb = len(pdf_bytes) // 1024
         step_logs.append(f'PDF 渲染完成，文件大小 {pdf_size_kb} KB')
-        current_app.logger.info(f'{student_label} PDF 转换生成完毕，最终大小缩略约为 {pdf_size_kb} KB')
+        current_app.logger.info(f'{student_label} PDF 渲染完毕，大小约 {pdf_size_kb} KB')
 
         if mode == 'generate':
             step_logs.append('PDF 生成完毕（未缓存）')

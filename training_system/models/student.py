@@ -222,6 +222,9 @@ def init_db(database_path):
         _ensure_column_exists(conn, 'students', 'reject_reason', 'reject_reason TEXT')
         _ensure_column_exists(conn, 'students', 'card_activated', 'card_activated INTEGER DEFAULT 0')
         _ensure_column_exists(conn, 'students', 'card_activated_at', 'card_activated_at TEXT')
+        # 省网报名 ID 与申请表水印号：首次下载省网申请表时记录，之后离线渲染不再访问省网
+        _ensure_column_exists(conn, 'students', 'sxtsks_bmid', 'sxtsks_bmid TEXT')
+        _ensure_column_exists(conn, 'students', 'sxtsks_watermark', 'sxtsks_watermark TEXT')
 
         # 创建高级字典表
         conn.execute('''

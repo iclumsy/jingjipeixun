@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>特种设备作业人员资格申请表</title>
+<style>
+@font-face {
+  font-family: "NotoSansSC";
+  src: url("{{ font_url }}") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+@page { size: A4; margin: 15mm 12mm 15mm 15mm; }
+body { font-size: 12pt; font-family: "NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; margin: 0; padding: 0; position: relative; }
+* { font-family: "NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif !important; }
+
+.tit1 { padding: 0 0 10px 0; line-height: 36pt; text-align: center; font-size: 18pt; font-weight: normal; }
+
+table.tbsd { border: 2px solid #000; width: 100%; max-width: 100%; border-collapse: collapse; margin: 0 auto; table-layout: fixed; box-sizing: border-box; }
+.tbsd tr:first-child td:nth-child(1) { width: 20%; }
+.tbsd tr:first-child td:nth-child(2) { width: 32%; }
+.tbsd tr:first-child td:nth-child(3) { width: 15%; }
+.tbsd tr:first-child td:nth-child(4) { width: 15%; }
+.tbsd tr:first-child td:nth-child(5) { width: 18%; }
+.tbsd td { font-size: 12pt; padding: 6px 4px; line-height: 16pt; border: 1px solid #000; word-break: break-all; vertical-align: middle; box-sizing: border-box; }
+.tbsd td p { font-size: 12pt; margin: 0; }
+
+/* 照片：固定 1 寸比例物理尺寸 (≈86:125)，object-fit cover 防变形 */
+img.photo {
+  width: 28mm;
+  height: 40mm;
+  object-fit: cover;
+  display: block;
+  margin: 0 auto;
+}
+
+/* 照片格留 1mm padding 作为照片和表格的间隙 */
+td.photo-cell { padding: 1mm !important; text-align: center; vertical-align: middle; }
+
+strong { font-weight: bold; font-size: 9pt; }
+.declare { font-size: 9pt; text-align: left; margin-left: 10px; }
+.sign-line { font-size: 9pt; text-align: right; padding-right: 20px; }
+
+.watermark {
+  position: fixed; top: 105mm; left: 15mm;
+  font-size: 20pt;
+  color: #a1a1ab;
+  white-space: nowrap;
+  z-index: -10;
+}
+
+.footer-note { width: 100%; margin-top: 6px; font-size: 11pt; text-align: left; }
+</style>
+</head>
+
+<body>
+<div class="watermark">{{ watermark_text }}</div>
+
+<table style="width:100%; margin:0 auto;" border="0" cellpadding="0" cellspacing="0">
+  <tr><td class="tit1">特种设备作业人员资格申请表</td></tr>
+</table>
+
+<table align="center" cellpadding="0" cellspacing="0" class="tbsd">
+  <tr>
+    <td>姓名</td>
+    <td>{{ name }}&nbsp;</td>
+    <td>性别</td>
+    <td>{{ gender }}&nbsp;</td>
+    <td rowspan="4" class="photo-cell">
+      {% if photo_url %}<img class="photo" src="{{ photo_url }}" />{% endif %}
+    </td>
+  </tr>
+  <tr>
+    <td>身份证件号</td>
+    <td>{{ id_card }}&nbsp;</td>
+    <td>文化程度</td>
+    <td>{{ education_display }}&nbsp;</td>
+  </tr>
+  <tr>
+    <td>工作单位</td>
+    <td colspan="3">{{ company }}&nbsp;</td>
+  </tr>
+  <tr>
+    <td>工作单位地址</td>
+    <td colspan="3">{{ company_address }}&nbsp;</td>
+  </tr>
+  <tr>
+    <td>通信地址</td>
+    <td colspan="4">{{ mailing_address }}&nbsp;</td>
+  </tr>
+  <tr>
+    <td>邮编</td>
+    <td>{{ postal_code }}&nbsp;</td>
+    <td>联系电话</td>
+    <td colspan="2">{{ phone }}&nbsp;</td>
+  </tr>
+  <tr>
+    <td>申请作业项目</td>
+    <td>{{ exam_project }}&nbsp;</td>
+    <td>申请项目代号</td>
+    <td colspan="2">{{ project_code }}&nbsp;</td>
+  </tr>
+  <tr>
+    <td style="height:64pt;">工作简历</td>
+    <td colspan="4">{{ work_history }}&nbsp;</td>
+  </tr>
+  <tr>
+    <td style="height:85pt;">相关资料</td>
+    <td colspan="4">
+      ■身份证明(复印件)1份<br>
+      ■学历证明(毕业证复印件1份)<br>
+      {{ '■' if needs_health else '□' }}体检报告(1份，相应考核大纲有要求的)<br>
+      □申请表扫描件<br>
+      □劳动合同或社保证明（适用时）<br>
+    </td>
+  </tr>
+  <tr>
+    <td>用人单位意见</td>
+    <td colspan="4">
+      （申请人在非户籍工作所在地申请时需填写本栏）<br>
+      <br>
+      <br>
+      用人单位(加盖公章)：&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;日期：
+    </td>
+  </tr>
+  <tr>
+    <td colspan="5" style="line-height: 25px">
+      <div class="declare"><strong>本人声明，以上填写信息及所提交的资料均合法、真实、有效，并承诺对填写的内容负责。</strong></div>
+      <div class="sign-line">
+        申请人(签字)：&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;日期：
+        {{ apply_date }}
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="footer-note" border="0" cellpadding="0" cellspacing="0">
+  <tr><td>注：申请人在网上申请的，填报申请表后打印盖章签字并扫描上传。</td></tr>
+</table>
+
+</body>
+</html>
