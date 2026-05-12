@@ -79,7 +79,13 @@ def export_excel():
         # 逐行写入学员数据（从第2行开始）
         for row_num, student in enumerate(students, 2):
             # 将数据库状态值转换为中文显示
-            status_text = '已审核' if student['status'] == 'reviewed' else '未审核'
+            status_map = {
+                'reviewed': '已审核',
+                'unreviewed': '未审核',
+                'rejected': '已驳回',
+                'registered': '已报名'
+            }
+            status_text = status_map.get(student['status'], student['status'] or '未知')
 
             data = [
                 student['id'],

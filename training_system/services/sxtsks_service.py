@@ -462,6 +462,9 @@ class SxtsksClient:
             # 302 重定向到登录页说明 cookie 已失效
             if r.status_code == 302 or 'login' in r.headers.get('Location', '').lower():
                 return False
+            # 响应中包含错误提示说明 session 异常
+            if '错误' in r.text and '网络管理员' in r.text:
+                return False
             # 页面中有 userid 说明有效
             if self.userid and self.userid in r.text:
                 return True
@@ -1127,12 +1130,13 @@ class SxtsksClient:
             logger.error(f'解析报名列表失败: {e}')
             return []
 
-    def download_application_form(self, bmid):
+    def download_application_form(self, bmid, sfzh=''):
         """
         下载申请表 PDF/HTML。
 
         参数:
             bmid: 报名 ID
+            sfzh: 学员身份证号（保留参数，当前未使用）
 
         返回:
             tuple: (content_bytes, content_type, filename)
@@ -1209,7 +1213,7 @@ class SxtsksClient:
 
         # 3. 下载申请表
         try:
-            content, content_type, filename = self.download_application_form(bmid)
+            content, content_type, filename = self.download_application_form(bmid, sfzh=submitted_sfzh)
             self._log_step('下载申请表', 'ok', f'bmid={bmid}, 文件={filename}, 大小={len(content)} 字节')
             result = {
                 'success': True,

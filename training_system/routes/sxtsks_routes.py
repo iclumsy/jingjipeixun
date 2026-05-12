@@ -310,7 +310,50 @@ def download_form(bmid):
         step_logs.append('正在连接省平台抓取最新报名申请表数据...')
         current_app.logger.info(f'{student_label} 前往平台抓取最新报名申请表数据 (BMID: {bmid})...')
         client = _get_client()
-        content, content_type, filename = client.download_application_form(bmid)
+        content, content_type, filename = client.download_application_form(bmid, sfzh=student.get('id_card', '') if student else '')
+
+        # 检测平台是否返回了错误页面（session 失效或权限问题）
+        _error_keywords = ['错误，请联系网络管理员', '很抱歉', '请重新登录', '会话已过期', '登录超时', '如有疑问请联系管理员']
+        _content_text = content.decode('utf-8', errors='ignore') if isinstance(content, bytes) else str(content)
+        if any(kw in _content_text for kw in _error_keywords):
+            step_logs.append('平台返回错误页面，尝试重新登录后重试...')
+            current_app.logger.warning(f'{student_label} 平台返回错误页面，内容前500字: {_content_text[:500]}')
+            # 强制重新登录
+            client.logged_in = False
+            login_result = client.login()
+            current_app.logger.info(f'{student_label} 重新登录结果: {login_result}')
+            if not login_result.get('success'):
+                error_msg = f'省平台重新登录失败: {login_result.get("message", "未知原因")}'
+                step_logs.append(error_msg)
+                current_app.logger.error(f'{student_label} {error_msg}')
+                if student_id:
+                    log_student_operation(
+                        student_id,
+                        'registration_form_downloaded',
+                        '下载报名申请表',
+                        status='fail',
+                        message=error_msg,
+                        metadata={'bmid': bmid}
+                    )
+                return jsonify({'success': False, 'message': error_msg}), 502
+            # 重试一次
+            content, content_type, filename = client.download_application_form(bmid, sfzh=student.get('id_card', '') if student else '')
+            _content_text = content.decode('utf-8', errors='ignore') if isinstance(content, bytes) else str(content)
+            if any(kw in _content_text for kw in _error_keywords):
+                error_msg = '省平台返回错误页面，重新登录后仍然失败，请稍后重试或联系管理员'
+                step_logs.append(error_msg)
+                current_app.logger.error(f'{student_label} {error_msg}，重试后内容前500字: {_content_text[:500]}')
+                if student_id:
+                    log_student_operation(
+                        student_id,
+                        'registration_form_downloaded',
+                        '下载报名申请表',
+                        status='fail',
+                        message=error_msg,
+                        metadata={'bmid': bmid}
+                    )
+                return jsonify({'success': False, 'message': error_msg}), 502
+
         step_logs.append('平台数据获取成功，正在注入排版规则...')
         current_app.logger.info(f'{student_label} 平台数据源获取成功，准备注入离线排版规则...')
 
@@ -372,7 +415,7 @@ def download_form(bmid):
 body {{ font-size:12pt; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; margin:0; padding:0; }}
 .tit1 {{ padding:0 0 10px 0; line-height:36pt; text-align:center; font-size:18pt; font-weight:normal;
         font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; }}
-.tbsd {{ border:2px solid #000; width:100%; max-width:100%; border-collapse:collapse; margin:0 auto; table-layout:fixed; box-sizing:border-box; }}
+.tbsd {{ border:2px solid #000; width:100%; max-width:100%; border-collapse:collapse; margin:0 auto; table-layout:fixed; box-sizing:border-box; overflow:hidden; }}
 .tbsd tr:first-child td:nth-child(1) {{ width: 20%; }}
 .tbsd tr:first-child td:nth-child(2) {{ width: 32%; }}
 .tbsd tr:first-child td:nth-child(3) {{ width: 15%; }}
@@ -380,7 +423,8 @@ body {{ font-size:12pt; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei"
 .tbsd tr:first-child td:nth-child(5) {{ width: 18%; }}
 .tbsd td {{ font-size:12pt; padding:6px 4px; line-height:16pt; border:1px solid #000;
            font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; word-break:break-all; vertical-align:middle; box-sizing:border-box; }}
-.tbsd td[colspan], .tbsd td:last-child {{ border-right:2px solid #000 !important; }}
+.tbsd tr td:last-child {{ border-right:none !important; }}
+.tbsd td[colspan] {{ border-right:none !important; }}
 .tbsd td p {{ font-size:12pt; font-family:"NotoSansSC","PingFang SC","Microsoft YaHei",sans-serif; margin:0; }}
 td[height="84"] {{ height:64pt; }}
 td[height="115"] {{ height:85pt; }}

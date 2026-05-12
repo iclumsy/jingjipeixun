@@ -293,7 +293,7 @@ def activate_card_for_student(student_dict):
     提供给路由层的上层调用封装：
     从登录到完整流程开卡，返回外部系统的 message 提示。
     """
-    student_id = student_dict.get("_id")
+    student_id = student_dict.get("id") or student_dict.get("_id")
     job_cat = student_dict.get("job_category")
     exam_proj = student_dict.get("exam_project")
     
