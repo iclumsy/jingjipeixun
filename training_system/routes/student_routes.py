@@ -36,6 +36,7 @@ from models.student import (
 )
 from services.wechat_service import send_review_result_message, broadcast_new_student_to_admins
 from services.image_service import process_and_save_file, delete_student_files
+from services.student_folder_service import migrate_student_files, MigrationError, MigrationRollbackError
 from services.document_service import generate_health_check_form
 from services import storage_service
 from services.operation_log_service import get_student_operation_logs, log_student_operation
@@ -717,6 +718,66 @@ def get_student_operation_logs_route(id):
         return build_internal_error_response('加载操作记录失败，请稍后重试')
 
 
+# ======================== 关键字段变更检测 ========================
+
+KEY_FIELDS = ('training_type', 'company', 'name', 'id_card')
+
+
+def _detect_key_field_changes(current_student, updates):
+    """
+    检测关键字段是否发生实际变化（trim 后比较）。
+
+    注意：如果 training_type 的变化来源于 training_project_id 联动，
+    则不视为"管理员直接修改"，不触发迁移。
+
+    参数:
+        current_student: 当前数据库中的学员记录 dict
+        updates: 本次请求中要更新的字段 dict
+
+    返回:
+        (old_fields, new_fields) 或 (None, None) 表示无需迁移
+        old_fields/new_fields 包含所有 4 个关键字段的值（路径计算需要全部字段）
+    """
+    has_actual_change = False
+
+    # 判断 training_type 是否因 training_project_id 联动产生
+    training_type_is_linked = 'training_project_id' in updates
+
+    old_fields = {}
+    new_fields = {}
+
+    for field in KEY_FIELDS:
+        old_val = (current_student.get(field, '') or '').strip()
+        old_fields[field] = old_val
+
+        if field in updates:
+            new_val = (updates.get(field, '') or '').strip()
+        else:
+            # 字段不在 updates 中，沿用旧值
+            new_val = old_val
+
+        new_fields[field] = new_val
+
+        # 判断该字段是否实际变化
+        if field not in updates:
+            continue  # 未提交该字段，不算变化
+
+        if old_val == new_val:
+            continue  # trim 后相同，不算变化
+
+        # training_type 联动排除：如果 updates 中有 training_project_id，
+        # 则 training_type 的变化视为联动产生，不触发迁移
+        if field == 'training_type' and training_type_is_linked:
+            continue
+
+        has_actual_change = True
+
+    if not has_actual_change:
+        return (None, None)
+
+    return (old_fields, new_fields)
+
+
 @student_bp.route('/api/students/<int:id>', methods=['PUT', 'PATCH'])
 def update_student_route(id):
     """
@@ -921,6 +982,22 @@ def update_student_route(id):
         if current_student.get('status') == 'rejected' and 'status' not in updates:
             updates['status'] = 'unreviewed'
             updates['reject_reason'] = ''
+
+        # ======= 关键字段变更 → 文件迁移 =======
+        old_fields, new_fields = _detect_key_field_changes(current_student, updates)
+        if old_fields is not None:
+            try:
+                path_updates = migrate_student_files(current_student, old_fields, new_fields)
+                if path_updates:
+                    updates.update(path_updates)
+            except MigrationRollbackError as e:
+                current_app.logger.critical(
+                    '学员 %s 文件迁移失败且回滚失败，需人工介入: %s', id, str(e)
+                )
+                return jsonify({'error': '文件迁移失败且回滚失败，请联系管理员', 'details': str(e)}), 500
+            except MigrationError as e:
+                return jsonify({'error': str(e)}), 500
+        # ==========================================
 
         # 执行数据库更新
         updated_student = update_student(id, updates)
