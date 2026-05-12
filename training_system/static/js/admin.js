@@ -1946,7 +1946,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             };
             healthCheckWrapper.appendChild(regenBtn);
-            filesContainer.appendChild(healthCheckWrapper);
+            // 暂存，稍后追加到 materialsContainer
+            window._pendingHealthCheckWrapper = healthCheckWrapper;
         }
 
         // 已报名学员显示「报名申请表」独立下载卡片，按学员状态显示，不依赖当前筛选 tab
@@ -2038,7 +2039,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             regFormWrapper.appendChild(regFormBox);
             regFormWrapper.appendChild(regDownloadBtn);
-            filesContainer.appendChild(regFormWrapper);
+            // 暂存，稍后追加到 materialsContainer
+            window._pendingRegFormWrapper = regFormWrapper;
         }
 
         if (student.status === 'reviewed' || student.status === 'registered') {
@@ -2063,6 +2065,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             materialsContainer.style.overflowX = 'auto';
             materialsContainer.style.padding = '10px 0';
             materialsSection.appendChild(materialsContainer);
+
+            // 将体检表和报名申请表追加到报名材料行
+            if (window._pendingHealthCheckWrapper) {
+                materialsContainer.appendChild(window._pendingHealthCheckWrapper);
+                delete window._pendingHealthCheckWrapper;
+            }
+            if (window._pendingRegFormWrapper) {
+                materialsContainer.appendChild(window._pendingRegFormWrapper);
+                delete window._pendingRegFormWrapper;
+            }
+            // 有文档卡片时直接显示 materialsSection（即使 API 还没返回）
+            materialsSection.style.display = 'block';
 
             const latestLogSection = document.createElement('div');
             latestLogSection.style.display = 'none';

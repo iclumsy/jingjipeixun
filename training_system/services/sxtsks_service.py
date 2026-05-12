@@ -126,9 +126,6 @@ XGCL_DEFAULT = ['07101', '07102', '07103']
 # 验证码最大重试次数
 MAX_CAPTCHA_RETRIES = 5
 
-# Cookie 持久化路径
-COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'logs', '.sxtsks_session.json')
-
 
 def _normalize_project_code(project_code):
     """归一化本地项目代号，兼容 Q2 带限定机型的写法。"""
@@ -276,7 +273,6 @@ class SxtsksClient:
         self.userid = None
         self.logged_in = False
         self._steps = []  # 步骤日志收集器
-        self._try_load_session()
 
     def _log_step(self, step, status, detail='', resp=None):
         """记录一个操作步骤的详细日志。"""
@@ -402,7 +398,6 @@ class SxtsksClient:
                 except Exception as ue:
                     self._log_step('登录-获取userid', 'warning', str(ue))
 
-                self._save_session()
                 return {
                     'success': True,
                     'message': f'登录成功（第{attempt}次尝试）',
@@ -420,40 +415,6 @@ class SxtsksClient:
             'message': f'登录失败，已重试 {MAX_CAPTCHA_RETRIES} 次',
             'attempts': MAX_CAPTCHA_RETRIES,
         }
-
-    def _save_session(self):
-        """将当前会话的 cookies 和 userid 持久化到本地文件。"""
-        try:
-            os.makedirs(os.path.dirname(COOKIE_FILE), exist_ok=True)
-            data = {
-                'cookies': dict(self.session.cookies),
-                'userid': self.userid,
-                'saved_at': time.time(),
-            }
-            with open(COOKIE_FILE, 'w') as f:
-                json.dump(data, f)
-            logger.info(f'会话已持久化到 {COOKIE_FILE}')
-        except Exception as e:
-            logger.warning(f'保存会话失败: {e}')
-
-    def _try_load_session(self):
-        """尝试从本地文件恢复上次的登录会话。"""
-        try:
-            if not os.path.exists(COOKIE_FILE):
-                return
-            with open(COOKIE_FILE, 'r') as f:
-                data = json.load(f)
-            # 超过 24 小时的 cookie 视为过期
-            if time.time() - data.get('saved_at', 0) > 86400:
-                logger.info('持久化会话已过期(>24h)，将重新登录')
-                return
-            for name, value in data.get('cookies', {}).items():
-                self.session.cookies.set(name, value)
-            self.userid = data.get('userid')
-            self.logged_in = True
-            logger.info(f'已恢复持久化会话，userid={self.userid}')
-        except Exception as e:
-            logger.warning(f'恢复会话失败: {e}')
 
     def _verify_session(self):
         """验证当前 cookie 是否仍然有效（轻量探测）。"""
