@@ -1136,30 +1136,73 @@ class SxtsksClient:
 
         参数:
             bmid: 报名 ID
-            sfzh: 学员身份证号
+            sfzh: 学员（报名记录）身份证号，必填——平台用它定位本次要打印的报名
 
         返回:
             tuple: (content_bytes, content_type, filename)
         """
         self._ensure_login()
 
-        # 模拟浏览器正常导航路径：登录后先访问报名管理页面，
-        # 让平台建立必要的服务端上下文，否则直接访问打印接口会返回错误页
+        # 复刻浏览器在「报名管理 → 点击打印申请表」时的完整请求顺序，
+        # 缺少 saveDwbmSfzh.do 这一步时 printBzSqb.do 会返回错误页。
+        referer = f'{BASE_URL}/turnToUserLogin.do'
+        xhr_headers = {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Referer': referer,
+        }
+
+        # 1. 报名管理页的表格列表请求：让平台进入"管理报名"视图
         try:
-            self.session.get(
+            self.session.post(
                 f'{BASE_URL}/dwbm_queryKsZtInfo.do',
                 params={
-                    'sfzh': sfzh or '',
+                    'sfzh': LOGIN_ID_CARD,
                     'userid': self.userid or '',
                 },
+                data={
+                    'page': '1',
+                    'rp': '25',
+                    'sortname': 'undefined',
+                    'sortorder': 'undefined',
+                    'query': '',
+                    'qtype': '',
+                    'params': 'undefined',
+                },
+                headers=xhr_headers,
                 timeout=10,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f'queryKsZtInfo 预热失败(忽略): {e}')
 
+        # 2. 校验会话存在（浏览器在打印按钮事件里会先调一次）
+        try:
+            self.session.post(
+                f'{BASE_URL}/dwbm_querySessionIsExist.do',
+                headers=xhr_headers,
+                timeout=10,
+            )
+        except Exception as e:
+            logger.warning(f'querySessionIsExist 失败(忽略): {e}')
+
+        # 3. ★ 关键：把要打印的考生身份证写进服务端 session
+        if sfzh:
+            try:
+                self.session.post(
+                    f'{BASE_URL}/saveDwbmSfzh.do',
+                    data={'sfzh': sfzh},
+                    headers=xhr_headers,
+                    timeout=10,
+                )
+            except Exception as e:
+                logger.warning(f'saveDwbmSfzh 失败: {e}')
+        else:
+            logger.warning('download_application_form 未传入 sfzh，平台可能拒绝打印')
+
+        # 4. 真正下载申请表
         resp = self.session.get(
             f'{BASE_URL}/dwbm_printBzSqb.do',
             params={'bmid': bmid},
+            headers={'Referer': referer},
             timeout=30,
         )
 
