@@ -2084,9 +2084,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (res.ok) {
                         const data = await res.json();
                         if (data.exists && data.materials && data.materials.length > 0) {
-                            materialsSection.style.display = 'block';
+                            // 过滤掉体检表（由独立卡片提供下载/重新生成功能）
+                            const filteredMaterials = data.materials.filter(mat => !mat.name.includes('体检表'));
+                            if (filteredMaterials.length > 0) {
+                                materialsSection.style.display = 'block';
+                            }
                             materialsContainer.innerHTML = '';
-                            data.materials.forEach(mat => {
+                            filteredMaterials.forEach(mat => {
                                 const wrapper = document.createElement('div');
                                 wrapper.style.display = 'flex';
                                 wrapper.style.flexDirection = 'column';
