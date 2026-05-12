@@ -1136,12 +1136,26 @@ class SxtsksClient:
 
         参数:
             bmid: 报名 ID
-            sfzh: 学员身份证号（保留参数，当前未使用）
+            sfzh: 学员身份证号
 
         返回:
             tuple: (content_bytes, content_type, filename)
         """
         self._ensure_login()
+
+        # 模拟浏览器正常导航路径：登录后先访问报名管理页面，
+        # 让平台建立必要的服务端上下文，否则直接访问打印接口会返回错误页
+        try:
+            self.session.get(
+                f'{BASE_URL}/dwbm_queryKsZtInfo.do',
+                params={
+                    'sfzh': sfzh or '',
+                    'userid': self.userid or '',
+                },
+                timeout=10,
+            )
+        except Exception:
+            pass
 
         resp = self.session.get(
             f'{BASE_URL}/dwbm_printBzSqb.do',
