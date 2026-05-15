@@ -8,13 +8,10 @@ const HISTORY_LIMIT = 50;
 
 const BANK_NAMES = {
   'N1_叉车司机': '叉车司机 (N1)',
-  'A_电梯管理': '电梯管理 (A)',
-  'G3_锅炉水处理': '锅炉水处理 (G3)',
+  'A_电梯管理': '特种设备安全管理-电梯管理 (A)',
   'G1_工业锅炉司炉': '工业锅炉司炉 (G1)',
-  'Q3_起重机指挥': '起重机指挥 (Q3)',
-  'Q2_门式起重机': '门式起重机 (Q2)',
-  'Q2_桥式起重机': '桥式起重机 (Q2)',
-  'N1_叉车司机_备选': '叉车司机 (备选库)'
+  'R1_快开门式压力容器操作': '快开门式压力容器操作 (R1)',
+  'Q2_桥式起重机': '桥式起重机司机 (Q2)',
 };
 
 let currentBank = 'N1_叉车司机';
@@ -474,7 +471,7 @@ function renderQuestion() {
   // 题目图片
   const imgEl = document.getElementById('q-image');
   if (q.question_images && q.question_images.length > 0) {
-    const baseDir = (currentBank === 'N1_叉车司机_备选') ? '/static/images/yibaifen/' : '/static/images/junrui/';
+    const baseDir = '/static/images/junrui/';
     imgEl.innerHTML = `<img src="${baseDir}${encodeURI(q.question_images[0])}" alt="题目图片" onerror="this.style.display='none'">`;
   } else {
     imgEl.innerHTML = '';
@@ -898,7 +895,7 @@ function renderMemorizeList() {
       answerText = String(q.answer || '');
     }
 
-    const baseDir = (currentBank === 'N1_叉车司机_备选') ? '/static/images/yibaifen/' : '/static/images/junrui/';
+    const baseDir = '/static/images/junrui/';
     const imgSrc = (q.question_images && q.question_images.length > 0)
       ? `<div style="margin:10px 0"><img src="${baseDir}${encodeURI(q.question_images[0])}" style="max-height:150px; border-radius:8px; border:1px solid var(--border)" onerror="this.style.display='none'"></div>`
       : '';
