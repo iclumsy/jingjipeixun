@@ -1213,6 +1213,7 @@ module.exports = {
   getPracticeQuestions, // 获取练习题目
   savePracticeProgress, // 保存练习进度
   savePracticeExam,     // 保存模拟考试记录
+  toAbsoluteFileUrl,    // 转换服务器文件 URL
   uploadAttachment,     // 上传附件
   downloadTrainingForm, // 下载体检表
   submitPlatformRegistration, // 提交报名

@@ -30,13 +30,18 @@ function isCorrectAnswer(question = {}, selectedKeys = []) {
   return sameSet(normalizeAnswer(question.answer), normalizeAnswer(selectedKeys))
 }
 
-function formatOptionList(options = {}) {
+function firstImageValue(value) {
+  if (Array.isArray(value)) return value[0] || ''
+  return value || ''
+}
+
+function formatOptionList(options = {}, optionImages = {}, resolveImageUrl = null) {
   return Object.keys(options || {})
     .sort()
     .map(key => ({
       key,
       text: options[key],
-      image: ''
+      image: typeof resolveImageUrl === 'function' ? resolveImageUrl(firstImageValue(optionImages[key])) : ''
     }))
 }
 

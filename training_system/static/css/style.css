@@ -1870,6 +1870,8 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
     display: flex;
     gap: 8px;
     align-items: center;
+    flex-wrap: wrap;
+    min-width: 360px;
 }
 
 .exam-bank-file-action {
@@ -1884,6 +1886,31 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
     inset: 0;
     opacity: 0;
     cursor: pointer;
+}
+
+.exam-bank-inline-input,
+.exam-bank-inline-select {
+    min-height: 38px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 7px 9px;
+    box-sizing: border-box;
+    background: #fff;
+    color: #334155;
+}
+
+.exam-bank-inline-input {
+    width: 180px;
+}
+
+.exam-bank-inline-select {
+    width: 210px;
+}
+
+.exam-bank-actions button.danger {
+    border-color: #fecdd3;
+    background: #fff1f2;
+    color: #be123c;
 }
 
 @media (max-width: 900px) {

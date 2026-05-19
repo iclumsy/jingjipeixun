@@ -16,6 +16,16 @@
       <text>第 {{currentIndex + 1}} 题</text>
     </view>
     <view class="q-text">{{questions[currentIndex].question}}</view>
+    <view wx:if="{{questionImages.length > 0}}" class="question-images">
+      <image
+        wx:for="{{questionImages}}"
+        wx:key="*this"
+        class="question-image"
+        mode="widthFix"
+        src="{{item}}"
+        show-menu-by-longpress
+      />
+    </view>
     <view class="options">
       <view
         wx:for="{{optionList}}"
@@ -26,7 +36,10 @@
         bindtap="selectOption"
       >
         <text class="option-key">{{option.key}}</text>
-        <text class="option-text">{{option.text}}</text>
+        <view class="option-body">
+          <text class="option-text">{{option.text}}</text>
+          <image wx:if="{{option.image}}" class="option-image" mode="widthFix" src="{{option.image}}" show-menu-by-longpress />
+        </view>
       </view>
     </view>
 

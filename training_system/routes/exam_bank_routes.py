@@ -111,6 +111,29 @@ def admin_toggle_exam_bank(bank_id):
         return _error(err, 404)
 
 
+@exam_bank_bp.route('/api/admin/exam_banks/<int:bank_id>/update', methods=['POST'])
+def admin_update_exam_bank(bank_id):
+    try:
+        data = request.get_json(silent=True) or {}
+        project_id = data.get('training_project_id') or data.get('trainingProjectId')
+        bank = exam_bank_service.update_exam_bank(
+            bank_id,
+            display_name=data.get('display_name') or data.get('displayName') or '',
+            training_project_id=int(project_id) if project_id else None,
+        )
+        return _success(bank=bank)
+    except ValueError as err:
+        return _error(err, 400)
+
+
+@exam_bank_bp.route('/api/admin/exam_banks/<int:bank_id>', methods=['DELETE'])
+def admin_delete_exam_bank(bank_id):
+    try:
+        return _success(**exam_bank_service.delete_exam_bank(bank_id))
+    except ValueError as err:
+        return _error(err, 404)
+
+
 @exam_bank_bp.route('/api/miniprogram/practice/summary', methods=['GET'])
 def mini_practice_summary():
     user = _require_mini_user()

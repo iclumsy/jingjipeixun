@@ -6,6 +6,7 @@ from models.student import get_db_connection
 
 
 ACTIVE_STUDENT_STATUSES = ('reviewed', 'registered')
+EXAM_BANK_TRAINING_TYPE = 'special_equipment'
 
 
 def _json_dumps(value):
@@ -108,15 +109,18 @@ def _get_training_project(conn, training_project_id):
     ).fetchone()
     if not row:
         raise ValueError('培训项目不存在')
-    return dict(row)
+    project = dict(row)
+    if project.get('training_type') != EXAM_BANK_TRAINING_TYPE:
+        raise ValueError('题库和真题练习仅支持特种设备项目')
+    return project
 
 
 def list_training_projects(include_inactive=False):
     with get_db_connection() as conn:
-        query = 'SELECT * FROM training_projects'
-        params = []
+        query = 'SELECT * FROM training_projects WHERE training_type = ?'
+        params = [EXAM_BANK_TRAINING_TYPE]
         if not include_inactive:
-            query += ' WHERE is_active = ?'
+            query += ' AND is_active = ?'
             params.append(1)
         query += ' ORDER BY training_type, job_category, project_code, exam_project'
         return [dict(row) for row in conn.execute(query, params).fetchall()]
@@ -231,6 +235,44 @@ def set_exam_bank_active(bank_id, is_active):
         return _row_to_bank(row)
 
 
+def update_exam_bank(bank_id, display_name='', training_project_id=None):
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    with get_db_connection() as conn:
+        existing = conn.execute('SELECT * FROM exam_banks WHERE id = ?', (bank_id,)).fetchone()
+        if not existing:
+            raise ValueError('题库不存在')
+        project_id = training_project_id or existing['training_project_id']
+        project = _get_training_project(conn, project_id)
+        name = str(display_name or '').strip() or existing['display_name'] or existing['bank_key']
+        conn.execute(
+            '''
+            UPDATE exam_banks
+            SET training_project_id = ?, training_type = ?, job_category = ?,
+                exam_project = ?, project_code = ?, display_name = ?, updated_at = ?
+            WHERE id = ?
+            ''',
+            (
+                project_id, project['training_type'], project['job_category'],
+                project['exam_project'], project.get('project_code', ''),
+                name, now, bank_id,
+            ),
+        )
+        row = conn.execute('SELECT * FROM exam_banks WHERE id = ?', (bank_id,)).fetchone()
+        return _row_to_bank(row)
+
+
+def delete_exam_bank(bank_id):
+    with get_db_connection() as conn:
+        existing = conn.execute('SELECT id FROM exam_banks WHERE id = ?', (bank_id,)).fetchone()
+        if not existing:
+            raise ValueError('题库不存在')
+        conn.execute('DELETE FROM mini_exam_records WHERE bank_id = ?', (bank_id,))
+        conn.execute('DELETE FROM mini_practice_progress WHERE bank_id = ?', (bank_id,))
+        conn.execute('DELETE FROM exam_questions WHERE bank_id = ?', (bank_id,))
+        conn.execute('DELETE FROM exam_banks WHERE id = ?', (bank_id,))
+    return {'success': True}
+
+
 def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_ids=None, question_type=''):
     page_no = max(1, int(page or 1))
     page_size = min(max(1, int(limit or 20)), 100)
@@ -342,7 +384,12 @@ def get_practice_summary(openid, is_admin=False):
     with get_db_connection() as conn:
         if is_admin:
             rows = conn.execute(
-                'SELECT * FROM exam_banks WHERE is_active = 1 ORDER BY project_code, exam_project, id'
+                '''
+                SELECT * FROM exam_banks
+                WHERE is_active = 1 AND training_type = ?
+                ORDER BY project_code, exam_project, id
+                ''',
+                (EXAM_BANK_TRAINING_TYPE,),
             ).fetchall()
         else:
             rows = conn.execute(
@@ -358,11 +405,12 @@ def get_practice_summary(openid, is_admin=False):
                     )
                   )
                 WHERE eb.is_active = 1
+                  AND eb.training_type = ?
                   AND s.submitter_openid = ?
                   AND s.status IN ({','.join(['?'] * len(ACTIVE_STUDENT_STATUSES))})
                 ORDER BY eb.project_code, eb.exam_project, eb.id
                 ''',
-                [openid] + list(ACTIVE_STUDENT_STATUSES),
+                [EXAM_BANK_TRAINING_TYPE, openid] + list(ACTIVE_STUDENT_STATUSES),
             ).fetchall()
         banks = [_row_to_bank(row) for row in rows]
         progress = _progress_for_banks(conn, openid, [bank['id'] for bank in banks])
@@ -381,6 +429,8 @@ def get_practice_summary(openid, is_admin=False):
 def can_access_bank(openid, bank_id, is_admin=False):
     bank = get_exam_bank(bank_id)
     if not bank or int(bank.get('is_active') or 0) != 1:
+        return False
+    if bank.get('training_type') != EXAM_BANK_TRAINING_TYPE:
         return False
     if is_admin:
         return True

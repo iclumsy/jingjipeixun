@@ -33,6 +33,7 @@ Page({
     wrongIds: '',
     answerMap: {},
     resultMap: {},
+    questionImages: [],
     doneCount: 0,
     correctCount: 0,
     wrongQuestionIds: [],
@@ -102,15 +103,34 @@ Page({
       submitted: this.data.mode === 'memorize' ? true : !!this.data.resultMap[q.id],
       isCorrect: !!this.data.resultMap[q.id],
       correctAnswerText: answer,
+      questionImages: this.buildQuestionImages(q),
       optionList: this.buildOptionList(q, stored)
     })
   },
 
   buildOptionList(question, selectedKeys) {
-    return practice.formatOptionList(question.options || {}).map(option => ({
+    return practice.formatOptionList(
+      question.options || {},
+      question.option_images || {},
+      value => this.resolveQuestionImageUrl(value)
+    ).map(option => ({
       ...option,
       selected: selectedKeys.includes(option.key)
     }))
+  },
+
+  buildQuestionImages(question) {
+    return (Array.isArray(question.question_images) ? question.question_images : [])
+      .map(value => this.resolveQuestionImageUrl(value))
+      .filter(Boolean)
+  },
+
+  resolveQuestionImageUrl(value) {
+    const raw = String(value || '').trim()
+    if (!raw) return ''
+    if (/^https?:\/\//i.test(raw)) return raw
+    if (raw.startsWith('/')) return api.toAbsoluteFileUrl(raw)
+    return api.toAbsoluteFileUrl(`/static/images/junrui/${raw}`)
   },
 
   currentQuestion() {

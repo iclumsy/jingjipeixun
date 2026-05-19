@@ -30,6 +30,18 @@ function renderProjects() {
   }).join('');
 }
 
+function projectLabel(project) {
+  if (!project) return '-';
+  return `${project.project_code || '-'} · ${project.exam_project || '-'}`;
+}
+
+function projectOptions(selectedId) {
+  return state.projects.map(project => {
+    const selected = String(project.id) === String(selectedId) ? 'selected' : '';
+    return `<option value="${project.id}" ${selected}>${projectLabel(project)}</option>`;
+  }).join('');
+}
+
 function renderBanks() {
   const body = $('bankTableBody');
   if (!state.banks.length) {
@@ -42,16 +54,23 @@ function renderBanks() {
         <strong>${bank.display_name || bank.bank_key}</strong>
         <small>${bank.source_filename || ''}</small>
       </td>
-      <td>${bank.project_code || '-'} · ${bank.exam_project || '-'}</td>
+      <td>
+        <select class="exam-bank-inline-select" data-project="${bank.id}">
+          ${projectOptions(bank.training_project_id)}
+        </select>
+      </td>
       <td>${bank.question_count || 0}</td>
       <td><span class="exam-bank-status ${bank.is_active ? 'active' : 'inactive'}">${bank.is_active ? '启用' : '停用'}</span></td>
       <td>${bank.imported_at || '-'}</td>
       <td class="exam-bank-actions">
+        <input class="exam-bank-inline-input" data-name="${bank.id}" type="text" value="${bank.display_name || bank.bank_key || ''}" aria-label="题库名称">
+        <button data-save="${bank.id}">保存</button>
         <label class="exam-bank-file-action">
           重导
           <input type="file" accept=".json,application/json" data-reimport="${bank.id}">
         </label>
         <button data-toggle="${bank.id}" data-active="${bank.is_active ? 0 : 1}">${bank.is_active ? '停用' : '启用'}</button>
+        <button class="danger" data-delete="${bank.id}">删除</button>
       </td>
     </tr>
   `).join('');
@@ -125,6 +144,40 @@ async function toggleBank(bankId, active) {
   }
 }
 
+async function updateBank(bankId) {
+  const nameInput = document.querySelector(`[data-name="${bankId}"]`);
+  const projectSelect = document.querySelector(`[data-project="${bankId}"]`);
+  showMessage('正在保存题库...', 'info');
+  try {
+    await requestJson(`/api/admin/exam_banks/${bankId}/update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        display_name: nameInput ? nameInput.value : '',
+        training_project_id: projectSelect ? projectSelect.value : ''
+      })
+    });
+    showMessage('题库已保存', 'success');
+    await loadBanks();
+  } catch (err) {
+    showMessage(err.message, 'error');
+  }
+}
+
+async function deleteBank(bankId) {
+  const bank = state.banks.find(item => String(item.id) === String(bankId));
+  const name = bank ? (bank.display_name || bank.bank_key || '该题库') : '该题库';
+  if (!window.confirm(`确定删除“${name}”？删除后题目、练习进度和考试记录都会删除。`)) return;
+  showMessage('正在删除题库...', 'info');
+  try {
+    await requestJson(`/api/admin/exam_banks/${bankId}`, { method: 'DELETE' });
+    showMessage('题库已删除', 'success');
+    await loadBanks();
+  } catch (err) {
+    showMessage(err.message, 'error');
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   $('importBankForm').addEventListener('submit', importBank);
   $('refreshBanksBtn').addEventListener('click', loadBanks);
@@ -132,6 +185,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const toggle = event.target.dataset.toggle;
     if (toggle) {
       toggleBank(toggle, event.target.dataset.active);
+    }
+    const save = event.target.dataset.save;
+    if (save) {
+      updateBank(save);
+    }
+    const deleteId = event.target.dataset.delete;
+    if (deleteId) {
+      deleteBank(deleteId);
     }
   });
   $('bankTableBody').addEventListener('change', event => {

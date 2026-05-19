@@ -55,7 +55,17 @@ class ExamBankRouteTests(unittest.TestCase):
                         }
                     ],
                 },
-                "special_operation": {"name": "特种作业", "job_categories": []},
+                "special_operation": {
+                    "name": "特种作业",
+                    "job_categories": [
+                        {
+                            "name": "电工作业",
+                            "exam_projects": [
+                                {"name": "低压电工作业", "code": "T1", "is_active": 1},
+                            ],
+                        }
+                    ],
+                },
             }, fp, ensure_ascii=False)
 
         self.app = create_app()
@@ -80,7 +90,19 @@ class ExamBankRouteTests(unittest.TestCase):
     def get_project_id(self):
         with self.app.app_context():
             with get_db_connection() as conn:
-                row = conn.execute("SELECT id FROM training_projects LIMIT 1").fetchone()
+                row = conn.execute(
+                    "SELECT id FROM training_projects WHERE training_type = ? LIMIT 1",
+                    ("special_equipment",),
+                ).fetchone()
+                return row["id"]
+
+    def get_special_operation_project_id(self):
+        with self.app.app_context():
+            with get_db_connection() as conn:
+                row = conn.execute(
+                    "SELECT id FROM training_projects WHERE training_type = ? LIMIT 1",
+                    ("special_operation",),
+                ).fetchone()
                 return row["id"]
 
     def create_bank(self):
@@ -146,6 +168,45 @@ class ExamBankRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["bank"]["is_active"], 0)
 
+    def test_admin_update_and_delete_bank(self):
+        self.login_web_admin()
+        bank = self.create_bank()
+
+        response = self.client.post(
+            f"/api/admin/exam_banks/{bank['id']}/update",
+            json={
+                "display_name": "更新后的题库",
+                "training_project_id": self.get_project_id(),
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["bank"]["display_name"], "更新后的题库")
+
+        response = self.client.delete(f"/api/admin/exam_banks/{bank['id']}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["success"])
+        banks = self.client.get("/api/admin/exam_banks")
+        self.assertEqual(len(banks.get_json()["banks"]), 0)
+
+    def test_admin_import_rejects_special_operation_project(self):
+        self.login_web_admin()
+
+        response = self.client.post(
+            "/api/admin/exam_banks/import",
+            data={
+                "training_project_id": str(self.get_special_operation_project_id()),
+                "file": (
+                    io.BytesIO(json.dumps(SAMPLE_QUESTIONS, ensure_ascii=False).encode("utf-8")),
+                    "T1_低压电工作业.json",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("特种设备", response.get_json()["message"])
+
     def test_projects_and_banks_list(self):
         self.login_web_admin()
         self.create_bank()
@@ -155,6 +216,10 @@ class ExamBankRouteTests(unittest.TestCase):
 
         self.assertEqual(projects.status_code, 200)
         self.assertGreaterEqual(len(projects.get_json()["projects"]), 1)
+        self.assertEqual(
+            {item["training_type"] for item in projects.get_json()["projects"]},
+            {"special_equipment"},
+        )
         self.assertEqual(banks.status_code, 200)
         self.assertEqual(len(banks.get_json()["banks"]), 1)
 

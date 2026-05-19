@@ -57,7 +57,14 @@ class ExamBankServiceTests(unittest.TestCase):
                 },
                 "special_operation": {
                     "name": "特种作业",
-                    "job_categories": [],
+                    "job_categories": [
+                        {
+                            "name": "电工作业",
+                            "exam_projects": [
+                                {"name": "低压电工作业", "code": "T1", "is_active": 1},
+                            ],
+                        }
+                    ],
                 },
             }, fp, ensure_ascii=False)
 
@@ -110,6 +117,31 @@ class ExamBankServiceTests(unittest.TestCase):
         self.assertEqual(questions["list"][0]["question"], "1+1=?")
         self.assertEqual(questions["list"][0]["answer"], ["B"])
 
+    def test_list_training_projects_only_returns_special_equipment_for_exam_banks(self):
+        projects = exam_bank_service.list_training_projects(include_inactive=True)
+
+        self.assertEqual({item["training_type"] for item in projects}, {"special_equipment"})
+        self.assertIn("叉车司机", {item["exam_project"] for item in projects})
+        self.assertIn("锅炉水处理", {item["exam_project"] for item in projects})
+        self.assertNotIn("低压电工作业", {item["exam_project"] for item in projects})
+
+    def test_import_rejects_special_operation_project(self):
+        with get_db_connection() as conn:
+            row = conn.execute(
+                "SELECT id FROM training_projects WHERE training_type = ?",
+                ("special_operation",),
+            ).fetchone()
+        self.assertIsNotNone(row)
+
+        with self.assertRaises(ValueError) as cm:
+            exam_bank_service.import_exam_bank(
+                io.BytesIO(json.dumps(SAMPLE_QUESTIONS, ensure_ascii=False).encode("utf-8")),
+                "T1_低压电工作业.json",
+                row["id"],
+            )
+
+        self.assertIn("特种设备", str(cm.exception))
+
     def test_reimport_replaces_existing_questions(self):
         project_id = self.get_project_id("叉车司机")
         bank = exam_bank_service.import_exam_bank(
@@ -151,6 +183,48 @@ class ExamBankServiceTests(unittest.TestCase):
         self.assertEqual(bank["exam_project"], "锅炉水处理")
         self.assertEqual(bank["display_name"], "自定义题库")
 
+    def test_update_exam_bank_changes_name_and_project(self):
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(SAMPLE_QUESTIONS, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+            display_name="旧名称",
+        )
+
+        updated = exam_bank_service.update_exam_bank(
+            bank["id"],
+            display_name="新名称",
+            training_project_id=self.get_project_id("锅炉水处理"),
+        )
+
+        self.assertEqual(updated["display_name"], "新名称")
+        self.assertEqual(updated["project_code"], "G3")
+        self.assertEqual(updated["exam_project"], "锅炉水处理")
+
+    def test_delete_exam_bank_removes_questions_and_progress(self):
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(SAMPLE_QUESTIONS, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        exam_bank_service.save_progress("student-openid", bank["id"], {
+            "doneCount": 1,
+            "correctCount": 1,
+            "wrongQuestionIds": [],
+        })
+
+        result = exam_bank_service.delete_exam_bank(bank["id"])
+
+        self.assertTrue(result["success"])
+        self.assertIsNone(exam_bank_service.get_exam_bank(bank["id"]))
+        self.assertEqual(exam_bank_service.get_questions(bank["id"])["total"], 0)
+        with get_db_connection() as conn:
+            progress = conn.execute(
+                "SELECT COUNT(*) FROM mini_practice_progress WHERE bank_id = ?",
+                (bank["id"],),
+            ).fetchone()[0]
+        self.assertEqual(progress, 0)
+
     def test_import_rejects_question_without_answer(self):
         invalid = [{**SAMPLE_QUESTIONS[0], "answer": []}]
 
@@ -174,6 +248,33 @@ class ExamBankServiceTests(unittest.TestCase):
 
         self.assertTrue(summary["practiceEnabled"])
         self.assertEqual([item["id"] for item in summary["banks"]], [bank["id"]])
+
+    def test_admin_summary_ignores_legacy_special_operation_banks(self):
+        with get_db_connection() as conn:
+            project = conn.execute(
+                "SELECT * FROM training_projects WHERE training_type = ?",
+                ("special_operation",),
+            ).fetchone()
+            cursor = conn.execute(
+                """
+                INSERT INTO exam_banks (
+                    training_project_id, bank_key, training_type, job_category,
+                    exam_project, project_code, display_name, source_filename,
+                    question_count, is_active, imported_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+                """,
+                (
+                    project["id"], "T1_低压电工作业", project["training_type"],
+                    project["job_category"], project["exam_project"], project["project_code"],
+                    "低压电工作业题库", "T1_低压电工作业.json", 1, 1,
+                ),
+            )
+            legacy_bank_id = cursor.lastrowid
+
+        summary = exam_bank_service.get_practice_summary("admin-openid", is_admin=True)
+
+        self.assertFalse(any(item["id"] == legacy_bank_id for item in summary["banks"]))
+        self.assertFalse(exam_bank_service.can_access_bank("admin-openid", legacy_bank_id, True))
 
     def test_student_summary_returns_only_owned_reviewed_matching_bank(self):
         bank = exam_bank_service.import_exam_bank(
