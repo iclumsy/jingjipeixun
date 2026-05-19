@@ -120,13 +120,12 @@ Component({
           this.triggerForceCreateOnCurrentSubmitPage()
         }
         this.triggerCurrentPageRefresh(url)
+        this.setData({
+          selected: data.index
+        })
       } else {
         wx.switchTab({ url })
       }
-
-      this.setData({
-        selected: data.index
-      })
     }
   }
 })
