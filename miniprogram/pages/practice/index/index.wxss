@@ -1,7 +1,7 @@
 .practice-page {
   min-height: 100vh;
   background: #f3f6fb;
-  padding: 28rpx 24rpx calc(160rpx + env(safe-area-inset-bottom));
+  padding: 24rpx 24rpx calc(240rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 
@@ -159,12 +159,16 @@
 }
 
 .chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14rpx;
 }
 
 .chips button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
   min-height: 68rpx;
   margin: 0;
   padding: 0 20rpx;
@@ -172,4 +176,11 @@
   background: #eef4ff;
   color: #1d4ed8;
   font-size: 24rpx;
+  line-height: 1.2;
+  box-sizing: border-box;
+  border: 0;
+}
+
+.chips button::after {
+  border: 0;
 }

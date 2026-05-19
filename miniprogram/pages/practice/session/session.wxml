@@ -30,7 +30,12 @@
       </view>
     </view>
 
-    <view wx:if="{{submitted && mode !== 'exam'}}" class="result {{isCorrect ? 'ok' : 'bad'}}">
+    <view wx:if="{{mode === 'memorize'}}" class="result neutral">
+      <view>正确答案：{{correctAnswerText}}</view>
+      <view wx:if="{{questions[currentIndex].analysis}}" class="analysis">{{questions[currentIndex].analysis}}</view>
+    </view>
+
+    <view wx:elif="{{submitted && mode !== 'exam'}}" class="result {{isCorrect ? 'ok' : 'bad'}}">
       <view>{{isCorrect ? '回答正确' : '回答错误'}}</view>
       <view>正确答案：{{correctAnswerText}}</view>
       <view wx:if="{{questions[currentIndex].analysis}}" class="analysis">{{questions[currentIndex].analysis}}</view>
@@ -45,7 +50,7 @@
     </view>
   </view>
 
-  <button wx:if="{{questions.length > 0}}" class="card-toggle" bindtap="toggleCard">卡</button>
+  <button wx:if="{{mode === 'exam' && questions.length > 0}}" class="card-toggle" bindtap="toggleCard">答题卡</button>
   <view wx:if="{{showCard}}" class="card-panel">
     <view class="card-head">
       <text>答题卡</text>
