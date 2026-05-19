@@ -2,7 +2,7 @@
   <view class="header">
     <view>
       <view class="title">真题练习</view>
-      <view class="subtitle">{{isAdmin ? '管理员可调试所有已启用题库' : '仅显示已审核通过报名对应的题库'}}</view>
+      <view class="subtitle">{{isAdmin ? '管理员可练习所有已启用题库' : '仅显示已审核通过报名对应的题库'}}</view>
     </view>
   </view>
 
@@ -13,28 +13,61 @@
     <button class="primary-btn" bindtap="loadSummary">重试</button>
   </view>
 
-  <view wx:elif="{{banks.length === 0}}" class="state">
-    <view>暂无可练习题库</view>
-  </view>
+  <view wx:elif="{{banks.length === 0}}" class="state">暂无可练习题库</view>
 
-  <view wx:else class="bank-list">
-    <view wx:for="{{banks}}" wx:key="id" class="bank-card">
-      <view class="bank-head">
-        <view>
-          <view class="bank-title">{{item.displayName}}</view>
-          <view class="bank-meta">{{item.projectCode}} · {{item.examProject}} · {{item.questionCount}} 题</view>
-        </view>
+  <view wx:else>
+    <scroll-view scroll-x class="bank-tabs">
+      <view
+        wx:for="{{banks}}"
+        wx:key="id"
+        data-index="{{index}}"
+        class="bank-tab {{activeBankIndex === index ? 'active' : ''}}"
+        bindtap="selectBank"
+      >
+        {{item.displayName}}
       </view>
+    </scroll-view>
+
+    <view class="hero-card">
+      <view class="bank-title">{{activeBank.displayName}}</view>
+      <view class="bank-meta">{{activeBank.projectCode}} · {{activeBank.examProject}}</view>
       <view class="stats">
-        <view><text>{{item.progress.doneCount}}</text><text>已练</text></view>
-        <view><text>{{item.progress.correctCount}}</text><text>正确</text></view>
-        <view><text>{{item.progress.wrongCount}}</text><text>错题</text></view>
+        <view><text>{{activeBank.questionCount}}</text><text>总题量</text></view>
+        <view><text>{{activeBank.progress.doneCount}}</text><text>已练习</text></view>
+        <view><text>{{activeBank.progress.wrongCount}}</text><text>错题数</text></view>
       </view>
-      <view class="actions">
-        <button data-bank-id="{{item.id}}" data-mode="sequential" data-title="{{item.displayName}}" bindtap="startMode">顺序</button>
-        <button data-bank-id="{{item.id}}" data-mode="random" data-title="{{item.displayName}}" bindtap="startMode">随机</button>
-        <button data-bank-id="{{item.id}}" data-mode="exam" data-title="{{item.displayName}}" bindtap="startMode">模拟</button>
-        <button data-bank-id="{{item.id}}" data-mode="wrong" data-title="{{item.displayName}}" bindtap="startMode">错题</button>
+    </view>
+
+    <view class="mode-grid">
+      <view class="mode-card" data-mode="memorize" bindtap="startMode">
+        <view class="mode-title">背题模式</view>
+        <view class="mode-desc">快速浏览 100 道题目及答案</view>
+        <view class="mode-detail">高效记忆</view>
+      </view>
+      <view class="mode-card" data-mode="sequential" bindtap="startMode">
+        <view class="mode-title">顺序练习</view>
+        <view class="mode-desc">按题库顺序逐题练习</view>
+        <view class="mode-detail">{{activeBank.progress.doneCount}} / {{activeBank.questionCount}}</view>
+      </view>
+      <view class="mode-card" data-mode="exam" bindtap="startMode">
+        <view class="mode-title">模拟考试</view>
+        <view class="mode-desc">100 题，60 分钟</view>
+        <view class="mode-detail">80 分及格</view>
+      </view>
+      <view class="mode-card" data-mode="wrong" bindtap="startMode">
+        <view class="mode-title">错题回顾</view>
+        <view class="mode-desc">重新练习之前做错的题</view>
+        <view class="mode-detail">{{activeBank.progress.wrongCount}} 道错题</view>
+      </view>
+    </view>
+
+    <view class="filter-section">
+      <view class="section-title">按题型练习</view>
+      <view class="chips">
+        <button data-mode="type" data-filter="all" bindtap="startMode">全部 {{activeBank.typeCounts.all || activeBank.questionCount}}</button>
+        <button data-mode="type" data-filter="single" bindtap="startMode">单选 {{activeBank.typeCounts.single || 0}}</button>
+        <button data-mode="type" data-filter="multi" bindtap="startMode">多选 {{activeBank.typeCounts.multi || 0}}</button>
+        <button data-mode="type" data-filter="judge" bindtap="startMode">判断 {{activeBank.typeCounts.judge || 0}}</button>
       </view>
     </view>
   </view>

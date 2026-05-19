@@ -47,6 +47,26 @@
   padding: 24rpx;
 }
 
+.q-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #697994;
+  font-size: 24rpx;
+  margin-bottom: 16rpx;
+}
+
+.q-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44rpx;
+  padding: 0 16rpx;
+  border-radius: 999rpx;
+  background: #eef4ff;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
 .q-text {
   font-size: 32rpx;
   line-height: 1.6;
@@ -127,6 +147,85 @@
 }
 
 .actions .primary {
+  background: #2f6af5;
+  color: #fff;
+}
+
+.card-toggle {
+  position: fixed;
+  right: 26rpx;
+  bottom: calc(40rpx + env(safe-area-inset-bottom));
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 44rpx;
+  padding: 0;
+  background: #15233d;
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 12rpx 28rpx rgba(21, 35, 61, 0.22);
+}
+
+.card-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 62vh;
+  background: #fff;
+  border-radius: 28rpx 28rpx 0 0;
+  padding: 24rpx 24rpx calc(28rpx + env(safe-area-inset-bottom));
+  box-shadow: 0 -14rpx 34rpx rgba(15, 23, 42, 0.18);
+  box-sizing: border-box;
+  z-index: 80;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #15233d;
+  margin-bottom: 18rpx;
+}
+
+.card-head button {
+  margin: 0;
+  min-height: 56rpx;
+  line-height: 56rpx;
+  font-size: 24rpx;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 10rpx;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.card-cell {
+  height: 58rpx;
+  line-height: 58rpx;
+  border-radius: 10rpx;
+  background: #f1f5f9;
+  color: #475569;
+  text-align: center;
+  font-size: 24rpx;
+}
+
+.card-cell.answered {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.card-cell.current {
+  background: #15233d;
+  color: #fff;
+}
+
+.finish-btn {
+  margin-top: 18rpx;
   background: #2f6af5;
   color: #fff;
 }

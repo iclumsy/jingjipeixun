@@ -139,6 +139,7 @@ def mini_practice_questions(bank_id):
         page=request.args.get('page', 1),
         limit=request.args.get('limit', 20),
         wrong_question_ids=wrong_ids,
+        question_type=request.args.get('question_type', ''),
     )
     return jsonify(result)
 

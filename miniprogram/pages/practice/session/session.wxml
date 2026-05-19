@@ -11,6 +11,10 @@
   <view wx:elif="{{questions.length === 0}}" class="state">暂无题目</view>
 
   <view wx:else class="question-card">
+    <view class="q-head">
+      <text class="q-badge">{{questions[currentIndex].question_type === 'multi' ? '多选题' : (questions[currentIndex].question_type === 'judge' ? '判断题' : '单选题')}}</text>
+      <text>第 {{currentIndex + 1}} 题</text>
+    </view>
     <view class="q-text">{{questions[currentIndex].question}}</view>
     <view class="options">
       <view
@@ -26,7 +30,7 @@
       </view>
     </view>
 
-    <view wx:if="{{submitted}}" class="result {{isCorrect ? 'ok' : 'bad'}}">
+    <view wx:if="{{submitted && mode !== 'exam'}}" class="result {{isCorrect ? 'ok' : 'bad'}}">
       <view>{{isCorrect ? '回答正确' : '回答错误'}}</view>
       <view>正确答案：{{correctAnswerText}}</view>
       <view wx:if="{{questions[currentIndex].analysis}}" class="analysis">{{questions[currentIndex].analysis}}</view>
@@ -34,8 +38,28 @@
 
     <view class="actions">
       <button bindtap="prevQuestion">上一题</button>
-      <button wx:if="{{!submitted}}" class="primary" bindtap="submitAnswer">确认答案</button>
+      <button wx:if="{{mode === 'memorize'}}" class="primary" bindtap="nextQuestion">{{currentIndex >= questions.length - 1 ? '完成' : '下一题'}}</button>
+      <button wx:elif="{{mode === 'exam'}}" class="primary" bindtap="submitAnswer">{{currentIndex >= questions.length - 1 ? '交卷' : '下一题'}}</button>
+      <button wx:elif="{{!submitted}}" class="primary" bindtap="submitAnswer">确认答案</button>
       <button wx:else class="primary" bindtap="nextQuestion">{{currentIndex >= questions.length - 1 ? '完成' : '下一题'}}</button>
     </view>
+  </view>
+
+  <button wx:if="{{questions.length > 0}}" class="card-toggle" bindtap="toggleCard">卡</button>
+  <view wx:if="{{showCard}}" class="card-panel">
+    <view class="card-head">
+      <text>答题卡</text>
+      <button bindtap="toggleCard">关闭</button>
+    </view>
+    <view class="card-grid">
+      <view
+        wx:for="{{questions}}"
+        wx:key="id"
+        data-index="{{index}}"
+        class="card-cell {{currentIndex === index ? 'current' : ''}} {{answerMap[item.id] ? 'answered' : ''}}"
+        bindtap="jumpQuestion"
+      >{{index + 1}}</view>
+    </view>
+    <button wx:if="{{mode === 'exam'}}" class="finish-btn" bindtap="finishSession">交卷</button>
   </view>
 </view>

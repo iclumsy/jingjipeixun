@@ -2,16 +2,25 @@ const api = require('../../../utils/api')
 const practice = require('../../../utils/practice')
 
 const MODE_TITLES = {
+  memorize: '背题模式',
   sequential: '顺序练习',
   random: '随机练习',
   wrong: '错题练习',
-  exam: '模拟考试'
+  exam: '模拟考试',
+  type: '题型练习'
+}
+
+const FILTER_TYPE_MAP = {
+  single: 'single',
+  multi: 'multi',
+  judge: 'judge'
 }
 
 Page({
   data: {
     bankId: '',
     mode: 'sequential',
+    filter: '',
     title: '练习',
     loading: true,
     questions: [],
@@ -22,22 +31,27 @@ Page({
     correctAnswerText: '',
     optionList: [],
     wrongIds: '',
+    answerMap: {},
+    resultMap: {},
     doneCount: 0,
     correctCount: 0,
     wrongQuestionIds: [],
     timeLeft: 3600,
-    timerText: '60:00'
+    timerText: '60:00',
+    showCard: false
   },
 
   onLoad(options = {}) {
     const bankId = options.bankId || ''
     const mode = options.mode || 'sequential'
+    const filter = options.filter || ''
     const title = decodeURIComponent(options.title || MODE_TITLES[mode] || '练习')
     this.setData({
       bankId,
       mode,
+      filter,
       wrongIds: decodeURIComponent(options.wrongIds || ''),
-      title: `${title} · ${MODE_TITLES[mode] || '练习'}`
+      title: `${title} · ${this.modeTitle(mode, filter)}`
     })
     this.loadQuestions()
   },
@@ -47,23 +61,31 @@ Page({
     this.saveProgress()
   },
 
+  modeTitle(mode, filter) {
+    if (mode !== 'type') return MODE_TITLES[mode] || '练习'
+    const labels = { all: '全部题型', single: '单选题', multi: '多选题', judge: '判断题' }
+    return labels[filter] || '题型练习'
+  },
+
   async loadQuestions() {
     this.setData({ loading: true })
     try {
-      const limit = this.data.mode === 'exam' ? 100 : 50
+      const mode = this.data.mode
+      const limit = mode === 'exam' || mode === 'memorize' ? 100 : 100
       const res = await api.getPracticeQuestions(this.data.bankId, {
-        mode: this.data.mode === 'wrong' ? 'sequential' : this.data.mode,
+        mode: mode === 'wrong' || mode === 'type' || mode === 'memorize' ? 'sequential' : mode,
         page: 1,
         limit,
-        wrong_ids: this.data.mode === 'wrong' ? this.data.wrongIds : ''
+        wrong_ids: mode === 'wrong' ? this.data.wrongIds : '',
+        question_type: mode === 'type' ? (FILTER_TYPE_MAP[this.data.filter] || '') : ''
       })
       let questions = Array.isArray(res.list) ? res.list : []
-      if (this.data.mode === 'random') {
+      if (mode === 'random' || mode === 'memorize') {
         questions = practice.shuffleQuestions(questions)
       }
       this.setData({ questions, loading: false, currentIndex: 0 })
       this.prepareCurrentQuestion()
-      if (this.data.mode === 'exam') this.startTimer()
+      if (mode === 'exam') this.startTimer()
     } catch (err) {
       this.setData({ loading: false })
       wx.showToast({ title: err.message || '题目加载失败', icon: 'none' })
@@ -73,13 +95,14 @@ Page({
   prepareCurrentQuestion() {
     const q = this.currentQuestion()
     if (!q) return
+    const stored = this.data.answerMap[q.id] || []
     const answer = practice.normalizeAnswer(q.answer).join('、')
     this.setData({
-      selectedKeys: [],
-      submitted: false,
-      isCorrect: false,
+      selectedKeys: stored,
+      submitted: this.data.mode === 'memorize' ? true : !!this.data.resultMap[q.id],
+      isCorrect: !!this.data.resultMap[q.id],
       correctAnswerText: answer,
-      optionList: this.buildOptionList(q, [])
+      optionList: this.buildOptionList(q, stored)
     })
   },
 
@@ -95,7 +118,7 @@ Page({
   },
 
   selectOption(e) {
-    if (this.data.submitted) return
+    if (this.data.mode !== 'exam' && this.data.submitted) return
     const key = e.currentTarget.dataset.key
     const q = this.currentQuestion()
     const type = practice.normalizeQuestionType(q)
@@ -107,8 +130,10 @@ Page({
     } else {
       selected = [key]
     }
+    const answerMap = { ...this.data.answerMap, [q.id]: selected }
     this.setData({
       selectedKeys: selected,
+      answerMap,
       optionList: this.buildOptionList(q, selected)
     })
   },
@@ -119,22 +144,30 @@ Page({
       wx.showToast({ title: '请选择答案', icon: 'none' })
       return
     }
+    if (this.data.mode === 'exam') {
+      this.nextQuestion()
+      return
+    }
     const isCorrect = practice.isCorrectAnswer(q, this.data.selectedKeys)
     const wrongIds = isCorrect
-      ? this.data.wrongQuestionIds
+      ? this.data.wrongQuestionIds.filter(id => id !== q.id)
       : Array.from(new Set([...this.data.wrongQuestionIds, q.id]))
+    const resultMap = { ...this.data.resultMap, [q.id]: isCorrect }
     this.setData({
       submitted: true,
       isCorrect,
-      doneCount: this.data.doneCount + 1,
-      correctCount: this.data.correctCount + (isCorrect ? 1 : 0),
+      resultMap,
+      doneCount: Object.keys(resultMap).length,
+      correctCount: Object.values(resultMap).filter(Boolean).length,
       wrongQuestionIds: wrongIds
     })
   },
 
   nextQuestion() {
     if (this.data.currentIndex >= this.data.questions.length - 1) {
-      this.finishSession()
+      if (this.data.mode === 'exam') {
+        this.finishSession()
+      }
       return
     }
     this.setData({ currentIndex: this.data.currentIndex + 1 })
@@ -145,6 +178,16 @@ Page({
     if (this.data.currentIndex <= 0) return
     this.setData({ currentIndex: this.data.currentIndex - 1 })
     this.prepareCurrentQuestion()
+  },
+
+  jumpQuestion(e) {
+    const index = Number(e.currentTarget.dataset.index || 0)
+    this.setData({ currentIndex: index, showCard: false })
+    this.prepareCurrentQuestion()
+  },
+
+  toggleCard() {
+    this.setData({ showCard: !this.data.showCard })
   },
 
   async saveProgress() {
@@ -165,28 +208,44 @@ Page({
 
   async finishSession() {
     this.clearTimer()
-    await this.saveProgress()
     if (this.data.mode === 'exam') {
+      const answerMap = this.data.answerMap
+      const resultMap = {}
+      const wrongIds = []
+      this.data.questions.forEach(q => {
+        const ok = practice.isCorrectAnswer(q, answerMap[q.id] || [])
+        resultMap[q.id] = ok
+        if (!ok) wrongIds.push(q.id)
+      })
       const total = this.data.questions.length || 1
-      const score = Math.round((this.data.correctCount / total) * 100)
+      const correct = Object.values(resultMap).filter(Boolean).length
+      const score = Math.round((correct / total) * 100)
+      this.setData({
+        resultMap,
+        doneCount: total,
+        correctCount: correct,
+        wrongQuestionIds: wrongIds
+      })
+      await this.saveProgress()
       try {
         await api.savePracticeExam({
           bankId: this.data.bankId,
           score,
           total,
-          correctCount: this.data.correctCount,
+          correctCount: correct,
           durationSeconds: 3600 - this.data.timeLeft,
           passed: score >= 80,
-          answers: {}
+          answers: answerMap
         })
       } catch (err) {
         console.warn('保存考试记录失败', err)
       }
       wx.redirectTo({
-        url: `/pages/practice/result/result?score=${score}&total=${total}&correct=${this.data.correctCount}&duration=${3600 - this.data.timeLeft}`
+        url: `/pages/practice/result/result?score=${score}&total=${total}&correct=${correct}&duration=${3600 - this.data.timeLeft}`
       })
       return
     }
+    await this.saveProgress()
     wx.navigateBack()
   },
 

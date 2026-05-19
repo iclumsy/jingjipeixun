@@ -5,6 +5,8 @@ Page({
     loading: true,
     error: '',
     banks: [],
+    activeBankIndex: 0,
+    activeBank: null,
     isAdmin: false
   },
 
@@ -27,9 +29,13 @@ Page({
     try {
       await app.ensureLogin()
       const summary = await app.refreshPracticeSummary()
+      const banks = Array.isArray(summary && summary.banks) ? summary.banks : []
+      const activeBankIndex = Math.min(this.data.activeBankIndex, Math.max(banks.length - 1, 0))
       this.setData({
         loading: false,
-        banks: Array.isArray(summary && summary.banks) ? summary.banks : [],
+        banks,
+        activeBankIndex,
+        activeBank: banks[activeBankIndex] || null,
         isAdmin: !!app.globalData.isAdmin,
         error: app.globalData.practiceError || ''
       })
@@ -38,20 +44,33 @@ Page({
         loading: false,
         error: err.message || '练习数据加载失败',
         banks: [],
+        activeBank: null,
         isAdmin: !!app.globalData.isAdmin
       })
     }
   },
 
+  selectBank(e) {
+    const index = Number(e.currentTarget.dataset.index || 0)
+    this.setData({
+      activeBankIndex: index,
+      activeBank: this.data.banks[index] || null
+    })
+  },
+
   startMode(e) {
-    const { bankId, mode, title } = e.currentTarget.dataset
-    if (!bankId || !mode) return
-    const bank = this.data.banks.find(item => String(item.id) === String(bankId))
-    const wrongIds = bank && bank.progress && Array.isArray(bank.progress.wrongQuestionIds)
+    const bank = this.data.activeBank
+    if (!bank) return
+    const { mode, filter } = e.currentTarget.dataset
+    const wrongIds = bank.progress && Array.isArray(bank.progress.wrongQuestionIds)
       ? bank.progress.wrongQuestionIds.join(',')
       : ''
+    if (mode === 'wrong' && !wrongIds) {
+      wx.showToast({ title: '暂无错题', icon: 'none' })
+      return
+    }
     wx.navigateTo({
-      url: `/pages/practice/session/session?bankId=${bankId}&mode=${mode}&title=${encodeURIComponent(title || '练习')}&wrongIds=${encodeURIComponent(wrongIds)}`
+      url: `/pages/practice/session/session?bankId=${bank.id}&mode=${mode}&filter=${filter || ''}&title=${encodeURIComponent(bank.displayName || '真题练习')}&wrongIds=${encodeURIComponent(wrongIds)}`
     })
   }
 })

@@ -231,7 +231,7 @@ def set_exam_bank_active(bank_id, is_active):
         return _row_to_bank(row)
 
 
-def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_ids=None):
+def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_ids=None, question_type=''):
     page_no = max(1, int(page or 1))
     page_size = min(max(1, int(limit or 20)), 100)
     offset = (page_no - 1) * page_size
@@ -244,6 +244,10 @@ def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_i
             placeholders = ','.join(['?'] * len(ids))
             where += f' AND id IN ({placeholders})'
             params.extend(ids)
+
+    if question_type in ('single', 'multi', 'judge'):
+        where += ' AND question_type = ?'
+        params.append(question_type)
 
     order = 'ORDER BY sort_order ASC, id ASC'
     if mode in ('random', 'exam'):
@@ -279,10 +283,43 @@ def _progress_for_banks(conn, openid, bank_ids):
     return {row['bank_id']: dict(row) for row in rows}
 
 
-def _format_summary_bank(bank, progress=None):
+def _type_counts_for_banks(conn, bank_ids):
+    if not bank_ids:
+        return {}
+    placeholders = ','.join(['?'] * len(bank_ids))
+    rows = conn.execute(
+        f'''
+        SELECT bank_id, question_type, COUNT(*) AS count
+        FROM exam_questions
+        WHERE bank_id IN ({placeholders})
+        GROUP BY bank_id, question_type
+        ''',
+        list(bank_ids),
+    ).fetchall()
+    result = {}
+    for row in rows:
+        bank_counts = result.setdefault(row['bank_id'], {
+            'all': 0,
+            'single': 0,
+            'multi': 0,
+            'judge': 0,
+        })
+        qtype = row['question_type'] if row['question_type'] in bank_counts else 'single'
+        bank_counts[qtype] += int(row['count'] or 0)
+        bank_counts['all'] += int(row['count'] or 0)
+    return result
+
+
+def _format_summary_bank(bank, progress=None, type_counts=None):
     wrong_ids = _json_loads((progress or {}).get('wrong_question_ids_json'), [])
     done = int((progress or {}).get('done_count') or 0)
     correct = int((progress or {}).get('correct_count') or 0)
+    counts = type_counts or {
+        'all': int(bank.get('question_count') or 0),
+        'single': 0,
+        'multi': 0,
+        'judge': 0,
+    }
     return {
         'id': bank['id'],
         'bankKey': bank['bank_key'],
@@ -290,6 +327,7 @@ def _format_summary_bank(bank, progress=None):
         'projectCode': bank.get('project_code') or '',
         'examProject': bank.get('exam_project') or '',
         'questionCount': int(bank.get('question_count') or 0),
+        'typeCounts': counts,
         'progress': {
             'doneCount': done,
             'correctCount': correct,
@@ -328,9 +366,10 @@ def get_practice_summary(openid, is_admin=False):
             ).fetchall()
         banks = [_row_to_bank(row) for row in rows]
         progress = _progress_for_banks(conn, openid, [bank['id'] for bank in banks])
+        type_counts = _type_counts_for_banks(conn, [bank['id'] for bank in banks])
 
     summary_banks = [
-        _format_summary_bank(bank, progress.get(bank['id']))
+        _format_summary_bank(bank, progress.get(bank['id']), type_counts.get(bank['id']))
         for bank in banks
     ]
     return {

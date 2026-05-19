@@ -6,7 +6,7 @@
 }
 
 .header {
-  padding: 22rpx 4rpx 26rpx;
+  padding: 22rpx 4rpx 20rpx;
 }
 
 .title {
@@ -34,13 +34,32 @@
   color: #fff;
 }
 
-.bank-list {
-  display: flex;
-  flex-direction: column;
-  gap: 22rpx;
+.bank-tabs {
+  white-space: nowrap;
+  margin-bottom: 18rpx;
 }
 
-.bank-card {
+.bank-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: 64rpx;
+  padding: 0 22rpx;
+  margin-right: 12rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  color: #697994;
+  border: 1rpx solid #dce6f2;
+  font-size: 24rpx;
+}
+
+.bank-tab.active {
+  background: #2f6af5;
+  color: #fff;
+  border-color: #2f6af5;
+}
+
+.hero-card,
+.filter-section {
   background: #fff;
   border: 1rpx solid #dce6f2;
   border-radius: 16rpx;
@@ -49,7 +68,7 @@
 }
 
 .bank-title {
-  font-size: 32rpx;
+  font-size: 34rpx;
   font-weight: 700;
   color: #15233d;
 }
@@ -64,7 +83,7 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12rpx;
-  margin: 22rpx 0;
+  margin-top: 22rpx;
 }
 
 .stats view {
@@ -88,16 +107,68 @@
   color: #697994;
 }
 
-.actions {
+.mode-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10rpx;
+  grid-template-columns: 1fr 1fr;
+  gap: 18rpx;
+  margin-top: 22rpx;
 }
 
-.actions button {
-  min-height: 72rpx;
-  padding: 0;
-  border-radius: 12rpx;
+.mode-card {
+  min-height: 188rpx;
+  background: #fff;
+  border: 1rpx solid #dce6f2;
+  border-radius: 16rpx;
+  padding: 22rpx;
+  box-sizing: border-box;
+}
+
+.mode-card:active {
+  background: #f5f9ff;
+}
+
+.mode-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #15233d;
+}
+
+.mode-desc {
+  margin-top: 10rpx;
+  min-height: 68rpx;
+  line-height: 1.45;
+  color: #697994;
+  font-size: 24rpx;
+}
+
+.mode-detail {
+  color: #1d4ed8;
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.filter-section {
+  margin-top: 22rpx;
+}
+
+.section-title {
+  color: #15233d;
+  font-size: 30rpx;
+  font-weight: 700;
+  margin-bottom: 16rpx;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.chips button {
+  min-height: 68rpx;
+  margin: 0;
+  padding: 0 20rpx;
+  border-radius: 999rpx;
   background: #eef4ff;
   color: #1d4ed8;
   font-size: 24rpx;
