@@ -1713,8 +1713,12 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
 }
 
 /* Exam bank admin */
-.exam-bank-page {
+body.exam-bank-page {
     background: #f3f6fb;
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .exam-bank-shell {
@@ -1833,6 +1837,37 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
     padding: 12px 10px;
     text-align: left;
     color: #334155;
+    vertical-align: middle;
+}
+
+.exam-bank-table th:nth-child(1),
+.exam-bank-table td:nth-child(1) {
+    width: 220px;
+}
+
+.exam-bank-table th:nth-child(2),
+.exam-bank-table td:nth-child(2) {
+    width: 240px;
+}
+
+.exam-bank-table th:nth-child(3),
+.exam-bank-table td:nth-child(3) {
+    width: 70px;
+}
+
+.exam-bank-table th:nth-child(4),
+.exam-bank-table td:nth-child(4) {
+    width: 80px;
+}
+
+.exam-bank-table th:nth-child(5),
+.exam-bank-table td:nth-child(5) {
+    width: 120px;
+}
+
+.exam-bank-table th:nth-child(6),
+.exam-bank-table td:nth-child(6) {
+    min-width: 260px;
 }
 
 .exam-bank-table th {
@@ -1871,7 +1906,7 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
     gap: 8px;
     align-items: center;
     flex-wrap: wrap;
-    min-width: 360px;
+    min-width: 260px;
 }
 
 .exam-bank-file-action {
@@ -1900,7 +1935,8 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
 }
 
 .exam-bank-inline-input {
-    width: 180px;
+    width: 100%;
+    max-width: 220px;
 }
 
 .exam-bank-inline-select {

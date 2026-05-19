@@ -51,7 +51,7 @@ function renderBanks() {
   body.innerHTML = state.banks.map(bank => `
     <tr>
       <td>
-        <strong>${bank.display_name || bank.bank_key}</strong>
+        <input class="exam-bank-inline-input" data-name="${bank.id}" type="text" value="${bank.display_name || bank.bank_key || ''}" aria-label="题库名称">
         <small>${bank.source_filename || ''}</small>
       </td>
       <td>
@@ -63,7 +63,6 @@ function renderBanks() {
       <td><span class="exam-bank-status ${bank.is_active ? 'active' : 'inactive'}">${bank.is_active ? '启用' : '停用'}</span></td>
       <td>${bank.imported_at || '-'}</td>
       <td class="exam-bank-actions">
-        <input class="exam-bank-inline-input" data-name="${bank.id}" type="text" value="${bank.display_name || bank.bank_key || ''}" aria-label="题库名称">
         <button data-save="${bank.id}">保存</button>
         <label class="exam-bank-file-action">
           重导
