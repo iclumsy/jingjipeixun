@@ -1,0 +1,167 @@
+from flask import Blueprint, g, jsonify, render_template, request
+
+from services import exam_bank_service
+
+
+exam_bank_bp = Blueprint('exam_bank', __name__)
+
+
+def _success(**payload):
+    return jsonify({'success': True, **payload})
+
+
+def _error(message, status=400):
+    return jsonify({'success': False, 'message': str(message)}), status
+
+
+def _parse_bool(value, default=False):
+    if value is None or value == '':
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _require_mini_user():
+    user = getattr(g, 'mini_user', None)
+    if not isinstance(user, dict) or not user.get('openid'):
+        return None
+    return user
+
+
+@exam_bank_bp.route('/admin/exam-banks', methods=['GET'])
+def exam_banks_admin_page():
+    return render_template('exam_banks_admin.html')
+
+
+@exam_bank_bp.route('/api/admin/exam_banks/projects', methods=['GET'])
+def admin_exam_bank_projects():
+    include_inactive = _parse_bool(request.args.get('include_inactive'), False)
+    return _success(projects=exam_bank_service.list_training_projects(include_inactive=include_inactive))
+
+
+@exam_bank_bp.route('/api/admin/exam_banks', methods=['GET'])
+def admin_exam_banks():
+    return _success(banks=exam_bank_service.list_exam_banks())
+
+
+def _uploaded_file():
+    file = request.files.get('file')
+    if not file or not file.filename:
+        raise ValueError('请选择题库 JSON 文件')
+    return file
+
+
+def _training_project_id():
+    json_data = request.get_json(silent=True) or {} if request.is_json else {}
+    raw = request.form.get('training_project_id') or json_data.get('training_project_id') or ''
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        value = 0
+    if value <= 0:
+        raise ValueError('请选择培训项目')
+    return value
+
+
+@exam_bank_bp.route('/api/admin/exam_banks/import', methods=['POST'])
+def admin_import_exam_bank():
+    try:
+        file = _uploaded_file()
+        bank = exam_bank_service.import_exam_bank(
+            file.stream,
+            file.filename,
+            _training_project_id(),
+            display_name=request.form.get('display_name', ''),
+            is_active=_parse_bool(request.form.get('is_active'), True),
+        )
+        return _success(bank=bank)
+    except ValueError as err:
+        return _error(err, 400)
+
+
+@exam_bank_bp.route('/api/admin/exam_banks/<int:bank_id>/reimport', methods=['POST'])
+def admin_reimport_exam_bank(bank_id):
+    try:
+        existing = exam_bank_service.get_exam_bank(bank_id)
+        if not existing:
+            return _error('题库不存在', 404)
+        file = _uploaded_file()
+        project_id = request.form.get('training_project_id') or existing.get('training_project_id')
+        bank = exam_bank_service.import_exam_bank(
+            file.stream,
+            file.filename,
+            int(project_id),
+            display_name=request.form.get('display_name') or existing.get('display_name') or '',
+            is_active=_parse_bool(request.form.get('is_active'), bool(existing.get('is_active'))),
+            replace_bank_id=bank_id,
+        )
+        return _success(bank=bank)
+    except ValueError as err:
+        return _error(err, 400)
+
+
+@exam_bank_bp.route('/api/admin/exam_banks/<int:bank_id>/toggle', methods=['POST'])
+def admin_toggle_exam_bank(bank_id):
+    try:
+        data = request.get_json(silent=True) or {}
+        bank = exam_bank_service.set_exam_bank_active(bank_id, _parse_bool(data.get('is_active'), False))
+        return _success(bank=bank)
+    except ValueError as err:
+        return _error(err, 404)
+
+
+@exam_bank_bp.route('/api/miniprogram/practice/summary', methods=['GET'])
+def mini_practice_summary():
+    user = _require_mini_user()
+    if not user:
+        return _error('未授权访问，请先登录', 401)
+    summary = exam_bank_service.get_practice_summary(
+        user.get('openid', ''),
+        is_admin=bool(user.get('is_admin')),
+    )
+    return jsonify(summary)
+
+
+@exam_bank_bp.route('/api/miniprogram/practice/banks/<int:bank_id>/questions', methods=['GET'])
+def mini_practice_questions(bank_id):
+    user = _require_mini_user()
+    if not user:
+        return _error('未授权访问，请先登录', 401)
+    if not exam_bank_service.can_access_bank(user.get('openid', ''), bank_id, bool(user.get('is_admin'))):
+        return _error('无权限访问该题库', 403)
+    wrong_ids = []
+    if request.args.get('wrong_ids'):
+        wrong_ids = [item for item in request.args.get('wrong_ids', '').split(',') if item.strip()]
+    result = exam_bank_service.get_questions(
+        bank_id,
+        mode=request.args.get('mode', 'sequential'),
+        page=request.args.get('page', 1),
+        limit=request.args.get('limit', 20),
+        wrong_question_ids=wrong_ids,
+    )
+    return jsonify(result)
+
+
+@exam_bank_bp.route('/api/miniprogram/practice/progress', methods=['POST'])
+def mini_practice_progress():
+    user = _require_mini_user()
+    if not user:
+        return _error('未授权访问，请先登录', 401)
+    data = request.get_json(silent=True) or {}
+    bank_id = int(data.get('bankId') or data.get('bank_id') or 0)
+    if not exam_bank_service.can_access_bank(user.get('openid', ''), bank_id, bool(user.get('is_admin'))):
+        return _error('无权限访问该题库', 403)
+    return jsonify(exam_bank_service.save_progress(user.get('openid', ''), bank_id, data))
+
+
+@exam_bank_bp.route('/api/miniprogram/practice/exams', methods=['POST'])
+def mini_practice_exam_record():
+    user = _require_mini_user()
+    if not user:
+        return _error('未授权访问，请先登录', 401)
+    data = request.get_json(silent=True) or {}
+    bank_id = int(data.get('bankId') or data.get('bank_id') or 0)
+    if not exam_bank_service.can_access_bank(user.get('openid', ''), bank_id, bool(user.get('is_admin'))):
+        return _error('无权限访问该题库', 403)
+    return jsonify(exam_bank_service.save_exam_record(user.get('openid', ''), bank_id, data))

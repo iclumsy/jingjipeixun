@@ -1,0 +1,41 @@
+<view class="session-page">
+  <view class="top">
+    <view>
+      <view class="title">{{title}}</view>
+      <view class="meta">{{currentIndex + 1}} / {{questions.length}}</view>
+    </view>
+    <view wx:if="{{mode === 'exam'}}" class="timer">{{timerText}}</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="state">正在加载题目...</view>
+  <view wx:elif="{{questions.length === 0}}" class="state">暂无题目</view>
+
+  <view wx:else class="question-card">
+    <view class="q-text">{{questions[currentIndex].question}}</view>
+    <view class="options">
+      <view
+        wx:for="{{optionList}}"
+        wx:for-item="option"
+        wx:key="key"
+        class="option {{option.selected ? 'selected' : ''}}"
+        data-key="{{option.key}}"
+        bindtap="selectOption"
+      >
+        <text class="option-key">{{option.key}}</text>
+        <text class="option-text">{{option.text}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{submitted}}" class="result {{isCorrect ? 'ok' : 'bad'}}">
+      <view>{{isCorrect ? '回答正确' : '回答错误'}}</view>
+      <view>正确答案：{{correctAnswerText}}</view>
+      <view wx:if="{{questions[currentIndex].analysis}}" class="analysis">{{questions[currentIndex].analysis}}</view>
+    </view>
+
+    <view class="actions">
+      <button bindtap="prevQuestion">上一题</button>
+      <button wx:if="{{!submitted}}" class="primary" bindtap="submitAnswer">确认答案</button>
+      <button wx:else class="primary" bindtap="nextQuestion">{{currentIndex >= questions.length - 1 ? '完成' : '下一题'}}</button>
+    </view>
+  </view>
+</view>

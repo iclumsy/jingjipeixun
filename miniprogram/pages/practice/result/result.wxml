@@ -1,0 +1,10 @@
+<view class="result-page">
+  <view class="score {{passed ? 'passed' : 'failed'}}">{{score}}</view>
+  <view class="verdict">{{passed ? '及格' : '未及格'}}</view>
+  <view class="stats">
+    <view>总题数：{{total}}</view>
+    <view>答对：{{correct}}</view>
+    <view>用时：{{durationText}}</view>
+  </view>
+  <button class="primary" bindtap="goHome">返回练习</button>
+</view>

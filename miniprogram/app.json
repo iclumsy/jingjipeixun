@@ -7,6 +7,9 @@
     "pages/user/edit/edit",
     "pages/admin/review/review",
     "pages/admin/detail/detail",
+    "pages/practice/index/index",
+    "pages/practice/session/session",
+    "pages/practice/result/result",
     "pages/agreement/agreement",
     "pages/privacy/privacy"
   ],
@@ -35,6 +38,10 @@
       {
         "pagePath": "pages/admin/review/review",
         "text": "审核管理"
+      },
+      {
+        "pagePath": "pages/practice/index/index",
+        "text": "真题练习"
       }
     ]
   },

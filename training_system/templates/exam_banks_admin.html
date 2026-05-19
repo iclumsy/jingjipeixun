@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>题库管理</title>
+    <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="admin-page exam-bank-page">
+    <div class="top-nav-bar">
+        <a href="/admin" class="top-nav-link top-nav-outline">学员管理</a>
+        <a href="/admin/files" class="top-nav-link top-nav-outline">文件管理</a>
+        <a href="/admin/config" class="top-nav-link top-nav-outline">系统配置</a>
+        <a href="/auth/logout" class="top-nav-link top-nav-outline">退出</a>
+    </div>
+
+    <main class="exam-bank-shell">
+        <section class="exam-bank-header">
+            <div>
+                <h1>题库管理</h1>
+                <p>为任意培训项目上传 JSON 题库。启用后，小程序会自动展示给有权限的学员和管理员。</p>
+            </div>
+            <button id="refreshBanksBtn" class="exam-bank-secondary">刷新</button>
+        </section>
+
+        <section class="exam-bank-panel">
+            <h2>上传题库</h2>
+            <form id="importBankForm" class="exam-bank-form">
+                <label>
+                    <span>培训项目</span>
+                    <select id="projectSelect" name="training_project_id" required></select>
+                </label>
+                <label>
+                    <span>题库显示名称</span>
+                    <input id="displayNameInput" name="display_name" type="text" placeholder="例如：叉车司机题库">
+                </label>
+                <label>
+                    <span>JSON 文件</span>
+                    <input id="bankFileInput" name="file" type="file" accept=".json,application/json" required>
+                </label>
+                <label class="exam-bank-check">
+                    <input id="activeInput" name="is_active" type="checkbox" checked>
+                    <span>导入后立即启用</span>
+                </label>
+                <button type="submit" class="exam-bank-primary">上传并导入</button>
+            </form>
+            <div id="bankMessage" class="exam-bank-message"></div>
+        </section>
+
+        <section class="exam-bank-panel">
+            <h2>已导入题库</h2>
+            <div class="exam-bank-table-wrap">
+                <table class="exam-bank-table">
+                    <thead>
+                        <tr>
+                            <th>题库</th>
+                            <th>项目</th>
+                            <th>题量</th>
+                            <th>状态</th>
+                            <th>导入时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bankTableBody">
+                        <tr><td colspan="6">正在加载...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/js/exam_banks_admin.js"></script>
+</body>
+</html>

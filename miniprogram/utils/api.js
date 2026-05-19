@@ -381,7 +381,8 @@ async function login() {
   return {
     token,
     openid,
-    isAdmin
+    isAdmin,
+    role: isAdmin ? 'admin' : 'student'
   }
 }
 
@@ -874,6 +875,39 @@ async function getStudentFilters(role = 'admin') {
   return data
 }
 
+async function getPracticeSummary() {
+  return await requestApi('/api/miniprogram/practice/summary', {
+    method: 'GET'
+  })
+}
+
+async function getPracticeQuestions(bankId, params = {}) {
+  const id = encodeURIComponent(String(bankId || '').trim())
+  if (!id) throw new Error('题库ID不能为空')
+  const query = Object.keys(params || {})
+    .filter(key => params[key] !== undefined && params[key] !== null && params[key] !== '')
+    .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+    .join('&')
+  const suffix = query ? `?${query}` : ''
+  return await requestApi(`/api/miniprogram/practice/banks/${id}/questions${suffix}`, {
+    method: 'GET'
+  })
+}
+
+async function savePracticeProgress(payload = {}) {
+  return await requestApi('/api/miniprogram/practice/progress', {
+    method: 'POST',
+    data: payload
+  })
+}
+
+async function savePracticeExam(payload = {}) {
+  return await requestApi('/api/miniprogram/practice/exams', {
+    method: 'POST',
+    data: payload
+  })
+}
+
 const COS = require('./cos-wx-sdk-v5.js');
 
 let cosInstance = null;
@@ -1175,6 +1209,10 @@ module.exports = {
   getWechatConfig,      // 获取微信配置
   getAttachmentConfig,  // 获取附件启用配置
   getStudentFilters,    // 获取学员列表筛选 tab 配置
+  getPracticeSummary,   // 获取可练习题库摘要
+  getPracticeQuestions, // 获取练习题目
+  savePracticeProgress, // 保存练习进度
+  savePracticeExam,     // 保存模拟考试记录
   uploadAttachment,     // 上传附件
   downloadTrainingForm, // 下载体检表
   submitPlatformRegistration, // 提交报名

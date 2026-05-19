@@ -1,5 +1,5 @@
 const FORCE_CREATE_SUBMIT_KEY = 'submit_force_create_mode'
-const { hasAdminAccess } = require('../utils/page-helpers')
+const { hasAdminAccess, hasPracticeAccess } = require('../utils/page-helpers')
 
 Component({
   data: {
@@ -32,12 +32,21 @@ Component({
       return index >= 0 ? index : 0
     },
 
-    updateTabBar() {
+    async updateTabBar() {
+      const app = getApp()
+      if (app && typeof app.ensureLogin === 'function') {
+        try {
+          await app.ensureLogin()
+        } catch (err) {
+          // 登录失败时继续使用最小标签，页面会展示对应错误。
+        }
+      }
       const currentRoute = this.getCurrentRoute()
       const isAdmin = hasAdminAccess()
+      const canPractice = hasPracticeAccess()
 
       // 根据用户角色动态设置 TabBar
-      const allTabs = [
+      const userTabs = [
         {
           pagePath: "/pages/user/submit/submit",
           text: "信息采集",
@@ -47,7 +56,14 @@ Component({
           pagePath: "/pages/user/list/list",
           text: "我的提交",
           iconText: "单"
-        },
+        }
+      ]
+      const practiceTab = {
+        pagePath: "/pages/practice/index/index",
+        text: "真题练习",
+        iconText: "练"
+      }
+      const adminTabs = [
         {
           pagePath: "/pages/admin/review/review",
           text: "审核管理",
@@ -55,8 +71,9 @@ Component({
         }
       ]
 
-      // 非管理员只显示前两个标签
-      const list = isAdmin ? allTabs : allTabs.slice(0, 2)
+      const list = isAdmin
+        ? [...userTabs, practiceTab, ...adminTabs]
+        : (canPractice ? [...userTabs, practiceTab] : userTabs)
       const selected = this.getSelectedIndex(list, currentRoute)
 
       this.setData({ list, selected })

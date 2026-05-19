@@ -1,0 +1,104 @@
+.practice-page {
+  min-height: 100vh;
+  background: #f3f6fb;
+  padding: 28rpx 24rpx calc(160rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.header {
+  padding: 22rpx 4rpx 26rpx;
+}
+
+.title {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #15233d;
+}
+
+.subtitle {
+  margin-top: 8rpx;
+  font-size: 26rpx;
+  color: #697994;
+}
+
+.state {
+  margin-top: 80rpx;
+  text-align: center;
+  color: #697994;
+  font-size: 28rpx;
+}
+
+.primary-btn {
+  margin-top: 24rpx;
+  background: #2f6af5;
+  color: #fff;
+}
+
+.bank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 22rpx;
+}
+
+.bank-card {
+  background: #fff;
+  border: 1rpx solid #dce6f2;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  box-shadow: 0 10rpx 24rpx rgba(19, 37, 69, 0.06);
+}
+
+.bank-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #15233d;
+}
+
+.bank-meta {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #697994;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12rpx;
+  margin: 22rpx 0;
+}
+
+.stats view {
+  background: #f5f8ff;
+  border-radius: 12rpx;
+  padding: 14rpx 8rpx;
+  text-align: center;
+}
+
+.stats text:first-child {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.stats text:last-child {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #697994;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10rpx;
+}
+
+.actions button {
+  min-height: 72rpx;
+  padding: 0;
+  border-radius: 12rpx;
+  background: #eef4ff;
+  color: #1d4ed8;
+  font-size: 24rpx;
+}

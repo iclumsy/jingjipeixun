@@ -62,7 +62,9 @@ App({
       // 登录成功：更新全局状态和本地存储
       this.globalData.userInfo = result
       this.globalData.isAdmin = !!result.isAdmin
+      this.globalData.role = result.role || (result.isAdmin ? 'admin' : 'student')
       this.globalData.openid = result.openid || ''
+      await this.refreshPracticeSummary()
       this.globalData.loginState = 'success'
       this.globalData.loginError = ''
       wx.setStorageSync('is_admin', !!result.isAdmin)
@@ -75,7 +77,11 @@ App({
       console.error('登录失败', err)
       this.globalData.userInfo = null
       this.globalData.isAdmin = false
+      this.globalData.role = 'student'
       this.globalData.openid = ''
+      this.globalData.practiceEnabled = false
+      this.globalData.practiceBanks = []
+      this.globalData.practiceError = ''
       this.globalData.loginState = 'failed'
       this.globalData.loginError = err.message || '请检查网络连接或联系管理员'
       wx.setStorageSync('is_admin', false)
@@ -84,11 +90,31 @@ App({
     }
   },
 
+  async refreshPracticeSummary() {
+    try {
+      const summary = await api.getPracticeSummary()
+      this.globalData.practiceEnabled = !!(summary && summary.practiceEnabled)
+      this.globalData.practiceBanks = Array.isArray(summary && summary.banks) ? summary.banks : []
+      this.globalData.practiceError = ''
+      return summary
+    } catch (err) {
+      console.warn('练习摘要加载失败', err)
+      this.globalData.practiceEnabled = false
+      this.globalData.practiceBanks = []
+      this.globalData.practiceError = err.message || '练习数据加载失败'
+      return null
+    }
+  },
+
   // ======================== 全局状态 ========================
   globalData: {
     userInfo: null,          // 用户信息对象
     isAdmin: false,          // 是否为管理员
+    role: 'student',         // 用户角色: admin/student
     openid: null,            // 用户 openid
+    practiceEnabled: false,  // 是否显示练习入口
+    practiceBanks: [],       // 可练习题库摘要
+    practiceError: '',       // 练习摘要加载错误
     loginState: 'idle',      // 登录状态: idle/loading/success/failed
     loginError: '',          // 登录错误信息
     // 临时允许 HTTP 接口地址（上线前请改为 false 并切换到 HTTPS）

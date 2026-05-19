@@ -21,9 +21,13 @@ function parseIsAdmin(raw) {
  */
 function hasAdminAccess() {
   const app = getApp()
-  const fromGlobal = !!(app && app.globalData && app.globalData.isAdmin)
-  const fromStorage = parseIsAdmin(wx.getStorageSync('is_admin'))
-  return fromGlobal || fromStorage
+  return !!(app && app.globalData && app.globalData.isAdmin)
+}
+
+function hasPracticeAccess() {
+  const app = getApp()
+  if (!app || !app.globalData) return false
+  return !!(app.globalData.isAdmin || app.globalData.practiceEnabled)
 }
 
 /**
@@ -79,5 +83,6 @@ function parseDateTimeParts(raw = '') {
 module.exports = {
   parseIsAdmin,
   hasAdminAccess,
+  hasPracticeAccess,
   formatDateTime
 }

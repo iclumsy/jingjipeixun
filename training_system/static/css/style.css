@@ -1711,3 +1711,188 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
     background: #dc2626;
     box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
 }
+
+/* Exam bank admin */
+.exam-bank-page {
+    background: #f3f6fb;
+}
+
+.exam-bank-shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 88px 24px 48px;
+}
+
+.exam-bank-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.exam-bank-header h1 {
+    margin: 0;
+    color: #111827;
+    font-size: 1.8rem;
+}
+
+.exam-bank-header p {
+    margin: 8px 0 0;
+    color: #64748b;
+}
+
+.exam-bank-panel {
+    background: #fff;
+    border: 1px solid #dbe4f0;
+    border-radius: 10px;
+    padding: 22px;
+    margin-bottom: 18px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+}
+
+.exam-bank-panel h2 {
+    margin: 0 0 16px;
+    font-size: 1.15rem;
+    color: #1f2937;
+}
+
+.exam-bank-form {
+    display: grid;
+    grid-template-columns: 2fr 1.4fr 1.4fr auto auto;
+    gap: 14px;
+    align-items: end;
+}
+
+.exam-bank-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: #475569;
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.exam-bank-form input,
+.exam-bank-form select {
+    min-height: 42px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 8px 10px;
+    box-sizing: border-box;
+}
+
+.exam-bank-check {
+    flex-direction: row !important;
+    align-items: center;
+    min-height: 42px;
+}
+
+.exam-bank-primary,
+.exam-bank-secondary,
+.exam-bank-actions button,
+.exam-bank-file-action {
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-weight: 700;
+    cursor: pointer;
+    min-height: 42px;
+    padding: 0 14px;
+}
+
+.exam-bank-primary {
+    background: #2563eb;
+    color: #fff;
+    border-color: #2563eb;
+}
+
+.exam-bank-message {
+    min-height: 22px;
+    margin-top: 12px;
+    color: #64748b;
+}
+
+.exam-bank-message.success { color: #047857; }
+.exam-bank-message.error { color: #be123c; }
+.exam-bank-message.info { color: #1d4ed8; }
+
+.exam-bank-table-wrap {
+    overflow-x: auto;
+}
+
+.exam-bank-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.exam-bank-table th,
+.exam-bank-table td {
+    border-bottom: 1px solid #e2e8f0;
+    padding: 12px 10px;
+    text-align: left;
+    color: #334155;
+}
+
+.exam-bank-table th {
+    color: #64748b;
+    font-size: 0.84rem;
+    background: #f8fafc;
+}
+
+.exam-bank-table small {
+    display: block;
+    color: #94a3b8;
+    margin-top: 4px;
+}
+
+.exam-bank-status {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.exam-bank-status.active {
+    background: #dcfce7;
+    color: #047857;
+}
+
+.exam-bank-status.inactive {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.exam-bank-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.exam-bank-file-action {
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.exam-bank-file-action input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+@media (max-width: 900px) {
+    .exam-bank-form {
+        grid-template-columns: 1fr;
+    }
+
+    .exam-bank-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

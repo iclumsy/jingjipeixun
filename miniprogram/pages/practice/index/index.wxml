@@ -1,0 +1,41 @@
+<view class="practice-page">
+  <view class="header">
+    <view>
+      <view class="title">真题练习</view>
+      <view class="subtitle">{{isAdmin ? '管理员可调试所有已启用题库' : '仅显示已审核通过报名对应的题库'}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="state">正在加载题库...</view>
+
+  <view wx:elif="{{error}}" class="state">
+    <view>{{error}}</view>
+    <button class="primary-btn" bindtap="loadSummary">重试</button>
+  </view>
+
+  <view wx:elif="{{banks.length === 0}}" class="state">
+    <view>暂无可练习题库</view>
+  </view>
+
+  <view wx:else class="bank-list">
+    <view wx:for="{{banks}}" wx:key="id" class="bank-card">
+      <view class="bank-head">
+        <view>
+          <view class="bank-title">{{item.displayName}}</view>
+          <view class="bank-meta">{{item.projectCode}} · {{item.examProject}} · {{item.questionCount}} 题</view>
+        </view>
+      </view>
+      <view class="stats">
+        <view><text>{{item.progress.doneCount}}</text><text>已练</text></view>
+        <view><text>{{item.progress.correctCount}}</text><text>正确</text></view>
+        <view><text>{{item.progress.wrongCount}}</text><text>错题</text></view>
+      </view>
+      <view class="actions">
+        <button data-bank-id="{{item.id}}" data-mode="sequential" data-title="{{item.displayName}}" bindtap="startMode">顺序</button>
+        <button data-bank-id="{{item.id}}" data-mode="random" data-title="{{item.displayName}}" bindtap="startMode">随机</button>
+        <button data-bank-id="{{item.id}}" data-mode="exam" data-title="{{item.displayName}}" bindtap="startMode">模拟</button>
+        <button data-bank-id="{{item.id}}" data-mode="wrong" data-title="{{item.displayName}}" bindtap="startMode">错题</button>
+      </view>
+    </view>
+  </view>
+</view>

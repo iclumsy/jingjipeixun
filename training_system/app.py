@@ -29,6 +29,7 @@ from routes.student_routes import student_bp
 from routes.file_routes import file_bp
 from routes.export_routes import export_bp
 from routes.config_routes import config_bp
+from routes.exam_bank_routes import exam_bank_bp
 from utils.miniprogram_auth import extract_mini_token, has_mini_auth_config, verify_mini_token
 from utils.auth import (
     build_login_redirect_target,
@@ -273,6 +274,7 @@ def create_app():
     app.register_blueprint(file_bp)          # /students/*         静态文件服务
     app.register_blueprint(export_bp)        # /api/export/*       数据导出
     app.register_blueprint(config_bp)        # /api/config/*       配置接口
+    app.register_blueprint(exam_bank_bp)     # /api/*/exam_banks, /api/miniprogram/practice 题库练习
     app.register_blueprint(log_bp)           # /api/logs/content, /admin/logs 日志查看
 
     # 报名平台自动化（按需加载，缺依赖不阻断启动）

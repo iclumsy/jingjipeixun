@@ -291,6 +291,79 @@ def init_db(database_path):
             )
         ''')
 
+        # 练习题库：JSON 题库导入后的正式运行数据源
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS exam_banks (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                training_project_id INTEGER,
+                bank_key            TEXT NOT NULL,
+                training_type       TEXT NOT NULL,
+                job_category        TEXT NOT NULL,
+                exam_project        TEXT NOT NULL,
+                project_code        TEXT,
+                display_name        TEXT NOT NULL,
+                source_filename     TEXT,
+                question_count      INTEGER DEFAULT 0,
+                is_active           INTEGER DEFAULT 1,
+                imported_at         TEXT,
+                created_at          TIMESTAMP DEFAULT (DATETIME(CURRENT_TIMESTAMP, 'localtime')),
+                updated_at          TIMESTAMP DEFAULT (DATETIME(CURRENT_TIMESTAMP, 'localtime'))
+            )
+        ''')
+        _ensure_column_exists(conn, 'exam_banks', 'training_project_id', 'training_project_id INTEGER')
+        _ensure_column_exists(conn, 'exam_banks', 'bank_key', 'bank_key TEXT')
+        _ensure_column_exists(conn, 'exam_banks', 'display_name', 'display_name TEXT')
+
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS exam_questions (
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                bank_id              INTEGER NOT NULL,
+                source_question_id   TEXT,
+                question_type        TEXT NOT NULL,
+                type_code            INTEGER,
+                question             TEXT NOT NULL,
+                question_html        TEXT,
+                options_json         TEXT DEFAULT '{}',
+                answer_json          TEXT DEFAULT '[]',
+                analysis             TEXT,
+                question_images_json TEXT DEFAULT '[]',
+                option_images_json   TEXT DEFAULT '{}',
+                audio                TEXT,
+                sort_order           INTEGER DEFAULT 0,
+                raw_json             TEXT DEFAULT '{}'
+            )
+        ''')
+
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS mini_practice_progress (
+                id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                openid                  TEXT NOT NULL,
+                bank_id                 INTEGER NOT NULL,
+                mode                    TEXT DEFAULT 'practice',
+                done_count              INTEGER DEFAULT 0,
+                correct_count           INTEGER DEFAULT 0,
+                wrong_question_ids_json TEXT DEFAULT '[]',
+                last_question_id        INTEGER,
+                updated_at              TIMESTAMP DEFAULT (DATETIME(CURRENT_TIMESTAMP, 'localtime')),
+                UNIQUE(openid, bank_id, mode)
+            )
+        ''')
+
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS mini_exam_records (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                openid           TEXT NOT NULL,
+                bank_id          INTEGER NOT NULL,
+                score            INTEGER DEFAULT 0,
+                total            INTEGER DEFAULT 0,
+                correct_count    INTEGER DEFAULT 0,
+                duration_seconds INTEGER DEFAULT 0,
+                passed           INTEGER DEFAULT 0,
+                answers_json     TEXT DEFAULT '{}',
+                created_at       TIMESTAMP DEFAULT (DATETIME(CURRENT_TIMESTAMP, 'localtime'))
+            )
+        ''')
+
         # 写入默认数据（已存在则忽略，不会覆盖管理员的修改）
         default_attachments = [
             ('special_equipment', 'photo',           '个人照片',     1, 1),
@@ -378,6 +451,18 @@ def init_db(database_path):
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_operation_logs_action_created "
             "ON operation_logs(action, created_at DESC, id DESC)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_exam_banks_project_active "
+            "ON exam_banks(training_project_id, is_active)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_exam_questions_bank_sort "
+            "ON exam_questions(bank_id, sort_order)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_practice_progress_openid_bank "
+            "ON mini_practice_progress(openid, bank_id)"
         )
         conn.commit()
     except sqlite3.Error as e:

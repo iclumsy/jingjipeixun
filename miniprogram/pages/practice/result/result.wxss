@@ -1,0 +1,43 @@
+.result-page {
+  min-height: 100vh;
+  background: #f3f6fb;
+  padding: 80rpx 40rpx;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.score {
+  width: 220rpx;
+  height: 220rpx;
+  margin: 0 auto;
+  border-radius: 110rpx;
+  line-height: 220rpx;
+  font-size: 72rpx;
+  font-weight: 800;
+  background: #fff;
+  border: 10rpx solid #10b981;
+  color: #047857;
+}
+
+.score.failed {
+  border-color: #f43f5e;
+  color: #be123c;
+}
+
+.verdict {
+  margin-top: 28rpx;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #15233d;
+}
+
+.stats {
+  margin: 36rpx 0;
+  color: #475569;
+  line-height: 2;
+}
+
+.primary {
+  background: #2f6af5;
+  color: #fff;
+}
