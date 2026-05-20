@@ -1604,8 +1604,22 @@ def auto_crop_document(image):
 
 
 def read_cv_image(path):
-    img_np = np.fromfile(path, dtype=np.uint8)
-    return cv2.imdecode(img_np, cv2.IMREAD_COLOR)
+    try:
+        from PIL import Image, ImageOps
+        with Image.open(path) as pil_img:
+            # 自动应用 EXIF 旋转属性
+            pil_img = ImageOps.exif_transpose(pil_img)
+            img_np = np.array(pil_img)
+            if len(img_np.shape) == 2:  # 灰度图
+                return cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
+            elif img_np.shape[2] == 4:  # 带透明通道的 RGBA
+                return cv2.cvtColor(img_np, cv2.COLOR_RGBA2BGR)
+            else:  # 标准 RGB
+                return cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+    except Exception as e:
+        print(f"[read_cv_image] Pillow 读取/校正 EXIF 失败，退回默认读取: {e}")
+        img_np = np.fromfile(path, dtype=np.uint8)
+        return cv2.imdecode(img_np, cv2.IMREAD_COLOR)
 
 
 def write_cv_image(path, img, quality=95):
