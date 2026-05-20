@@ -200,7 +200,7 @@ def resolve_openid_name(openid: str) -> str:
     """
     将小程序用户 openid 解析为可读姓名。
 
-    命中映射表时返回 "姓名(openid)"，未命中时原样返回 openid。
+    命中映射表或数据库时返回对应姓名，未命中时原样返回 openid。
     openid 为空时返回 "-"。
 
     参数:
@@ -214,6 +214,20 @@ def resolve_openid_name(openid: str) -> str:
     name = OPENID_NAME_MAP.get(openid)
     if name:
         return name
+    
+    # 尝试从数据库里查询该 openid 对应的学生姓名
+    try:
+        from models.student import get_db_connection
+        with get_db_connection() as conn:
+            row = conn.execute(
+                "SELECT name FROM students WHERE submitter_openid = ? LIMIT 1",
+                (openid,)
+            ).fetchone()
+            if row and row['name']:
+                return row['name']
+    except Exception:
+        pass
+
     return openid
 
 
