@@ -2743,7 +2743,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return null;
     }
 
-    function showAdjustPanel(student, matType, anchorEl, reloadFn) {
+    function showAdjustPanel(student, matType, anchorEl, reloadFn, currentAdjustment) {
         const existingPanel = document.getElementById('mat-adjust-panel');
         if (existingPanel) existingPanel.remove();
 
@@ -2845,28 +2845,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         const ratioDesc  = tip('📌 比例明显异常（过扁或过高）→ 尝试「关闭」｜多数情况保持「开启」');
         const whiteBgDesc = tip('📌 使用 AI 去除背景并替换为纯白色｜如照片已是白底可关闭');
 
+        const savedAdjs = (currentAdjustment && currentAdjustment.adjustments) || {};
+
         let leftHtml;
         if (matType === 'photo') {
             // photo 简化版：只有白底开关 + 旋转
-            leftHtml = fieldRow('白底处理', whiteBgDesc, 'white_bg', whiteOptions, 'on');
+            const defWhiteBg = savedAdjs.skip_white_bg ? 'off' : 'on';
+            leftHtml = fieldRow('白底处理', whiteBgDesc, 'white_bg', whiteOptions, defWhiteBg);
             cfg.rotateFields.forEach(f => {
-                leftHtml += fieldRow(f.label, f.hint || tip('📌 方向颠倒或横置时使用，每次旋转 90°'), f.key, rotateOptions, '0');
+                const defRotate = savedAdjs[f.key] ? String(savedAdjs[f.key]) : '0';
+                leftHtml += fieldRow(f.label, f.hint || tip('📌 方向颠倒或横置时使用，每次旋转 90°'), f.key, rotateOptions, defRotate);
             });
         } else {
-            let advancedHtml = fieldRow('裁剪模式', cropDesc, 'crop_mode', cropOptions, 'auto')
-                             + fieldRow('裁剪边距', expandDesc, 'expand_level', expandOptions, 'normal')
-                             + fieldRow('比例修剪', ratioDesc, 'ratio_trim', trimOptions, 'on');
+            const defCropMode = savedAdjs.crop_mode || 'auto';
+            const defExpand = savedAdjs.expand_level || 'normal';
+            const defRatioTrim = savedAdjs.skip_ratio_trim ? 'off' : 'on';
+            let advancedHtml = fieldRow('裁剪模式', cropDesc, 'crop_mode', cropOptions, defCropMode)
+                             + fieldRow('裁剪边距', expandDesc, 'expand_level', expandOptions, defExpand)
+                             + fieldRow('比例修剪', ratioDesc, 'ratio_trim', trimOptions, defRatioTrim);
 
             if (matType === 'id_card' || matType === 'hukou') {
                 const cannyOptions = [{value:'1.5',label:'低灵敏'},{value:'1.0',label:'标准'},{value:'0.6',label:'高灵敏'},{value:'0.35',label:'极高灵敏'}];
                 const cannyDesc = matType === 'id_card'
                     ? tip('📌 纯黑背景+白色卡片 → 极高灵敏｜深色背景/边缘模糊 → 高灵敏｜被误识到背景纹理噪点 → 低灵敏｜不确定先试「高灵敏」')
                     : tip('📌 户口本放在深色桌面上拍 → 高灵敏｜扫描件/白底书页 → 标准｜识别到装订线等多余边缘 → 低灵敏');
-                advancedHtml += fieldRow('边缘灵敏度', cannyDesc, 'canny_scale', cannyOptions, '1.0');
+                const defCanny = savedAdjs.canny_scale ? String(savedAdjs.canny_scale) : '1.0';
+                advancedHtml += fieldRow('边缘灵敏度', cannyDesc, 'canny_scale', cannyOptions, defCanny);
             }
             leftHtml = advancedBlock(advancedHtml);
             cfg.rotateFields.forEach(f => {
-                leftHtml += fieldRow(f.label, f.hint || tip('📌 方向颠倒或横置时使用，每次旋转 90°'), f.key, rotateOptions, '0');
+                const defRotate = savedAdjs[f.key] ? String(savedAdjs[f.key]) : '0';
+                leftHtml += fieldRow(f.label, f.hint || tip('📌 方向颠倒或横置时使用，每次旋转 90°'), f.key, rotateOptions, defRotate);
             });
         }
 
@@ -2916,8 +2925,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             let dispPts    = null;   // 4×[cx,cy] canvas 坐标（由 origToDisp 动态派生）
             let dragging   = -1;
             let userDragged = false; // 用户真正手动拖动过
-            let hasConfirmedPoints = false; // 仅用户确认过的点位才参与提交
-            let rotationDeg = 0;     // 当前旋转角度（0/90/180/270）
+
+            // 从历史数据恢复 points 和 confirmed 状态
+            const savedPoints = (currentAdjustment && currentAdjustment.points) || {};
+            const savedPts = savedPoints[ip.pointsKey];
+            let hasConfirmedPoints = false;
+            if (savedPts && savedPts.length === 4) {
+                originalPts = savedPts.map(p => [...p]);
+                hasConfirmedPoints = true;
+                // 同步设置至 cropState 保证初始状态有效
+                cropState[ip.pointsKey] = {
+                    displayPts: [],
+                    originalPts: originalPts.map(p => [...p])
+                };
+            }
+
+            // 从历史数据恢复旋转角度
+            let rotKey = null;
+            if (cfg.rotateKeyToPanel) {
+                for (const [rk, pk] of Object.entries(cfg.rotateKeyToPanel)) {
+                    if (pk === ip.pointsKey) {
+                        rotKey = rk;
+                        break;
+                    }
+                }
+            }
+            let rotationDeg = rotKey ? parseInt(savedAdjs[rotKey] || '0', 10) : 0;
 
             // ── photo 固定比例矩形框状态 ──────────────────────────────────
             const isFixedRatio = !!cfg.fixedRatio;
@@ -3001,24 +3034,36 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const nw = img.naturalWidth, nh = img.naturalHeight;
                 if (!nw) return;
                 if (isFixedRatio) {
-                    // 在原图中心放置最大的固定比例矩形
-                    let rw, rh;
-                    if (nw / nh > FIXED_RATIO) {
-                        rh = nh * 0.85;
-                        rw = rh * FIXED_RATIO;
+                    if (originalPts && originalPts.length === 4) {
+                        cropRect = {
+                            x: originalPts[0][0],
+                            y: originalPts[0][1],
+                            w: originalPts[2][0] - originalPts[0][0],
+                            h: originalPts[2][1] - originalPts[0][1]
+                        };
+                        refreshDispRect();
                     } else {
-                        rw = nw * 0.85;
-                        rh = rw / FIXED_RATIO;
+                        // 在原图中心放置最大的固定比例矩形
+                        let rw, rh;
+                        if (nw / nh > FIXED_RATIO) {
+                            rh = nh * 0.85;
+                            rw = rh * FIXED_RATIO;
+                        } else {
+                            rw = nw * 0.85;
+                            rh = rw / FIXED_RATIO;
+                        }
+                        cropRect = {
+                            x: Math.round((nw - rw) / 2),
+                            y: Math.round((nh - rh) / 2),
+                            w: Math.round(rw),
+                            h: Math.round(rh),
+                        };
+                        refreshDispRect();
                     }
-                    cropRect = {
-                        x: Math.round((nw - rw) / 2),
-                        y: Math.round((nh - rh) / 2),
-                        w: Math.round(rw),
-                        h: Math.round(rh),
-                    };
-                    refreshDispRect();
                 } else {
-                    originalPts = [[0, 0], [nw, 0], [nw, nh], [0, nh]];
+                    if (!originalPts) {
+                        originalPts = [[0, 0], [nw, 0], [nw, nh], [0, nh]];
+                    }
                     refreshDispPts();
                 }
                 syncCropState();
@@ -3369,7 +3414,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // ── 暴露接口 ──────────────────────────────────────────────────
             wrap.applyServerPoints = (pts_orig) => {
-                if (userDragged) return; // 用户手动拖过，不覆盖
+                if (userDragged || hasConfirmedPoints) return; // 用户手动拖过或已有历史点，不覆盖
                 originalPts = pts_orig.map(p => [...p]);
                 hasConfirmedPoints = false;
                 refreshDispPts();
@@ -3380,6 +3425,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
 
             wrap.getHasDragged = () => userDragged;
+            wrap.getHasConfirmed = () => hasConfirmedPoints;
 
             wrap.setStatus = (text, color) => {
                 statusEl.textContent = text;
@@ -3415,14 +3461,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (cvs.clientWidth === 0) return;
                 if (isFixedRatio) {
                     initRect();
-                    statusEl.textContent = '拖动选框调整裁剪范围（不标记默认处理整张图）';
-                    statusEl.style.color = '#6b7280';
+                    if (hasConfirmedPoints) {
+                        statusEl.textContent = '✓ 已加载历史裁剪范围，可拖动选框调整';
+                        statusEl.style.color = '#059669';
+                    } else {
+                        statusEl.textContent = '拖动选框调整裁剪范围（不标记默认处理整张图）';
+                        statusEl.style.color = '#6b7280';
+                    }
                 } else if (!hasConfirmedPoints && !originalPts) {
                     initRect();
                     statusEl.textContent = '拖动角点调整裁剪区域（不标记默认按左侧参数运行自动处理）';
                     statusEl.style.color = '#6b7280';
                 } else {
                     refreshDispPts();
+                    if (hasConfirmedPoints) {
+                        statusEl.textContent = '✓ 已加载历史裁剪区域，可拖动角点微调';
+                        statusEl.style.color = '#059669';
+                    }
                 }
                 redraw();
             }
@@ -3571,7 +3626,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             cfg.imagePanels.forEach(ip => {
                 const el = panelEls[ip.pointsKey];
-                if (el && !el.getHasDragged()) el.setStatus('⏳ 计算中...', '#9ca3af');
+                if (el && !el.getHasDragged() && !el.getHasConfirmed()) el.setStatus('⏳ 计算中...', '#9ca3af');
             });
             fetch(`/api/students/${student.id}/analyze_material_points`, {
                 method: 'POST',
@@ -3582,7 +3637,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 cfg.imagePanels.forEach(ip => {
                     const el = panelEls[ip.pointsKey];
                     if (!el) return;
-                    if (el.getHasDragged()) return; // 用户手动拖过，不覆盖
+                    if (el.getHasDragged() || el.getHasConfirmed()) return; // 用户手动拖过或已有历史点，不覆盖
                     const pts = data[ip.pointsKey] || data.points;
                     if (pts && pts.length === 4) {
                         el.applyServerPoints(pts);
@@ -3593,7 +3648,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }).catch(() => {
                 cfg.imagePanels.forEach(ip => {
                     const el = panelEls[ip.pointsKey];
-                    if (el && !el.getHasDragged()) el.setStatus('计算失败', '#ef4444');
+                    if (el && !el.getHasDragged() && !el.getHasConfirmed()) el.setStatus('计算失败', '#ef4444');
                 });
             });
         }
@@ -3607,7 +3662,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // 打开面板后立即分析一次（photo 不需要后端角点分析）
         if (matType !== 'photo') {
-            reanalyzePoints({});
+            const allHasConfirmed = cfg.imagePanels.every(ip => {
+                const s = cropState[ip.pointsKey];
+                return s && s.originalPts && s.originalPts.length === 4;
+            });
+            if (!allHasConfirmed) {
+                reanalyzePoints({});
+            }
         }
 
         // ── Pill 交互（区分旋转 vs 裁剪参数）────────────────────────────────
