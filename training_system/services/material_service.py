@@ -928,7 +928,7 @@ def trim_hukou_home_page_margins(image):
     return image[top:bottom, left:right].copy()
 
 
-def prepare_hukou_output_page(image, page_kind, crop_mode="auto", expand_level=None, skip_ratio_trim=False, canny_scale=1.0, manual_crop_applied=False):
+def prepare_hukou_output_page(image, page_kind, crop_mode="auto", expand_level=None, skip_ratio_trim=False, canny_scale=1.0, manual_crop_applied=False, extra_rotate=0):
     kind_label = "首页" if page_kind == "home" else "本人页"
     tag = f"[hukou][{kind_label}]"
     h0, w0 = image.shape[:2]
@@ -972,7 +972,7 @@ def prepare_hukou_output_page(image, page_kind, crop_mode="auto", expand_level=N
         else:
             print(f"{tag} 二次精细裁剪未生效（面积没有明显缩小），保持第一次结果")
 
-    if not manual_crop_applied:
+    if not manual_crop_applied and not extra_rotate:
         page = normalize_hukou_page_orientation(page, original_image=image, page_kind=page_kind)
     h3, w3 = page.shape[:2]
     if (h3, w3) != (h1, w1):
@@ -2149,6 +2149,7 @@ def process_hukou(residence_path, personal_path, output_dir, name_prefix, adjust
                     skip_ratio_trim=skip_ratio_trim,
                     canny_scale=canny_scale,
                     manual_crop_applied=home_manual_crop_applied,
+                    extra_rotate=home_rotate,
                 )
                 if logger is not None:
                     logger.emit("success", "hukou_home", "auto_crop", "户口本首页处理完成", "已完成户口本首页裁边/方向校正准备排版", details={"crop_mode": crop_mode, **_size_details(img1, "processed")})
@@ -2169,7 +2170,7 @@ def process_hukou(residence_path, personal_path, output_dir, name_prefix, adjust
                 if logger is not None:
                     logger.emit("info", "hukou_personal", "read_input", "户口本人页读取成功", "已读取户口本人页原图", details=_size_details(img2, "input"))
                 if logger is not None and personal_manual_crop_applied:
-                    logger.emit("info", "hukou_personal", "auto_crop", "使用手动确认裁剪区域", "户口本人页已按手动点位裁好，跳过自动裁边和方向校正，以用户手动结果为准", details={"crop_mode": crop_mode})
+                    logger.emit("info", "hukou_personal", "auto_crop", "使用手动确认裁剪区域", "户口本人页已按手动点位裁好，跳过自动裁边 and 方向校正，以用户手动结果为准", details={"crop_mode": crop_mode})
                 img2 = prepare_hukou_output_page(
                     img2,
                     "personal",
@@ -2178,6 +2179,7 @@ def process_hukou(residence_path, personal_path, output_dir, name_prefix, adjust
                     skip_ratio_trim=skip_ratio_trim,
                     canny_scale=canny_scale,
                     manual_crop_applied=personal_manual_crop_applied,
+                    extra_rotate=personal_rotate,
                 )
                 if logger is not None:
                     logger.emit("success", "hukou_personal", "auto_crop", "户口本人页处理完成", "已完成户口本人页裁边/方向校正准备排版", details={"crop_mode": crop_mode, **_size_details(img2, "processed")})
