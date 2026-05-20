@@ -50,6 +50,14 @@ async function testAdminReviewSelectedByRoute() {
   assert.strictEqual(instance.data.list[instance.data.selected].text, '审核管理')
 }
 
+async function testAdminPracticeSelectedByRoute() {
+  const instance = createTabBar('pages/practice/index/index')
+
+  await instance.updateTabBar()
+
+  assert.strictEqual(instance.data.list[instance.data.selected].text, '真题练习')
+}
+
 async function testSwitchingRoutesDoesNotPreselectOnOldTabBar() {
   const instance = createTabBar('pages/practice/index/index')
   let switchedTo = ''
@@ -70,9 +78,24 @@ async function testSwitchingRoutesDoesNotPreselectOnOldTabBar() {
   )
 }
 
+function testAppJsonTabOrderMatchesCustomAdminOrder() {
+  const appJson = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '../../app.json'),
+    'utf8'
+  ))
+  const paths = (appJson.tabBar && appJson.tabBar.list || []).map(item => `/${item.pagePath}`)
+
+  assert(
+    paths.indexOf('/pages/practice/index/index') < paths.indexOf('/pages/admin/review/review'),
+    'app.json tabBar order must keep 真题练习 before 审核管理 to match custom admin tab order'
+  )
+}
+
 async function run() {
   await testAdminReviewSelectedByRoute()
+  await testAdminPracticeSelectedByRoute()
   await testSwitchingRoutesDoesNotPreselectOnOldTabBar()
+  testAppJsonTabOrderMatchesCustomAdminOrder()
   const reviewSource = fs.readFileSync(
     path.join(__dirname, '../../pages/admin/review/review.js'),
     'utf8'

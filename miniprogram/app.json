@@ -36,12 +36,12 @@
         "text": "我的提交"
       },
       {
-        "pagePath": "pages/admin/review/review",
-        "text": "审核管理"
-      },
-      {
         "pagePath": "pages/practice/index/index",
         "text": "真题练习"
+      },
+      {
+        "pagePath": "pages/admin/review/review",
+        "text": "审核管理"
       }
     ]
   },
