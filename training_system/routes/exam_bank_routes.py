@@ -1,4 +1,4 @@
-from flask import Blueprint, g, jsonify, render_template, request
+from flask import Blueprint, g, jsonify, render_template, request, current_app
 
 from services import exam_bank_service
 
@@ -156,6 +156,22 @@ def mini_practice_questions(bank_id):
     wrong_ids = []
     if request.args.get('wrong_ids'):
         wrong_ids = [item for item in request.args.get('wrong_ids', '').split(',') if item.strip()]
+    
+    # 记录日志
+    bank = exam_bank_service.get_exam_bank(bank_id)
+    bank_name = bank.get('display_name') if bank else f"ID {bank_id}"
+    mode = request.args.get('mode', 'sequential')
+    mode_labels = {
+        'sequential': '顺序练习',
+        'random': '随机练习',
+        'exam': '模拟考试',
+        'wrong': '错题练习',
+        'memorize': '背题模式',
+        'type': '题型练习'
+    }
+    mode_label = mode_labels.get(mode, mode)
+    current_app.logger.info(f"拉取了题库「{bank_name}」的题目，练习模式：{mode_label}")
+
     result = exam_bank_service.get_questions(
         bank_id,
         mode=request.args.get('mode', 'sequential'),
@@ -176,6 +192,15 @@ def mini_practice_progress():
     bank_id = int(data.get('bankId') or data.get('bank_id') or 0)
     if not exam_bank_service.can_access_bank(user.get('openid', ''), bank_id, bool(user.get('is_admin'))):
         return _error('无权限访问该题库', 403)
+
+    # 记录日志
+    bank = exam_bank_service.get_exam_bank(bank_id)
+    bank_name = bank.get('display_name') if bank else f"ID {bank_id}"
+    done = int(data.get('doneCount') or data.get('done_count') or 0)
+    correct = int(data.get('correctCount') or data.get('correct_count') or 0)
+    wrong_ids = data.get('wrongQuestionIds') or data.get('wrong_question_ids') or []
+    current_app.logger.info(f"更新了题库「{bank_name}」的练习进度，已做 {done} 题，答对 {correct} 题，错题数 {len(wrong_ids)}")
+
     return jsonify(exam_bank_service.save_progress(user.get('openid', ''), bank_id, data))
 
 
@@ -188,4 +213,21 @@ def mini_practice_exam_record():
     bank_id = int(data.get('bankId') or data.get('bank_id') or 0)
     if not exam_bank_service.can_access_bank(user.get('openid', ''), bank_id, bool(user.get('is_admin'))):
         return _error('无权限访问该题库', 403)
+
+    # 记录日志
+    bank = exam_bank_service.get_exam_bank(bank_id)
+    bank_name = bank.get('display_name') if bank else f"ID {bank_id}"
+    score = int(data.get('score') or 0)
+    total = int(data.get('total') or 0)
+    correct = int(data.get('correctCount') or data.get('correct_count') or 0)
+    duration = int(data.get('durationSeconds') or data.get('duration_seconds') or 0)
+    passed = bool(data.get('passed'))
+    
+    passed_text = "通过" if passed else "未通过"
+    minutes = duration // 60
+    seconds = duration % 60
+    duration_text = f"{minutes}分{seconds}秒" if minutes > 0 else f"{seconds}秒"
+    
+    current_app.logger.info(f"提交了题库「{bank_name}」的模拟考试，得分：{score}分，总题数：{total}，答对：{correct}，用时：{duration_text}，结果：{passed_text}")
+
     return jsonify(exam_bank_service.save_exam_record(user.get('openid', ''), bank_id, data))
