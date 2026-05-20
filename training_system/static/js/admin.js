@@ -3070,7 +3070,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             function syncCropState() {
-                if (!originalPts || !hasConfirmedPoints) {
+                if (!originalPts) {
                     cropState[ip.pointsKey] = { displayPts: [], originalPts: [] };
                     return;
                 }
