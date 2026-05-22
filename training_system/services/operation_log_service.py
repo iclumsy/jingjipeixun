@@ -130,6 +130,34 @@ def get_student_operation_logs(student_id, limit=100):
     return logs
 
 
+def has_recent_duplicate_operation_log(student_id, action, message, seconds=10):
+    """判断短时间内是否已经写过同一条操作日志。"""
+    try:
+        normalized_seconds = max(1, int(seconds))
+    except (TypeError, ValueError):
+        normalized_seconds = 10
+
+    with get_db_connection() as conn:
+        row = conn.execute(
+            '''
+            SELECT id
+            FROM operation_logs
+            WHERE student_id = ?
+              AND action = ?
+              AND message = ?
+              AND created_at >= DATETIME('now', 'localtime', ?)
+            LIMIT 1
+            ''',
+            (
+                student_id,
+                str(action or '').strip(),
+                str(message or ''),
+                f'-{normalized_seconds} seconds',
+            ),
+        ).fetchone()
+    return row is not None
+
+
 def log_student_operation(*args, **kwargs):
     """路由埋点用的容错包装：日志失败不影响主业务。"""
     try:

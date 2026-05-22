@@ -1,9 +1,11 @@
 from flask import Blueprint, g, jsonify, render_template, request, current_app
 
 from services import exam_bank_service
+from services.operation_log_service import has_recent_duplicate_operation_log, log_student_operation
 
 
 exam_bank_bp = Blueprint('exam_bank', __name__)
+LEARNING_LOG_MIN_ANSWER_COUNT = 20
 
 
 def _success(**payload):
@@ -27,6 +29,28 @@ def _require_mini_user():
     if not isinstance(user, dict) or not user.get('openid'):
         return None
     return user
+
+
+def _write_learning_operation_log(openid, bank_id, action, action_label, message, answered_count, metadata=None):
+    if int(answered_count or 0) <= LEARNING_LOG_MIN_ANSWER_COUNT:
+        return
+    student = exam_bank_service.find_learning_log_student(openid, bank_id)
+    if not student:
+        return
+    student_id = student.get('id')
+    if has_recent_duplicate_operation_log(student_id, action, message):
+        return
+    log_student_operation(
+        student_id,
+        action,
+        action_label,
+        message=message,
+        metadata={
+            'bank_id': bank_id,
+            'student_name': student.get('name', ''),
+            **(metadata or {}),
+        }
+    )
 
 
 @exam_bank_bp.route('/admin/exam-banks', methods=['GET'])
@@ -199,9 +223,27 @@ def mini_practice_progress():
     done = int(data.get('doneCount') or data.get('done_count') or 0)
     correct = int(data.get('correctCount') or data.get('correct_count') or 0)
     wrong_ids = data.get('wrongQuestionIds') or data.get('wrong_question_ids') or []
-    current_app.logger.info(f"更新了题库「{bank_name}」的练习进度，已做 {done} 题，答对 {correct} 题，错题数 {len(wrong_ids)}")
+    message = f"更新了题库「{bank_name}」的练习进度，已做 {done} 题，答对 {correct} 题，错题数 {len(wrong_ids)}"
+    current_app.logger.info(message)
+    result = exam_bank_service.save_progress(user.get('openid', ''), bank_id, data)
+    mode = str(data.get('mode') or 'practice')
+    if mode == 'practice':
+        _write_learning_operation_log(
+            user.get('openid', ''),
+            bank_id,
+            'practice_progress_updated',
+            '题库练习',
+            message,
+            done,
+            metadata={
+                'bank_name': bank_name,
+                'done_count': done,
+                'correct_count': correct,
+                'wrong_count': len(wrong_ids),
+            }
+        )
 
-    return jsonify(exam_bank_service.save_progress(user.get('openid', ''), bank_id, data))
+    return jsonify(result)
 
 
 @exam_bank_bp.route('/api/miniprogram/practice/exams', methods=['POST'])
@@ -228,6 +270,24 @@ def mini_practice_exam_record():
     seconds = duration % 60
     duration_text = f"{minutes}分{seconds}秒" if minutes > 0 else f"{seconds}秒"
     
-    current_app.logger.info(f"提交了题库「{bank_name}」的模拟考试，得分：{score}分，总题数：{total}，答对：{correct}，用时：{duration_text}，结果：{passed_text}")
+    message = f"提交了题库「{bank_name}」的模拟考试，得分：{score}分，总题数：{total}，答对：{correct}，用时：{duration_text}，结果：{passed_text}"
+    current_app.logger.info(message)
+    result = exam_bank_service.save_exam_record(user.get('openid', ''), bank_id, data)
+    _write_learning_operation_log(
+        user.get('openid', ''),
+        bank_id,
+        'practice_exam_submitted',
+        '模拟考试',
+        message,
+        total,
+        metadata={
+            'bank_name': bank_name,
+            'score': score,
+            'total': total,
+            'correct_count': correct,
+            'duration_seconds': duration,
+            'passed': passed,
+        }
+    )
 
-    return jsonify(exam_bank_service.save_exam_record(user.get('openid', ''), bank_id, data))
+    return jsonify(result)

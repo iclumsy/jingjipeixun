@@ -438,6 +438,38 @@ def can_access_bank(openid, bank_id, is_admin=False):
     return any(item['id'] == int(bank_id) for item in summary['banks'])
 
 
+def find_learning_log_student(openid, bank_id):
+    """查找某个 openid 在指定题库下应写入学习日志的学员记录。"""
+    openid = str(openid or '').strip()
+    if not openid or not bank_id:
+        return None
+
+    with get_db_connection() as conn:
+        row = conn.execute(
+            f'''
+            SELECT s.*
+            FROM students s
+            JOIN exam_banks eb
+              ON eb.id = ?
+             AND (
+                (s.training_project_id IS NOT NULL AND s.training_project_id = eb.training_project_id)
+                OR (
+                  COALESCE(s.project_code, '') = COALESCE(eb.project_code, '')
+                  AND COALESCE(s.exam_project, '') = COALESCE(eb.exam_project, '')
+                )
+             )
+            WHERE s.submitter_openid = ?
+              AND s.status IN ({','.join(['?'] * len(ACTIVE_STUDENT_STATUSES))})
+            ORDER BY
+              CASE s.status WHEN 'registered' THEN 0 WHEN 'reviewed' THEN 1 ELSE 2 END,
+              s.id DESC
+            LIMIT 1
+            ''',
+            [bank_id, openid] + list(ACTIVE_STUDENT_STATUSES),
+        ).fetchone()
+    return dict(row) if row else None
+
+
 def save_progress(openid, bank_id, payload):
     mode = str((payload or {}).get('mode') or 'practice')
     done = int((payload or {}).get('doneCount') or (payload or {}).get('done_count') or 0)

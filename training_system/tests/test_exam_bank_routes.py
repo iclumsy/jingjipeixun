@@ -113,6 +113,35 @@ class ExamBankRouteTests(unittest.TestCase):
                 self.get_project_id(),
             )
 
+    def create_reviewed_student(self, openid="student-openid", name="张治富"):
+        with self.app.app_context():
+            project_id = self.get_project_id()
+            with get_db_connection() as conn:
+                cursor = conn.execute(
+                    """
+                    INSERT INTO students (
+                        name, gender, education, id_card, phone, job_category,
+                        exam_project, project_code, training_type, status,
+                        submitter_openid, training_project_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        name, "男", "高中或同等学历", "110101199001011234", "13800138000",
+                        "场(厂)内专用机动车辆作业", "叉车司机", "N1",
+                        "special_equipment", "reviewed", openid, project_id,
+                    ),
+                )
+                return cursor.lastrowid
+
+    def list_operation_logs(self, student_id):
+        with self.app.app_context():
+            with get_db_connection() as conn:
+                rows = conn.execute(
+                    "SELECT * FROM operation_logs WHERE student_id = ? ORDER BY id",
+                    (student_id,),
+                ).fetchall()
+                return [dict(row) for row in rows]
+
     def mini_headers(self, openid="admin-openid", is_admin=True):
         token = sign_mini_token(self.app.config["SECRET_KEY"], openid, is_admin=is_admin)
         return {"Authorization": f"Bearer {token}"}
@@ -245,6 +274,118 @@ class ExamBankRouteTests(unittest.TestCase):
         self.assertEqual(summary.status_code, 200)
         self.assertFalse(summary.get_json()["practiceEnabled"])
         self.assertEqual(questions.status_code, 403)
+
+    def test_practice_progress_over_twenty_records_student_learning_log_once(self):
+        bank = self.create_bank()
+        student_id = self.create_reviewed_student(openid="student-openid", name="张治富")
+        headers = self.mini_headers(openid="student-openid", is_admin=False)
+
+        low_response = self.client.post(
+            "/api/miniprogram/practice/progress",
+            headers=headers,
+            json={
+                "bankId": bank["id"],
+                "doneCount": 20,
+                "correctCount": 16,
+                "wrongQuestionIds": [1, 2, 3, 4],
+            },
+        )
+        self.assertEqual(low_response.status_code, 200)
+        self.assertEqual(self.list_operation_logs(student_id), [])
+
+        response = self.client.post(
+            "/api/miniprogram/practice/progress",
+            headers=headers,
+            json={
+                "bankId": bank["id"],
+                "doneCount": 21,
+                "correctCount": 17,
+                "wrongQuestionIds": [1, 2, 3, 4],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        logs = self.list_operation_logs(student_id)
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(logs[0]["action"], "practice_progress_updated")
+        self.assertEqual(logs[0]["action_label"], "题库练习")
+        self.assertIn("更新了题库", logs[0]["message"])
+        self.assertIn("已做 21 题", logs[0]["message"])
+        self.assertIn("答对 17 题", logs[0]["message"])
+        self.assertIn("错题数 4", logs[0]["message"])
+
+        duplicate_response = self.client.post(
+            "/api/miniprogram/practice/progress",
+            headers=headers,
+            json={
+                "bankId": bank["id"],
+                "doneCount": 21,
+                "correctCount": 17,
+                "wrongQuestionIds": [1, 2, 3, 4],
+            },
+        )
+        self.assertEqual(duplicate_response.status_code, 200)
+        self.assertEqual(len(self.list_operation_logs(student_id)), 1)
+
+    def test_practice_exam_over_twenty_records_student_learning_log(self):
+        bank = self.create_bank()
+        student_id = self.create_reviewed_student(openid="student-openid", name="杨柳")
+        headers = self.mini_headers(openid="student-openid", is_admin=False)
+
+        progress_response = self.client.post(
+            "/api/miniprogram/practice/progress",
+            headers=headers,
+            json={
+                "bankId": bank["id"],
+                "mode": "exam",
+                "doneCount": 100,
+                "correctCount": 70,
+                "wrongQuestionIds": [1, 2, 3],
+            },
+        )
+        self.assertEqual(progress_response.status_code, 200)
+        self.assertEqual(self.list_operation_logs(student_id), [])
+
+        response = self.client.post(
+            "/api/miniprogram/practice/exams",
+            headers=headers,
+            json={
+                "bankId": bank["id"],
+                "score": 70,
+                "total": 100,
+                "correctCount": 70,
+                "durationSeconds": 1269,
+                "passed": False,
+                "answers": {},
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        logs = self.list_operation_logs(student_id)
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(logs[0]["action"], "practice_exam_submitted")
+        self.assertEqual(logs[0]["action_label"], "模拟考试")
+        self.assertIn("提交了题库", logs[0]["message"])
+        self.assertIn("得分：70分", logs[0]["message"])
+        self.assertIn("总题数：100", logs[0]["message"])
+        self.assertIn("用时：21分9秒", logs[0]["message"])
+        self.assertIn("结果：未通过", logs[0]["message"])
+
+        duplicate_response = self.client.post(
+            "/api/miniprogram/practice/exams",
+            headers=headers,
+            json={
+                "bankId": bank["id"],
+                "score": 70,
+                "total": 100,
+                "correctCount": 70,
+                "durationSeconds": 1269,
+                "passed": False,
+                "answers": {},
+            },
+        )
+        self.assertEqual(duplicate_response.status_code, 200)
+        self.assertEqual(len(self.list_operation_logs(student_id)), 1)
 
 
 if __name__ == "__main__":
