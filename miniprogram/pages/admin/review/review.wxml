@@ -5,7 +5,7 @@
         <view class="top-title">审核管理</view>
         <view class="top-count">当前 {{records.length}} 条</view>
       </view>
-      <view class="top-desc">支持按状态、培训类型、公司筛选；可直接通过、驳回或删除记录。</view>
+      <view class="top-desc">支持按状态、培训类型、公司筛选；可直接通过或驳回记录。</view>
     </view>
 
     <view class="filter-card card fade-enter">
@@ -153,22 +153,13 @@
             >↩️ 驳回</button>
 
             <button
-              wx:if="{{item.actions.canDelete}}"
-              class="action-btn btn-delete"
-              size="mini"
-              catchtap="onDeleteTap"
-              data-id="{{item._id}}"
-            >🗑️ 删除</button>
-
-            <button
               class="action-btn btn-operation-log"
               size="mini"
               catchtap="onOperationLogTap"
               data-id="{{item._id}}"
             >📋 操作记录</button>
           </block>
-
-          <!-- 已通过：主操作 + 更多操作 -->
+          <!-- 已通过：主操作 + 操作记录 + 更多操作 -->
           <block wx:elif="{{item.status === 'reviewed'}}">
             <button
               wx:if="{{item.actions.canSubmitReg}}"
@@ -177,6 +168,13 @@
               catchtap="onSubmitRegisterTap"
               data-id="{{item._id}}"
             >🚀 提交报名</button>
+
+            <button
+              class="action-btn btn-operation-log"
+              size="mini"
+              catchtap="onOperationLogTap"
+              data-id="{{item._id}}"
+            >📋 操作记录</button>
 
             <button
               class="action-btn btn-more"
@@ -188,14 +186,6 @@
 
           <!-- 已报名：仅保留可执行项 -->
           <block wx:elif="{{item.status === 'registered'}}">
-            <button
-              wx:if="{{item.actions.canDelete}}"
-              class="action-btn btn-delete"
-              size="mini"
-              catchtap="onDeleteTap"
-              data-id="{{item._id}}"
-            >🗑️ 删除</button>
-
             <button
               class="action-btn btn-operation-log"
               size="mini"
@@ -213,14 +203,6 @@
               catchtap="onRejectTap"
               data-id="{{item._id}}"
             >↩️ 驳回</button>
-
-            <button
-              wx:if="{{item.actions.canDelete}}"
-              class="action-btn btn-delete"
-              size="mini"
-              catchtap="onDeleteTap"
-              data-id="{{item._id}}"
-            >🗑️ 删除</button>
 
             <button
               class="action-btn btn-operation-log"
@@ -474,20 +456,6 @@
           <view class="more-action-text">
             <text class="more-action-label">操作记录</text>
             <text class="more-action-desc">查看该学员所有操作历史</text>
-          </view>
-          <text class="more-action-arrow">›</text>
-        </view>
-
-        <view
-          wx:if="{{moreActionsStudent.actions.canDelete}}"
-          class="more-action-item more-action-delete"
-          hover-class="more-action-hover"
-          catchtap="onMoreDelete"
-        >
-          <view class="more-action-icon">🗑️</view>
-          <view class="more-action-text">
-            <text class="more-action-label">删除记录</text>
-            <text class="more-action-desc">删除后不可恢复，请谨慎操作</text>
           </view>
           <text class="more-action-arrow">›</text>
         </view>

@@ -360,29 +360,6 @@ Page({
     })
   },
 
-  async onDeleteTap(e) {
-    const { id } = e.currentTarget.dataset
-    if (!id) return
-
-    const confirmed = await this.confirmAction(
-      '删除记录',
-      '删除后不可恢复，是否继续？'
-    )
-
-    if (!confirmed) return
-
-    wx.showLoading({ title: '删除中...' })
-    try {
-      await api.deleteStudent(id)
-      wx.hideLoading()
-      wx.showToast({ title: '已删除', icon: 'success' })
-      await this.loadRecords(true)
-    } catch (err) {
-      wx.hideLoading()
-      wx.showToast({ title: err.message || '删除失败', icon: 'none' })
-    }
-  },
-
   async onApproveTap(e) {
     const { id } = e.currentTarget.dataset
     if (!id) return
@@ -814,13 +791,6 @@ Page({
     if (!id) return
     this.closeMoreActionsModal()
     this.onRejectTap({ currentTarget: { dataset: { id } } })
-  },
-
-  onMoreDelete() {
-    const id = this.data.moreActionsStudent && this.data.moreActionsStudent._id
-    if (!id) return
-    this.closeMoreActionsModal()
-    this.onDeleteTap({ currentTarget: { dataset: { id } } })
   },
 
   onMoreOperationLog() {
