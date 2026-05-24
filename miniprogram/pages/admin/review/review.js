@@ -43,14 +43,65 @@ function mapRecord(item) {
     fallbackTags.push({ text: '复审', color: '#e65100', bg: '#fff3e0' })
   }
   const actions = item.actions || buildLocalActions(item)
+  const canViewLearningStatus = item.status === 'reviewed' || item.status === 'registered'
   return {
     ...item,
     actions,
+    canViewLearningStatus,
     statusText: item.statusText || STATUS_LABELS[item.status] || item.status || '-',
     statusClass: item.statusClass || item.status || '',
     trainingTypeText: item.trainingTypeText || TRAINING_TYPE_LABELS[item.training_type] || item.training_type || '-',
     tags: Array.isArray(item.tags) ? item.tags : fallbackTags,
     submitTimeText: formatDateTime(item.created_at)
+  }
+}
+
+function mapLearningActivity(item = {}) {
+  const type = item.type || ''
+  return {
+    ...item,
+    typeClass: type === 'exam' ? 'exam' : 'practice',
+    typeText: type === 'exam' ? '模拟考试' : '题库练习',
+    timeText: item.timeText || formatDateTime(item.happenedAt)
+  }
+}
+
+function normalizeLearningStatus(result = {}) {
+  const summary = result.summary || {}
+  const examStats = result.examStats || {}
+  const bestScore = summary.bestScore === undefined ? null : summary.bestScore
+  const latestScore = summary.latestScore === undefined ? null : summary.latestScore
+  return {
+    success: !!result.success,
+    student: result.student || {},
+    bank: result.bank || null,
+    summary: {
+      state: summary.state || 'not_started',
+      stateText: summary.stateText || '未开始',
+      adviceText: summary.adviceText || '',
+      doneCount: Number(summary.doneCount || 0),
+      questionCount: Number(summary.questionCount || 0),
+      progressPercent: Number(summary.progressPercent || 0),
+      correctCount: Number(summary.correctCount || 0),
+      correctRate: Number(summary.correctRate || 0),
+      wrongCount: Number(summary.wrongCount || 0),
+      lastStudyTimeText: summary.lastStudyTimeText || formatDateTime(summary.lastStudyAt),
+      examCount: Number(summary.examCount || 0),
+      latestScore,
+      latestScoreText: latestScore === null || latestScore === '' ? '-' : `${latestScore}分`,
+      bestScore,
+      bestScoreText: bestScore === null || bestScore === '' ? '-' : `${bestScore}分`,
+      passCount: Number(summary.passCount || 0),
+      latestPassed: !!summary.latestPassed,
+      latestDurationText: summary.latestDurationText || ''
+    },
+    examStats: {
+      count: Number(examStats.count || 0),
+      bestScore: examStats.bestScore,
+      passCount: Number(examStats.passCount || 0),
+      latest: examStats.latest || null
+    },
+    activities: Array.isArray(result.activities) ? result.activities.map(mapLearningActivity) : []
   }
 }
 
@@ -102,6 +153,12 @@ Page({
     operationLogs: [],
     operationLogsLoading: false,
     operationLogsError: '',
+
+    showLearningStatusModal: false,
+    learningStatusStudent: {},
+    learningStatus: normalizeLearningStatus(),
+    learningStatusLoading: false,
+    learningStatusError: '',
 
     // 更多操作弹窗
     showMoreActionsModal: false,
@@ -481,6 +538,58 @@ Page({
 
   closeCardInfoModal() {
     this.setData({ showCardInfoModal: false, cardInfo: {} })
+  },
+
+  async onLearningStatusTap(e) {
+    const { id } = e.currentTarget.dataset
+    if (!id) {
+      wx.showToast({ title: '记录ID不存在', icon: 'none' })
+      return
+    }
+
+    const student = this.data.records.find(item => String(item._id) === String(id)) || { _id: id }
+    this.setData({
+      showLearningStatusModal: true,
+      learningStatusStudent: student,
+      learningStatus: normalizeLearningStatus(),
+      learningStatusError: '',
+      learningStatusLoading: true
+    })
+    await this.loadLearningStatusForStudent(id)
+  },
+
+  async loadLearningStatusForStudent(id) {
+    this.setData({ learningStatusLoading: true, learningStatusError: '' })
+    try {
+      const result = await api.getStudentLearningStatus(id)
+      this.setData({
+        learningStatus: normalizeLearningStatus(result),
+        learningStatusLoading: false,
+        learningStatusError: ''
+      })
+    } catch (err) {
+      console.warn('加载学习情况失败:', err)
+      this.setData({
+        learningStatus: normalizeLearningStatus(),
+        learningStatusLoading: false,
+        learningStatusError: err.message || '学习情况加载失败'
+      })
+    }
+  },
+
+  async refreshLearningStatus() {
+    const student = this.data.learningStatusStudent || {}
+    if (!student._id || this.data.learningStatusLoading) return
+    await this.loadLearningStatusForStudent(student._id)
+  },
+
+  closeLearningStatusModal() {
+    this.setData({
+      showLearningStatusModal: false,
+      learningStatusStudent: {},
+      learningStatus: normalizeLearningStatus(),
+      learningStatusError: ''
+    })
   },
 
   async onOperationLogTap(e) {

@@ -62,7 +62,15 @@
             <view class="student-name">{{item.name || '-'}}</view>
             <view class="time-text">{{item.submitTimeText}}</view>
           </view>
-          <view class="status-badge badge-{{item.statusClass}}">{{item.statusText}}</view>
+          <view class="card-head-actions">
+            <view
+              wx:if="{{item.canViewLearningStatus}}"
+              class="learning-status-chip"
+              catchtap="onLearningStatusTap"
+              data-id="{{item._id}}"
+            >学习情况</view>
+            <view class="status-badge badge-{{item.statusClass}}">{{item.statusText}}</view>
+          </view>
         </view>
 
         <view class="meta-row">
@@ -352,6 +360,103 @@
       </view>
       <view class="card-info-footer">
         <button class="card-info-close-btn" catchtap="closeCardInfoModal">关 闭</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 学习情况弹窗 -->
+  <view class="custom-modal-mask fade-enter" wx:if="{{showLearningStatusModal}}" catchtap="closeLearningStatusModal">
+    <view class="learning-modal" catchtap="preventD">
+      <view class="learning-modal-header">
+        <view class="learning-modal-heading">
+          <view class="learning-modal-title">学习情况</view>
+          <view class="learning-modal-sub">{{learningStatusStudent.name || '-'}} · {{learningStatusStudent.statusText || '-'}}</view>
+        </view>
+        <view class="learning-modal-close" catchtap="closeLearningStatusModal">×</view>
+      </view>
+
+      <view wx:if="{{learningStatusLoading}}" class="learning-modal-state">学习情况加载中...</view>
+      <view wx:elif="{{learningStatusError}}" class="learning-modal-state error">{{learningStatusError}}</view>
+      <view wx:else class="learning-modal-body">
+        <view class="learning-student-line">
+          <text class="learning-student-name">{{learningStatus.student.name || learningStatusStudent.name || '-'}}</text>
+          <text class="learning-state-badge state-{{learningStatus.summary.state}}">{{learningStatus.summary.stateText}}</text>
+        </view>
+        <view class="learning-bank-line">
+          <text>{{learningStatus.bank ? learningStatus.bank.displayName : '未匹配到可用题库'}}</text>
+        </view>
+
+        <view class="learning-metric-grid">
+          <view class="learning-metric">
+            <text class="learning-metric-label">练习进度</text>
+            <text class="learning-metric-value">{{learningStatus.summary.doneCount}}/{{learningStatus.summary.questionCount}}</text>
+          </view>
+          <view class="learning-metric">
+            <text class="learning-metric-label">正确率</text>
+            <text class="learning-metric-value">{{learningStatus.summary.correctRate}}%</text>
+          </view>
+          <view class="learning-metric">
+            <text class="learning-metric-label">模拟考试</text>
+            <text class="learning-metric-value">{{learningStatus.summary.examCount}}次</text>
+          </view>
+          <view class="learning-metric">
+            <text class="learning-metric-label">最好成绩</text>
+            <text class="learning-metric-value">{{learningStatus.summary.bestScoreText}}</text>
+          </view>
+        </view>
+
+        <view class="learning-progress-box">
+          <view class="learning-progress-head">
+            <text>题库练习</text>
+            <text>{{learningStatus.summary.progressPercent}}%</text>
+          </view>
+          <view class="learning-progress-track">
+            <view class="learning-progress-bar" style="width: {{learningStatus.summary.progressPercent}}%;"></view>
+          </view>
+          <view class="learning-progress-note">
+            答对 {{learningStatus.summary.correctCount}} 题，错题 {{learningStatus.summary.wrongCount}} 题，最近 {{learningStatus.summary.lastStudyTimeText || '-'}}
+          </view>
+        </view>
+
+        <view class="learning-exam-box">
+          <view class="learning-section-head">
+            <text class="learning-section-title">模拟考试</text>
+            <text class="learning-section-sub">通过 {{learningStatus.summary.passCount}} 次</text>
+          </view>
+          <view wx:if="{{learningStatus.examStats.latest}}" class="learning-exam-latest">
+            <text class="learning-exam-score">{{learningStatus.examStats.latest.score}}分</text>
+            <text class="learning-exam-result {{learningStatus.examStats.latest.passed ? 'passed' : 'failed'}}">{{learningStatus.examStats.latest.passed ? '通过' : '未通过'}}</text>
+            <text class="learning-exam-time">{{learningStatus.examStats.latest.timeText || '-'}}</text>
+          </view>
+          <view wx:else class="learning-empty-line">暂无模拟考试记录</view>
+        </view>
+
+        <view class="learning-activity-box">
+          <view class="learning-section-head">
+            <text class="learning-section-title">最近动态</text>
+            <text class="learning-section-sub">共 {{learningStatus.activities.length}} 条</text>
+          </view>
+          <scroll-view class="learning-activity-scroll" scroll-y enhanced show-scrollbar="{{true}}">
+            <view wx:if="{{!learningStatus.activities.length}}" class="learning-empty-line">暂无学习动态</view>
+            <view wx:else class="learning-activity-list">
+              <view class="learning-activity-item" wx:for="{{learningStatus.activities}}" wx:key="index">
+                <view class="learning-activity-type type-{{item.typeClass}}">{{item.typeText}}</view>
+                <view class="learning-activity-main">
+                  <view class="learning-activity-top">
+                    <text class="learning-activity-title">{{item.title || item.typeText}}</text>
+                    <text class="learning-activity-time">{{item.timeText || '-'}}</text>
+                  </view>
+                  <view class="learning-activity-detail">{{item.detail || '-'}}</view>
+                </view>
+              </view>
+            </view>
+          </scroll-view>
+        </view>
+      </view>
+
+      <view class="learning-modal-footer">
+        <button class="learning-modal-btn ghost" catchtap="refreshLearningStatus" loading="{{learningStatusLoading}}" disabled="{{learningStatusLoading}}">刷新</button>
+        <button class="learning-modal-btn primary" catchtap="closeLearningStatusModal">关闭</button>
       </view>
     </view>
   </view>

@@ -241,7 +241,7 @@ Page({
     try {
       await api.savePracticeProgress({
         bankId: this.data.bankId,
-        mode: 'practice',
+        mode: this.data.mode === 'exam' ? 'exam' : 'practice',
         doneCount: this.data.doneCount,
         correctCount: this.data.correctCount,
         wrongQuestionIds: this.data.wrongQuestionIds,

@@ -38,7 +38,7 @@ from services.wechat_service import send_review_result_message, broadcast_new_st
 from services.image_service import process_and_save_file, delete_student_files
 from services.student_folder_service import migrate_student_files, MigrationError, MigrationRollbackError
 from services.document_service import generate_health_check_form
-from services import storage_service
+from services import exam_bank_service, storage_service
 from services.operation_log_service import get_student_operation_logs, log_student_operation
 from services.student_serializer import enrich_student, enrich_students
 from utils.validators import validate_student_data, validate_file_upload
@@ -716,6 +716,28 @@ def get_student_operation_logs_route(id):
     except Exception as e:
         current_app.logger.exception('Error getting operation logs for student %s', id)
         return build_internal_error_response('加载操作记录失败，请稍后重试')
+
+
+@student_bp.route('/api/students/<int:id>/learning_status', methods=['GET'])
+@mini_admin_required
+def get_student_learning_status_route(id):
+    """获取某个已通过/已报名学员的真题练习和模拟考试情况。"""
+    try:
+        student = get_student_by_id(id)
+        enriched = enrich_student(student)
+        result = exam_bank_service.get_student_learning_status(student)
+        if isinstance(result.get('student'), dict):
+            result['student']['statusText'] = (enriched or {}).get('statusText') or result['student'].get('status', '')
+            result['student']['company'] = student.get('company') or ''
+            result['student']['phone'] = student.get('phone') or ''
+        return jsonify(result)
+    except NotFoundError as e:
+        return jsonify(e.to_dict()), e.status_code
+    except AppError as e:
+        return jsonify(e.to_dict()), e.status_code
+    except Exception as e:
+        current_app.logger.exception('Error getting learning status for student %s', id)
+        return build_internal_error_response('加载学习情况失败，请稍后重试')
 
 
 # ======================== 关键字段变更检测 ========================

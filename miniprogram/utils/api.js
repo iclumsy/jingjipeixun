@@ -660,6 +660,22 @@ async function getStudentOperationLogs(studentId) {
 }
 
 /**
+ * 获取某个学员的题库练习和模拟考试情况。
+ *
+ * @param {number|string} studentId - 学员 ID
+ * @returns {Promise<Object>} { success, student, bank, summary, examStats, activities }
+ */
+async function getStudentLearningStatus(studentId) {
+  const id = encodeURIComponent(String(studentId || '').trim())
+  if (!id) {
+    throw new Error('学员ID不能为空')
+  }
+  return await requestApi(`/api/students/${id}/learning_status`, {
+    method: 'GET'
+  })
+}
+
+/**
  * 手工裁剪并重新生成单个报名材料。
  *
  * @param {number|string} studentId - 学员 ID
@@ -1198,6 +1214,7 @@ module.exports = {
   getStudentDetail,     // 获取学员详情
   getGeneratedMaterials, // 获取已生成报名材料
   getStudentOperationLogs, // 获取学员操作记录
+  getStudentLearningStatus, // 获取学员学习情况
   manualCropMaterial,   // 手工裁剪并重新生成报名材料
   regenerateTrainingForm, // 重新生成体检表
   swapMaterials,          // 互换身份证正反面/户口本首页本人页
