@@ -5,3 +5,61 @@
 .application-options {
   margin-top: 12rpx;
 }
+
+.type-summary + .type-options {
+  margin-top: 16rpx;
+}
+
+.type-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  min-height: 78rpx;
+  padding: 0 20rpx;
+  border: 2rpx solid #dce6f2;
+  border-radius: 14rpx;
+  background: #f8fbff;
+  box-sizing: border-box;
+}
+
+.type-summary-label {
+  margin-bottom: 4rpx;
+  color: #6b7c93;
+  font-size: 22rpx;
+}
+
+.type-summary-value {
+  color: #0f172a;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.type-summary-action {
+  flex: 0 0 auto;
+  min-width: 80rpx;
+  color: #1d4ed8;
+  font-size: 24rpx;
+  font-weight: 700;
+  text-align: right;
+}
+
+.identity-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(190rpx, 0.75fr);
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+}
+
+.identity-row .form-item {
+  margin-bottom: 0;
+}
+
+.gender-selector.compact {
+  height: 78rpx;
+}
+
+.gender-selector.compact .gender-option {
+  height: 78rpx;
+  font-size: 26rpx;
+}

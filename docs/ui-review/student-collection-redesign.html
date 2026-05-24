@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>学员信息采集单页改版示意图</title>
+  <style>
+    :root {
+      --bg: #eef3f8;
+      --ink: #162033;
+      --muted: #66758a;
+      --line: #d9e3ef;
+      --soft: #f7fafc;
+      --blue: #2563eb;
+      --blue-soft: #eaf1ff;
+      --green: #138a5b;
+      --green-soft: #eaf8f0;
+      --orange: #d97706;
+      --orange-soft: #fff4df;
+      --red: #c2413b;
+      --red-soft: #fff0ef;
+      --shadow: 0 18px 46px rgba(22, 32, 51, 0.12);
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      letter-spacing: 0;
+    }
+
+    .page {
+      width: min(1380px, 100%);
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 22px;
+      margin-bottom: 22px;
+    }
+
+    .eyebrow {
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.18;
+    }
+
+    .subtitle {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.6;
+      max-width: 780px;
+    }
+
+    .scope {
+      flex: 0 0 310px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: 0 10px 28px rgba(22, 32, 51, 0.06);
+    }
+
+    .scope strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .scope span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 450px 1fr;
+      gap: 22px;
+      align-items: start;
+    }
+
+    .phone {
+      width: 430px;
+      height: 860px;
+      border-radius: 34px;
+      border: 10px solid #151b28;
+      background: #f4f7fb;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      position: sticky;
+      top: 18px;
+    }
+
+    .phone::before {
+      content: "";
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      width: 96px;
+      height: 22px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: #151b28;
+      z-index: 4;
+    }
+
+    .mobile {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: #f4f7fb;
+      overflow: hidden;
+    }
+
+    .hero {
+      padding: 44px 18px 18px;
+      color: #fff;
+      background: linear-gradient(135deg, #1f5fe0 0%, #2b8fdd 58%, #20a078 100%);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 800;
+      opacity: 0.92;
+      margin-bottom: 12px;
+    }
+
+    .logo-mark {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.45);
+    }
+
+    .hero-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .mobile-title {
+      font-size: 24px;
+      line-height: 1.18;
+      font-weight: 900;
+    }
+
+    .mobile-sub {
+      margin-top: 7px;
+      font-size: 13px;
+      line-height: 1.45;
+      color: rgba(255,255,255,0.86);
+    }
+
+    .status-pill {
+      flex: 0 0 auto;
+      padding: 6px 9px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.18);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      border: 1px solid rgba(255,255,255,0.34);
+    }
+
+    .body {
+      flex: 1;
+      overflow: hidden;
+      padding: 14px;
+      position: relative;
+    }
+
+    .summary-card,
+    .section,
+    .note-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: 0 8px 22px rgba(22, 32, 51, 0.07);
+    }
+
+    .summary-card {
+      padding: 13px;
+    }
+
+    .summary-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .summary-title {
+      font-size: 15px;
+      font-weight: 900;
+    }
+
+    .summary-tip {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
+    .complete {
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .progress {
+      height: 10px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: #e8eef7;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: 74%;
+      border-radius: inherit;
+      background: var(--blue);
+    }
+
+    .quick-status {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .mini {
+      padding: 8px 7px;
+      border-radius: 7px;
+      background: var(--soft);
+      border: 1px solid #e5edf7;
+      text-align: center;
+    }
+
+    .mini b {
+      display: block;
+      font-size: 15px;
+      line-height: 1.1;
+    }
+
+    .mini span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .section {
+      padding: 13px;
+      margin-top: 11px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 11px;
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 900;
+    }
+
+    .section-caption {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .edit-link {
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .choice-grid,
+    .field-pair,
+    .upload-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .choice {
+      min-height: 54px;
+      padding: 10px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: #fbfdff;
+    }
+
+    .choice.active {
+      background: var(--blue-soft);
+      border-color: #9bbcff;
+      box-shadow: inset 0 0 0 1px #9bbcff;
+    }
+
+    .choice b {
+      display: block;
+      font-size: 13px;
+    }
+
+    .choice span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .field-list {
+      display: grid;
+      gap: 9px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .label {
+      color: #344155;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .label.req::before {
+      content: "*";
+      color: var(--red);
+      margin-right: 2px;
+    }
+
+    .input {
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #f8fbff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 10px;
+      color: #1f2937;
+      font-size: 13px;
+    }
+
+    .placeholder { color: #9aa7b8; }
+
+    .upload-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px;
+      border-radius: var(--radius);
+      background: var(--orange-soft);
+      border: 1px solid #fed7aa;
+      color: #8a4b0f;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 9px;
+    }
+
+    .upload-card {
+      min-height: 94px;
+      border: 1px dashed #c4d4e8;
+      border-radius: var(--radius);
+      background: #fbfdff;
+      padding: 9px;
+      display: grid;
+      gap: 7px;
+    }
+
+    .upload-card.done {
+      border-style: solid;
+      border-color: #b7e5cd;
+      background: #f3fbf7;
+    }
+
+    .upload-name {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .upload-name span:last-child {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .thumb {
+      min-height: 46px;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      background: #eef4fb;
+      border: 1px solid #d7e3ef;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .review-strip {
+      margin-top: 9px;
+      padding: 9px 10px;
+      border-radius: var(--radius);
+      background: var(--green-soft);
+      border: 1px solid #b7e5cd;
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .agreement {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .check {
+      width: 17px;
+      height: 17px;
+      flex: 0 0 auto;
+      border-radius: 4px;
+      background: var(--blue);
+      margin-top: 1px;
+      position: relative;
+    }
+
+    .check::after {
+      content: "";
+      position: absolute;
+      left: 5px;
+      top: 2px;
+      width: 5px;
+      height: 9px;
+      border: solid #fff;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+
+    .bottom-bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: grid;
+      grid-template-columns: 0.9fr 1.25fr;
+      gap: 9px;
+      padding: 10px 14px 16px;
+      border-top: 1px solid var(--line);
+      background: rgba(255,255,255,0.96);
+      box-shadow: 0 -8px 18px rgba(22, 32, 51, 0.08);
+    }
+
+    .btn {
+      min-height: 42px;
+      border-radius: var(--radius);
+      display: grid;
+      place-items: center;
+      font-size: 14px;
+      font-weight: 900;
+      background: #eef4fb;
+      color: #334155;
+    }
+
+    .btn.primary {
+      background: var(--blue);
+      color: #fff;
+      box-shadow: 0 10px 20px rgba(37, 99, 235, 0.22);
+    }
+
+    .side {
+      display: grid;
+      gap: 16px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: 900;
+    }
+
+    .panel-note {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .panel-body {
+      padding: 16px 18px 18px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .compare-card,
+    .map-row {
+      padding: 12px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--soft);
+    }
+
+    .compare-card b,
+    .map-row b {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+
+    .compare-card span,
+    .map-row span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .map-grid {
+      display: grid;
+      gap: 9px;
+    }
+
+    .reject-card {
+      padding: 12px;
+      border-radius: var(--radius);
+      border: 1px solid #fecaca;
+      background: var(--red-soft);
+      color: var(--red);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .reject-card b {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    @media (max-width: 1050px) {
+      .layout { grid-template-columns: 1fr; }
+      .phone { position: relative; top: 0; margin: 0 auto; }
+    }
+
+    @media (max-width: 760px) {
+      .page { padding: 18px; }
+      .topbar { display: block; }
+      .scope { margin-top: 16px; width: 100%; }
+      .phone { width: 360px; height: 790px; }
+      .compare { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">信息采集界面轻量改版</div>
+        <h1>不分步骤，改成一张更顺手的单页表单</h1>
+        <div class="subtitle">
+          你的判断是对的：字段量不大，不适合做四步向导。这版保留单页填写，只优化顶部完成度、字段密度、附件缺失提醒和底部提交区。
+        </div>
+      </div>
+      <aside class="scope">
+        <strong>适合当前业务规模</strong>
+        <span>每月约 30 个报名，用户不需要复杂流程。单页更快，管理员看到的资料结构也更接近现在。</span>
+      </aside>
+    </header>
+
+    <section class="layout">
+      <div class="phone">
+        <div class="mobile">
+          <div class="hero">
+            <div class="brand"><span class="logo-mark"></span>俊睿培训</div>
+            <div class="hero-row">
+              <div>
+                <div class="mobile-title">学员信息采集</div>
+                <div class="mobile-sub">填写信息并上传材料，提交后可查看审核状态</div>
+              </div>
+              <div class="status-pill">草稿</div>
+            </div>
+          </div>
+
+          <div class="body">
+            <div class="summary-card">
+              <div class="summary-top">
+                <div>
+                  <div class="summary-title">还差 2 项即可提交</div>
+                  <div class="summary-tip">身份证号、学历证书未完成</div>
+                </div>
+                <div class="complete">74%</div>
+              </div>
+              <div class="progress"><span></span></div>
+              <div class="quick-status">
+                <div class="mini"><b>8/10</b><span>基础信息</span></div>
+                <div class="mini"><b>4/6</b><span>附件</span></div>
+                <div class="mini"><b>已同意</b><span>协议</span></div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-head">
+                <div>
+                  <div class="section-title">报名项目</div>
+                  <div class="section-caption">先选类型，作业项目和附件要求自动匹配</div>
+                </div>
+              </div>
+              <div class="choice-grid">
+                <div class="choice active"><b>特种设备</b><span>叉车、锅炉等项目</span></div>
+                <div class="choice"><b>特种作业</b><span>电工等作业</span></div>
+                <div class="choice active"><b>新考证</b><span>首次报名考试</span></div>
+                <div class="choice"><b>复审</b><span>已有证件复审</span></div>
+              </div>
+              <div class="field-list" style="margin-top:9px">
+                <div class="field">
+                  <div class="label req">作业类别</div>
+                  <div class="input"><span>场(厂)内专用机动车辆作业</span><span>›</span></div>
+                </div>
+                <div class="field">
+                  <div class="label">操作项目</div>
+                  <div class="input"><span>叉车司机 N1</span><span>›</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-head">
+                <div>
+                  <div class="section-title">学员与单位信息</div>
+                  <div class="section-caption">短字段并排，减少滚动；必填项仍然清楚</div>
+                </div>
+              </div>
+              <div class="field-list">
+                <div class="field-pair">
+                  <div class="field">
+                    <div class="label req">姓名</div>
+                    <div class="input"><span>张三</span></div>
+                  </div>
+                  <div class="field">
+                    <div class="label req">性别</div>
+                    <div class="input"><span>男</span><span>›</span></div>
+                  </div>
+                </div>
+                <div class="field">
+                  <div class="label req">身份证号</div>
+                  <div class="input"><span class="placeholder">请输入18位身份证号</span></div>
+                </div>
+                <div class="field-pair">
+                  <div class="field">
+                    <div class="label req">手机号</div>
+                    <div class="input"><span>13800138000</span></div>
+                  </div>
+                  <div class="field">
+                    <div class="label req">文化程度</div>
+                    <div class="input"><span>高中</span><span>›</span></div>
+                  </div>
+                </div>
+                <div class="field-pair">
+                  <div class="field">
+                    <div class="label">毕业学校</div>
+                    <div class="input"><span class="placeholder">选填</span></div>
+                  </div>
+                  <div class="field">
+                    <div class="label">所学专业</div>
+                    <div class="input"><span class="placeholder">选填</span></div>
+                  </div>
+                </div>
+                <div class="field">
+                  <div class="label req">单位名称</div>
+                  <div class="input"><span>某某机械有限公司</span></div>
+                </div>
+                <div class="field">
+                  <div class="label req">单位地址</div>
+                  <div class="input"><span>太原市小店区示例路 88 号</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-head">
+                <div>
+                  <div class="section-title">附件上传</div>
+                  <div class="section-caption">仍按后台附件配置显示，只增加缺失提醒</div>
+                </div>
+                <div class="edit-link">要求说明</div>
+              </div>
+              <div class="upload-summary">
+                <span>还差：学历证书、户口本个人页</span>
+                <span>4/6</span>
+              </div>
+              <div class="upload-grid">
+                <div class="upload-card done"><div class="upload-name"><span>个人照片</span><span>已传</span></div><div class="thumb">预览</div></div>
+                <div class="upload-card done"><div class="upload-name"><span>身份证正面</span><span>已传</span></div><div class="thumb">预览</div></div>
+                <div class="upload-card done"><div class="upload-name"><span>身份证反面</span><span>已传</span></div><div class="thumb">预览</div></div>
+                <div class="upload-card"><div class="upload-name"><span>学历证书</span><span>必传</span></div><div class="thumb">点击上传</div></div>
+              </div>
+              <div class="review-strip">上传后仍可替换、移除、点击预览</div>
+            </div>
+
+            <div class="section" style="margin-bottom:72px">
+              <div class="section-head">
+                <div>
+                  <div class="section-title">提交确认</div>
+                  <div class="section-caption">不单独跳转确认页，只在提交前保留核对摘要</div>
+                </div>
+              </div>
+              <div class="review-strip">特种设备 · 新考证 · 叉车司机 N1 · 附件 4/6</div>
+              <div class="agreement">
+                <span class="check"></span>
+                <span>我已阅读并同意《用户服务协议》和《隐私政策》。</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bottom-bar">
+            <div class="btn">保存草稿</div>
+            <div class="btn primary">提交信息</div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="side">
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">新版原则</div>
+            <div class="panel-note">这次不做分步骤，只把单页变清楚</div>
+          </div>
+          <div class="panel-body">
+            <div class="compare">
+              <div class="compare-card">
+                <b>不做向导</b>
+                <span>用户信息量不大，分步骤会多一次理解成本，也会让“提交”显得离得更远。</span>
+              </div>
+              <div class="compare-card">
+                <b>保留连续填写</b>
+                <span>用户从上到下填完即可；顶部告诉他还差什么，底部一直能提交。</span>
+              </div>
+              <div class="compare-card">
+                <b>压缩字段高度</b>
+                <span>姓名/性别、手机号/文化程度、学校/专业这些短字段并排，减少滚动。</span>
+              </div>
+              <div class="compare-card">
+                <b>附件只做提醒</b>
+                <span>附件上传功能不变，只增加“还差哪几项”的清单提示。</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">现有功能保留</div>
+            <div class="panel-note">按当前小程序真实流程映射</div>
+          </div>
+          <div class="panel-body map-grid">
+            <div class="map-row"><b>培训类型/报名类型</b><span>特种设备、特种作业、新考证、复审全部保留。</span></div>
+            <div class="map-row"><b>作业类别/操作项目</b><span>继续使用现有 picker 和自动填入单一操作项目逻辑。</span></div>
+            <div class="map-row"><b>基本字段</b><span>姓名、性别、文化程度、身份证、手机号、学校、专业、单位名称、单位地址全部保留。</span></div>
+            <div class="map-row"><b>动态附件</b><span>仍按后台附件配置和报名类型决定上传项。</span></div>
+            <div class="map-row"><b>协议与订阅</b><span>协议勾选、隐私弹窗、订阅消息请求、提交逻辑都不改变。</span></div>
+            <div class="map-row"><b>驳回编辑</b><span>驳回原因、重新编辑、禁止切换培训项目照旧保留。</span></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">编辑驳回态</div>
+            <div class="panel-note">不是新页面，只是顶部多一条提醒</div>
+          </div>
+          <div class="panel-body">
+            <div class="reject-card">
+              <b>该记录已被驳回</b>
+              驳回原因：身份证反面照片反光，请重新上传。下方表单直接定位到附件区，培训项目不可更换。
+            </div>
+            <div class="map-row">
+              <b>实现建议</b>
+              <span>在 `edit` 页面顶部保留驳回原因卡片；表单仍是同一张单页，只通过醒目提示和缺失清单引导修改。</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">实现范围</div>
+            <div class="panel-note">轻量改版，不碰数据库</div>
+          </div>
+          <div class="panel-body map-grid">
+            <div class="map-row"><b>主要改</b><span>`student-form.wxml/wxss`、`submit.wxml/wxss`、`edit.wxml/wxss`。</span></div>
+            <div class="map-row"><b>少量 JS</b><span>计算完成度、缺失附件列表、可选草稿保存。现有提交 API 不需要改。</span></div>
+            <div class="map-row"><b>不建议做</b><span>多步骤向导、复杂后台草稿、重新设计数据库。当前规模用不上。</span></div>
+          </div>
+        </section>
+      </aside>
+    </section>
+  </main>
+</body>
+</html>

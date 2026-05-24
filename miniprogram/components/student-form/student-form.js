@@ -69,7 +69,18 @@ Component({
     }
   },
 
+  data: {
+    trainingTypeExpanded: false
+  },
+
   methods: {
+    toggleTrainingType() {
+      if (this.data.disableTrainingType) return
+      this.setData({
+        trainingTypeExpanded: !this.data.trainingTypeExpanded
+      })
+    },
+
     onSelectTrainingType(e) {
       if (this.data.disableTrainingType) return
       const type = e.currentTarget?.dataset?.type || ''
