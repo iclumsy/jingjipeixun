@@ -1,4 +1,5 @@
 const app = getApp()
+const practice = require('../../../utils/practice')
 
 Page({
   data: {
@@ -29,7 +30,11 @@ Page({
     try {
       await app.ensureLogin()
       const summary = await app.refreshPracticeSummary()
-      const banks = Array.isArray(summary && summary.banks) ? summary.banks : []
+      const banks = (Array.isArray(summary && summary.banks) ? summary.banks : [])
+        .map(bank => ({
+          ...bank,
+          studyState: practice.buildBankStudyState(bank)
+        }))
       const activeBankIndex = Math.min(this.data.activeBankIndex, Math.max(banks.length - 1, 0))
       this.setData({
         loading: false,
@@ -61,7 +66,7 @@ Page({
   startMode(e) {
     const bank = this.data.activeBank
     if (!bank) return
-    const { mode, filter } = e.currentTarget.dataset
+    const { mode, filter, lastQuestionId } = e.currentTarget.dataset
     const wrongIds = bank.progress && Array.isArray(bank.progress.wrongQuestionIds)
       ? bank.progress.wrongQuestionIds.join(',')
       : ''
@@ -70,7 +75,7 @@ Page({
       return
     }
     wx.navigateTo({
-      url: `/pages/practice/session/session?bankId=${bank.id}&mode=${mode}&filter=${filter || ''}&title=${encodeURIComponent(bank.displayName || '真题练习')}&wrongIds=${encodeURIComponent(wrongIds)}`
+      url: `/pages/practice/session/session?bankId=${bank.id}&mode=${mode}&filter=${filter || ''}&title=${encodeURIComponent(bank.displayName || '真题练习')}&wrongIds=${encodeURIComponent(wrongIds)}&lastQuestionId=${encodeURIComponent(lastQuestionId || '')}`
     })
   }
 })

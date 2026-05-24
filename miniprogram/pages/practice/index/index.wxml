@@ -8,12 +8,16 @@
 
   <view wx:if="{{loading}}" class="state">正在加载题库...</view>
 
-  <view wx:elif="{{error}}" class="state">
-    <view>{{error}}</view>
+  <view wx:elif="{{error}}" class="state state-card">
+    <view class="state-title">题库加载失败</view>
+    <view class="state-desc">{{error}}</view>
     <button class="primary-btn" bindtap="loadSummary">重试</button>
   </view>
 
-  <view wx:elif="{{banks.length === 0}}" class="state">暂无可练习题库</view>
+  <view wx:elif="{{banks.length === 0}}" class="state state-card">
+    <view class="state-title">暂无可练习题库</view>
+    <view class="state-desc">{{isAdmin ? '请先在后台导入并启用特种设备题库' : '报名审核通过并匹配题库后，这里会显示练习入口'}}</view>
+  </view>
 
   <view wx:else>
     <scroll-view scroll-x class="bank-tabs">
@@ -29,11 +33,59 @@
     </scroll-view>
 
     <view class="hero-card">
-      <view class="bank-title">{{activeBank.displayName}}</view>
+      <view class="bank-row">
+        <view>
+          <view class="bank-title">{{activeBank.displayName}}</view>
+          <view class="bank-meta">{{activeBank.examProject || activeBank.projectCode || '真题题库'}}</view>
+        </view>
+        <view class="bank-pill">{{activeBank.questionCount}} 题</view>
+      </view>
       <view class="stats">
         <view><text>{{activeBank.questionCount}}</text><text>总题量</text></view>
         <view><text>{{activeBank.progress.doneCount}}</text><text>已练习</text></view>
-        <view><text>{{activeBank.progress.wrongCount}}</text><text>错题数</text></view>
+        <view><text>{{activeBank.studyState.correctRateText}}</text><text>正确率</text></view>
+        <view><text>{{activeBank.progress.wrongCount}}</text><text>错题</text></view>
+      </view>
+      <view class="progress-block">
+        <view class="progress-copy">
+          <text>学习进度</text>
+          <text>{{activeBank.studyState.progressText}}</text>
+        </view>
+        <view class="progress-track">
+          <view class="progress-fill" style="width: {{activeBank.studyState.progressPercent}}%;"></view>
+        </view>
+      </view>
+    </view>
+
+    <view class="action-card">
+      <view class="action-copy">
+        <view class="action-eyebrow">{{activeBank.studyState.canContinue ? '上次进度' : '下一步建议'}}</view>
+        <view class="action-title">{{activeBank.studyState.canContinue ? '继续上次练习' : activeBank.studyState.recommendedTitle}}</view>
+        <view class="action-detail">{{activeBank.studyState.canContinue ? '从上次停下的题目继续' : activeBank.studyState.recommendedDetail}}</view>
+      </view>
+      <button
+        class="action-btn"
+        data-mode="{{activeBank.studyState.canContinue ? 'sequential' : activeBank.studyState.recommendedMode}}"
+        data-last-question-id="{{activeBank.studyState.canContinue ? activeBank.studyState.continueQuestionId : ''}}"
+        bindtap="startMode"
+      >{{activeBank.studyState.canContinue ? '继续' : '开始'}}</button>
+    </view>
+
+    <view class="path-section">
+      <view class="section-title">学习路径</view>
+      <view class="path-steps">
+        <view class="path-step {{activeBank.studyState.recommendedMode === 'memorize' ? 'active' : ''}}">
+          <text>1</text><view>背题</view>
+        </view>
+        <view class="path-step {{activeBank.studyState.recommendedMode === 'sequential' ? 'active' : ''}}">
+          <text>2</text><view>顺序练习</view>
+        </view>
+        <view class="path-step {{activeBank.studyState.recommendedMode === 'wrong' ? 'active' : ''}}">
+          <text>3</text><view>错题回顾</view>
+        </view>
+        <view class="path-step {{activeBank.studyState.recommendedMode === 'exam' ? 'active' : ''}}">
+          <text>4</text><view>模拟考试</view>
+        </view>
       </view>
     </view>
 
@@ -46,14 +98,14 @@
       <view class="mode-card" data-mode="sequential" bindtap="startMode">
         <view class="mode-title">顺序练习</view>
         <view class="mode-desc">按题库顺序逐题练习</view>
-        <view class="mode-detail">{{activeBank.progress.doneCount}} / {{activeBank.questionCount}}</view>
+        <view class="mode-detail">{{activeBank.studyState.progressText}}</view>
       </view>
       <view class="mode-card" data-mode="exam" bindtap="startMode">
         <view class="mode-title">模拟考试</view>
         <view class="mode-desc">100 题，60 分钟</view>
         <view class="mode-detail">80 分及格</view>
       </view>
-      <view class="mode-card" data-mode="wrong" bindtap="startMode">
+      <view class="mode-card {{activeBank.studyState.hasWrongQuestions ? '' : 'muted'}}" data-mode="wrong" bindtap="startMode">
         <view class="mode-title">错题回顾</view>
         <view class="mode-desc">重新练习之前做错的题</view>
         <view class="mode-detail">{{activeBank.progress.wrongCount}} 道错题</view>

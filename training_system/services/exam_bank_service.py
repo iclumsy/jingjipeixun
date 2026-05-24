@@ -375,6 +375,7 @@ def _format_summary_bank(bank, progress=None, type_counts=None):
             'correctCount': correct,
             'wrongCount': len(wrong_ids) if isinstance(wrong_ids, list) else 0,
             'wrongQuestionIds': wrong_ids if isinstance(wrong_ids, list) else [],
+            'lastQuestionId': (progress or {}).get('last_question_id'),
         },
     }
 

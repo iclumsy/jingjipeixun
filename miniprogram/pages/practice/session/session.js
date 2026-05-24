@@ -21,10 +21,14 @@ Page({
     bankId: '',
     mode: 'sequential',
     filter: '',
+    lastQuestionId: '',
     title: '练习',
     loading: true,
     questions: [],
     currentIndex: 0,
+    progressPercent: 0,
+    answeredCount: 0,
+    modeHint: '',
     selectedKeys: [],
     submitted: false,
     isCorrect: false,
@@ -51,8 +55,10 @@ Page({
       bankId,
       mode,
       filter,
+      lastQuestionId: decodeURIComponent(options.lastQuestionId || ''),
       wrongIds: decodeURIComponent(options.wrongIds || ''),
-      title: `${title} · ${this.modeTitle(mode, filter)}`
+      title: `${title} · ${this.modeTitle(mode, filter)}`,
+      modeHint: this.modeHint(mode, filter)
     })
     this.loadQuestions()
   },
@@ -66,6 +72,14 @@ Page({
     if (mode !== 'type') return MODE_TITLES[mode] || '练习'
     const labels = { all: '全部题型', single: '单选题', multi: '多选题', judge: '判断题' }
     return labels[filter] || '题型练习'
+  },
+
+  modeHint(mode, filter) {
+    if (mode === 'memorize') return '背题模式会直接显示答案和解析'
+    if (mode === 'exam') return '模拟考试可跳题，最后统一交卷'
+    if (mode === 'wrong') return '集中处理上次练习留下的错题'
+    if (mode === 'type') return `${this.modeTitle(mode, filter)}，适合专项强化`
+    return '答题后会自动记录进度和错题'
   },
 
   async loadQuestions() {
@@ -84,7 +98,9 @@ Page({
       if (mode === 'random' || mode === 'memorize') {
         questions = practice.shuffleQuestions(questions)
       }
-      this.setData({ questions, loading: false, currentIndex: 0 })
+      const currentIndex = practice.findQuestionIndexById(questions, this.data.lastQuestionId)
+      this.setData({ questions, loading: false, currentIndex })
+      this.updateSessionMeta()
       this.prepareCurrentQuestion()
       if (mode === 'exam') this.startTimer()
     } catch (err) {
@@ -106,6 +122,7 @@ Page({
       questionImages: this.buildQuestionImages(q),
       optionList: this.buildOptionList(q, stored)
     })
+    this.updateSessionMeta()
   },
 
   buildOptionList(question, selectedKeys) {
@@ -156,6 +173,7 @@ Page({
       answerMap,
       optionList: this.buildOptionList(q, selected)
     })
+    this.updateSessionMeta()
   },
 
   submitAnswer() {
@@ -181,13 +199,12 @@ Page({
       correctCount: Object.values(resultMap).filter(Boolean).length,
       wrongQuestionIds: wrongIds
     })
+    this.updateSessionMeta()
   },
 
   nextQuestion() {
     if (this.data.currentIndex >= this.data.questions.length - 1) {
-      if (this.data.mode === 'exam') {
-        this.finishSession()
-      }
+      this.finishSession()
       return
     }
     this.setData({ currentIndex: this.data.currentIndex + 1 })
@@ -204,6 +221,15 @@ Page({
     const index = Number(e.currentTarget.dataset.index || 0)
     this.setData({ currentIndex: index, showCard: false })
     this.prepareCurrentQuestion()
+  },
+
+  updateSessionMeta() {
+    const total = this.data.questions.length || 0
+    const progressPercent = total > 0
+      ? Math.max(0, Math.min(100, Math.round(((this.data.currentIndex + 1) / total) * 100)))
+      : 0
+    const answeredCount = Object.keys(this.data.answerMap || {}).length
+    this.setData({ progressPercent, answeredCount })
   },
 
   toggleCard() {

@@ -7,18 +7,28 @@
 
 .top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 24rpx;
+  gap: 18rpx;
+  margin-bottom: 14rpx;
+}
+
+.top-copy {
+  flex: 1;
+  min-width: 0;
 }
 
 .title {
   font-size: 32rpx;
   font-weight: 700;
   color: #15233d;
+  line-height: 1.35;
 }
 
-.meta {
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
   margin-top: 6rpx;
   color: #697994;
   font-size: 24rpx;
@@ -32,6 +42,32 @@
   background: #15233d;
   color: #fff;
   font-weight: 700;
+}
+
+.session-progress {
+  height: 12rpx;
+  margin-bottom: 14rpx;
+  border-radius: 999rpx;
+  overflow: hidden;
+  background: #e8eef7;
+}
+
+.session-progress-fill {
+  height: 100%;
+  min-width: 10rpx;
+  border-radius: 999rpx;
+  background: #2f6af5;
+}
+
+.mode-hint {
+  margin-bottom: 20rpx;
+  padding: 14rpx 18rpx;
+  border-radius: 12rpx;
+  background: #fff;
+  border: 1rpx solid #dce6f2;
+  color: #697994;
+  font-size: 24rpx;
+  line-height: 1.45;
 }
 
 .state {

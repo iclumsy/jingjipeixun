@@ -1,11 +1,18 @@
 <view class="session-page">
   <view class="top">
-    <view>
+    <view class="top-copy">
       <view class="title">{{title}}</view>
-      <view class="meta">{{currentIndex + 1}} / {{questions.length}}</view>
+      <view class="meta-row">
+        <text>{{currentIndex + 1}} / {{questions.length}}</text>
+        <text wx:if="{{questions.length > 0}}">已答 {{answeredCount}}</text>
+      </view>
     </view>
     <view wx:if="{{mode === 'exam'}}" class="timer">{{timerText}}</view>
   </view>
+  <view wx:if="{{questions.length > 0}}" class="session-progress">
+    <view class="session-progress-fill" style="width: {{progressPercent}}%;"></view>
+  </view>
+  <view wx:if="{{modeHint}}" class="mode-hint">{{modeHint}}</view>
 
   <view wx:if="{{loading}}" class="state">正在加载题目...</view>
   <view wx:elif="{{questions.length === 0}}" class="state">暂无题目</view>
