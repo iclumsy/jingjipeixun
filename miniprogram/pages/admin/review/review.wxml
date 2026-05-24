@@ -440,13 +440,13 @@
             <view wx:if="{{!learningStatus.activities.length}}" class="learning-empty-line">暂无学习动态</view>
             <view wx:else class="learning-activity-list">
               <view class="learning-activity-item" wx:for="{{learningStatus.activities}}" wx:key="index">
-                <view class="learning-activity-type type-{{item.typeClass}}">{{item.typeText}}</view>
+                <view class="learning-activity-side">
+                  <view class="learning-activity-type type-{{item.typeClass}}">{{item.typeText}}</view>
+                  <view class="learning-activity-time">{{item.shortTimeText || '-'}}</view>
+                </view>
                 <view class="learning-activity-main">
-                  <view class="learning-activity-top">
-                    <text class="learning-activity-title">{{item.title || item.typeText}}</text>
-                    <text class="learning-activity-time">{{item.timeText || '-'}}</text>
-                  </view>
-                  <view class="learning-activity-detail">{{item.detail || '-'}}</view>
+                  <view class="learning-activity-primary">{{item.primaryText || '-'}}</view>
+                  <view wx:if="{{item.secondaryText}}" class="learning-activity-secondary">{{item.secondaryText}}</view>
                 </view>
               </view>
             </view>

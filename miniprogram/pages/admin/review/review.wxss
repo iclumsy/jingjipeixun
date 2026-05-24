@@ -1082,8 +1082,15 @@
   border-bottom: none;
 }
 
+.learning-activity-side {
+  flex: 0 0 112rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+
 .learning-activity-type {
-  flex: 0 0 auto;
   width: 112rpx;
   height: 42rpx;
   border-radius: 999rpx;
@@ -1111,33 +1118,26 @@
   min-width: 0;
 }
 
-.learning-activity-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10rpx;
-}
-
-.learning-activity-title {
-  color: #0f172a;
-  font-size: 24rpx;
-  line-height: 1.35;
-  font-weight: 800;
-}
-
 .learning-activity-time {
-  flex: 0 0 auto;
   color: #94a3b8;
-  font-size: 20rpx;
+  font-size: 18rpx;
   line-height: 1.4;
   white-space: nowrap;
 }
 
-.learning-activity-detail {
-  margin-top: 7rpx;
-  color: #334155;
+.learning-activity-primary {
+  color: #0f172a;
+  font-size: 24rpx;
+  line-height: 1.4;
+  font-weight: 800;
+  word-break: break-all;
+}
+
+.learning-activity-secondary {
+  margin-top: 6rpx;
+  color: #475569;
   font-size: 22rpx;
-  line-height: 1.55;
+  line-height: 1.5;
   word-break: break-all;
 }
 

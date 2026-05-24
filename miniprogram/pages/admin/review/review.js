@@ -58,11 +58,35 @@ function mapRecord(item) {
 
 function mapLearningActivity(item = {}) {
   const type = item.type || ''
+  const rawTimeText = item.timeText || formatDateTime(item.happenedAt)
+  const shortTimeText = rawTimeText && rawTimeText !== '-'
+    ? rawTimeText.replace(/^\d{4}-/, '')
+    : rawTimeText
+  const hasNumber = value => value !== undefined && value !== null && value !== ''
+  let primaryText = item.detail || '-'
+  let secondaryText = ''
+  if (type === 'exam') {
+    primaryText = `${hasNumber(item.score) ? item.score : '-'} 分 · ${item.passed ? '通过' : '未通过'}`
+    secondaryText = [
+      hasNumber(item.total) ? `总题数 ${item.total}` : '',
+      hasNumber(item.correctCount) ? `答对 ${item.correctCount}` : '',
+      item.durationText ? `用时${item.durationText}` : ''
+    ].filter(Boolean).join('，')
+  } else {
+    primaryText = hasNumber(item.doneCount) ? `已完成 ${item.doneCount} 题` : '题库练习'
+    secondaryText = [
+      hasNumber(item.correctCount) ? `答对 ${item.correctCount} 题` : '',
+      hasNumber(item.wrongCount) ? `错题 ${item.wrongCount} 题` : ''
+    ].filter(Boolean).join('，')
+  }
   return {
     ...item,
     typeClass: type === 'exam' ? 'exam' : 'practice',
     typeText: type === 'exam' ? '模拟考试' : '题库练习',
-    timeText: item.timeText || formatDateTime(item.happenedAt)
+    timeText: rawTimeText,
+    shortTimeText,
+    primaryText,
+    secondaryText
   }
 }
 
