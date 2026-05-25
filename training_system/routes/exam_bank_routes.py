@@ -163,11 +163,9 @@ def mini_practice_questions(bank_id):
     mode = request.args.get('mode', 'sequential')
     mode_labels = {
         'sequential': '顺序练习',
-        'random': '随机练习',
         'exam': '模拟考试',
         'wrong': '错题练习',
-        'memorize': '背题模式',
-        'type': '题型练习'
+        'memorize': '背题模式'
     }
     mode_label = mode_labels.get(mode, mode)
     current_app.logger.info(f"拉取了题库「{bank_name}」的题目，练习模式：{mode_label}")
@@ -204,6 +202,28 @@ def mini_practice_progress():
     result = exam_bank_service.save_progress(user.get('openid', ''), bank_id, data)
 
     return jsonify(result)
+
+
+@exam_bank_bp.route('/api/miniprogram/practice/question_state', methods=['POST'])
+def mini_practice_question_state():
+    user = _require_mini_user()
+    if not user:
+        return _error('未授权访问，请先登录', 401)
+    data = request.get_json(silent=True) or {}
+    bank_id = int(data.get('bankId') or data.get('bank_id') or 0)
+    question_id = data.get('questionId') or data.get('question_id')
+    if not exam_bank_service.can_access_bank(user.get('openid', ''), bank_id, bool(user.get('is_admin'))):
+        return _error('无权限访问该题库', 403)
+    try:
+        result = exam_bank_service.save_question_state(
+            user.get('openid', ''),
+            bank_id,
+            question_id,
+            data,
+        )
+        return jsonify(result)
+    except ValueError as err:
+        return _error(err, 400)
 
 
 @exam_bank_bp.route('/api/miniprogram/practice/exams', methods=['POST'])

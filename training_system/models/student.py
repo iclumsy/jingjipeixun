@@ -350,6 +350,25 @@ def init_db(database_path):
         ''')
 
         conn.execute('''
+            CREATE TABLE IF NOT EXISTS mini_question_states (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                openid           TEXT NOT NULL,
+                bank_id          INTEGER NOT NULL,
+                question_id      INTEGER NOT NULL,
+                status           TEXT NOT NULL,
+                answer_count     INTEGER DEFAULT 0,
+                correct_count    INTEGER DEFAULT 0,
+                wrong_count      INTEGER DEFAULT 0,
+                last_answer_json TEXT DEFAULT '[]',
+                last_mode        TEXT DEFAULT '',
+                last_answered_at TEXT,
+                created_at       TIMESTAMP DEFAULT (DATETIME(CURRENT_TIMESTAMP, 'localtime')),
+                updated_at       TIMESTAMP DEFAULT (DATETIME(CURRENT_TIMESTAMP, 'localtime')),
+                UNIQUE(openid, bank_id, question_id)
+            )
+        ''')
+
+        conn.execute('''
             CREATE TABLE IF NOT EXISTS mini_exam_records (
                 id               INTEGER PRIMARY KEY AUTOINCREMENT,
                 openid           TEXT NOT NULL,
@@ -463,6 +482,14 @@ def init_db(database_path):
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_practice_progress_openid_bank "
             "ON mini_practice_progress(openid, bank_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_question_states_openid_bank_status "
+            "ON mini_question_states(openid, bank_id, status)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_question_states_bank_question "
+            "ON mini_question_states(bank_id, question_id)"
         )
         conn.commit()
     except sqlite3.Error as e:

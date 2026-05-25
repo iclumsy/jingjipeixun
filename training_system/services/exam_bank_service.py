@@ -102,6 +102,51 @@ def _row_to_question(row):
     return item
 
 
+def _row_to_question_state(row, question_id_override=None):
+    item = dict(row)
+    answer = _json_loads(item.get('last_answer_json'), [])
+    if not isinstance(answer, list):
+        answer = [answer] if answer not in (None, '') else []
+    return {
+        'id': item.get('id'),
+        'openid': item.get('openid') or '',
+        'bankId': item.get('bank_id'),
+        'questionId': question_id_override if question_id_override is not None else item.get('question_id'),
+        'status': item.get('status') or 'seen',
+        'answerCount': int(item.get('answer_count') or 0),
+        'correctCount': int(item.get('correct_count') or 0),
+        'wrongCount': int(item.get('wrong_count') or 0),
+        'lastAnswer': answer,
+        'lastMode': item.get('last_mode') or '',
+        'lastAnsweredAt': item.get('last_answered_at') or '',
+        'createdAt': item.get('created_at') or '',
+        'updatedAt': item.get('updated_at') or '',
+    }
+
+
+def _as_bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    return str(value or '').strip().lower() in ('1', 'true', 'yes', 'on', 'correct')
+
+
+def _normalize_answer_payload(value):
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, tuple):
+        return [str(item).strip() for item in value if str(item).strip()]
+    text = str(value).strip()
+    if not text:
+        return []
+    if ',' in text:
+        return [item.strip() for item in text.split(',') if item.strip()]
+    return [text]
+
+
 def _get_training_project(conn, training_project_id):
     row = conn.execute(
         'SELECT * FROM training_projects WHERE id = ?',
@@ -268,6 +313,7 @@ def delete_exam_bank(bank_id):
             raise ValueError('题库不存在')
         conn.execute('DELETE FROM mini_exam_records WHERE bank_id = ?', (bank_id,))
         conn.execute('DELETE FROM mini_practice_progress WHERE bank_id = ?', (bank_id,))
+        conn.execute('DELETE FROM mini_question_states WHERE bank_id = ?', (bank_id,))
         conn.execute('DELETE FROM exam_questions WHERE bank_id = ?', (bank_id,))
         conn.execute('DELETE FROM exam_banks WHERE id = ?', (bank_id,))
     return {'success': True}
@@ -352,10 +398,84 @@ def _type_counts_for_banks(conn, bank_ids):
     return result
 
 
-def _format_summary_bank(bank, progress=None, type_counts=None):
+def _question_state_counts_for_banks(conn, openid, bank_ids):
+    if not bank_ids or not openid:
+        return {}
+    placeholders = ','.join(['?'] * len(bank_ids))
+    rows = conn.execute(
+        f'''
+        SELECT bank_id, status, COUNT(*) AS count
+        FROM mini_question_states
+        WHERE openid = ? AND bank_id IN ({placeholders})
+        GROUP BY bank_id, status
+        ''',
+        [openid] + list(bank_ids),
+    ).fetchall()
+    result = {}
+    for row in rows:
+        counts = result.setdefault(row['bank_id'], {
+            'seen': 0,
+            'mastered': 0,
+            'wrong': 0,
+        })
+        status = row['status'] if row['status'] in counts else 'seen'
+        counts[status] += int(row['count'] or 0)
+    return result
+
+
+def _wrong_question_ids_for_banks(conn, openid, bank_ids):
+    if not bank_ids or not openid:
+        return {}
+    placeholders = ','.join(['?'] * len(bank_ids))
+    rows = conn.execute(
+        f'''
+        SELECT bank_id, question_id
+        FROM mini_question_states
+        WHERE openid = ? AND bank_id IN ({placeholders}) AND status = ?
+        ORDER BY updated_at DESC, id DESC
+        ''',
+        [openid] + list(bank_ids) + ['wrong'],
+    ).fetchall()
+    result = {}
+    for row in rows:
+        result.setdefault(row['bank_id'], []).append(row['question_id'])
+    return result
+
+
+def _aggregate_question_state_summary(question_count, counts=None):
+    counts = counts or {}
+    total = max(0, int(question_count or 0))
+    seen_count = int(counts.get('seen') or 0)
+    mastered_count = int(counts.get('mastered') or 0)
+    wrong_count = int(counts.get('wrong') or 0)
+    touched_count = seen_count + mastered_count + wrong_count
+    answered_count = mastered_count + wrong_count
+    untouched_count = max(0, total - touched_count)
+    return {
+        'seenCount': seen_count,
+        'masteredCount': mastered_count,
+        'wrongCount': wrong_count,
+        'untouchedCount': untouched_count,
+        'answeredCount': answered_count,
+        'touchedCount': touched_count,
+        'studyProgressPercent': round(touched_count * 100 / total) if total else 0,
+        'answerProgressPercent': round(answered_count * 100 / total) if total else 0,
+        'masteryPercent': round(mastered_count * 100 / total) if total else 0,
+        'correctRate': round(mastered_count * 100 / answered_count) if answered_count else 0,
+    }
+
+
+def _format_summary_bank(bank, progress=None, type_counts=None, question_counts=None, wrong_question_ids=None):
     wrong_ids = _json_loads((progress or {}).get('wrong_question_ids_json'), [])
     done = int((progress or {}).get('done_count') or 0)
     correct = int((progress or {}).get('correct_count') or 0)
+    state_summary = _aggregate_question_state_summary(
+        int(bank.get('question_count') or 0),
+        question_counts,
+    )
+    current_wrong_ids = wrong_question_ids if isinstance(wrong_question_ids, list) else None
+    legacy_wrong_ids = wrong_ids if isinstance(wrong_ids, list) else []
+    merged_wrong_ids = current_wrong_ids if current_wrong_ids is not None else legacy_wrong_ids
     counts = type_counts or {
         'all': int(bank.get('question_count') or 0),
         'single': 0,
@@ -371,11 +491,15 @@ def _format_summary_bank(bank, progress=None, type_counts=None):
         'questionCount': int(bank.get('question_count') or 0),
         'typeCounts': counts,
         'progress': {
-            'doneCount': done,
-            'correctCount': correct,
-            'wrongCount': len(wrong_ids) if isinstance(wrong_ids, list) else 0,
-            'wrongQuestionIds': wrong_ids if isinstance(wrong_ids, list) else [],
+            'doneCount': state_summary['answeredCount'] or done,
+            'correctCount': state_summary['masteredCount'] or correct,
+            'wrongCount': state_summary['wrongCount'] if question_counts else len(legacy_wrong_ids),
+            'wrongQuestionIds': merged_wrong_ids,
             'lastQuestionId': (progress or {}).get('last_question_id'),
+        },
+        'questionState': {
+            **state_summary,
+            'wrongQuestionIds': merged_wrong_ids,
         },
     }
 
@@ -414,6 +538,13 @@ def _empty_learning_summary(state='not_started'):
         'doneCount': 0,
         'questionCount': 0,
         'progressPercent': 0,
+        'seenCount': 0,
+        'masteredCount': 0,
+        'untouchedCount': 0,
+        'answeredCount': 0,
+        'studyProgressPercent': 0,
+        'answerProgressPercent': 0,
+        'masteryPercent': 0,
         'correctCount': 0,
         'correctRate': 0,
         'wrongCount': 0,
@@ -461,6 +592,20 @@ def _find_student_bank(conn, student):
     return _row_to_bank(row)
 
 
+def _format_exam_record(row):
+    return {
+        'id': row.get('id'),
+        'score': int(row.get('score') or 0),
+        'total': int(row.get('total') or 0),
+        'correctCount': int(row.get('correct_count') or 0),
+        'durationSeconds': int(row.get('duration_seconds') or 0),
+        'durationText': _duration_text(row.get('duration_seconds')),
+        'passed': bool(int(row.get('passed') or 0)),
+        'createdAt': row.get('created_at') or '',
+        'timeText': _format_learning_time(row.get('created_at')),
+    }
+
+
 def get_student_learning_status(student):
     """汇总管理员查看某个学员学习情况所需的数据。"""
     student = dict(student or {})
@@ -488,6 +633,7 @@ def get_student_learning_status(student):
     if not openid:
         base['summary']['stateText'] = '未绑定用户'
         base['summary']['adviceText'] = '该学员没有小程序提交人信息'
+        base['examStats']['records'] = []
         return base
 
     with get_db_connection() as conn:
@@ -505,6 +651,25 @@ def get_student_learning_status(student):
             ''',
             (openid, bank['id'], 'practice'),
         ).fetchone()
+        state_rows = conn.execute(
+            '''
+            SELECT status, COUNT(*) AS count
+            FROM mini_question_states
+            WHERE openid = ? AND bank_id = ?
+            GROUP BY status
+            ''',
+            (openid, bank['id']),
+        ).fetchall()
+        latest_state = conn.execute(
+            '''
+            SELECT updated_at
+            FROM mini_question_states
+            WHERE openid = ? AND bank_id = ?
+            ORDER BY updated_at DESC, id DESC
+            LIMIT 1
+            ''',
+            (openid, bank['id']),
+        ).fetchone()
         exam_rows = conn.execute(
             '''
             SELECT *
@@ -516,12 +681,18 @@ def get_student_learning_status(student):
         ).fetchall()
 
     progress = dict(progress) if progress else None
+    latest_state = dict(latest_state) if latest_state else None
     exams = [dict(row) for row in exam_rows]
     question_count = int(bank.get('question_count') or 0)
-    done = int((progress or {}).get('done_count') or 0)
-    correct = int((progress or {}).get('correct_count') or 0)
-    wrong_ids = _json_loads((progress or {}).get('wrong_question_ids_json'), [])
-    wrong_count = len(wrong_ids) if isinstance(wrong_ids, list) else 0
+    state_counts = {
+        (row['status'] if row['status'] in ('seen', 'mastered', 'wrong') else 'seen'): int(row['count'] or 0)
+        for row in state_rows
+    }
+    state_summary = _aggregate_question_state_summary(question_count, state_counts)
+    done = state_summary['answeredCount']
+    correct = state_summary['masteredCount']
+    wrong_count = state_summary['wrongCount']
+    touched_count = state_summary['touchedCount']
     exam_count = len(exams)
     pass_count = sum(1 for row in exams if int(row.get('passed') or 0) == 1)
     best_score = max([int(row.get('score') or 0) for row in exams], default=None)
@@ -531,17 +702,15 @@ def get_student_learning_status(student):
         state = 'passed'
     elif exam_count > 0:
         state = 'exam_attempted'
-    elif done > 0:
+    elif touched_count > 0:
         state = 'practicing'
     else:
         state = 'not_started'
 
     summary = _empty_learning_summary(state)
-    progress_percent = round(min(done, question_count) * 100 / question_count) if question_count else 0
-    correct_rate = round(correct * 100 / done) if done else 0
     last_candidates = []
-    if progress and progress.get('updated_at'):
-        last_candidates.append(str(progress.get('updated_at')))
+    if latest_state and latest_state.get('updated_at'):
+        last_candidates.append(str(latest_state.get('updated_at')))
     if latest and latest.get('created_at'):
         last_candidates.append(str(latest.get('created_at')))
     last_study_at = max(last_candidates) if last_candidates else ''
@@ -549,9 +718,16 @@ def get_student_learning_status(student):
     summary.update({
         'doneCount': done,
         'questionCount': question_count,
-        'progressPercent': progress_percent,
+        'progressPercent': state_summary['studyProgressPercent'],
+        'seenCount': state_summary['seenCount'],
+        'masteredCount': state_summary['masteredCount'],
+        'untouchedCount': state_summary['untouchedCount'],
+        'answeredCount': state_summary['answeredCount'],
+        'studyProgressPercent': state_summary['studyProgressPercent'],
+        'answerProgressPercent': state_summary['answerProgressPercent'],
+        'masteryPercent': state_summary['masteryPercent'],
         'correctCount': correct,
-        'correctRate': correct_rate,
+        'correctRate': state_summary['correctRate'],
         'wrongCount': wrong_count,
         'lastStudyAt': last_study_at,
         'lastStudyTimeText': _format_learning_time(last_study_at),
@@ -564,17 +740,17 @@ def get_student_learning_status(student):
     })
 
     activities = []
-    if progress and done > 0:
+    if touched_count > 0:
         activities.append({
             'type': 'practice',
             'title': '题库练习',
-            'happenedAt': progress.get('updated_at') or '',
-            'timeText': _format_learning_time(progress.get('updated_at')),
-            'detail': f'已完成 {done} 题，答对 {correct} 题，错题 {wrong_count} 题',
+            'happenedAt': (latest_state or {}).get('updated_at') or '',
+            'timeText': _format_learning_time((latest_state or {}).get('updated_at')),
+            'detail': f'已看 {state_summary["seenCount"]} 题，已掌握 {correct} 题，错题 {wrong_count} 题',
             'doneCount': done,
             'correctCount': correct,
             'wrongCount': wrong_count,
-            '_sortId': int(progress.get('id') or 0),
+            '_sortId': 0,
         })
 
     for row in exams:
@@ -603,17 +779,7 @@ def get_student_learning_status(student):
 
     latest_payload = None
     if latest:
-        latest_payload = {
-            'id': latest.get('id'),
-            'score': int(latest.get('score') or 0),
-            'total': int(latest.get('total') or 0),
-            'correctCount': int(latest.get('correct_count') or 0),
-            'durationSeconds': int(latest.get('duration_seconds') or 0),
-            'durationText': _duration_text(latest.get('duration_seconds')),
-            'passed': bool(int(latest.get('passed') or 0)),
-            'createdAt': latest.get('created_at') or '',
-            'timeText': _format_learning_time(latest.get('created_at')),
-        }
+        latest_payload = _format_exam_record(latest)
 
     base.update({
         'bank': {
@@ -629,6 +795,7 @@ def get_student_learning_status(student):
             'bestScore': best_score,
             'passCount': pass_count,
             'latest': latest_payload,
+            'records': [_format_exam_record(row) for row in exams],
         },
         'activities': activities,
     })
@@ -671,9 +838,17 @@ def get_practice_summary(openid, is_admin=False):
         banks = [_row_to_bank(row) for row in rows]
         progress = _progress_for_banks(conn, openid, [bank['id'] for bank in banks])
         type_counts = _type_counts_for_banks(conn, [bank['id'] for bank in banks])
+        question_state_counts = _question_state_counts_for_banks(conn, openid, [bank['id'] for bank in banks])
+        wrong_question_ids = _wrong_question_ids_for_banks(conn, openid, [bank['id'] for bank in banks])
 
     summary_banks = [
-        _format_summary_bank(bank, progress.get(bank['id']), type_counts.get(bank['id']))
+        _format_summary_bank(
+            bank,
+            progress.get(bank['id']),
+            type_counts.get(bank['id']),
+            question_state_counts.get(bank['id']),
+            wrong_question_ids.get(bank['id']),
+        )
         for bank in banks
     ]
     return {
@@ -692,6 +867,110 @@ def can_access_bank(openid, bank_id, is_admin=False):
         return True
     summary = get_practice_summary(openid, is_admin=False)
     return any(item['id'] == int(bank_id) for item in summary['banks'])
+
+
+def save_question_state(openid, bank_id, question_id, payload):
+    openid = str(openid or '').strip()
+    bank_id = int(bank_id or 0)
+    raw_question_id = str(question_id or '').strip()
+    if not openid:
+        raise ValueError('用户不存在')
+    if bank_id <= 0:
+        raise ValueError('题库不存在')
+    if not raw_question_id:
+        raise ValueError('题目不存在')
+
+    payload = payload or {}
+    action = str(payload.get('action') or 'answer').strip().lower()
+    if action not in ('seen', 'answer'):
+        raise ValueError('题目状态动作无效')
+    mode = str(payload.get('mode') or '').strip()
+    answer = _normalize_answer_payload(payload.get('answer'))
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    with get_db_connection() as conn:
+        bank = conn.execute(
+            'SELECT id FROM exam_banks WHERE id = ?',
+            (bank_id,),
+        ).fetchone()
+        if not bank:
+            raise ValueError('题库不存在')
+
+        question = conn.execute(
+            '''
+            SELECT id, source_question_id
+            FROM exam_questions
+            WHERE bank_id = ? AND (
+                CAST(id AS TEXT) = ?
+                OR CAST(source_question_id AS TEXT) = ?
+            )
+            ORDER BY CASE WHEN CAST(source_question_id AS TEXT) = ? THEN 0 ELSE 1 END, id
+            LIMIT 1
+            ''',
+            (bank_id, raw_question_id, raw_question_id, raw_question_id),
+        ).fetchone()
+        if not question:
+            raise ValueError('题目不存在')
+        state_question_id = int(question['id'])
+
+        existing = conn.execute(
+            '''
+            SELECT *
+            FROM mini_question_states
+            WHERE openid = ? AND bank_id = ? AND question_id = ?
+            ''',
+            (openid, bank_id, state_question_id),
+        ).fetchone()
+        existing_dict = dict(existing) if existing else None
+
+        if action == 'seen':
+            next_status = (existing_dict or {}).get('status') or 'seen'
+            answer_count = int((existing_dict or {}).get('answer_count') or 0)
+            correct_count = int((existing_dict or {}).get('correct_count') or 0)
+            wrong_count = int((existing_dict or {}).get('wrong_count') or 0)
+            last_answer_json = (existing_dict or {}).get('last_answer_json') or _json_dumps([])
+            last_answered_at = (existing_dict or {}).get('last_answered_at')
+        else:
+            is_correct = _as_bool(payload.get('isCorrect') if 'isCorrect' in payload else payload.get('is_correct'))
+            next_status = 'mastered' if is_correct else 'wrong'
+            answer_count = int((existing_dict or {}).get('answer_count') or 0) + 1
+            correct_count = int((existing_dict or {}).get('correct_count') or 0) + (1 if is_correct else 0)
+            wrong_count = int((existing_dict or {}).get('wrong_count') or 0) + (0 if is_correct else 1)
+            last_answer_json = _json_dumps(answer)
+            last_answered_at = now
+
+        conn.execute(
+            '''
+            INSERT INTO mini_question_states (
+                openid, bank_id, question_id, status, answer_count,
+                correct_count, wrong_count, last_answer_json, last_mode,
+                last_answered_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(openid, bank_id, question_id) DO UPDATE SET
+                status = excluded.status,
+                answer_count = excluded.answer_count,
+                correct_count = excluded.correct_count,
+                wrong_count = excluded.wrong_count,
+                last_answer_json = excluded.last_answer_json,
+                last_mode = excluded.last_mode,
+                last_answered_at = excluded.last_answered_at,
+                updated_at = excluded.updated_at
+            ''',
+            (
+                openid, bank_id, state_question_id, next_status, answer_count,
+                correct_count, wrong_count, last_answer_json, mode,
+                last_answered_at, now, now,
+            ),
+        )
+        row = conn.execute(
+            '''
+            SELECT *
+            FROM mini_question_states
+            WHERE openid = ? AND bank_id = ? AND question_id = ?
+            ''',
+            (openid, bank_id, state_question_id),
+        ).fetchone()
+    return {'success': True, 'state': _row_to_question_state(row, question_id_override=int(raw_question_id) if raw_question_id.isdigit() else raw_question_id)}
 
 
 def save_progress(openid, bank_id, payload):

@@ -388,33 +388,33 @@
 
         <view class="learning-metric-grid">
           <view class="learning-metric">
-            <text class="learning-metric-label">练习进度</text>
-            <text class="learning-metric-value">{{learningStatus.summary.doneCount}}/{{learningStatus.summary.questionCount}}</text>
+            <text class="learning-metric-label">已掌握</text>
+            <text class="learning-metric-value">{{learningStatus.summary.masteredCount}}/{{learningStatus.summary.questionCount}}</text>
           </view>
           <view class="learning-metric">
-            <text class="learning-metric-label">正确率</text>
-            <text class="learning-metric-value">{{learningStatus.summary.correctRate}}%</text>
+            <text class="learning-metric-label">错题</text>
+            <text class="learning-metric-value">{{learningStatus.summary.wrongCount}}</text>
           </view>
           <view class="learning-metric">
-            <text class="learning-metric-label">模拟考试</text>
-            <text class="learning-metric-value">{{learningStatus.summary.examCount}}次</text>
+            <text class="learning-metric-label">已看</text>
+            <text class="learning-metric-value">{{learningStatus.summary.seenCount}}</text>
           </view>
           <view class="learning-metric">
-            <text class="learning-metric-label">最好成绩</text>
-            <text class="learning-metric-value">{{learningStatus.summary.bestScoreText}}</text>
+            <text class="learning-metric-label">未做</text>
+            <text class="learning-metric-value">{{learningStatus.summary.untouchedCount}}</text>
           </view>
         </view>
 
         <view class="learning-progress-box">
           <view class="learning-progress-head">
-            <text>题库练习</text>
-            <text>{{learningStatus.summary.progressPercent}}%</text>
+            <text>学习覆盖</text>
+            <text>{{learningStatus.summary.studyProgressPercent}}%</text>
           </view>
           <view class="learning-progress-track">
-            <view class="learning-progress-bar" style="width: {{learningStatus.summary.progressPercent}}%;"></view>
+            <view class="learning-progress-bar" style="width: {{learningStatus.summary.studyProgressPercent}}%;"></view>
           </view>
           <view class="learning-progress-note">
-            答对 {{learningStatus.summary.correctCount}} 题，错题 {{learningStatus.summary.wrongCount}} 题，最近 {{learningStatus.summary.lastStudyTimeText || '-'}}
+            已答 {{learningStatus.summary.answeredCount}} 题，正确率 {{learningStatus.summary.correctRate}}%，掌握率 {{learningStatus.summary.masteryPercent}}%，最近 {{learningStatus.summary.lastStudyTimeText || '-'}}
           </view>
         </view>
 
@@ -433,20 +433,20 @@
 
         <view class="learning-activity-box">
           <view class="learning-section-head">
-            <text class="learning-section-title">最近动态</text>
-            <text class="learning-section-sub">共 {{learningStatus.activities.length}} 条</text>
+            <text class="learning-section-title">考试动态</text>
+            <text class="learning-section-sub">共 {{learningStatus.examStats.records.length}} 条</text>
           </view>
           <scroll-view class="learning-activity-scroll" scroll-y enhanced show-scrollbar="{{true}}">
-            <view wx:if="{{!learningStatus.activities.length}}" class="learning-empty-line">暂无学习动态</view>
+            <view wx:if="{{!learningStatus.examStats.records.length}}" class="learning-empty-line">暂无考试记录</view>
             <view wx:else class="learning-activity-list">
-              <view class="learning-activity-item" wx:for="{{learningStatus.activities}}" wx:key="index">
+              <view class="learning-activity-item" wx:for="{{learningStatus.examStats.records}}" wx:key="id">
                 <view class="learning-activity-side">
-                  <view class="learning-activity-type type-{{item.typeClass}}">{{item.typeText}}</view>
+                  <view class="learning-activity-type type-exam">模拟考试</view>
                   <view class="learning-activity-time">{{item.shortTimeText || '-'}}</view>
                 </view>
                 <view class="learning-activity-main">
-                  <view class="learning-activity-primary">{{item.primaryText || '-'}}</view>
-                  <view wx:if="{{item.secondaryText}}" class="learning-activity-secondary">{{item.secondaryText}}</view>
+                  <view class="learning-activity-primary">{{item.scoreText}} · {{item.resultText}}</view>
+                  <view class="learning-activity-secondary">总题数 {{item.total || 0}}，答对 {{item.correctCount || 0}}，用时{{item.durationText || '-'}}</view>
                 </view>
               </view>
             </view>

@@ -67,8 +67,8 @@ Page({
     const bank = this.data.activeBank
     if (!bank) return
     const { mode, filter, lastQuestionId } = e.currentTarget.dataset
-    const wrongIds = bank.progress && Array.isArray(bank.progress.wrongQuestionIds)
-      ? bank.progress.wrongQuestionIds.join(',')
+    const wrongIds = bank.studyState && Array.isArray(bank.studyState.wrongQuestionIds)
+      ? bank.studyState.wrongQuestionIds.join(',')
       : ''
     if (mode === 'wrong' && !wrongIds) {
       wx.showToast({ title: '暂无错题', icon: 'none' })

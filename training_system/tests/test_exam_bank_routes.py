@@ -275,23 +275,36 @@ class ExamBankRouteTests(unittest.TestCase):
         self.assertFalse(summary.get_json()["practiceEnabled"])
         self.assertEqual(questions.status_code, 403)
 
-    def test_practice_progress_over_twenty_records_student_learning_log_once(self):
+    def test_mini_student_saves_single_question_state_without_operation_log(self):
         bank = self.create_bank()
         student_id = self.create_reviewed_student(openid="student-openid", name="张治富")
         headers = self.mini_headers(openid="student-openid", is_admin=False)
 
-        low_response = self.client.post(
-            "/api/miniprogram/practice/progress",
+        response = self.client.post(
+            "/api/miniprogram/practice/question_state",
             headers=headers,
             json={
                 "bankId": bank["id"],
-                "doneCount": 20,
-                "correctCount": 16,
-                "wrongQuestionIds": [1, 2, 3, 4],
+                "questionId": 101,
+                "mode": "practice",
+                "action": "answer",
+                "isCorrect": True,
+                "answer": ["B"],
             },
         )
-        self.assertEqual(low_response.status_code, 200)
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["state"]["status"], "mastered")
+        self.assertEqual(payload["state"]["questionId"], 101)
+        self.assertEqual(payload["state"]["answerCount"], 1)
         self.assertEqual(self.list_operation_logs(student_id), [])
+
+    def test_practice_progress_does_not_write_student_operation_log(self):
+        bank = self.create_bank()
+        student_id = self.create_reviewed_student(openid="student-openid", name="张治富")
+        headers = self.mini_headers(openid="student-openid", is_admin=False)
 
         response = self.client.post(
             "/api/miniprogram/practice/progress",
@@ -305,14 +318,7 @@ class ExamBankRouteTests(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        logs = self.list_operation_logs(student_id)
-        self.assertEqual(len(logs), 1)
-        self.assertEqual(logs[0]["action"], "practice_progress_updated")
-        self.assertEqual(logs[0]["action_label"], "题库练习")
-        self.assertIn("更新了题库", logs[0]["message"])
-        self.assertIn("已做 21 题", logs[0]["message"])
-        self.assertIn("答对 17 题", logs[0]["message"])
-        self.assertIn("错题数 4", logs[0]["message"])
+        self.assertEqual(self.list_operation_logs(student_id), [])
 
         duplicate_response = self.client.post(
             "/api/miniprogram/practice/progress",
@@ -325,9 +331,9 @@ class ExamBankRouteTests(unittest.TestCase):
             },
         )
         self.assertEqual(duplicate_response.status_code, 200)
-        self.assertEqual(len(self.list_operation_logs(student_id)), 1)
+        self.assertEqual(self.list_operation_logs(student_id), [])
 
-    def test_practice_exam_over_twenty_records_student_learning_log(self):
+    def test_practice_exam_record_does_not_write_student_operation_log(self):
         bank = self.create_bank()
         student_id = self.create_reviewed_student(openid="student-openid", name="杨柳")
         headers = self.mini_headers(openid="student-openid", is_admin=False)
@@ -361,15 +367,7 @@ class ExamBankRouteTests(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        logs = self.list_operation_logs(student_id)
-        self.assertEqual(len(logs), 1)
-        self.assertEqual(logs[0]["action"], "practice_exam_submitted")
-        self.assertEqual(logs[0]["action_label"], "模拟考试")
-        self.assertIn("提交了题库", logs[0]["message"])
-        self.assertIn("得分：70分", logs[0]["message"])
-        self.assertIn("总题数：100", logs[0]["message"])
-        self.assertIn("用时：21分9秒", logs[0]["message"])
-        self.assertIn("结果：未通过", logs[0]["message"])
+        self.assertEqual(self.list_operation_logs(student_id), [])
 
         duplicate_response = self.client.post(
             "/api/miniprogram/practice/exams",
@@ -385,7 +383,7 @@ class ExamBankRouteTests(unittest.TestCase):
             },
         )
         self.assertEqual(duplicate_response.status_code, 200)
-        self.assertEqual(len(self.list_operation_logs(student_id)), 1)
+        self.assertEqual(self.list_operation_logs(student_id), [])
 
 
 if __name__ == "__main__":

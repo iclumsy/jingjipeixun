@@ -90,11 +90,32 @@ function mapLearningActivity(item = {}) {
   }
 }
 
+function mapExamRecord(item = {}) {
+  const rawTimeText = item.timeText || formatDateTime(item.createdAt || item.created_at)
+  const shortTimeText = rawTimeText && rawTimeText !== '-'
+    ? rawTimeText.replace(/^\d{4}-/, '')
+    : rawTimeText
+  const hasNumber = value => value !== undefined && value !== null && value !== ''
+  return {
+    ...item,
+    score: hasNumber(item.score) ? Number(item.score) : null,
+    total: hasNumber(item.total) ? Number(item.total) : null,
+    correctCount: hasNumber(item.correctCount) ? Number(item.correctCount) : Number(item.correct_count || 0),
+    durationText: item.durationText || '',
+    passed: !!item.passed,
+    timeText: rawTimeText,
+    shortTimeText,
+    scoreText: hasNumber(item.score) ? `${item.score}分` : '-',
+    resultText: item.passed ? '通过' : '未通过'
+  }
+}
+
 function normalizeLearningStatus(result = {}) {
   const summary = result.summary || {}
   const examStats = result.examStats || {}
   const bestScore = summary.bestScore === undefined ? null : summary.bestScore
   const latestScore = summary.latestScore === undefined ? null : summary.latestScore
+  const examRecords = Array.isArray(examStats.records) ? examStats.records.map(mapExamRecord) : []
   return {
     success: !!result.success,
     student: result.student || {},
@@ -106,6 +127,13 @@ function normalizeLearningStatus(result = {}) {
       doneCount: Number(summary.doneCount || 0),
       questionCount: Number(summary.questionCount || 0),
       progressPercent: Number(summary.progressPercent || 0),
+      seenCount: Number(summary.seenCount || 0),
+      masteredCount: Number(summary.masteredCount || 0),
+      untouchedCount: Number(summary.untouchedCount || 0),
+      answeredCount: Number(summary.answeredCount || 0),
+      studyProgressPercent: Number(summary.studyProgressPercent || summary.progressPercent || 0),
+      answerProgressPercent: Number(summary.answerProgressPercent || 0),
+      masteryPercent: Number(summary.masteryPercent || 0),
       correctCount: Number(summary.correctCount || 0),
       correctRate: Number(summary.correctRate || 0),
       wrongCount: Number(summary.wrongCount || 0),
@@ -123,7 +151,8 @@ function normalizeLearningStatus(result = {}) {
       count: Number(examStats.count || 0),
       bestScore: examStats.bestScore,
       passCount: Number(examStats.passCount || 0),
-      latest: examStats.latest || null
+      latest: examStats.latest || null,
+      records: examRecords
     },
     activities: Array.isArray(result.activities) ? result.activities.map(mapLearningActivity) : []
   }

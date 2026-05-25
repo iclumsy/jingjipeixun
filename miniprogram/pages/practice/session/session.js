@@ -4,16 +4,8 @@ const practice = require('../../../utils/practice')
 const MODE_TITLES = {
   memorize: '背题模式',
   sequential: '顺序练习',
-  random: '随机练习',
   wrong: '错题练习',
-  exam: '模拟考试',
-  type: '题型练习'
-}
-
-const FILTER_TYPE_MAP = {
-  single: 'single',
-  multi: 'multi',
-  judge: 'judge'
+  exam: '模拟考试'
 }
 
 Page({
@@ -65,21 +57,17 @@ Page({
 
   onUnload() {
     this.clearTimer()
-    this.saveProgress()
   },
 
   modeTitle(mode, filter) {
-    if (mode !== 'type') return MODE_TITLES[mode] || '练习'
-    const labels = { all: '全部题型', single: '单选题', multi: '多选题', judge: '判断题' }
-    return labels[filter] || '题型练习'
+    return MODE_TITLES[mode] || '练习'
   },
 
   modeHint(mode, filter) {
     if (mode === 'memorize') return '背题模式会直接显示答案和解析'
     if (mode === 'exam') return '模拟考试可跳题，最后统一交卷'
     if (mode === 'wrong') return '集中处理上次练习留下的错题'
-    if (mode === 'type') return `${this.modeTitle(mode, filter)}，适合专项强化`
-    return '答题后会自动记录进度和错题'
+    return '每答一题都会立即记录掌握和错题状态'
   },
 
   async loadQuestions() {
@@ -88,14 +76,14 @@ Page({
       const mode = this.data.mode
       const limit = mode === 'exam' || mode === 'memorize' ? 100 : 100
       const res = await api.getPracticeQuestions(this.data.bankId, {
-        mode: mode === 'wrong' || mode === 'type' || mode === 'memorize' ? 'sequential' : mode,
+        mode: mode === 'wrong' || mode === 'memorize' ? 'sequential' : mode,
         page: 1,
         limit,
         wrong_ids: mode === 'wrong' ? this.data.wrongIds : '',
-        question_type: mode === 'type' ? (FILTER_TYPE_MAP[this.data.filter] || '') : ''
+        question_type: ''
       })
       let questions = Array.isArray(res.list) ? res.list : []
-      if (mode === 'random' || mode === 'memorize') {
+      if (mode === 'memorize') {
         questions = practice.shuffleQuestions(questions)
       }
       const currentIndex = practice.findQuestionIndexById(questions, this.data.lastQuestionId)
@@ -122,6 +110,9 @@ Page({
       questionImages: this.buildQuestionImages(q),
       optionList: this.buildOptionList(q, stored)
     })
+    if (this.data.mode === 'memorize') {
+      this.markQuestionSeen(q)
+    }
     this.updateSessionMeta()
   },
 
@@ -176,7 +167,7 @@ Page({
     this.updateSessionMeta()
   },
 
-  submitAnswer() {
+  async submitAnswer() {
     const q = this.currentQuestion()
     if (!q || this.data.selectedKeys.length === 0) {
       wx.showToast({ title: '请选择答案', icon: 'none' })
@@ -199,6 +190,7 @@ Page({
       correctCount: Object.values(resultMap).filter(Boolean).length,
       wrongQuestionIds: wrongIds
     })
+    await this.recordQuestionAnswer(q, this.data.selectedKeys, isCorrect)
     this.updateSessionMeta()
   },
 
@@ -236,19 +228,46 @@ Page({
     this.setData({ showCard: !this.data.showCard })
   },
 
-  async saveProgress() {
-    if (!this.data.bankId) return
+  async saveQuestionState(payload = {}) {
+    if (!this.data.bankId || !payload.questionId) return null
     try {
-      await api.savePracticeProgress({
+      return await api.saveQuestionState({
         bankId: this.data.bankId,
-        mode: this.data.mode === 'exam' ? 'exam' : 'practice',
-        doneCount: this.data.doneCount,
-        correctCount: this.data.correctCount,
-        wrongQuestionIds: this.data.wrongQuestionIds,
-        lastQuestionId: (this.currentQuestion() || {}).id || null
+        ...payload
       })
     } catch (err) {
-      console.warn('保存练习进度失败', err)
+      console.warn('保存题目状态失败', err)
+      return null
+    }
+  },
+
+  markQuestionSeen(question) {
+    if (!question || !question.id) return
+    this._seenQuestionIds = this._seenQuestionIds || {}
+    if (this._seenQuestionIds[question.id]) return
+    this._seenQuestionIds[question.id] = true
+    this.saveQuestionState({
+      questionId: question.id,
+      action: 'seen',
+      mode: this.data.mode
+    })
+  },
+
+  async recordQuestionAnswer(question, selectedKeys, isCorrect) {
+    if (!question || !question.id) return
+    await this.saveQuestionState({
+      questionId: question.id,
+      action: 'answer',
+      mode: this.data.mode,
+      answer: selectedKeys,
+      isCorrect
+    })
+  },
+
+  async recordExamQuestionStates(resultMap) {
+    const answerMap = this.data.answerMap || {}
+    for (const q of this.data.questions) {
+      await this.recordQuestionAnswer(q, answerMap[q.id] || [], !!resultMap[q.id])
     }
   },
 
@@ -272,7 +291,7 @@ Page({
         correctCount: correct,
         wrongQuestionIds: wrongIds
       })
-      await this.saveProgress()
+      await this.recordExamQuestionStates(resultMap)
       try {
         await api.savePracticeExam({
           bankId: this.data.bankId,
@@ -291,7 +310,6 @@ Page({
       })
       return
     }
-    await this.saveProgress()
     wx.navigateBack()
   },
 

@@ -99,6 +99,7 @@ class ExamBankServiceTests(unittest.TestCase):
         self.assertIn("exam_questions", names)
         self.assertIn("mini_practice_progress", names)
         self.assertIn("mini_exam_records", names)
+        self.assertIn("mini_question_states", names)
 
     def test_import_exam_bank_creates_bank_and_questions(self):
         bank = exam_bank_service.import_exam_bank(
@@ -212,6 +213,12 @@ class ExamBankServiceTests(unittest.TestCase):
             "correctCount": 1,
             "wrongQuestionIds": [],
         })
+        exam_bank_service.save_question_state("student-openid", bank["id"], SAMPLE_QUESTIONS[0]["id"], {
+            "action": "answer",
+            "isCorrect": True,
+            "answer": ["B"],
+            "mode": "practice",
+        })
 
         result = exam_bank_service.delete_exam_bank(bank["id"])
 
@@ -223,7 +230,46 @@ class ExamBankServiceTests(unittest.TestCase):
                 "SELECT COUNT(*) FROM mini_practice_progress WHERE bank_id = ?",
                 (bank["id"],),
             ).fetchone()[0]
+            states = conn.execute(
+                "SELECT COUNT(*) FROM mini_question_states WHERE bank_id = ?",
+                (bank["id"],),
+            ).fetchone()[0]
         self.assertEqual(progress, 0)
+        self.assertEqual(states, 0)
+
+    def test_save_question_state_tracks_seen_mastered_and_wrong_statuses(self):
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(SAMPLE_QUESTIONS, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        question_id = SAMPLE_QUESTIONS[0]["id"]
+
+        seen = exam_bank_service.save_question_state("student-openid", bank["id"], question_id, {
+            "action": "seen",
+            "mode": "memorize",
+        })
+        wrong = exam_bank_service.save_question_state("student-openid", bank["id"], question_id, {
+            "action": "answer",
+            "isCorrect": False,
+            "answer": ["A"],
+            "mode": "practice",
+        })
+        mastered = exam_bank_service.save_question_state("student-openid", bank["id"], question_id, {
+            "action": "answer",
+            "isCorrect": True,
+            "answer": ["B"],
+            "mode": "wrong",
+        })
+
+        self.assertEqual(seen["state"]["status"], "seen")
+        self.assertEqual(wrong["state"]["status"], "wrong")
+        self.assertEqual(mastered["state"]["status"], "mastered")
+        self.assertEqual(mastered["state"]["answerCount"], 2)
+        self.assertEqual(mastered["state"]["correctCount"], 1)
+        self.assertEqual(mastered["state"]["wrongCount"], 1)
+        self.assertEqual(mastered["state"]["lastMode"], "wrong")
+        self.assertEqual(mastered["state"]["lastAnswer"], ["B"])
 
     def test_import_rejects_question_without_answer(self):
         invalid = [{**SAMPLE_QUESTIONS[0], "answer": []}]
@@ -303,6 +349,84 @@ class ExamBankServiceTests(unittest.TestCase):
 
         self.assertTrue(summary["practiceEnabled"])
         self.assertEqual([item["id"] for item in summary["banks"]], [bank["id"]])
+
+    def test_learning_status_aggregates_question_states_and_all_exam_records(self):
+        sample_questions = [
+            {**SAMPLE_QUESTIONS[0], "id": 101, "question": "1+1=?", "answer": ["B"]},
+            {**SAMPLE_QUESTIONS[0], "id": 102, "question": "2+2=?", "answer": ["A"]},
+            {**SAMPLE_QUESTIONS[0], "id": 103, "question": "3+3=?", "answer": ["B"]},
+            {**SAMPLE_QUESTIONS[0], "id": 104, "question": "4+4=?", "answer": ["A"]},
+        ]
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(sample_questions, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        with get_db_connection() as conn:
+            project_id = self.get_project_id("叉车司机")
+            student_id = conn.execute(
+                """
+                INSERT INTO students (
+                    name, gender, education, id_card, phone, job_category,
+                    exam_project, project_code, training_type, status,
+                    submitter_openid, training_project_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "王五", "男", "高中或同等学历", "110101199001011236", "13800138002",
+                    "场(厂)内专用机动车辆作业", "叉车司机", "N1",
+                    "special_equipment", "reviewed", "student-openid", project_id,
+                ),
+            ).lastrowid
+
+        exam_bank_service.save_question_state("student-openid", bank["id"], 101, {
+            "action": "seen",
+            "mode": "memorize",
+        })
+        exam_bank_service.save_question_state("student-openid", bank["id"], 102, {
+            "action": "answer",
+            "isCorrect": True,
+            "answer": ["A"],
+            "mode": "practice",
+        })
+        exam_bank_service.save_question_state("student-openid", bank["id"], 103, {
+            "action": "answer",
+            "isCorrect": False,
+            "answer": ["A"],
+            "mode": "practice",
+        })
+        exam_bank_service.save_exam_record("student-openid", bank["id"], {
+            "score": 70,
+            "total": 100,
+            "correctCount": 70,
+            "durationSeconds": 1800,
+            "passed": False,
+        })
+        exam_bank_service.save_exam_record("student-openid", bank["id"], {
+            "score": 88,
+            "total": 100,
+            "correctCount": 88,
+            "durationSeconds": 1700,
+            "passed": True,
+        })
+
+        with get_db_connection() as conn:
+            student = dict(conn.execute("SELECT * FROM students WHERE id = ?", (student_id,)).fetchone())
+        result = exam_bank_service.get_student_learning_status(student)
+
+        self.assertEqual(result["summary"]["seenCount"], 1)
+        self.assertEqual(result["summary"]["masteredCount"], 1)
+        self.assertEqual(result["summary"]["wrongCount"], 1)
+        self.assertEqual(result["summary"]["untouchedCount"], 1)
+        self.assertEqual(result["summary"]["answeredCount"], 2)
+        self.assertEqual(result["summary"]["studyProgressPercent"], 75)
+        self.assertEqual(result["summary"]["answerProgressPercent"], 50)
+        self.assertEqual(result["summary"]["masteryPercent"], 25)
+        self.assertEqual(result["summary"]["correctRate"], 50)
+        self.assertEqual(result["examStats"]["count"], 2)
+        self.assertEqual(result["examStats"]["bestScore"], 88)
+        self.assertEqual(result["examStats"]["passCount"], 1)
+        self.assertEqual([item["score"] for item in result["examStats"]["records"]], [88, 70])
 
     def test_student_cannot_access_unreviewed_or_inactive_bank(self):
         bank = exam_bank_service.import_exam_bank(

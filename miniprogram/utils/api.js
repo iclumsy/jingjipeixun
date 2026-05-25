@@ -917,6 +917,13 @@ async function savePracticeProgress(payload = {}) {
   })
 }
 
+async function saveQuestionState(payload = {}) {
+  return await requestApi('/api/miniprogram/practice/question_state', {
+    method: 'POST',
+    data: payload
+  })
+}
+
 async function savePracticeExam(payload = {}) {
   return await requestApi('/api/miniprogram/practice/exams', {
     method: 'POST',
@@ -1229,6 +1236,7 @@ module.exports = {
   getPracticeSummary,   // 获取可练习题库摘要
   getPracticeQuestions, // 获取练习题目
   savePracticeProgress, // 保存练习进度
+  saveQuestionState,    // 保存单题学习状态
   savePracticeExam,     // 保存模拟考试记录
   toAbsoluteFileUrl,    // 转换服务器文件 URL
   uploadAttachment,     // 上传附件

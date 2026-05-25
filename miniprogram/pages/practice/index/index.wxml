@@ -42,9 +42,15 @@
       </view>
       <view class="stats">
         <view><text>{{activeBank.questionCount}}</text><text>总题量</text></view>
-        <view><text>{{activeBank.progress.doneCount}}</text><text>已练习</text></view>
+        <view><text>{{activeBank.studyState.masteredCount}}</text><text>已掌握</text></view>
+        <view><text>{{activeBank.studyState.seenCount}}</text><text>已看</text></view>
+        <view><text>{{activeBank.studyState.wrongCount}}</text><text>错题</text></view>
+      </view>
+      <view class="stats secondary">
+        <view><text>{{activeBank.studyState.untouchedCount}}</text><text>未做</text></view>
         <view><text>{{activeBank.studyState.correctRateText}}</text><text>正确率</text></view>
-        <view><text>{{activeBank.progress.wrongCount}}</text><text>错题</text></view>
+        <view><text>{{activeBank.studyState.answerProgressPercent}}%</text><text>答题进度</text></view>
+        <view><text>{{activeBank.studyState.masteryPercent}}%</text><text>掌握率</text></view>
       </view>
       <view class="progress-block">
         <view class="progress-copy">
@@ -108,17 +114,7 @@
       <view class="mode-card {{activeBank.studyState.hasWrongQuestions ? '' : 'muted'}}" data-mode="wrong" bindtap="startMode">
         <view class="mode-title">错题回顾</view>
         <view class="mode-desc">重新练习之前做错的题</view>
-        <view class="mode-detail">{{activeBank.progress.wrongCount}} 道错题</view>
-      </view>
-    </view>
-
-    <view class="filter-section">
-      <view class="section-title">按题型练习</view>
-      <view class="chips">
-        <button data-mode="type" data-filter="all" bindtap="startMode">全部 {{activeBank.typeCounts.all || activeBank.questionCount}}</button>
-        <button data-mode="type" data-filter="single" bindtap="startMode">单选 {{activeBank.typeCounts.single || 0}}</button>
-        <button data-mode="type" data-filter="multi" bindtap="startMode">多选 {{activeBank.typeCounts.multi || 0}}</button>
-        <button data-mode="type" data-filter="judge" bindtap="startMode">判断 {{activeBank.typeCounts.judge || 0}}</button>
+        <view class="mode-detail">{{activeBank.studyState.wrongCount}} 道错题</view>
       </view>
     </view>
   </view>

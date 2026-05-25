@@ -130,6 +130,10 @@
   margin-top: 22rpx;
 }
 
+.stats.secondary {
+  margin-top: 12rpx;
+}
+
 .stats view {
   background: #f5f8ff;
   border-radius: 12rpx;
@@ -332,40 +336,9 @@
   font-weight: 600;
 }
 
-.filter-section {
-  margin-top: 22rpx;
-}
-
 .section-title {
   color: #15233d;
   font-size: 30rpx;
   font-weight: 700;
   margin-bottom: 16rpx;
-}
-
-.chips {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14rpx;
-}
-
-.chips button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-height: 68rpx;
-  margin: 0;
-  padding: 0 20rpx;
-  border-radius: 999rpx;
-  background: #eef4ff;
-  color: #1d4ed8;
-  font-size: 24rpx;
-  line-height: 1.2;
-  box-sizing: border-box;
-  border: 0;
-}
-
-.chips button::after {
-  border: 0;
 }
