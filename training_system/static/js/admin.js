@@ -342,6 +342,136 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    function formatLearningValue(value, fallback = '0') {
+        if (value === null || value === undefined || value === '') return fallback;
+        return String(value);
+    }
+
+    function renderLearningStatusOverlay(student, data) {
+        const existing = document.getElementById('learning-status-overlay');
+        if (existing) existing.remove();
+
+        const summary = data?.summary || {};
+        const examStats = data?.examStats || {};
+        const records = Array.isArray(examStats.records) ? examStats.records : [];
+        const bank = data?.bank || null;
+        const questionCount = Number(summary.questionCount || 0);
+        const metrics = [
+            ['已掌握', summary.masteredCount, questionCount ? ` / ${questionCount}` : ''],
+            ['错题', summary.wrongCount, ''],
+            ['已看', summary.seenCount, ''],
+            ['未做', summary.untouchedCount, ''],
+        ];
+        const progressRows = [
+            ['学习覆盖', summary.studyProgressPercent || summary.progressPercent || 0],
+            ['答题进度', summary.answerProgressPercent || 0],
+            ['掌握率', summary.masteryPercent || 0],
+        ];
+
+        const metricHtml = metrics.map(([label, value, suffix]) => `
+            <div class="learning-status-metric">
+                <div class="learning-status-metric-label">${escapeHtml(label)}</div>
+                <div class="learning-status-metric-value">${escapeHtml(formatLearningValue(value))}<span>${escapeHtml(suffix)}</span></div>
+            </div>
+        `).join('');
+
+        const progressHtml = progressRows.map(([label, value]) => {
+            const percent = Math.max(0, Math.min(100, Number(value || 0)));
+            return `
+                <div class="learning-status-progress-row">
+                    <div class="learning-status-progress-head">
+                        <span>${escapeHtml(label)}</span>
+                        <strong>${percent}%</strong>
+                    </div>
+                    <div class="learning-status-progress-track">
+                        <div class="learning-status-progress-fill" style="width:${percent}%;"></div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const recordHtml = records.length ? records.map(record => {
+            const passed = !!record.passed;
+            return `
+                <div class="learning-status-record">
+                    <div>
+                        <div class="learning-status-record-main">
+                            ${escapeHtml(formatLearningValue(record.score, '-'))}分
+                            <span class="${passed ? 'passed' : 'failed'}">${passed ? '通过' : '未通过'}</span>
+                        </div>
+                        <div class="learning-status-record-sub">
+                            总题数 ${escapeHtml(formatLearningValue(record.total))}，答对 ${escapeHtml(formatLearningValue(record.correctCount))}，用时${escapeHtml(record.durationText || '-')}
+                        </div>
+                    </div>
+                    <div class="learning-status-record-time">${escapeHtml(record.timeText || formatOperationTime(record.createdAt) || '-')}</div>
+                </div>
+            `;
+        }).join('') : '<div class="learning-status-empty">暂无模拟考试记录</div>';
+
+        const overlay = document.createElement('div');
+        overlay.id = 'learning-status-overlay';
+        overlay.className = 'learning-status-overlay';
+        overlay.innerHTML = `
+            <div class="learning-status-modal">
+                <div class="learning-status-modal-header">
+                    <div>
+                        <div class="learning-status-modal-title">学习概况</div>
+                        <div class="learning-status-modal-sub">${escapeHtml(student.name || '-')} · ${escapeHtml(summary.stateText || '未开始')}</div>
+                    </div>
+                    <button type="button" class="learning-status-close" aria-label="关闭学习概况">×</button>
+                </div>
+                <div class="learning-status-modal-body">
+                    <div class="learning-status-bank">
+                        <div>
+                            <div class="learning-status-bank-label">匹配题库</div>
+                            <div class="learning-status-bank-name">${escapeHtml(bank ? (bank.displayName || '-') : '未匹配到可用题库')}</div>
+                        </div>
+                        <div class="learning-status-bank-count">${escapeHtml(formatLearningValue(questionCount))} 题</div>
+                    </div>
+                    <div class="learning-status-grid">${metricHtml}</div>
+                    <div class="learning-status-progress">${progressHtml}</div>
+                    <div class="learning-status-note">
+                        已答 ${escapeHtml(formatLearningValue(summary.answeredCount))} 题，正确率 ${escapeHtml(formatLearningValue(summary.correctRate))}%，最近 ${escapeHtml(summary.lastStudyTimeText || '-')}
+                    </div>
+                    <div class="learning-status-exam-head">
+                        <span>考试动态</span>
+                        <strong>共 ${escapeHtml(formatLearningValue(records.length))} 条</strong>
+                    </div>
+                    <div class="learning-status-record-list">${recordHtml}</div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('.learning-status-close').onclick = () => overlay.remove();
+        overlay.addEventListener('click', e => {
+            if (e.target === overlay) overlay.remove();
+        });
+    }
+
+    async function showLearningStatusOverlay(student) {
+        const studentId = student && student.id;
+        if (!studentId) return;
+        const btn = document.querySelector('.web-learning-status-btn');
+        const originalText = btn ? btn.textContent : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = '加载中...';
+        }
+        try {
+            const res = await fetch(`/api/students/${student.id}/learning_status`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || data.error || '学习概况加载失败');
+            renderLearningStatusOverlay(student, data);
+        } catch (err) {
+            showMessage(err.message || '学习概况加载失败', 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = originalText || '学习概况';
+            }
+        }
+    }
+
     function storeMaterialLog(student, payload) {
         student._lastMaterialLog = {
             logs: payload.logs || '',
@@ -1292,6 +1422,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // 仅特种设备且已审核（或已报名）学员在顶部显示「开卡」按钮
             if ((student.status === 'reviewed' || student.status === 'registered') && student.training_type === 'special_equipment') {
+                const learningBtn = document.createElement('button');
+                learningBtn.type = 'button';
+                learningBtn.className = 'web-learning-status-btn';
+                learningBtn.textContent = '学习概况';
+                learningBtn.onclick = () => showLearningStatusOverlay(student);
+                statusBadge.insertBefore(learningBtn, statusBadge.firstChild);
+
                 const isActivated = !!student.card_activated;
 
                 if (isActivated) {

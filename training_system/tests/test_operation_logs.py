@@ -84,6 +84,28 @@ class MiniprogramReviewOperationLogUiTests(unittest.TestCase):
         self.assertIn("width: 160rpx", wxss)
 
 
+class WebStudentDetailLearningStatusUiTests(unittest.TestCase):
+    def read_file(self, relative_path):
+        repo_dir = os.path.dirname(PROJECT_DIR)
+        with open(os.path.join(repo_dir, relative_path), encoding="utf-8") as file_obj:
+            return file_obj.read()
+
+    def test_web_detail_shows_learning_summary_entry_near_status_badge(self):
+        js = self.read_file("training_system/static/js/admin.js")
+        css = self.read_file("training_system/static/css/style.css")
+
+        self.assertIn("web-learning-status-btn", js)
+        self.assertIn("showLearningStatusOverlay(student)", js)
+        self.assertIn("statusBadge.insertBefore(learningBtn", js)
+        self.assertIn("/api/students/${student.id}/learning_status", js)
+        self.assertIn("已掌握", js)
+        self.assertIn("考试动态", js)
+
+        self.assertIn(".web-learning-status-btn", css)
+        self.assertIn("order: -1", css)
+        self.assertIn(".learning-status-modal", css)
+
+
 class OperationLogTests(unittest.TestCase):
     def build_app(self, tmp_dir, db_path, students_dir):
         app = Flask(__name__)

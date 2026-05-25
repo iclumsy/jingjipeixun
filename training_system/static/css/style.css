@@ -822,6 +822,286 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
     margin-top: 2px;
 }
 
+.web-learning-status-btn {
+    order: -1;
+    border: 1px solid #bfdbfe;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-right: 10px;
+    line-height: 1.35;
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.web-learning-status-btn:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+}
+
+.web-learning-status-btn:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.learning-status-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.52);
+    backdrop-filter: blur(4px);
+}
+
+.learning-status-modal {
+    width: min(720px, 96vw);
+    max-height: 88vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.learning-status-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 20px 24px;
+    color: #fff;
+    background: linear-gradient(135deg, #0f766e 0%, #2563eb 100%);
+}
+
+.learning-status-modal-title {
+    font-size: 1.12rem;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.learning-status-modal-sub {
+    margin-top: 5px;
+    color: rgba(255, 255, 255, 0.84);
+    font-size: 0.84rem;
+}
+
+.learning-status-close {
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+    font-size: 24px;
+    line-height: 32px;
+    cursor: pointer;
+}
+
+.learning-status-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px 24px;
+    background: #f8fbff;
+}
+
+.learning-status-bank {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+    border: 1px solid #dbeafe;
+    border-radius: 14px;
+    background: #fff;
+}
+
+.learning-status-bank-label {
+    color: #64748b;
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.learning-status-bank-name {
+    margin-top: 4px;
+    color: #0f172a;
+    font-size: 0.94rem;
+    font-weight: 800;
+}
+
+.learning-status-bank-count {
+    flex: 0 0 auto;
+    color: #15803d;
+    background: #dcfce7;
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 0.82rem;
+    font-weight: 800;
+}
+
+.learning-status-grid {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.learning-status-metric {
+    min-width: 0;
+    padding: 13px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.learning-status-metric-label {
+    color: #64748b;
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.learning-status-metric-value {
+    margin-top: 6px;
+    color: #1d4ed8;
+    font-size: 1.26rem;
+    font-weight: 900;
+    line-height: 1.2;
+}
+
+.learning-status-metric-value span {
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.learning-status-progress {
+    margin-top: 14px;
+    padding: 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #fff;
+}
+
+.learning-status-progress-row + .learning-status-progress-row {
+    margin-top: 12px;
+}
+
+.learning-status-progress-head {
+    display: flex;
+    justify-content: space-between;
+    color: #334155;
+    font-size: 0.82rem;
+    font-weight: 800;
+}
+
+.learning-status-progress-track {
+    height: 9px;
+    margin-top: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e2e8f0;
+}
+
+.learning-status-progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #14b8a6 0%, #2563eb 100%);
+}
+
+.learning-status-note {
+    margin-top: 12px;
+    color: #475569;
+    font-size: 0.84rem;
+    line-height: 1.55;
+}
+
+.learning-status-exam-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 18px;
+    color: #0f172a;
+    font-size: 0.92rem;
+    font-weight: 900;
+}
+
+.learning-status-exam-head strong {
+    color: #64748b;
+    font-size: 0.8rem;
+}
+
+.learning-status-record-list {
+    margin-top: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #fff;
+    overflow: hidden;
+}
+
+.learning-status-record {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 13px 16px;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.learning-status-record:last-child {
+    border-bottom: none;
+}
+
+.learning-status-record-main {
+    color: #0f172a;
+    font-size: 0.94rem;
+    font-weight: 900;
+}
+
+.learning-status-record-main span {
+    margin-left: 8px;
+    border-radius: 999px;
+    padding: 2px 9px;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.learning-status-record-main span.passed {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.learning-status-record-main span.failed {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.learning-status-record-sub,
+.learning-status-record-time,
+.learning-status-empty {
+    color: #64748b;
+    font-size: 0.8rem;
+    line-height: 1.55;
+}
+
+.learning-status-record-time {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.learning-status-empty {
+    padding: 22px;
+    text-align: center;
+}
+
 .detail-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1161,6 +1441,12 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
     border: 1px solid #10B981;
 }
 
+.badge.registered {
+    background: #E0E7FF;
+    color: #3730A3;
+    border: 1px solid #A5B4FC;
+}
+
 .badge.rejected {
     background: #FEE2E2;
     color: #991B1B;
@@ -1403,6 +1689,47 @@ body.admin-page { padding: 0; overflow: hidden; height: 100vh; }
 
     .detail-header .student-id {
         word-break: break-all;
+    }
+
+    .status-badge {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding-left: 0;
+    }
+
+    .web-learning-status-btn {
+        margin-right: 0;
+    }
+
+    .learning-status-overlay {
+        align-items: flex-start;
+        padding: 14px;
+    }
+
+    .learning-status-modal {
+        width: 100%;
+        max-height: calc(100vh - 28px);
+        border-radius: 14px;
+    }
+
+    .learning-status-modal-header,
+    .learning-status-modal-body {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .learning-status-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .learning-status-bank,
+    .learning-status-record {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .learning-status-record-time {
+        white-space: normal;
     }
 
     .action-bar {
