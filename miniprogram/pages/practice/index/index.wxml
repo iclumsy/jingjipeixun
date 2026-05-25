@@ -36,7 +36,6 @@
       <view class="bank-row">
         <view>
           <view class="bank-title">{{activeBank.displayName}}</view>
-          <view class="bank-meta">{{activeBank.examProject || activeBank.projectCode || '真题题库'}}</view>
         </view>
         <view class="bank-pill">{{activeBank.questionCount}} 题</view>
       </view>
