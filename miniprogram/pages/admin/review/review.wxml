@@ -396,7 +396,7 @@
             <text class="learning-metric-value">{{learningStatus.summary.wrongCount}}</text>
           </view>
           <view class="learning-metric">
-            <text class="learning-metric-label">已看</text>
+            <text class="learning-metric-label">已浏览</text>
             <text class="learning-metric-value">{{learningStatus.summary.seenCount}}</text>
           </view>
           <view class="learning-metric">

@@ -2,7 +2,7 @@ const api = require('../../../utils/api')
 const practice = require('../../../utils/practice')
 
 const MODE_TITLES = {
-  memorize: '背题模式',
+  memorize: '题目浏览',
   sequential: '顺序练习',
   wrong: '错题练习',
   exam: '模拟考试'
@@ -64,7 +64,7 @@ Page({
   },
 
   modeHint(mode, filter) {
-    if (mode === 'memorize') return '背题模式会直接显示答案和解析'
+    if (mode === 'memorize') return '题目浏览会优先展示未浏览题，并直接显示答案和解析'
     if (mode === 'exam') return '模拟考试可跳题，最后统一交卷'
     if (mode === 'wrong') return '集中处理上次练习留下的错题'
     return '每答一题都会立即记录掌握和错题状态'
@@ -76,16 +76,13 @@ Page({
       const mode = this.data.mode
       const limit = mode === 'exam' || mode === 'memorize' ? 100 : 100
       const res = await api.getPracticeQuestions(this.data.bankId, {
-        mode: mode === 'wrong' || mode === 'memorize' ? 'sequential' : mode,
+        mode: mode === 'wrong' ? 'sequential' : mode,
         page: 1,
         limit,
         wrong_ids: mode === 'wrong' ? this.data.wrongIds : '',
         question_type: ''
       })
       let questions = Array.isArray(res.list) ? res.list : []
-      if (mode === 'memorize') {
-        questions = practice.shuffleQuestions(questions)
-      }
       const currentIndex = practice.findQuestionIndexById(questions, this.data.lastQuestionId)
       this.setData({ questions, loading: false, currentIndex })
       this.updateSessionMeta()

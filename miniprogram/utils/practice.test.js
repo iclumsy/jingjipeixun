@@ -19,8 +19,8 @@ function testBuildBankStudyStateForNewBank() {
   assert.strictEqual(state.canContinue, false)
   assert.strictEqual(state.hasWrongQuestions, false)
   assert.strictEqual(state.recommendedMode, 'memorize')
-  assert.strictEqual(state.recommendedTitle, '先背题')
-  assert.strictEqual(state.recommendedDetail, '先快速熟悉题目和答案')
+  assert.strictEqual(state.recommendedTitle, '先浏览题目')
+  assert.strictEqual(state.recommendedDetail, '先熟悉题目、答案和解析')
 }
 
 function testBuildBankStudyStateForOngoingBank() {

@@ -42,7 +42,7 @@
       <view class="stats">
         <view><text>{{activeBank.questionCount}}</text><text>总题量</text></view>
         <view><text>{{activeBank.studyState.masteredCount}}</text><text>已掌握</text></view>
-        <view><text>{{activeBank.studyState.seenCount}}</text><text>已看</text></view>
+        <view><text>{{activeBank.studyState.seenCount}}</text><text>已浏览</text></view>
         <view><text>{{activeBank.studyState.wrongCount}}</text><text>错题</text></view>
       </view>
       <view class="stats secondary">
@@ -80,7 +80,7 @@
       <view class="section-title">学习路径</view>
       <view class="path-steps">
         <view class="path-step {{activeBank.studyState.recommendedMode === 'memorize' ? 'active' : ''}}">
-          <text>1</text><view>背题</view>
+          <text>1</text><view>浏览</view>
         </view>
         <view class="path-step {{activeBank.studyState.recommendedMode === 'sequential' ? 'active' : ''}}">
           <text>2</text><view>顺序练习</view>
@@ -96,9 +96,9 @@
 
     <view class="mode-grid">
       <view class="mode-card" data-mode="memorize" bindtap="startMode">
-        <view class="mode-title">背题模式</view>
-        <view class="mode-desc">快速浏览 100 道题目及答案</view>
-        <view class="mode-detail">高效记忆</view>
+        <view class="mode-title">题目浏览</view>
+        <view class="mode-desc">优先浏览未看过的 100 道题目</view>
+        <view class="mode-detail">答案解析同步看</view>
       </view>
       <view class="mode-card" data-mode="sequential" bindtap="startMode">
         <view class="mode-title">顺序练习</view>

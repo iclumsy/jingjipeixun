@@ -165,7 +165,7 @@ def mini_practice_questions(bank_id):
         'sequential': '顺序练习',
         'exam': '模拟考试',
         'wrong': '错题练习',
-        'memorize': '背题模式'
+        'memorize': '题目浏览'
     }
     mode_label = mode_labels.get(mode, mode)
     current_app.logger.info(f"拉取了题库「{bank_name}」的题目，练习模式：{mode_label}")
@@ -177,6 +177,7 @@ def mini_practice_questions(bank_id):
         limit=request.args.get('limit', 20),
         wrong_question_ids=wrong_ids,
         question_type=request.args.get('question_type', ''),
+        openid=user.get('openid', ''),
     )
     return jsonify(result)
 

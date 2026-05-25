@@ -359,7 +359,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const metrics = [
             ['已掌握', summary.masteredCount, questionCount ? ` / ${questionCount}` : ''],
             ['错题', summary.wrongCount, ''],
-            ['已看', summary.seenCount, ''],
+            ['已浏览', summary.seenCount, ''],
             ['未做', summary.untouchedCount, ''],
         ];
         const progressRows = [

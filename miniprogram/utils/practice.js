@@ -124,8 +124,8 @@ function buildBankStudyState(bank = {}) {
 
   if (touchedCount <= 0) {
     recommendedMode = 'memorize'
-    recommendedTitle = '先背题'
-    recommendedDetail = '先快速熟悉题目和答案'
+    recommendedTitle = '先浏览题目'
+    recommendedDetail = '先熟悉题目、答案和解析'
   } else if (hasWrongQuestions) {
     recommendedMode = 'wrong'
     recommendedTitle = '先练错题'

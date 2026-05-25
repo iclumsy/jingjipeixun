@@ -115,7 +115,7 @@ function bindEvents() {
   document.getElementById('btn-card-toggle').addEventListener('click', toggleAnswerCard);
   document.getElementById('btn-card-close').addEventListener('click', toggleAnswerCard);
   document.getElementById('answer-card-overlay').addEventListener('click', toggleAnswerCard);
-  // 背题模式
+  // 题目浏览
   document.querySelectorAll('[data-action="home"]').forEach(b => b.addEventListener('click', () => goHome(false)));
   document.querySelectorAll('[data-action="reroll"]').forEach(b => b.addEventListener('click', () => startMode('memorize')));
   // 结果页
@@ -874,7 +874,7 @@ function escapeAttr(str) {
   return escapeHTML(str);
 }
 
-// ===== 背题模式渲染 =====
+// ===== 题目浏览渲染 =====
 function renderMemorizeList() {
   const listEl = document.getElementById('memorize-list');
   listEl.innerHTML = currentQuestions.map((q, idx) => {

@@ -118,6 +118,7 @@ def _row_to_question_state(row, question_id_override=None):
         'wrongCount': int(item.get('wrong_count') or 0),
         'lastAnswer': answer,
         'lastMode': item.get('last_mode') or '',
+        'seenAt': item.get('seen_at') or '',
         'lastAnsweredAt': item.get('last_answered_at') or '',
         'createdAt': item.get('created_at') or '',
         'updatedAt': item.get('updated_at') or '',
@@ -319,7 +320,7 @@ def delete_exam_bank(bank_id):
     return {'success': True}
 
 
-def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_ids=None, question_type=''):
+def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_ids=None, question_type='', openid=''):
     page_no = max(1, int(page or 1))
     page_size = min(max(1, int(limit or 20)), 100)
     offset = (page_no - 1) * page_size
@@ -337,7 +338,19 @@ def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_i
         where += ' AND question_type = ?'
         params.append(question_type)
 
+    order_params = []
     order = 'ORDER BY sort_order ASC, id ASC'
+    if mode == 'memorize' and str(openid or '').strip():
+        order = '''
+        ORDER BY CASE
+            WHEN id IN (
+                SELECT question_id
+                FROM mini_question_states
+                WHERE openid = ? AND bank_id = ? AND COALESCE(seen_at, '') != ''
+            ) THEN 1 ELSE 0
+        END, sort_order ASC, id ASC
+        '''
+        order_params = [str(openid or '').strip(), bank_id]
     if mode in ('random', 'exam'):
         order = 'ORDER BY RANDOM()'
 
@@ -345,7 +358,7 @@ def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_i
         total = conn.execute(f'SELECT COUNT(*) FROM exam_questions {where}', params).fetchone()[0]
         rows = conn.execute(
             f'SELECT * FROM exam_questions {where} {order} LIMIT ? OFFSET ?',
-            params + [page_size, offset],
+            params + order_params + [page_size, offset],
         ).fetchall()
 
     return {
@@ -404,22 +417,26 @@ def _question_state_counts_for_banks(conn, openid, bank_ids):
     placeholders = ','.join(['?'] * len(bank_ids))
     rows = conn.execute(
         f'''
-        SELECT bank_id, status, COUNT(*) AS count
+        SELECT
+            bank_id,
+            SUM(CASE WHEN COALESCE(seen_at, '') != '' THEN 1 ELSE 0 END) AS seen_count,
+            SUM(CASE WHEN status = 'mastered' THEN 1 ELSE 0 END) AS mastered_count,
+            SUM(CASE WHEN status = 'wrong' THEN 1 ELSE 0 END) AS wrong_count,
+            COUNT(*) AS touched_count
         FROM mini_question_states
         WHERE openid = ? AND bank_id IN ({placeholders})
-        GROUP BY bank_id, status
+        GROUP BY bank_id
         ''',
         [openid] + list(bank_ids),
     ).fetchall()
     result = {}
     for row in rows:
-        counts = result.setdefault(row['bank_id'], {
-            'seen': 0,
-            'mastered': 0,
-            'wrong': 0,
-        })
-        status = row['status'] if row['status'] in counts else 'seen'
-        counts[status] += int(row['count'] or 0)
+        result[row['bank_id']] = {
+            'seen': int(row['seen_count'] or 0),
+            'mastered': int(row['mastered_count'] or 0),
+            'wrong': int(row['wrong_count'] or 0),
+            'touched': int(row['touched_count'] or 0),
+        }
     return result
 
 
@@ -448,7 +465,9 @@ def _aggregate_question_state_summary(question_count, counts=None):
     seen_count = int(counts.get('seen') or 0)
     mastered_count = int(counts.get('mastered') or 0)
     wrong_count = int(counts.get('wrong') or 0)
-    touched_count = seen_count + mastered_count + wrong_count
+    touched_count = int(counts.get('touched') or 0)
+    if not touched_count:
+        touched_count = seen_count + mastered_count + wrong_count
     answered_count = mastered_count + wrong_count
     untouched_count = max(0, total - touched_count)
     return {
@@ -653,13 +672,16 @@ def get_student_learning_status(student):
         ).fetchone()
         state_rows = conn.execute(
             '''
-            SELECT status, COUNT(*) AS count
+            SELECT
+                SUM(CASE WHEN COALESCE(seen_at, '') != '' THEN 1 ELSE 0 END) AS seen_count,
+                SUM(CASE WHEN status = 'mastered' THEN 1 ELSE 0 END) AS mastered_count,
+                SUM(CASE WHEN status = 'wrong' THEN 1 ELSE 0 END) AS wrong_count,
+                COUNT(*) AS touched_count
             FROM mini_question_states
             WHERE openid = ? AND bank_id = ?
-            GROUP BY status
             ''',
             (openid, bank['id']),
-        ).fetchall()
+        ).fetchone()
         latest_state = conn.execute(
             '''
             SELECT updated_at
@@ -684,9 +706,12 @@ def get_student_learning_status(student):
     latest_state = dict(latest_state) if latest_state else None
     exams = [dict(row) for row in exam_rows]
     question_count = int(bank.get('question_count') or 0)
+    state_row = dict(state_rows) if state_rows else {}
     state_counts = {
-        (row['status'] if row['status'] in ('seen', 'mastered', 'wrong') else 'seen'): int(row['count'] or 0)
-        for row in state_rows
+        'seen': int(state_row.get('seen_count') or 0),
+        'mastered': int(state_row.get('mastered_count') or 0),
+        'wrong': int(state_row.get('wrong_count') or 0),
+        'touched': int(state_row.get('touched_count') or 0),
     }
     state_summary = _aggregate_question_state_summary(question_count, state_counts)
     done = state_summary['answeredCount']
@@ -746,7 +771,7 @@ def get_student_learning_status(student):
             'title': '题库练习',
             'happenedAt': (latest_state or {}).get('updated_at') or '',
             'timeText': _format_learning_time((latest_state or {}).get('updated_at')),
-            'detail': f'已看 {state_summary["seenCount"]} 题，已掌握 {correct} 题，错题 {wrong_count} 题',
+            'detail': f'已浏览 {state_summary["seenCount"]} 题，已掌握 {correct} 题，错题 {wrong_count} 题',
             'doneCount': done,
             'correctCount': correct,
             'wrongCount': wrong_count,
@@ -929,6 +954,7 @@ def save_question_state(openid, bank_id, question_id, payload):
             correct_count = int((existing_dict or {}).get('correct_count') or 0)
             wrong_count = int((existing_dict or {}).get('wrong_count') or 0)
             last_answer_json = (existing_dict or {}).get('last_answer_json') or _json_dumps([])
+            seen_at = (existing_dict or {}).get('seen_at') or now
             last_answered_at = (existing_dict or {}).get('last_answered_at')
         else:
             is_correct = _as_bool(payload.get('isCorrect') if 'isCorrect' in payload else payload.get('is_correct'))
@@ -937,6 +963,7 @@ def save_question_state(openid, bank_id, question_id, payload):
             correct_count = int((existing_dict or {}).get('correct_count') or 0) + (1 if is_correct else 0)
             wrong_count = int((existing_dict or {}).get('wrong_count') or 0) + (0 if is_correct else 1)
             last_answer_json = _json_dumps(answer)
+            seen_at = (existing_dict or {}).get('seen_at')
             last_answered_at = now
 
         conn.execute(
@@ -944,8 +971,8 @@ def save_question_state(openid, bank_id, question_id, payload):
             INSERT INTO mini_question_states (
                 openid, bank_id, question_id, status, answer_count,
                 correct_count, wrong_count, last_answer_json, last_mode,
-                last_answered_at, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                seen_at, last_answered_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(openid, bank_id, question_id) DO UPDATE SET
                 status = excluded.status,
                 answer_count = excluded.answer_count,
@@ -953,15 +980,28 @@ def save_question_state(openid, bank_id, question_id, payload):
                 wrong_count = excluded.wrong_count,
                 last_answer_json = excluded.last_answer_json,
                 last_mode = excluded.last_mode,
+                seen_at = excluded.seen_at,
                 last_answered_at = excluded.last_answered_at,
                 updated_at = excluded.updated_at
             ''',
             (
                 openid, bank_id, state_question_id, next_status, answer_count,
                 correct_count, wrong_count, last_answer_json, mode,
-                last_answered_at, now, now,
+                seen_at, last_answered_at, now, now,
             ),
         )
+        if action == 'answer' and mode in ('practice', 'sequential'):
+            conn.execute(
+                '''
+                INSERT INTO mini_practice_progress (
+                    openid, bank_id, mode, last_question_id, updated_at
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(openid, bank_id, mode) DO UPDATE SET
+                    last_question_id = excluded.last_question_id,
+                    updated_at = excluded.updated_at
+                ''',
+                (openid, bank_id, 'practice', state_question_id, now),
+            )
         row = conn.execute(
             '''
             SELECT *

@@ -35,6 +35,16 @@ SAMPLE_QUESTIONS = [
 ]
 
 
+def make_question(question_id, question_text=None, answer=None):
+    return {
+        **SAMPLE_QUESTIONS[0],
+        "id": question_id,
+        "question": question_text or f"题目 {question_id}",
+        "question_html": question_text or f"题目 {question_id}",
+        "answer": answer or ["B"],
+    }
+
+
 class ExamBankServiceTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -270,6 +280,102 @@ class ExamBankServiceTests(unittest.TestCase):
         self.assertEqual(mastered["state"]["wrongCount"], 1)
         self.assertEqual(mastered["state"]["lastMode"], "wrong")
         self.assertEqual(mastered["state"]["lastAnswer"], ["B"])
+
+    def test_browsed_and_mastered_counts_are_independent(self):
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(SAMPLE_QUESTIONS, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        question_id = SAMPLE_QUESTIONS[0]["id"]
+
+        exam_bank_service.save_question_state("student-openid", bank["id"], question_id, {
+            "action": "seen",
+            "mode": "memorize",
+        })
+        exam_bank_service.save_question_state("student-openid", bank["id"], question_id, {
+            "action": "answer",
+            "isCorrect": True,
+            "answer": ["B"],
+            "mode": "practice",
+        })
+
+        summary = exam_bank_service.get_practice_summary("student-openid", is_admin=True)
+        state = summary["banks"][0]["questionState"]
+
+        self.assertEqual(state["seenCount"], 1)
+        self.assertEqual(state["masteredCount"], 1)
+        self.assertEqual(state["wrongCount"], 0)
+        self.assertEqual(state["answeredCount"], 1)
+        self.assertEqual(state["touchedCount"], 1)
+        self.assertEqual(state["untouchedCount"], 0)
+
+    def test_save_question_state_updates_practice_resume_cursor_for_answers_only(self):
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps([
+                make_question(101, "第一题"),
+                make_question(102, "第二题"),
+            ], ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+
+        exam_bank_service.save_question_state("student-openid", bank["id"], 101, {
+            "action": "seen",
+            "mode": "memorize",
+        })
+        with get_db_connection() as conn:
+            seen_progress = conn.execute(
+                "SELECT * FROM mini_practice_progress WHERE openid = ? AND bank_id = ? AND mode = ?",
+                ("student-openid", bank["id"], "practice"),
+            ).fetchone()
+        self.assertIsNone(seen_progress)
+
+        exam_bank_service.save_question_state("student-openid", bank["id"], 102, {
+            "action": "answer",
+            "isCorrect": True,
+            "answer": ["B"],
+            "mode": "practice",
+        })
+
+        with get_db_connection() as conn:
+            progress = conn.execute(
+                "SELECT * FROM mini_practice_progress WHERE openid = ? AND bank_id = ? AND mode = ?",
+                ("student-openid", bank["id"], "practice"),
+            ).fetchone()
+        self.assertIsNotNone(progress)
+        self.assertEqual(progress["last_question_id"], 2)
+
+    def test_memorize_questions_prioritize_unbrowsed_questions_for_openid(self):
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps([
+                make_question(101, "已浏览题"),
+                make_question(102, "已掌握但未浏览题"),
+                make_question(103, "未浏览题"),
+                make_question(104, "另一道未浏览题"),
+            ], ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        exam_bank_service.save_question_state("student-openid", bank["id"], 101, {
+            "action": "seen",
+            "mode": "memorize",
+        })
+        exam_bank_service.save_question_state("student-openid", bank["id"], 102, {
+            "action": "answer",
+            "isCorrect": True,
+            "answer": ["B"],
+            "mode": "practice",
+        })
+
+        result = exam_bank_service.get_questions(
+            bank["id"],
+            mode="memorize",
+            limit=2,
+            openid="student-openid",
+        )
+
+        self.assertEqual([item["source_question_id"] for item in result["list"]], ["102", "103"])
 
     def test_import_rejects_question_without_answer(self):
         invalid = [{**SAMPLE_QUESTIONS[0], "answer": []}]

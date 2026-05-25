@@ -361,6 +361,7 @@ def init_db(database_path):
                 wrong_count      INTEGER DEFAULT 0,
                 last_answer_json TEXT DEFAULT '[]',
                 last_mode        TEXT DEFAULT '',
+                seen_at          TEXT,
                 last_answered_at TEXT,
                 created_at       TIMESTAMP DEFAULT (DATETIME(CURRENT_TIMESTAMP, 'localtime')),
                 updated_at       TIMESTAMP DEFAULT (DATETIME(CURRENT_TIMESTAMP, 'localtime')),
@@ -382,6 +383,14 @@ def init_db(database_path):
                 created_at       TIMESTAMP DEFAULT (DATETIME(CURRENT_TIMESTAMP, 'localtime'))
             )
         ''')
+        _ensure_column_exists(conn, 'mini_question_states', 'seen_at', 'seen_at TEXT')
+        conn.execute(
+            '''
+            UPDATE mini_question_states
+            SET seen_at = COALESCE(updated_at, created_at, DATETIME(CURRENT_TIMESTAMP, 'localtime'))
+            WHERE status = 'seen' AND COALESCE(seen_at, '') = ''
+            '''
+        )
 
         # 写入默认数据（已存在则忽略，不会覆盖管理员的修改）
         default_attachments = [
