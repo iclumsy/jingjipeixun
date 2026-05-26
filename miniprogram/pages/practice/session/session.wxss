@@ -240,13 +240,13 @@
 }
 
 .actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: 16rpx;
   margin-top: 28rpx;
 }
 
 .actions button {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;

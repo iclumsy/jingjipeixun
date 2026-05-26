@@ -29,7 +29,7 @@
   <view wx:else class="question-card">
     <view class="q-head">
       <text class="q-badge">{{questions[currentIndex].question_type === 'multi' ? '多选题' : (questions[currentIndex].question_type === 'judge' ? '判断题' : (questions[currentIndex].question_type === 'case' ? '案例题' : '单选题'))}}</text>
-      <text>第 {{currentIndex + 1}} 题</text>
+      <text>第 {{currentPosition + 1}} 题</text>
     </view>
     <view class="q-text">{{questions[currentIndex].question}}</view>
     <view wx:if="{{questionImages.length > 0}}" class="question-images">
@@ -71,7 +71,7 @@
     </view>
 
     <view class="actions">
-      <button bindtap="prevQuestion">上一题</button>
+      <button wx:if="{{mode === 'exam'}}" bindtap="prevQuestion">上一题</button>
       <button wx:if="{{mode === 'memorize'}}" class="primary" bindtap="nextQuestion">{{currentPosition >= questionTotal - 1 ? '完成' : '下一题'}}</button>
       <button wx:elif="{{mode === 'exam'}}" class="primary" bindtap="submitAnswer">{{currentIndex >= questions.length - 1 ? '交卷' : '下一题'}}</button>
       <button wx:elif="{{!submitted}}" class="primary" bindtap="submitAnswer">确认答案</button>

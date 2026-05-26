@@ -20,9 +20,35 @@
 const api = require('./utils/api')
 
 App({
-  /** 小程序启动时触发，自动尝试登录 */
+  /** 小程序启动时触发，自动尝试登录并检测版本更新 */
   onLaunch() {
     this.ensureLogin()
+    this.checkUpdate()
+  },
+
+  /** 检查并提示更新 */
+  checkUpdate() {
+    if (wx.canIUse('getUpdateManager')) {
+      const updateManager = wx.getUpdateManager()
+      updateManager.onCheckForUpdate(function (res) {
+        console.log('检查是否有新版本：', res.hasUpdate)
+      })
+      updateManager.onUpdateReady(function () {
+        wx.showModal({
+          title: '更新提示',
+          content: '小程序已更新，请重启以使用最新版本',
+          showCancel: false,
+          success(res) {
+            if (res.confirm) {
+              updateManager.applyUpdate()
+            }
+          }
+        })
+      })
+      updateManager.onUpdateFailed(function () {
+        console.warn('新版本下载失败')
+      })
+    }
   },
 
   /**

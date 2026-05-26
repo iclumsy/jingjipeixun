@@ -150,15 +150,16 @@ Page({
           return
         }
 
+        const stateMaps = practice.buildQuestionStateMaps([question])
         this.setData({
           questions: [question],
           loading: false,
           currentIndex: 0,
           currentPosition,
           questionTotal,
-          seenQuestionIds: {},
-          answeredQuestionIds: {},
-          masteredQuestionIds: {},
+          seenQuestionIds: stateMaps.seenQuestionIds,
+          answeredQuestionIds: stateMaps.answeredQuestionIds,
+          masteredQuestionIds: stateMaps.masteredQuestionIds,
           summaryState,
           doneCount: Number(summaryState.answeredCount || 0),
           correctCount: Number(summaryState.masteredCount || 0),
@@ -267,7 +268,9 @@ Page({
       selected = [key]
     }
     const answerMap = { ...this.data.answerMap, [q.id]: selected }
-    const answeredQuestionIds = { ...this.data.answeredQuestionIds, [q.id]: true }
+    const answeredQuestionIds = this.data.mode === 'exam'
+      ? { ...this.data.answeredQuestionIds, [q.id]: true }
+      : this.data.answeredQuestionIds
     this.setData({
       selectedKeys: selected,
       answerMap,
@@ -358,12 +361,19 @@ Page({
           return
         }
 
+        const prevPosition = this.data.currentPosition
+        const prevTotal = this.data.questionTotal
+        const stateMaps = practice.buildQuestionStateMaps([question])
+
         this.setData({
           questions: [question],
           currentIndex: 0,
-          currentPosition,
-          questionTotal,
+          currentPosition: this.data.mode === 'wrong' ? prevPosition + 1 : currentPosition,
+          questionTotal: this.data.mode === 'wrong' ? prevTotal : questionTotal,
           loading: false,
+          seenQuestionIds: stateMaps.seenQuestionIds,
+          answeredQuestionIds: stateMaps.answeredQuestionIds,
+          masteredQuestionIds: stateMaps.masteredQuestionIds,
           summaryState: questionState,
           doneCount: Number(questionState.answeredCount || 0),
           correctCount: Number(questionState.masteredCount || 0)

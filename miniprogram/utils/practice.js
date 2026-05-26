@@ -53,55 +53,39 @@ function clampPercent(value) {
 
 function buildBankStudyState(bank = {}) {
   const progress = bank.progress || {}
-  const questionState = bank.questionState || bank.question_state || {}
-  const questionCount = Math.max(0, Number(bank.questionCount || bank.question_count || 0))
+  const questionState = bank.questionState || {}
+  const questionCount = Math.max(0, Number(bank.questionCount || 0))
 
-  const wrongIds = Array.isArray(questionState.wrongQuestionIds)
-    ? questionState.wrongQuestionIds
-    : (Array.isArray(questionState.wrong_question_ids) ? questionState.wrong_question_ids : [])
+  const wrongIds = Array.isArray(questionState.wrongQuestionIds) ? questionState.wrongQuestionIds : []
 
-  const progressDoneCount = Math.max(0, Number(progress.doneCount || progress.done_count || 0))
-  const progressCorrectCount = Math.max(0, Number(progress.correctCount || progress.correct_count || 0))
-  const progressWrongCount = Math.max(0, Number(progress.wrongCount || progress.wrong_count || 0))
-  const progressWrongIds = Array.isArray(progress.wrongQuestionIds)
-    ? progress.wrongQuestionIds
-    : (Array.isArray(progress.wrong_question_ids) ? progress.wrong_question_ids : [])
-
-  const masteredCount = Math.max(0, Number(questionState.masteredCount || questionState.mastered_count || progressCorrectCount))
-  const seenCount = Math.max(0, Number(questionState.seenCount || questionState.seen_count || 0))
-  const wrongCount = Math.max(0, Number(questionState.wrongCount || questionState.wrong_count || progressWrongCount))
-  const answeredCount = Math.max(0, Number(questionState.answeredCount || questionState.answered_count || progressDoneCount))
+  const masteredCount = Math.max(0, Number(questionState.masteredCount || progress.correctCount || 0))
+  const seenCount = Math.max(0, Number(questionState.seenCount || 0))
+  const wrongCount = Math.max(0, Number(questionState.wrongCount || progress.wrongCount || 0))
+  const answeredCount = Math.max(0, Number(questionState.answeredCount || progress.doneCount || 0))
   const touchedCount = Math.max(0, Number(
-    questionState.touchedCount !== undefined ? questionState.touchedCount
-      : (questionState.touched_count !== undefined ? questionState.touched_count
-        : Math.max(answeredCount, seenCount, progressDoneCount))
+    questionState.touchedCount !== undefined ? questionState.touchedCount : Math.max(answeredCount, seenCount)
   ))
   const untouchedCount = Math.max(0, Number(
-    questionState.untouchedCount !== undefined ? questionState.untouchedCount
-      : (questionState.untouched_count !== undefined ? questionState.untouched_count : Math.max(0, questionCount - touchedCount))
+    questionState.untouchedCount !== undefined ? questionState.untouchedCount : Math.max(0, questionCount - touchedCount)
   ))
-  const lastQuestionId = progress.lastQuestionId || progress.last_question_id || null
+  const lastQuestionId = progress.lastQuestionId || null
 
-  const hasExplicitProgressPercent = questionState.studyProgressPercent !== undefined || questionState.study_progress_percent !== undefined
-  const progressPercent = hasExplicitProgressPercent && (questionState.studyProgressPercent || questionState.study_progress_percent) > 0
-    ? clampPercent(Number(questionState.studyProgressPercent || questionState.study_progress_percent))
+  const progressPercent = questionState.studyProgressPercent !== undefined && questionState.studyProgressPercent > 0
+    ? clampPercent(Number(questionState.studyProgressPercent))
     : (questionCount > 0 ? clampPercent((touchedCount / questionCount) * 100) : 0)
 
-  const hasExplicitAnswerPercent = questionState.answerProgressPercent !== undefined || questionState.answer_progress_percent !== undefined
-  const answerProgressPercent = hasExplicitAnswerPercent && (questionState.answerProgressPercent || questionState.answer_progress_percent) > 0
-    ? clampPercent(Number(questionState.answerProgressPercent || questionState.answer_progress_percent))
+  const answerProgressPercent = questionState.answerProgressPercent !== undefined && questionState.answerProgressPercent > 0
+    ? clampPercent(Number(questionState.answerProgressPercent))
     : (questionCount > 0 ? clampPercent((answeredCount / questionCount) * 100) : 0)
 
-  const hasExplicitMasteryPercent = questionState.masteryPercent !== undefined || questionState.mastery_percent !== undefined
-  const masteryPercent = hasExplicitMasteryPercent && (questionState.masteryPercent || questionState.mastery_percent) > 0
-    ? clampPercent(Number(questionState.masteryPercent || questionState.mastery_percent))
+  const masteryPercent = questionState.masteryPercent !== undefined && questionState.masteryPercent > 0
+    ? clampPercent(Number(questionState.masteryPercent))
     : (questionCount > 0 ? clampPercent((masteredCount / questionCount) * 100) : 0)
 
-  const hasExplicitCorrectRate = questionState.correctRate !== undefined || questionState.correct_rate !== undefined
-  const correctRate = hasExplicitCorrectRate && (questionState.correctRate || questionState.correct_rate) > 0
-    ? clampPercent(Number(questionState.correctRate || questionState.correct_rate))
+  const correctRate = questionState.correctRate !== undefined && questionState.correctRate > 0
+    ? clampPercent(Number(questionState.correctRate))
     : (answeredCount > 0 ? clampPercent((masteredCount / answeredCount) * 100) : 0)
-  const hasWrongQuestions = wrongCount > 0 || wrongIds.length > 0 || progressWrongIds.length > 0
+  const hasWrongQuestions = wrongCount > 0 || wrongIds.length > 0
 
   let recommendedMode = 'sequential'
   let recommendedTitle = '继续练习'
@@ -114,7 +98,7 @@ function buildBankStudyState(bank = {}) {
   } else if (hasWrongQuestions) {
     recommendedMode = 'wrong'
     recommendedTitle = '先练错题'
-    recommendedDetail = `已有 ${wrongCount || wrongIds.length || progressWrongIds.length} 道错题，先补薄弱点`
+    recommendedDetail = `已有 ${wrongCount || wrongIds.length} 道错题，先补薄弱点`
   } else if (progressPercent >= 80 && correctRate >= 75) {
     recommendedMode = 'exam'
     recommendedTitle = '做模拟考试'

@@ -79,7 +79,7 @@
     <view class="mode-grid">
       <view class="mode-card" data-mode="memorize" bindtap="startMode">
         <view class="mode-title">题目浏览</view>
-        <view class="mode-desc">优先浏览未看过的 100 道题目</view>
+        <view class="mode-desc">优先浏览未看过的题目</view>
         <view class="mode-detail">答案解析同步看</view>
       </view>
       <view class="mode-card" data-mode="sequential" bindtap="startMode">
