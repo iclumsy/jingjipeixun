@@ -167,6 +167,62 @@ function findQuestionIndexById(questions = [], questionId = '') {
   return index >= 0 ? index : 0
 }
 
+function resolveStartQuestionId(mode = '', explicitQuestionId = '', studyState = {}) {
+  const explicit = String(explicitQuestionId || '').trim()
+  if (explicit) return explicit
+  if (mode !== 'sequential') return ''
+  return String((studyState || {}).continueQuestionId || '').trim()
+}
+
+function shouldShowQuestionTypeFilter(mode = '') {
+  return mode === 'memorize' || mode === 'sequential'
+}
+
+function buildQuestionStateMaps(questions = []) {
+  return (Array.isArray(questions) ? questions : []).reduce((maps, question) => {
+    const id = question && question.id
+    const state = question && question.state
+    if (!id || !state) return maps
+
+    const status = String(state.status || '').trim()
+    const answerCount = Number(state.answerCount || state.answer_count || 0)
+    const seenAt = String(state.seenAt || state.seen_at || '').trim()
+    if (seenAt) {
+      maps.seenQuestionIds[id] = true
+    }
+    if (answerCount > 0 || status === 'mastered' || status === 'wrong') {
+      maps.answeredQuestionIds[id] = true
+    }
+    if (status === 'mastered') {
+      maps.masteredQuestionIds[id] = true
+    }
+    return maps
+  }, {
+    seenQuestionIds: {},
+    answeredQuestionIds: {},
+    masteredQuestionIds: {}
+  })
+}
+
+function resolveSessionProgressMeta(mode = '', summaryState = {}) {
+  if (mode === 'memorize') {
+    return {
+      label: '已浏览',
+      count: Math.max(0, Number((summaryState || {}).seenCount || (summaryState || {}).seen_count || 0))
+    }
+  }
+  if (mode === 'exam') {
+    return {
+      label: '已答',
+      count: Math.max(0, Number((summaryState || {}).answeredCount || (summaryState || {}).answered_count || 0))
+    }
+  }
+  return {
+    label: '已掌握',
+    count: Math.max(0, Number((summaryState || {}).masteredCount || (summaryState || {}).mastered_count || 0))
+  }
+}
+
 module.exports = {
   normalizeQuestionType,
   normalizeAnswer,
@@ -174,5 +230,9 @@ module.exports = {
   formatOptionList,
   shuffleQuestions,
   buildBankStudyState,
-  findQuestionIndexById
+  findQuestionIndexById,
+  resolveStartQuestionId,
+  shouldShowQuestionTypeFilter,
+  buildQuestionStateMaps,
+  resolveSessionProgressMeta
 }

@@ -3,14 +3,23 @@
     <view class="top-copy">
       <view class="title">{{title}}</view>
       <view class="meta-row">
-        <text>{{currentIndex + 1}} / {{questions.length}}</text>
-        <text wx:if="{{questions.length > 0}}">已答 {{answeredCount}}</text>
+        <text>{{currentIndex + 1}} / {{questionTotal || questions.length}}</text>
+        <text wx:if="{{questions.length > 0}}">{{answeredLabel}} {{answeredCount}}</text>
       </view>
     </view>
     <view wx:if="{{mode === 'exam'}}" class="timer">{{timerText}}</view>
   </view>
   <view wx:if="{{questions.length > 0}}" class="session-progress">
     <view class="session-progress-fill" style="width: {{progressPercent}}%;"></view>
+  </view>
+  <view wx:if="{{showQuestionTypeFilter}}" class="type-filter">
+    <view
+      wx:for="{{questionTypeOptions}}"
+      wx:key="value"
+      class="type-filter-btn {{activeQuestionType === item.value ? 'active' : ''}}"
+      data-type="{{item.value}}"
+      bindtap="switchQuestionType"
+    >{{item.label}}</view>
   </view>
   <view wx:if="{{modeHint}}" class="mode-hint">{{modeHint}}</view>
 

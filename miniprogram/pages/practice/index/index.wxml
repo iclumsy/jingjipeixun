@@ -76,24 +76,6 @@
       >{{activeBank.studyState.canContinue ? '继续' : '开始'}}</button>
     </view>
 
-    <view class="path-section">
-      <view class="section-title">学习路径</view>
-      <view class="path-steps">
-        <view class="path-step {{activeBank.studyState.recommendedMode === 'memorize' ? 'active' : ''}}">
-          <text>1</text><view>浏览</view>
-        </view>
-        <view class="path-step {{activeBank.studyState.recommendedMode === 'sequential' ? 'active' : ''}}">
-          <text>2</text><view>顺序练习</view>
-        </view>
-        <view class="path-step {{activeBank.studyState.recommendedMode === 'wrong' ? 'active' : ''}}">
-          <text>3</text><view>错题回顾</view>
-        </view>
-        <view class="path-step {{activeBank.studyState.recommendedMode === 'exam' ? 'active' : ''}}">
-          <text>4</text><view>模拟考试</view>
-        </view>
-      </view>
-    </view>
-
     <view class="mode-grid">
       <view class="mode-card" data-mode="memorize" bindtap="startMode">
         <view class="mode-title">题目浏览</view>

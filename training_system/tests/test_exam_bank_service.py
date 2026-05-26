@@ -377,6 +377,132 @@ class ExamBankServiceTests(unittest.TestCase):
 
         self.assertEqual([item["source_question_id"] for item in result["list"]], ["102", "103"])
 
+    def test_get_questions_returns_student_question_state_summary(self):
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps([
+                make_question(101, "已浏览题"),
+                make_question(102, "已掌握题"),
+                make_question(103, "错题"),
+                make_question(104, "未做题"),
+            ], ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        exam_bank_service.save_question_state("student-openid", bank["id"], 101, {
+            "action": "seen",
+            "mode": "memorize",
+        })
+        exam_bank_service.save_question_state("student-openid", bank["id"], 102, {
+            "action": "answer",
+            "isCorrect": True,
+            "answer": ["B"],
+            "mode": "practice",
+        })
+        exam_bank_service.save_question_state("student-openid", bank["id"], 103, {
+            "action": "answer",
+            "isCorrect": False,
+            "answer": ["A"],
+            "mode": "practice",
+        })
+
+        result = exam_bank_service.get_questions(
+            bank["id"],
+            mode="sequential",
+            limit=4,
+            openid="student-openid",
+        )
+
+        self.assertEqual(result["questionState"]["seenCount"], 1)
+        self.assertEqual(result["questionState"]["masteredCount"], 1)
+        self.assertEqual(result["questionState"]["wrongCount"], 1)
+        self.assertEqual(result["questionState"]["answeredCount"], 2)
+        self.assertEqual(result["questionState"]["touchedCount"], 3)
+        self.assertEqual(result["questionState"]["studyProgressPercent"], 75)
+        self.assertEqual(result["questionState"]["answerProgressPercent"], 50)
+        states = {
+            item["source_question_id"]: item.get("state")
+            for item in result["list"]
+        }
+        self.assertEqual(states["101"]["status"], "seen")
+        self.assertEqual(states["102"]["status"], "mastered")
+        self.assertEqual(states["103"]["status"], "wrong")
+        self.assertIsNone(states["104"])
+
+    def test_get_questions_uses_legacy_progress_when_question_states_missing(self):
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps([
+                make_question(101, "第一题"),
+                make_question(102, "第二题"),
+                make_question(103, "第三题"),
+                make_question(104, "第四题"),
+            ], ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        exam_bank_service.save_progress("student-openid", bank["id"], {
+            "doneCount": 3,
+            "correctCount": 2,
+            "wrongQuestionIds": [103],
+            "lastQuestionId": 103,
+            "mode": "practice",
+        })
+
+        result = exam_bank_service.get_questions(
+            bank["id"],
+            mode="sequential",
+            limit=4,
+            openid="student-openid",
+        )
+
+        self.assertEqual(result["questionState"]["masteredCount"], 2)
+        self.assertEqual(result["questionState"]["wrongCount"], 1)
+        self.assertEqual(result["questionState"]["answeredCount"], 3)
+        self.assertEqual(result["questionState"]["touchedCount"], 3)
+        self.assertEqual(result["questionState"]["answerProgressPercent"], 75)
+
+    def test_get_questions_state_summary_respects_question_type_filter(self):
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps([
+                make_question(101, "单选掌握题"),
+                {**make_question(102, "判断错题"), "type": "判断题", "type_code": 3, "answer": ["B"]},
+                {**make_question(103, "判断掌握题"), "type": "判断题", "type_code": 3, "answer": ["B"]},
+            ], ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        exam_bank_service.save_question_state("student-openid", bank["id"], 101, {
+            "action": "answer",
+            "isCorrect": True,
+            "answer": ["B"],
+            "mode": "practice",
+        })
+        exam_bank_service.save_question_state("student-openid", bank["id"], 102, {
+            "action": "answer",
+            "isCorrect": False,
+            "answer": ["A"],
+            "mode": "practice",
+        })
+        exam_bank_service.save_question_state("student-openid", bank["id"], 103, {
+            "action": "answer",
+            "isCorrect": True,
+            "answer": ["B"],
+            "mode": "practice",
+        })
+
+        result = exam_bank_service.get_questions(
+            bank["id"],
+            mode="sequential",
+            limit=3,
+            question_type="judge",
+            openid="student-openid",
+        )
+
+        self.assertEqual(result["total"], 2)
+        self.assertEqual(result["questionState"]["masteredCount"], 1)
+        self.assertEqual(result["questionState"]["wrongCount"], 1)
+        self.assertEqual(result["questionState"]["answeredCount"], 2)
+        self.assertEqual(result["questionState"]["masteryPercent"], 50)
+
     def test_import_rejects_question_without_answer(self):
         invalid = [{**SAMPLE_QUESTIONS[0], "answer": []}]
 

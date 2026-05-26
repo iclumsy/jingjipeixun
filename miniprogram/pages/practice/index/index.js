@@ -67,6 +67,7 @@ Page({
     const bank = this.data.activeBank
     if (!bank) return
     const { mode, filter, lastQuestionId } = e.currentTarget.dataset
+    const startQuestionId = practice.resolveStartQuestionId(mode, lastQuestionId, bank.studyState)
     const wrongIds = bank.studyState && Array.isArray(bank.studyState.wrongQuestionIds)
       ? bank.studyState.wrongQuestionIds.join(',')
       : ''
@@ -75,7 +76,7 @@ Page({
       return
     }
     wx.navigateTo({
-      url: `/pages/practice/session/session?bankId=${bank.id}&mode=${mode}&filter=${filter || ''}&title=${encodeURIComponent(bank.displayName || '真题练习')}&wrongIds=${encodeURIComponent(wrongIds)}&lastQuestionId=${encodeURIComponent(lastQuestionId || '')}`
+      url: `/pages/practice/session/session?bankId=${bank.id}&mode=${mode}&filter=${filter || ''}&title=${encodeURIComponent(bank.displayName || '真题练习')}&wrongIds=${encodeURIComponent(wrongIds)}&lastQuestionId=${encodeURIComponent(startQuestionId || '')}`
     })
   }
 })

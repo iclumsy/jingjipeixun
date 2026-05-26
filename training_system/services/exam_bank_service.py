@@ -324,6 +324,7 @@ def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_i
     page_no = max(1, int(page or 1))
     page_size = min(max(1, int(limit or 20)), 100)
     offset = (page_no - 1) * page_size
+    student_openid = str(openid or '').strip()
     params = [bank_id]
     where = 'WHERE bank_id = ?'
 
@@ -340,7 +341,7 @@ def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_i
 
     order_params = []
     order = 'ORDER BY sort_order ASC, id ASC'
-    if mode == 'memorize' and str(openid or '').strip():
+    if mode == 'memorize' and student_openid:
         order = '''
         ORDER BY CASE
             WHEN id IN (
@@ -350,7 +351,7 @@ def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_i
             ) THEN 1 ELSE 0
         END, sort_order ASC, id ASC
         '''
-        order_params = [str(openid or '').strip(), bank_id]
+        order_params = [student_openid, bank_id]
     if mode in ('random', 'exam'):
         order = 'ORDER BY RANDOM()'
 
@@ -360,13 +361,85 @@ def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_i
             f'SELECT * FROM exam_questions {where} {order} LIMIT ? OFFSET ?',
             params + order_params + [page_size, offset],
         ).fetchall()
+        question_rows = [_row_to_question(row) for row in rows]
+        state_counts = {}
+        states_by_question_id = {}
+        if student_openid:
+            state_where = 'WHERE qs.openid = ? AND qs.bank_id = ?'
+            state_params = [student_openid, bank_id]
+            if question_type in ('single', 'multi', 'judge'):
+                state_where += ' AND eq.question_type = ?'
+                state_params.append(question_type)
+            state_row = conn.execute(
+                f'''
+                SELECT
+                    SUM(CASE WHEN COALESCE(qs.seen_at, '') != '' THEN 1 ELSE 0 END) AS seen_count,
+                    SUM(CASE WHEN qs.status = 'mastered' THEN 1 ELSE 0 END) AS mastered_count,
+                    SUM(CASE WHEN qs.status = 'wrong' THEN 1 ELSE 0 END) AS wrong_count,
+                    COUNT(*) AS touched_count
+                FROM mini_question_states qs
+                JOIN exam_questions eq ON eq.id = qs.question_id
+                {state_where}
+                ''',
+                state_params,
+            ).fetchone()
+            state_counts = {
+                'seen': int(state_row['seen_count'] or 0) if state_row else 0,
+                'mastered': int(state_row['mastered_count'] or 0) if state_row else 0,
+                'wrong': int(state_row['wrong_count'] or 0) if state_row else 0,
+                'touched': int(state_row['touched_count'] or 0) if state_row else 0,
+            }
+            if not state_counts['touched']:
+                legacy_progress = conn.execute(
+                    '''
+                    SELECT *
+                    FROM mini_practice_progress
+                    WHERE openid = ? AND bank_id = ? AND mode = ?
+                    ORDER BY updated_at DESC, id DESC
+                    LIMIT 1
+                    ''',
+                    (student_openid, bank_id, 'practice'),
+                ).fetchone()
+                if legacy_progress:
+                    legacy_done = max(0, int(legacy_progress['done_count'] or 0))
+                    legacy_correct = max(0, int(legacy_progress['correct_count'] or 0))
+                    legacy_wrong_ids = _json_loads(legacy_progress['wrong_question_ids_json'], [])
+                    legacy_wrong = len(legacy_wrong_ids) if isinstance(legacy_wrong_ids, list) else 0
+                    if not legacy_wrong:
+                        legacy_wrong = max(0, legacy_done - legacy_correct)
+                    state_counts = {
+                        'seen': 0,
+                        'mastered': min(legacy_correct, legacy_done),
+                        'wrong': max(0, legacy_wrong),
+                        'touched': legacy_done,
+                    }
+            question_ids = [int(item['id']) for item in question_rows if str(item.get('id') or '').isdigit()]
+            if question_ids:
+                placeholders = ','.join(['?'] * len(question_ids))
+                state_rows = conn.execute(
+                    f'''
+                    SELECT *
+                    FROM mini_question_states
+                    WHERE openid = ? AND bank_id = ? AND question_id IN ({placeholders})
+                    ''',
+                    [student_openid, bank_id] + question_ids,
+                ).fetchall()
+                states_by_question_id = {
+                    int(row['question_id']): _row_to_question_state(row)
+                    for row in state_rows
+                }
+
+    if states_by_question_id:
+        for item in question_rows:
+            item['state'] = states_by_question_id.get(int(item.get('id') or 0))
 
     return {
-        'list': [_row_to_question(row) for row in rows],
+        'list': question_rows,
         'page': page_no,
         'limit': page_size,
         'total': total,
         'hasMore': offset + len(rows) < total,
+        'questionState': _aggregate_question_state_summary(total, state_counts),
     }
 
 

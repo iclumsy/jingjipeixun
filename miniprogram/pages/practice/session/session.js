@@ -13,13 +13,23 @@ Page({
     bankId: '',
     mode: 'sequential',
     filter: '',
+    activeQuestionType: '',
+    showQuestionTypeFilter: false,
+    questionTypeOptions: [
+      { label: '全部', value: '' },
+      { label: '单选', value: 'single' },
+      { label: '多选', value: 'multi' },
+      { label: '判断', value: 'judge' }
+    ],
     lastQuestionId: '',
     title: '练习',
     loading: true,
     questions: [],
     currentIndex: 0,
+    questionTotal: 0,
     progressPercent: 0,
     answeredCount: 0,
+    answeredLabel: '已答',
     modeHint: '',
     selectedKeys: [],
     submitted: false,
@@ -30,6 +40,10 @@ Page({
     answerMap: {},
     resultMap: {},
     questionImages: [],
+    seenQuestionIds: {},
+    answeredQuestionIds: {},
+    masteredQuestionIds: {},
+    summaryState: {},
     doneCount: 0,
     correctCount: 0,
     wrongQuestionIds: [],
@@ -47,6 +61,7 @@ Page({
       bankId,
       mode,
       filter,
+      showQuestionTypeFilter: practice.shouldShowQuestionTypeFilter(mode),
       lastQuestionId: decodeURIComponent(options.lastQuestionId || ''),
       wrongIds: decodeURIComponent(options.wrongIds || ''),
       title: `${title} · ${this.modeTitle(mode, filter)}`,
@@ -80,11 +95,32 @@ Page({
         page: 1,
         limit,
         wrong_ids: mode === 'wrong' ? this.data.wrongIds : '',
-        question_type: ''
+        question_type: this.data.showQuestionTypeFilter ? this.data.activeQuestionType : ''
       })
       let questions = Array.isArray(res.list) ? res.list : []
       const currentIndex = practice.findQuestionIndexById(questions, this.data.lastQuestionId)
-      this.setData({ questions, loading: false, currentIndex })
+      const questionState = res.questionState || {}
+      const questionTotal = mode === 'exam'
+        ? questions.length
+        : Number(res.total || questions.length || 0)
+      const summaryState = mode === 'exam' ? {} : questionState
+      const stateMaps = this.data.showQuestionTypeFilter
+        ? practice.buildQuestionStateMaps(questions)
+        : { seenQuestionIds: {}, answeredQuestionIds: {}, masteredQuestionIds: {} }
+      this._seenQuestionIds = { ...stateMaps.seenQuestionIds }
+      this.setData({
+        questions,
+        loading: false,
+        currentIndex,
+        questionTotal,
+        seenQuestionIds: stateMaps.seenQuestionIds,
+        answeredQuestionIds: stateMaps.answeredQuestionIds,
+        masteredQuestionIds: stateMaps.masteredQuestionIds,
+        summaryState,
+        doneCount: Number(summaryState.answeredCount || 0),
+        correctCount: Number(summaryState.masteredCount || 0),
+        wrongQuestionIds: []
+      })
       this.updateSessionMeta()
       this.prepareCurrentQuestion()
       if (mode === 'exam') this.startTimer()
@@ -92,6 +128,35 @@ Page({
       this.setData({ loading: false })
       wx.showToast({ title: err.message || '题目加载失败', icon: 'none' })
     }
+  },
+
+  switchQuestionType(e) {
+    if (!this.data.showQuestionTypeFilter || this.data.loading) return
+    const type = e.currentTarget.dataset.type || ''
+    if (type === this.data.activeQuestionType) return
+    this.setData({
+      activeQuestionType: type,
+      currentIndex: 0,
+      questionTotal: 0,
+      progressPercent: 0,
+      answeredCount: 0,
+      selectedKeys: [],
+      submitted: false,
+      isCorrect: false,
+      correctAnswerText: '',
+      optionList: [],
+      answerMap: {},
+      resultMap: {},
+      questionImages: [],
+      seenQuestionIds: {},
+      answeredQuestionIds: {},
+      masteredQuestionIds: {},
+      summaryState: {},
+      doneCount: 0,
+      correctCount: 0,
+      wrongQuestionIds: []
+    })
+    this.loadQuestions()
   },
 
   prepareCurrentQuestion() {
@@ -156,9 +221,11 @@ Page({
       selected = [key]
     }
     const answerMap = { ...this.data.answerMap, [q.id]: selected }
+    const answeredQuestionIds = { ...this.data.answeredQuestionIds, [q.id]: true }
     this.setData({
       selectedKeys: selected,
       answerMap,
+      answeredQuestionIds,
       optionList: this.buildOptionList(q, selected)
     })
     this.updateSessionMeta()
@@ -179,12 +246,31 @@ Page({
       ? this.data.wrongQuestionIds.filter(id => id !== q.id)
       : Array.from(new Set([...this.data.wrongQuestionIds, q.id]))
     const resultMap = { ...this.data.resultMap, [q.id]: isCorrect }
+    const wasAnswered = !!this.data.answeredQuestionIds[q.id]
+    const wasMastered = !!this.data.masteredQuestionIds[q.id]
+    const answeredQuestionIds = { ...this.data.answeredQuestionIds, [q.id]: true }
+    const masteredQuestionIds = isCorrect
+      ? { ...this.data.masteredQuestionIds, [q.id]: true }
+      : { ...this.data.masteredQuestionIds }
+    if (!isCorrect) delete masteredQuestionIds[q.id]
+    const summaryState = { ...this.data.summaryState }
+    if (!wasAnswered) {
+      summaryState.answeredCount = Math.max(0, Number(summaryState.answeredCount || 0)) + 1
+    }
+    if (isCorrect && !wasMastered) {
+      summaryState.masteredCount = Math.max(0, Number(summaryState.masteredCount || 0)) + 1
+    } else if (!isCorrect && wasMastered) {
+      summaryState.masteredCount = Math.max(0, Number(summaryState.masteredCount || 0) - 1)
+    }
     this.setData({
       submitted: true,
       isCorrect,
       resultMap,
-      doneCount: Object.keys(resultMap).length,
-      correctCount: Object.values(resultMap).filter(Boolean).length,
+      answeredQuestionIds,
+      masteredQuestionIds,
+      summaryState,
+      doneCount: Number(summaryState.answeredCount || Object.keys(answeredQuestionIds).length),
+      correctCount: Number(summaryState.masteredCount || Object.keys(masteredQuestionIds).length),
       wrongQuestionIds: wrongIds
     })
     await this.recordQuestionAnswer(q, this.data.selectedKeys, isCorrect)
@@ -213,12 +299,19 @@ Page({
   },
 
   updateSessionMeta() {
-    const total = this.data.questions.length || 0
+    const total = this.data.questionTotal || this.data.questions.length || 0
     const progressPercent = total > 0
       ? Math.max(0, Math.min(100, Math.round(((this.data.currentIndex + 1) / total) * 100)))
       : 0
-    const answeredCount = Object.keys(this.data.answerMap || {}).length
-    this.setData({ progressPercent, answeredCount })
+    const summaryState = this.data.mode === 'exam'
+      ? { answeredCount: Object.keys(this.data.answeredQuestionIds || {}).length }
+      : this.data.summaryState
+    const progressMeta = practice.resolveSessionProgressMeta(this.data.mode, summaryState)
+    this.setData({
+      progressPercent,
+      answeredCount: progressMeta.count,
+      answeredLabel: progressMeta.label
+    })
   },
 
   toggleCard() {
@@ -243,6 +336,15 @@ Page({
     this._seenQuestionIds = this._seenQuestionIds || {}
     if (this._seenQuestionIds[question.id]) return
     this._seenQuestionIds[question.id] = true
+    const summaryState = {
+      ...this.data.summaryState,
+      seenCount: Math.max(0, Number((this.data.summaryState || {}).seenCount || 0)) + 1
+    }
+    this.setData({
+      seenQuestionIds: { ...this.data.seenQuestionIds, [question.id]: true },
+      summaryState
+    })
+    this.updateSessionMeta()
     this.saveQuestionState({
       questionId: question.id,
       action: 'seen',

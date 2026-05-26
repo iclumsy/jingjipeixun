@@ -144,6 +144,69 @@ function testFindQuestionIndexById() {
   assert.strictEqual(practice.findQuestionIndexById([], 22), 0)
 }
 
+function testResolveStartQuestionIdUsesResumeForSequentialMode() {
+  const state = { continueQuestionId: 88 }
+
+  assert.strictEqual(practice.resolveStartQuestionId('sequential', '', state), '88')
+  assert.strictEqual(practice.resolveStartQuestionId('sequential', '22', state), '22')
+  assert.strictEqual(practice.resolveStartQuestionId('exam', '', state), '')
+}
+
+function testQuestionTypeFilterOnlyShowsForBrowseAndSequentialModes() {
+  assert.strictEqual(practice.shouldShowQuestionTypeFilter('memorize'), true)
+  assert.strictEqual(practice.shouldShowQuestionTypeFilter('sequential'), true)
+  assert.strictEqual(practice.shouldShowQuestionTypeFilter('exam'), false)
+  assert.strictEqual(practice.shouldShowQuestionTypeFilter('wrong'), false)
+}
+
+function testBuildQuestionStateMapsKeepsBrowsedAnsweredAndMasteredSeparate() {
+  const maps = practice.buildQuestionStateMaps([
+    { id: 1, state: { seenAt: '2026-05-26 10:00:00', status: 'seen', answerCount: 0 } },
+    { id: 2, state: { seenAt: '', status: 'mastered', answerCount: 1 } },
+    { id: 3, state: { seenAt: '2026-05-26 10:05:00', status: 'wrong', answerCount: 2 } },
+    { id: 4, state: null }
+  ])
+
+  assert.deepStrictEqual(maps.seenQuestionIds, { 1: true, 3: true })
+  assert.deepStrictEqual(maps.answeredQuestionIds, { 2: true, 3: true })
+  assert.deepStrictEqual(maps.masteredQuestionIds, { 2: true })
+}
+
+function testResolveSessionProgressMetaUsesSummaryCounts() {
+  assert.deepStrictEqual(
+    practice.resolveSessionProgressMeta('memorize', {
+      seenCount: 12,
+      masteredCount: 8,
+      answeredCount: 20
+    }),
+    { label: '已浏览', count: 12 }
+  )
+  assert.deepStrictEqual(
+    practice.resolveSessionProgressMeta('sequential', {
+      seenCount: 12,
+      masteredCount: 8,
+      answeredCount: 20
+    }),
+    { label: '已掌握', count: 8 }
+  )
+  assert.deepStrictEqual(
+    practice.resolveSessionProgressMeta('wrong', {
+      seenCount: 12,
+      masteredCount: 8,
+      answeredCount: 20
+    }),
+    { label: '已掌握', count: 8 }
+  )
+  assert.deepStrictEqual(
+    practice.resolveSessionProgressMeta('exam', {
+      seenCount: 12,
+      masteredCount: 8,
+      answeredCount: 20
+    }),
+    { label: '已答', count: 20 }
+  )
+}
+
 function run() {
   testBuildBankStudyStateForNewBank()
   testBuildBankStudyStateForOngoingBank()
@@ -151,6 +214,10 @@ function run() {
   testBuildBankStudyStateFallsBackToProgressWhenQuestionStateIsEmpty()
   testBuildBankStudyStateForExamReadyBank()
   testFindQuestionIndexById()
+  testResolveStartQuestionIdUsesResumeForSequentialMode()
+  testQuestionTypeFilterOnlyShowsForBrowseAndSequentialModes()
+  testBuildQuestionStateMapsKeepsBrowsedAnsweredAndMasteredSeparate()
+  testResolveSessionProgressMetaUsesSummaryCounts()
 }
 
 run()
