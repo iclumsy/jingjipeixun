@@ -35,10 +35,12 @@ SAMPLE_QUESTIONS = [
 ]
 
 
-def make_question(question_id, question_text=None, answer=None):
+def make_question(question_id, question_text=None, answer=None, question_type="单选题", type_code=1):
     return {
         **SAMPLE_QUESTIONS[0],
         "id": question_id,
+        "type": question_type,
+        "type_code": type_code,
         "question": question_text or f"题目 {question_id}",
         "question_html": question_text or f"题目 {question_id}",
         "answer": answer or ["B"],
@@ -465,6 +467,34 @@ class ExamBankServiceTests(unittest.TestCase):
         self.assertEqual(result["questionState"]["wrongCount"], 1)
         self.assertEqual(result["questionState"]["answeredCount"], 2)
         self.assertEqual(result["questionState"]["masteryPercent"], 50)
+
+    def test_exam_questions_use_fixed_type_distribution(self):
+        questions = []
+        questions.extend(
+            make_question(1000 + index, f"单选题 {index}", question_type="单选题", type_code=1)
+            for index in range(60)
+        )
+        questions.extend(
+            make_question(2000 + index, f"多选题 {index}", answer=["A", "B"], question_type="多选题", type_code=2)
+            for index in range(40)
+        )
+        questions.extend(
+            make_question(3000 + index, f"判断题 {index}", question_type="判断题", type_code=3)
+            for index in range(30)
+        )
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(questions, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+
+        result = exam_bank_service.get_questions(bank["id"], mode="exam", limit=100)
+        counts = {}
+        for item in result["list"]:
+            counts[item["question_type"]] = counts.get(item["question_type"], 0) + 1
+
+        self.assertEqual(len(result["list"]), 100)
+        self.assertEqual(counts, {"single": 50, "multi": 30, "judge": 20})
 
     def test_import_rejects_question_without_answer(self):
         invalid = [{**SAMPLE_QUESTIONS[0], "answer": []}]

@@ -7,6 +7,11 @@ from models.student import get_db_connection
 
 ACTIVE_STUDENT_STATUSES = ('reviewed', 'registered')
 EXAM_BANK_TRAINING_TYPE = 'special_equipment'
+EXAM_QUESTION_DISTRIBUTION = (
+    ('single', 50),
+    ('multi', 30),
+    ('judge', 20),
+)
 
 
 def _json_dumps(value):
@@ -125,6 +130,23 @@ def _row_to_question_state(row, question_id_override=None):
         'createdAt': item.get('created_at') or '',
         'updatedAt': item.get('updated_at') or '',
     }
+
+
+def _load_fixed_exam_questions(conn, where, params, page_size):
+    if page_size != sum(count for _, count in EXAM_QUESTION_DISTRIBUTION):
+        rows = conn.execute(
+            f'SELECT * FROM exam_questions {where} ORDER BY RANDOM() LIMIT ?',
+            params + [page_size],
+        ).fetchall()
+        return rows
+
+    rows = []
+    for qtype, count in EXAM_QUESTION_DISTRIBUTION:
+        rows.extend(conn.execute(
+            f'SELECT * FROM exam_questions {where} AND question_type = ? ORDER BY RANDOM() LIMIT ?',
+            params + [qtype, count],
+        ).fetchall())
+    return rows
 
 
 def _as_bool(value):
@@ -371,10 +393,13 @@ def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_i
 
     with get_db_connection() as conn:
         total = conn.execute(f'SELECT COUNT(*) FROM exam_questions {where}', params).fetchone()[0]
-        rows = conn.execute(
-            f'SELECT * FROM exam_questions {where} {order} LIMIT ? OFFSET ?',
-            params + order_params + [page_size, offset],
-        ).fetchall()
+        if mode == 'exam' and not question_type and offset == 0:
+            rows = _load_fixed_exam_questions(conn, where, params, page_size)
+        else:
+            rows = conn.execute(
+                f'SELECT * FROM exam_questions {where} {order} LIMIT ? OFFSET ?',
+                params + order_params + [page_size, offset],
+            ).fetchall()
         question_rows = [_row_to_question(row) for row in rows]
         state_counts = {}
         states_by_question_id = {}
