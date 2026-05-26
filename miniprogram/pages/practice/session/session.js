@@ -488,6 +488,8 @@ Page({
   },
 
   async finishSession() {
+    if (this._finishingSession) return
+    this._finishingSession = true
     this.clearTimer()
     if (this.data.mode === 'exam') {
       const answerMap = this.data.answerMap
@@ -507,8 +509,10 @@ Page({
         correctCount: correct,
         wrongQuestionIds: wrongIds
       })
-      await this.recordExamQuestionStates(resultMap)
+      
+      wx.showLoading({ title: '提交中...', mask: true })
       try {
+        await this.recordExamQuestionStates(resultMap)
         await api.savePracticeExam({
           bankId: this.data.bankId,
           score,
@@ -520,6 +524,8 @@ Page({
         })
       } catch (err) {
         console.warn('保存考试记录失败', err)
+      } finally {
+        wx.hideLoading()
       }
       wx.redirectTo({
         url: `/pages/practice/result/result?score=${score}&total=${total}&correct=${correct}&duration=${3600 - this.data.timeLeft}`
