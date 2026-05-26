@@ -193,9 +193,10 @@ function testResolveSessionProgressMetaUsesSummaryCounts() {
     practice.resolveSessionProgressMeta('wrong', {
       seenCount: 12,
       masteredCount: 8,
-      answeredCount: 20
+      answeredCount: 20,
+      wrongCount: 5
     }),
-    { label: '已掌握', count: 8 }
+    { label: '剩余错题', count: 5 }
   )
   assert.deepStrictEqual(
     practice.resolveSessionProgressMeta('exam', {

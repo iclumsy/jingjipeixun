@@ -186,6 +186,12 @@ function resolveSessionProgressMeta(mode = '', summaryState = {}) {
       count: Math.max(0, Number((summaryState || {}).answeredCount || (summaryState || {}).answered_count || 0))
     }
   }
+  if (mode === 'wrong') {
+    return {
+      label: '剩余错题',
+      count: Math.max(0, Number((summaryState || {}).wrongCount || (summaryState || {}).wrong_count || 0))
+    }
+  }
   return {
     label: '已掌握',
     count: Math.max(0, Number((summaryState || {}).masteredCount || (summaryState || {}).mastered_count || 0))
