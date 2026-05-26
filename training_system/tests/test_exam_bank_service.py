@@ -218,11 +218,6 @@ class ExamBankServiceTests(unittest.TestCase):
             "N1_叉车司机.json",
             self.get_project_id("叉车司机"),
         )
-        exam_bank_service.save_progress("student-openid", bank["id"], {
-            "doneCount": 1,
-            "correctCount": 1,
-            "wrongQuestionIds": [],
-        })
         exam_bank_service.save_question_state("student-openid", bank["id"], SAMPLE_QUESTIONS[0]["id"], {
             "action": "answer",
             "isCorrect": True,
@@ -375,7 +370,7 @@ class ExamBankServiceTests(unittest.TestCase):
             openid="student-openid",
         )
 
-        self.assertEqual([item["source_question_id"] for item in result["list"]], ["102", "103"])
+        self.assertEqual([item["source_question_id"] for item in result["list"]], ["103", "104"])
 
     def test_get_questions_returns_student_question_state_summary(self):
         bank = exam_bank_service.import_exam_bank(
@@ -412,7 +407,7 @@ class ExamBankServiceTests(unittest.TestCase):
             openid="student-openid",
         )
 
-        self.assertEqual(result["questionState"]["seenCount"], 1)
+        self.assertEqual(result["questionState"]["seenCount"], 3)
         self.assertEqual(result["questionState"]["masteredCount"], 1)
         self.assertEqual(result["questionState"]["wrongCount"], 1)
         self.assertEqual(result["questionState"]["answeredCount"], 2)
@@ -427,38 +422,6 @@ class ExamBankServiceTests(unittest.TestCase):
         self.assertEqual(states["102"]["status"], "mastered")
         self.assertEqual(states["103"]["status"], "wrong")
         self.assertIsNone(states["104"])
-
-    def test_get_questions_uses_legacy_progress_when_question_states_missing(self):
-        bank = exam_bank_service.import_exam_bank(
-            io.BytesIO(json.dumps([
-                make_question(101, "第一题"),
-                make_question(102, "第二题"),
-                make_question(103, "第三题"),
-                make_question(104, "第四题"),
-            ], ensure_ascii=False).encode("utf-8")),
-            "N1_叉车司机.json",
-            self.get_project_id("叉车司机"),
-        )
-        exam_bank_service.save_progress("student-openid", bank["id"], {
-            "doneCount": 3,
-            "correctCount": 2,
-            "wrongQuestionIds": [103],
-            "lastQuestionId": 103,
-            "mode": "practice",
-        })
-
-        result = exam_bank_service.get_questions(
-            bank["id"],
-            mode="sequential",
-            limit=4,
-            openid="student-openid",
-        )
-
-        self.assertEqual(result["questionState"]["masteredCount"], 2)
-        self.assertEqual(result["questionState"]["wrongCount"], 1)
-        self.assertEqual(result["questionState"]["answeredCount"], 3)
-        self.assertEqual(result["questionState"]["touchedCount"], 3)
-        self.assertEqual(result["questionState"]["answerProgressPercent"], 75)
 
     def test_get_questions_state_summary_respects_question_type_filter(self):
         bank = exam_bank_service.import_exam_bank(
@@ -646,7 +609,7 @@ class ExamBankServiceTests(unittest.TestCase):
             student = dict(conn.execute("SELECT * FROM students WHERE id = ?", (student_id,)).fetchone())
         result = exam_bank_service.get_student_learning_status(student)
 
-        self.assertEqual(result["summary"]["seenCount"], 1)
+        self.assertEqual(result["summary"]["seenCount"], 3)
         self.assertEqual(result["summary"]["masteredCount"], 1)
         self.assertEqual(result["summary"]["wrongCount"], 1)
         self.assertEqual(result["summary"]["untouchedCount"], 1)

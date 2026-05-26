@@ -47,6 +47,8 @@ def _normalize_question_type(question):
         return 'judge'
     if type_text == '多选题' or type_code in (2, '2'):
         return 'multi'
+    if type_text == '案例题' or type_code in (4, '4'):
+        return 'case'
     return 'single'
 
 
@@ -225,6 +227,8 @@ def import_exam_bank(file_stream, filename, training_project_id, display_name=''
                 ),
             )
             conn.execute('DELETE FROM exam_questions WHERE bank_id = ?', (bank_id,))
+            conn.execute('DELETE FROM mini_question_states WHERE bank_id = ?', (bank_id,))
+            conn.execute('DELETE FROM mini_practice_progress WHERE bank_id = ?', (bank_id,))
         else:
             cursor = conn.execute(
                 '''
@@ -322,20 +326,30 @@ def delete_exam_bank(bank_id):
 
 def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_ids=None, question_type='', openid=''):
     page_no = max(1, int(page or 1))
-    page_size = min(max(1, int(limit or 20)), 100)
+    max_limit = 500 if mode in ('sequential', 'wrong', 'memorize') else 100
+    page_size = min(max(1, int(limit or 20)), max_limit)
     offset = (page_no - 1) * page_size
     student_openid = str(openid or '').strip()
     params = [bank_id]
     where = 'WHERE bank_id = ?'
 
-    if wrong_question_ids:
+    if mode == 'wrong' and student_openid:
+        where += '''
+            AND id IN (
+                SELECT question_id
+                FROM mini_question_states
+                WHERE openid = ? AND bank_id = ? AND status = 'wrong'
+            )
+        '''
+        params.extend([student_openid, bank_id])
+    elif wrong_question_ids:
         ids = [int(qid) for qid in wrong_question_ids if str(qid).isdigit()]
         if ids:
             placeholders = ','.join(['?'] * len(ids))
             where += f' AND id IN ({placeholders})'
             params.extend(ids)
 
-    if question_type in ('single', 'multi', 'judge'):
+    if question_type in ('single', 'multi', 'judge', 'case'):
         where += ' AND question_type = ?'
         params.append(question_type)
 
@@ -352,7 +366,7 @@ def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_i
         END, sort_order ASC, id ASC
         '''
         order_params = [student_openid, bank_id]
-    if mode in ('random', 'exam'):
+    elif mode in ('random', 'exam'):
         order = 'ORDER BY RANDOM()'
 
     with get_db_connection() as conn:
@@ -367,7 +381,7 @@ def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_i
         if student_openid:
             state_where = 'WHERE qs.openid = ? AND qs.bank_id = ?'
             state_params = [student_openid, bank_id]
-            if question_type in ('single', 'multi', 'judge'):
+            if question_type in ('single', 'multi', 'judge', 'case'):
                 state_where += ' AND eq.question_type = ?'
                 state_params.append(question_type)
             state_row = conn.execute(
@@ -389,30 +403,6 @@ def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_i
                 'wrong': int(state_row['wrong_count'] or 0) if state_row else 0,
                 'touched': int(state_row['touched_count'] or 0) if state_row else 0,
             }
-            if not state_counts['touched']:
-                legacy_progress = conn.execute(
-                    '''
-                    SELECT *
-                    FROM mini_practice_progress
-                    WHERE openid = ? AND bank_id = ? AND mode = ?
-                    ORDER BY updated_at DESC, id DESC
-                    LIMIT 1
-                    ''',
-                    (student_openid, bank_id, 'practice'),
-                ).fetchone()
-                if legacy_progress:
-                    legacy_done = max(0, int(legacy_progress['done_count'] or 0))
-                    legacy_correct = max(0, int(legacy_progress['correct_count'] or 0))
-                    legacy_wrong_ids = _json_loads(legacy_progress['wrong_question_ids_json'], [])
-                    legacy_wrong = len(legacy_wrong_ids) if isinstance(legacy_wrong_ids, list) else 0
-                    if not legacy_wrong:
-                        legacy_wrong = max(0, legacy_done - legacy_correct)
-                    state_counts = {
-                        'seen': 0,
-                        'mastered': min(legacy_correct, legacy_done),
-                        'wrong': max(0, legacy_wrong),
-                        'touched': legacy_done,
-                    }
             question_ids = [int(item['id']) for item in question_rows if str(item.get('id') or '').isdigit()]
             if question_ids:
                 placeholders = ','.join(['?'] * len(question_ids))
@@ -441,6 +431,254 @@ def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_i
         'hasMore': offset + len(rows) < total,
         'questionState': _aggregate_question_state_summary(total, state_counts),
     }
+
+
+def get_next_question(bank_id, mode='sequential', current_question_id=None, question_type='', openid=''):
+    student_openid = str(openid or '').strip()
+
+    # 验证 current_question_id
+    current_id = None
+    if current_question_id:
+        if str(current_question_id).isdigit():
+            current_id = int(current_question_id)
+        else:
+            current_id = None
+
+    params = [bank_id]
+    where = 'WHERE bank_id = ?'
+    count_where = 'WHERE bank_id = ?'
+    count_params = [bank_id]
+
+    if question_type in ('single', 'multi', 'judge', 'case'):
+        where += ' AND question_type = ?'
+        count_where += ' AND question_type = ?'
+        params.append(question_type)
+        count_params.append(question_type)
+
+    order = 'ORDER BY sort_order ASC, id ASC'
+    order_params = []
+
+    if mode == 'wrong' and student_openid:
+        wrong_subquery = '''
+            AND id IN (
+                SELECT question_id
+                FROM mini_question_states
+                WHERE openid = ? AND bank_id = ? AND status = 'wrong'
+            )
+        '''
+        where += wrong_subquery
+        count_where += wrong_subquery
+        params.extend([student_openid, bank_id])
+        count_params.extend([student_openid, bank_id])
+    elif mode == 'memorize' and student_openid:
+        order = '''
+        ORDER BY CASE
+            WHEN id IN (
+                SELECT question_id
+                FROM mini_question_states
+                WHERE openid = ? AND bank_id = ? AND COALESCE(seen_at, '') != ''
+            ) THEN 1 ELSE 0
+        END, sort_order ASC, id ASC
+        '''
+        order_params = [student_openid, bank_id]
+
+    with get_db_connection() as conn:
+        # 游标：基于 (sort_order, id) 而不是只用 id
+        if current_id:
+            if mode == 'memorize' and student_openid:
+                # 题目浏览：需要考虑"未浏览优先"排序
+                # 获取当前题的 sort_order 和是否已浏览
+                current_row = conn.execute(
+                    'SELECT sort_order FROM exam_questions WHERE id = ?',
+                    [current_id]
+                ).fetchone()
+                if current_row:
+                    current_sort_order = current_row['sort_order']
+                    current_seen = conn.execute(
+                        '''
+                        SELECT COUNT(*) FROM mini_question_states
+                        WHERE openid = ? AND bank_id = ? AND question_id = ? AND COALESCE(seen_at, '') != ''
+                        ''',
+                        [student_openid, bank_id, current_id]
+                    ).fetchone()[0] > 0
+
+                    if current_seen:
+                        # 当前题已浏览：下一题可以是未浏览的任意题，或已浏览且排序更后的题
+                        where += '''
+                            AND (
+                                id NOT IN (
+                                    SELECT question_id
+                                    FROM mini_question_states
+                                    WHERE openid = ? AND bank_id = ? AND COALESCE(seen_at, '') != ''
+                                )
+                                OR (
+                                    id IN (
+                                        SELECT question_id
+                                        FROM mini_question_states
+                                        WHERE openid = ? AND bank_id = ? AND COALESCE(seen_at, '') != ''
+                                    )
+                                    AND (sort_order > ? OR (sort_order = ? AND id > ?))
+                                )
+                            )
+                        '''
+                        params.extend([student_openid, bank_id, student_openid, bank_id, current_sort_order, current_sort_order, current_id])
+                    else:
+                        # 当前题未浏览：下一题是未浏览且排序更后的题
+                        where += '''
+                            AND id NOT IN (
+                                SELECT question_id
+                                FROM mini_question_states
+                                WHERE openid = ? AND bank_id = ? AND COALESCE(seen_at, '') != ''
+                            )
+                            AND (sort_order > ? OR (sort_order = ? AND id > ?))
+                        '''
+                        params.extend([student_openid, bank_id, current_sort_order, current_sort_order, current_id])
+            else:
+                # 其他模式：基于 (sort_order, id) 游标
+                current_row = conn.execute(
+                    'SELECT sort_order FROM exam_questions WHERE id = ?',
+                    [current_id]
+                ).fetchone()
+                if current_row:
+                    current_sort_order = current_row['sort_order']
+                    where += ' AND (sort_order > ? OR (sort_order = ? AND id > ?))'
+                    params.extend([current_sort_order, current_sort_order, current_id])
+        # 计算当前模式下的总题数
+        total = conn.execute(f'SELECT COUNT(*) FROM exam_questions {count_where}', count_params).fetchone()[0]
+
+        # 查询下一题
+        row = conn.execute(
+            f'SELECT * FROM exam_questions {where} {order} LIMIT 1',
+            params + order_params,
+        ).fetchone()
+
+        if not row:
+            return {'question': None, 'total': total, 'hasMore': False, 'currentPosition': total}
+
+        question = _row_to_question(row)
+
+        # 计算当前位置：按照实际排序规则计算
+        if mode == 'memorize' and student_openid:
+            # 题目浏览：位置基于 sort_order, id 的绝对位置
+            # 不使用"未浏览优先"排序，否则浏览后位置会跳变
+            position_query = f'''
+                SELECT COUNT(*) FROM exam_questions
+                {count_where}
+                AND (sort_order < ? OR (sort_order = ? AND id <= ?))
+            '''
+            position_params = count_params + [
+                question['sort_order'], question['sort_order'], question['id']
+            ]
+        else:
+            # 其他模式：按 sort_order, id 排序
+            position_query = f'''
+                SELECT COUNT(*) FROM exam_questions
+                {count_where}
+                AND (sort_order < ? OR (sort_order = ? AND id <= ?))
+            '''
+            position_params = count_params + [
+                question['sort_order'], question['sort_order'], question['id']
+            ]
+
+        current_position = conn.execute(position_query, position_params).fetchone()[0] - 1
+
+        state_counts = {}
+        if student_openid:
+            state_where = 'WHERE qs.openid = ? AND qs.bank_id = ?'
+            state_params = [student_openid, bank_id]
+            if question_type in ('single', 'multi', 'judge', 'case'):
+                state_where += ' AND eq.question_type = ?'
+                state_params.append(question_type)
+            state_row = conn.execute(
+                f'''
+                SELECT
+                    SUM(CASE WHEN COALESCE(qs.seen_at, '') != '' THEN 1 ELSE 0 END) AS seen_count,
+                    SUM(CASE WHEN qs.status = 'mastered' THEN 1 ELSE 0 END) AS mastered_count,
+                    SUM(CASE WHEN qs.status = 'wrong' THEN 1 ELSE 0 END) AS wrong_count,
+                    COUNT(*) AS touched_count
+                FROM mini_question_states qs
+                JOIN exam_questions eq ON eq.id = qs.question_id
+                {state_where}
+                ''',
+                state_params,
+            ).fetchone()
+            state_counts = {
+                'seen': int(state_row['seen_count'] or 0) if state_row else 0,
+                'mastered': int(state_row['mastered_count'] or 0) if state_row else 0,
+                'wrong': int(state_row['wrong_count'] or 0) if state_row else 0,
+                'touched': int(state_row['touched_count'] or 0) if state_row else 0,
+            }
+
+            question_state = conn.execute(
+                'SELECT * FROM mini_question_states WHERE openid = ? AND bank_id = ? AND question_id = ?',
+                [student_openid, bank_id, question['id']],
+            ).fetchone()
+            if question_state:
+                question['state'] = _row_to_question_state(question_state)
+
+        # 检查是否还有更多题：使用与游标一致的逻辑
+        if mode == 'memorize' and student_openid:
+            # 题目浏览：检查是否还有未浏览题或已浏览且排序更后的题
+            current_seen = conn.execute(
+                '''
+                SELECT COUNT(*) FROM mini_question_states
+                WHERE openid = ? AND bank_id = ? AND question_id = ? AND COALESCE(seen_at, '') != ''
+                ''',
+                [student_openid, bank_id, question['id']]
+            ).fetchone()[0] > 0
+
+            if current_seen:
+                has_more_query = f'''
+                    SELECT COUNT(*) FROM exam_questions
+                    {count_where}
+                    AND (
+                        id NOT IN (
+                            SELECT question_id
+                            FROM mini_question_states
+                            WHERE openid = ? AND bank_id = ? AND COALESCE(seen_at, '') != ''
+                        )
+                        OR (
+                            id IN (
+                                SELECT question_id
+                                FROM mini_question_states
+                                WHERE openid = ? AND bank_id = ? AND COALESCE(seen_at, '') != ''
+                            )
+                            AND (sort_order > ? OR (sort_order = ? AND id > ?))
+                        )
+                    )
+                '''
+                has_more_params = count_params + [student_openid, bank_id, student_openid, bank_id, question['sort_order'], question['sort_order'], question['id']]
+            else:
+                has_more_query = f'''
+                    SELECT COUNT(*) FROM exam_questions
+                    {count_where}
+                    AND id NOT IN (
+                        SELECT question_id
+                        FROM mini_question_states
+                        WHERE openid = ? AND bank_id = ? AND COALESCE(seen_at, '') != ''
+                    )
+                    AND (sort_order > ? OR (sort_order = ? AND id > ?))
+                '''
+                has_more_params = count_params + [student_openid, bank_id, question['sort_order'], question['sort_order'], question['id']]
+        else:
+            # 其他模式：基于 (sort_order, id) 判断
+            has_more_query = f'''
+                SELECT COUNT(*) FROM exam_questions
+                {count_where}
+                AND (sort_order > ? OR (sort_order = ? AND id > ?))
+            '''
+            has_more_params = count_params + [question['sort_order'], question['sort_order'], question['id']]
+
+        has_more = conn.execute(has_more_query, has_more_params).fetchone()[0] > 0
+
+        return {
+            'question': question,
+            'total': total,
+            'currentPosition': current_position,
+            'hasMore': has_more,
+            'questionState': _aggregate_question_state_summary(total, state_counts),
+        }
+
 
 
 def _progress_for_banks(conn, openid, bank_ids):
@@ -477,6 +715,7 @@ def _type_counts_for_banks(conn, bank_ids):
             'single': 0,
             'multi': 0,
             'judge': 0,
+            'case': 0,
         })
         qtype = row['question_type'] if row['question_type'] in bank_counts else 'single'
         bank_counts[qtype] += int(row['count'] or 0)
@@ -558,16 +797,11 @@ def _aggregate_question_state_summary(question_count, counts=None):
 
 
 def _format_summary_bank(bank, progress=None, type_counts=None, question_counts=None, wrong_question_ids=None):
-    wrong_ids = _json_loads((progress or {}).get('wrong_question_ids_json'), [])
-    done = int((progress or {}).get('done_count') or 0)
-    correct = int((progress or {}).get('correct_count') or 0)
     state_summary = _aggregate_question_state_summary(
         int(bank.get('question_count') or 0),
         question_counts,
     )
-    current_wrong_ids = wrong_question_ids if isinstance(wrong_question_ids, list) else None
-    legacy_wrong_ids = wrong_ids if isinstance(wrong_ids, list) else []
-    merged_wrong_ids = current_wrong_ids if current_wrong_ids is not None else legacy_wrong_ids
+    merged_wrong_ids = wrong_question_ids if isinstance(wrong_question_ids, list) else []
     counts = type_counts or {
         'all': int(bank.get('question_count') or 0),
         'single': 0,
@@ -583,9 +817,9 @@ def _format_summary_bank(bank, progress=None, type_counts=None, question_counts=
         'questionCount': int(bank.get('question_count') or 0),
         'typeCounts': counts,
         'progress': {
-            'doneCount': state_summary['answeredCount'] or done,
-            'correctCount': state_summary['masteredCount'] or correct,
-            'wrongCount': state_summary['wrongCount'] if question_counts else len(legacy_wrong_ids),
+            'doneCount': state_summary['answeredCount'],
+            'correctCount': state_summary['masteredCount'],
+            'wrongCount': state_summary['wrongCount'],
             'wrongQuestionIds': merged_wrong_ids,
             'lastQuestionId': (progress or {}).get('last_question_id'),
         },
@@ -1036,7 +1270,7 @@ def save_question_state(openid, bank_id, question_id, payload):
             correct_count = int((existing_dict or {}).get('correct_count') or 0) + (1 if is_correct else 0)
             wrong_count = int((existing_dict or {}).get('wrong_count') or 0) + (0 if is_correct else 1)
             last_answer_json = _json_dumps(answer)
-            seen_at = (existing_dict or {}).get('seen_at')
+            seen_at = (existing_dict or {}).get('seen_at') or now
             last_answered_at = now
 
         conn.execute(
@@ -1084,37 +1318,6 @@ def save_question_state(openid, bank_id, question_id, payload):
             (openid, bank_id, state_question_id),
         ).fetchone()
     return {'success': True, 'state': _row_to_question_state(row, question_id_override=int(raw_question_id) if raw_question_id.isdigit() else raw_question_id)}
-
-
-def save_progress(openid, bank_id, payload):
-    mode = str((payload or {}).get('mode') or 'practice')
-    done = int((payload or {}).get('doneCount') or (payload or {}).get('done_count') or 0)
-    correct = int((payload or {}).get('correctCount') or (payload or {}).get('correct_count') or 0)
-    wrong_ids = (payload or {}).get('wrongQuestionIds')
-    if wrong_ids is None:
-        wrong_ids = (payload or {}).get('wrong_question_ids') or []
-    last_question_id = (payload or {}).get('lastQuestionId') or (payload or {}).get('last_question_id')
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    with get_db_connection() as conn:
-        conn.execute(
-            '''
-            INSERT INTO mini_practice_progress (
-                openid, bank_id, mode, done_count, correct_count,
-                wrong_question_ids_json, last_question_id, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(openid, bank_id, mode) DO UPDATE SET
-                done_count = excluded.done_count,
-                correct_count = excluded.correct_count,
-                wrong_question_ids_json = excluded.wrong_question_ids_json,
-                last_question_id = excluded.last_question_id,
-                updated_at = excluded.updated_at
-            ''',
-            (
-                openid, bank_id, mode, done, correct, _json_dumps(wrong_ids),
-                last_question_id, now,
-            ),
-        )
-    return {'success': True}
 
 
 def save_exam_record(openid, bank_id, payload):

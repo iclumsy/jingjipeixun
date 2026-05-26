@@ -68,15 +68,13 @@ Page({
     if (!bank) return
     const { mode, filter, lastQuestionId } = e.currentTarget.dataset
     const startQuestionId = practice.resolveStartQuestionId(mode, lastQuestionId, bank.studyState)
-    const wrongIds = bank.studyState && Array.isArray(bank.studyState.wrongQuestionIds)
-      ? bank.studyState.wrongQuestionIds.join(',')
-      : ''
-    if (mode === 'wrong' && !wrongIds) {
+    const wrongCount = bank.studyState && bank.studyState.wrongCount > 0 ? bank.studyState.wrongCount : 0
+    if (mode === 'wrong' && wrongCount === 0) {
       wx.showToast({ title: '暂无错题', icon: 'none' })
       return
     }
     wx.navigateTo({
-      url: `/pages/practice/session/session?bankId=${bank.id}&mode=${mode}&filter=${filter || ''}&title=${encodeURIComponent(bank.displayName || '真题练习')}&wrongIds=${encodeURIComponent(wrongIds)}&lastQuestionId=${encodeURIComponent(startQuestionId || '')}`
+      url: `/pages/practice/session/session?bankId=${bank.id}&mode=${mode}&filter=${filter || ''}&title=${encodeURIComponent(bank.displayName || '真题练习')}&lastQuestionId=${encodeURIComponent(startQuestionId || '')}`
     })
   }
 })

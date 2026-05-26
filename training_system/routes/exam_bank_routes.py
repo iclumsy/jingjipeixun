@@ -182,27 +182,68 @@ def mini_practice_questions(bank_id):
     return jsonify(result)
 
 
-@exam_bank_bp.route('/api/miniprogram/practice/progress', methods=['POST'])
-def mini_practice_progress():
+@exam_bank_bp.route('/api/miniprogram/practice/banks/<int:bank_id>/next_question', methods=['GET'])
+def mini_practice_next_question(bank_id):
     user = _require_mini_user()
     if not user:
         return _error('未授权访问，请先登录', 401)
-    data = request.get_json(silent=True) or {}
-    bank_id = int(data.get('bankId') or data.get('bank_id') or 0)
     if not exam_bank_service.can_access_bank(user.get('openid', ''), bank_id, bool(user.get('is_admin'))):
         return _error('无权限访问该题库', 403)
 
-    # 记录日志
-    bank = exam_bank_service.get_exam_bank(bank_id)
-    bank_name = bank.get('display_name') if bank else f"ID {bank_id}"
-    done = int(data.get('doneCount') or data.get('done_count') or 0)
-    correct = int(data.get('correctCount') or data.get('correct_count') or 0)
-    wrong_ids = data.get('wrongQuestionIds') or data.get('wrong_question_ids') or []
-    message = f"更新了题库「{bank_name}」的练习进度，已做 {done} 题，答对 {correct} 题，错题数 {len(wrong_ids)}"
-    current_app.logger.info(message)
-    result = exam_bank_service.save_progress(user.get('openid', ''), bank_id, data)
-
+    result = exam_bank_service.get_next_question(
+        bank_id,
+        mode=request.args.get('mode', 'sequential'),
+        current_question_id=request.args.get('current_question_id'),
+        question_type=request.args.get('question_type', ''),
+        openid=user.get('openid', ''),
+    )
     return jsonify(result)
+
+
+@exam_bank_bp.route('/api/miniprogram/practice/progress', methods=['POST'])
+def mini_practice_progress_compat():
+    """
+    旧版进度保存接口（兼容层）
+    新版已改用 question_state，此接口仅为兼容旧版小程序包
+    如果旧包传了 last_question_id，会保存到 mini_practice_progress 表
+    """
+    user = _require_mini_user()
+    if not user:
+        return _error('未授权访问，请先登录', 401)
+
+    data = request.get_json(silent=True) or {}
+    bank_id = int(data.get('bankId') or data.get('bank_id') or 0)
+    last_question_id = data.get('lastQuestionId') or data.get('last_question_id')
+
+    # 权限校验
+    if bank_id:
+        if not exam_bank_service.can_access_bank(user.get('openid', ''), bank_id, bool(user.get('is_admin'))):
+            return _error('无权限访问该题库', 403)
+
+    if bank_id and last_question_id:
+        # 保存进度到旧表（兼容旧包）
+        try:
+            from datetime import datetime
+            from models.student import get_db_connection
+            now = datetime.utcnow().isoformat() + 'Z'
+            with get_db_connection() as conn:
+                conn.execute(
+                    '''
+                    INSERT INTO mini_practice_progress (
+                        openid, bank_id, mode, last_question_id, updated_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(openid, bank_id, mode) DO UPDATE SET
+                        last_question_id = excluded.last_question_id,
+                        updated_at = excluded.updated_at
+                    ''',
+                    (user.get('openid', ''), bank_id, 'practice', last_question_id, now),
+                )
+            return jsonify({'success': True, 'message': '已保存（兼容模式）'})
+        except Exception as e:
+            current_app.logger.error(f"旧进度接口保存失败: {e}")
+            return _error(f'保存进度失败: {str(e)}', 500)
+
+    return jsonify({'success': True, 'message': '无需保存'})
 
 
 @exam_bank_bp.route('/api/miniprogram/practice/question_state', methods=['POST'])

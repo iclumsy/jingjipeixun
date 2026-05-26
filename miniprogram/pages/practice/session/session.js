@@ -19,13 +19,15 @@ Page({
       { label: '全部', value: '' },
       { label: '单选', value: 'single' },
       { label: '多选', value: 'multi' },
-      { label: '判断', value: 'judge' }
+      { label: '判断', value: 'judge' },
+      { label: '案例', value: 'case' }
     ],
     lastQuestionId: '',
     title: '练习',
     loading: true,
     questions: [],
     currentIndex: 0,
+    currentPosition: 0,
     questionTotal: 0,
     progressPercent: 0,
     answeredCount: 0,
@@ -89,41 +91,82 @@ Page({
     this.setData({ loading: true })
     try {
       const mode = this.data.mode
-      const limit = mode === 'exam' || mode === 'memorize' ? 100 : 100
-      const res = await api.getPracticeQuestions(this.data.bankId, {
-        mode: mode === 'wrong' ? 'sequential' : mode,
-        page: 1,
-        limit,
-        wrong_ids: mode === 'wrong' ? this.data.wrongIds : '',
-        question_type: this.data.showQuestionTypeFilter ? this.data.activeQuestionType : ''
-      })
-      let questions = Array.isArray(res.list) ? res.list : []
-      const currentIndex = practice.findQuestionIndexById(questions, this.data.lastQuestionId)
-      const questionState = res.questionState || {}
-      const questionTotal = mode === 'exam'
-        ? questions.length
-        : Number(res.total || questions.length || 0)
-      const summaryState = mode === 'exam' ? {} : questionState
-      const stateMaps = this.data.showQuestionTypeFilter
-        ? practice.buildQuestionStateMaps(questions)
-        : { seenQuestionIds: {}, answeredQuestionIds: {}, masteredQuestionIds: {} }
-      this._seenQuestionIds = { ...stateMaps.seenQuestionIds }
-      this.setData({
-        questions,
-        loading: false,
-        currentIndex,
-        questionTotal,
-        seenQuestionIds: stateMaps.seenQuestionIds,
-        answeredQuestionIds: stateMaps.answeredQuestionIds,
-        masteredQuestionIds: stateMaps.masteredQuestionIds,
-        summaryState,
-        doneCount: Number(summaryState.answeredCount || 0),
-        correctCount: Number(summaryState.masteredCount || 0),
-        wrongQuestionIds: []
-      })
-      this.updateSessionMeta()
-      this.prepareCurrentQuestion()
-      if (mode === 'exam') this.startTimer()
+
+      if (mode === 'exam') {
+        // 模拟考试：批量加载 100 题
+        const res = await api.getPracticeQuestions(this.data.bankId, {
+          mode: mode,
+          page: 1,
+          limit: 100,
+          question_type: this.data.showQuestionTypeFilter ? this.data.activeQuestionType : ''
+        })
+        let questions = Array.isArray(res.list) ? res.list : []
+        const currentIndex = practice.findQuestionIndexById(questions, this.data.lastQuestionId)
+        const questionState = res.questionState || {}
+        const questionTotal = questions.length  // 模拟考试：使用实际加载的题目数
+        const summaryState = {}
+        const stateMaps = this.data.showQuestionTypeFilter
+          ? practice.buildQuestionStateMaps(questions)
+          : { seenQuestionIds: {}, answeredQuestionIds: {}, masteredQuestionIds: {} }
+        this._seenQuestionIds = { ...stateMaps.seenQuestionIds }
+        this.setData({
+          questions,
+          loading: false,
+          currentIndex,
+          currentPosition: currentIndex,
+          questionTotal,
+          seenQuestionIds: stateMaps.seenQuestionIds,
+          answeredQuestionIds: stateMaps.answeredQuestionIds,
+          masteredQuestionIds: stateMaps.masteredQuestionIds,
+          summaryState,
+          doneCount: 0,
+          correctCount: 0,
+          wrongQuestionIds: []
+        })
+        this.updateSessionMeta()
+        this.prepareCurrentQuestion()
+        this.startTimer()
+      } else {
+        // 其他模式：单题加载
+        const res = await api.getNextQuestion(this.data.bankId, {
+          mode: mode,
+          current_question_id: this.data.lastQuestionId || '',
+          question_type: this.data.showQuestionTypeFilter ? this.data.activeQuestionType : ''
+        })
+
+        const question = res.question
+        const questionState = res.questionState || {}
+        const questionTotal = Number(res.total || 0)
+        const currentPosition = Number(res.currentPosition || 0)
+        const summaryState = questionState
+
+        if (!question) {
+          wx.showToast({ title: '没有更多题目了', icon: 'none' })
+          this.setData({
+            loading: false,
+            questions: [],
+            questionTotal: 0
+          })
+          return
+        }
+
+        this.setData({
+          questions: [question],
+          loading: false,
+          currentIndex: 0,
+          currentPosition,
+          questionTotal,
+          seenQuestionIds: {},
+          answeredQuestionIds: {},
+          masteredQuestionIds: {},
+          summaryState,
+          doneCount: Number(summaryState.answeredCount || 0),
+          correctCount: Number(summaryState.masteredCount || 0),
+          wrongQuestionIds: []
+        })
+        this.updateSessionMeta()
+        this.prepareCurrentQuestion()
+      }
     } catch (err) {
       this.setData({ loading: false })
       wx.showToast({ title: err.message || '题目加载失败', icon: 'none' })
@@ -136,6 +179,7 @@ Page({
     if (type === this.data.activeQuestionType) return
     this.setData({
       activeQuestionType: type,
+      questions: [],
       currentIndex: 0,
       questionTotal: 0,
       progressPercent: 0,
@@ -154,7 +198,9 @@ Page({
       summaryState: {},
       doneCount: 0,
       correctCount: 0,
-      wrongQuestionIds: []
+      wrongQuestionIds: [],
+      lastQuestionId: '',
+      currentPosition: 0
     })
     this.loadQuestions()
   },
@@ -213,7 +259,7 @@ Page({
     const q = this.currentQuestion()
     const type = practice.normalizeQuestionType(q)
     let selected = [...this.data.selectedKeys]
-    if (type === 'multi') {
+    if (type === 'multi' || type === 'case') {
       selected = selected.includes(key)
         ? selected.filter(item => item !== key)
         : [...selected, key]
@@ -277,31 +323,85 @@ Page({
     this.updateSessionMeta()
   },
 
-  nextQuestion() {
-    if (this.data.currentIndex >= this.data.questions.length - 1) {
-      this.finishSession()
-      return
+  async nextQuestion() {
+    const mode = this.data.mode
+
+    if (mode === 'exam') {
+      // 模拟考试：在已加载的题目中翻页
+      if (this.data.currentIndex >= this.data.questions.length - 1) {
+        this.finishSession()
+        return
+      }
+      this.setData({
+        currentIndex: this.data.currentIndex + 1,
+        currentPosition: this.data.currentIndex + 1
+      })
+      this.prepareCurrentQuestion()
+    } else {
+      // 其他模式：加载下一题
+      this.setData({ loading: true })
+      try {
+        const currentQuestion = this.currentQuestion()
+        const res = await api.getNextQuestion(this.data.bankId, {
+          mode: mode,
+          current_question_id: currentQuestion ? currentQuestion.id : '',
+          question_type: this.data.showQuestionTypeFilter ? this.data.activeQuestionType : ''
+        })
+
+        const question = res.question
+        const questionState = res.questionState || {}
+        const currentPosition = Number(res.currentPosition || 0)
+        const questionTotal = Number(res.total || 0)
+
+        if (!question) {
+          this.finishSession()
+          return
+        }
+
+        this.setData({
+          questions: [question],
+          currentIndex: 0,
+          currentPosition,
+          questionTotal,
+          loading: false,
+          summaryState: questionState,
+          doneCount: Number(questionState.answeredCount || 0),
+          correctCount: Number(questionState.masteredCount || 0)
+        })
+        this.prepareCurrentQuestion()
+      } catch (err) {
+        this.setData({ loading: false })
+        wx.showToast({ title: '加载下一题失败', icon: 'none' })
+      }
     }
-    this.setData({ currentIndex: this.data.currentIndex + 1 })
-    this.prepareCurrentQuestion()
   },
 
   prevQuestion() {
+    if (this.data.mode !== 'exam') return
     if (this.data.currentIndex <= 0) return
-    this.setData({ currentIndex: this.data.currentIndex - 1 })
+    this.setData({
+      currentIndex: this.data.currentIndex - 1,
+      currentPosition: this.data.currentIndex - 1
+    })
     this.prepareCurrentQuestion()
   },
 
   jumpQuestion(e) {
+    if (this.data.mode !== 'exam') return
     const index = Number(e.currentTarget.dataset.index || 0)
-    this.setData({ currentIndex: index, showCard: false })
+    this.setData({
+      currentIndex: index,
+      currentPosition: index,
+      showCard: false
+    })
     this.prepareCurrentQuestion()
   },
 
   updateSessionMeta() {
     const total = this.data.questionTotal || this.data.questions.length || 0
+    const position = this.data.mode === 'exam' ? this.data.currentIndex : this.data.currentPosition
     const progressPercent = total > 0
-      ? Math.max(0, Math.min(100, Math.round(((this.data.currentIndex + 1) / total) * 100)))
+      ? Math.max(0, Math.min(100, Math.round(((position + 1) / total) * 100)))
       : 0
     const summaryState = this.data.mode === 'exam'
       ? { answeredCount: Object.keys(this.data.answeredQuestionIds || {}).length }
@@ -365,8 +465,15 @@ Page({
 
   async recordExamQuestionStates(resultMap) {
     const answerMap = this.data.answerMap || {}
-    for (const q of this.data.questions) {
-      await this.recordQuestionAnswer(q, answerMap[q.id] || [], !!resultMap[q.id])
+    const questions = this.data.questions
+    const batchSize = 10
+    for (let i = 0; i < questions.length; i += batchSize) {
+      const batch = questions.slice(i, i + batchSize)
+      await Promise.all(
+        batch.map(q =>
+          this.recordQuestionAnswer(q, answerMap[q.id] || [], !!resultMap[q.id])
+        )
+      )
     }
   },
 

@@ -910,10 +910,16 @@ async function getPracticeQuestions(bankId, params = {}) {
   })
 }
 
-async function savePracticeProgress(payload = {}) {
-  return await requestApi('/api/miniprogram/practice/progress', {
-    method: 'POST',
-    data: payload
+async function getNextQuestion(bankId, params = {}) {
+  const id = encodeURIComponent(String(bankId || '').trim())
+  if (!id) throw new Error('题库ID不能为空')
+  const query = Object.keys(params || {})
+    .filter(key => params[key] !== undefined && params[key] !== null && params[key] !== '')
+    .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+    .join('&')
+  const suffix = query ? `?${query}` : ''
+  return await requestApi(`/api/miniprogram/practice/banks/${id}/next_question${suffix}`, {
+    method: 'GET'
   })
 }
 
@@ -1235,7 +1241,7 @@ module.exports = {
   getStudentFilters,    // 获取学员列表筛选 tab 配置
   getPracticeSummary,   // 获取可练习题库摘要
   getPracticeQuestions, // 获取练习题目
-  savePracticeProgress, // 保存练习进度
+  getNextQuestion,      // 获取下一题
   saveQuestionState,    // 保存单题学习状态
   savePracticeExam,     // 保存模拟考试记录
   toAbsoluteFileUrl,    // 转换服务器文件 URL

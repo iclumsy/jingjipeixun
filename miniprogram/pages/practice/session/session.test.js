@@ -23,7 +23,7 @@ function run() {
     js.includes('practice.buildQuestionStateMaps(questions)') &&
       js.includes('practice.resolveSessionProgressMeta') &&
       js.includes('questionTotal') &&
-      js.includes('Number(res.total || questions.length || 0)') &&
+      js.includes('questions.length') &&
       js.includes('this.data.showQuestionTypeFilter') &&
       js.includes('answeredLabel') &&
       js.includes('summaryState'),
