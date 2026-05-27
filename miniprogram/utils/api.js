@@ -930,6 +930,13 @@ async function saveQuestionState(payload = {}) {
   })
 }
 
+async function saveBatchQuestionStates(bankId, payload = {}) {
+  return await requestApi('/api/miniprogram/practice/batch_question_states', {
+    method: 'POST',
+    data: { bankId, ...payload }
+  })
+}
+
 async function savePracticeExam(payload = {}) {
   return await requestApi('/api/miniprogram/practice/exams', {
     method: 'POST',
@@ -1243,6 +1250,7 @@ module.exports = {
   getPracticeQuestions, // 获取练习题目
   getNextQuestion,      // 获取下一题
   saveQuestionState,    // 保存单题学习状态
+  saveBatchQuestionStates, // 批量保存题目学习状态
   savePracticeExam,     // 保存模拟考试记录
   toAbsoluteFileUrl,    // 转换服务器文件 URL
   uploadAttachment,     // 上传附件

@@ -476,15 +476,16 @@ Page({
   async recordExamQuestionStates(resultMap) {
     const answerMap = this.data.answerMap || {}
     const questions = this.data.questions
-    const batchSize = 10
-    for (let i = 0; i < questions.length; i += batchSize) {
-      const batch = questions.slice(i, i + batchSize)
-      await Promise.all(
-        batch.map(q =>
-          this.recordQuestionAnswer(q, answerMap[q.id] || [], !!resultMap[q.id])
-        )
-      )
-    }
+    const states = questions.map(q => ({
+      questionId: q.id,
+      action: 'answer',
+      answer: answerMap[q.id] || [],
+      isCorrect: !!resultMap[q.id]
+    }))
+    await api.saveBatchQuestionStates(this.data.bankId, {
+      mode: this.data.mode,
+      states
+    })
   },
 
   async finishSession() {

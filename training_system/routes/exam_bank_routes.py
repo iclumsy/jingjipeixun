@@ -252,3 +252,24 @@ def mini_practice_exam_record():
     result = exam_bank_service.save_exam_record(user.get('openid', ''), bank_id, data)
 
     return jsonify(result)
+
+
+@exam_bank_bp.route('/api/miniprogram/practice/batch_question_states', methods=['POST'])
+def mini_practice_batch_question_states():
+    user = _require_mini_user()
+    if not user:
+        return _error('未授权访问，请先登录', 401)
+    data = request.get_json(silent=True) or {}
+    bank_id = int(data.get('bankId') or data.get('bank_id') or 0)
+    if not exam_bank_service.can_access_bank(user.get('openid', ''), bank_id, bool(user.get('is_admin'))):
+        return _error('无权限访问该题库', 403)
+    try:
+        result = exam_bank_service.save_batch_question_states(
+            user.get('openid', ''),
+            bank_id,
+            data
+        )
+        return jsonify(result)
+    except ValueError as err:
+        return _error(err, 400)
+

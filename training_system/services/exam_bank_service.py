@@ -1367,3 +1367,129 @@ def save_exam_record(openid, bank_id, payload):
             ),
         )
         return {'success': True, 'id': cursor.lastrowid}
+
+
+def save_batch_question_states(openid, bank_id, payload):
+    openid = str(openid or '').strip()
+    bank_id = int(bank_id or 0)
+    if not openid:
+        raise ValueError('用户不存在')
+    if bank_id <= 0:
+        raise ValueError('题库不存在')
+
+    payload = payload or {}
+    mode = str(payload.get('mode') or '').strip()
+    states_list = payload.get('states') or []
+    if not isinstance(states_list, list):
+        raise ValueError('参数 states 必须是数组')
+
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    with get_db_connection() as conn:
+        bank = conn.execute(
+            'SELECT id FROM exam_banks WHERE id = ?',
+            (bank_id,),
+        ).fetchone()
+        if not bank:
+            raise ValueError('题库不存在')
+
+        for item in states_list:
+            question_id = item.get('questionId') or item.get('question_id')
+            raw_question_id = str(question_id or '').strip()
+            if not raw_question_id:
+                continue
+
+            action = str(item.get('action') or 'answer').strip().lower()
+            if action not in ('seen', 'answer'):
+                continue
+
+            answer = _normalize_answer_payload(item.get('answer'))
+
+            # 查询题目
+            question = conn.execute(
+                '''
+                SELECT id, source_question_id
+                FROM exam_questions
+                WHERE bank_id = ? AND (
+                    CAST(id AS TEXT) = ?
+                    OR CAST(source_question_id AS TEXT) = ?
+                )
+                ORDER BY CASE WHEN CAST(source_question_id AS TEXT) = ? THEN 0 ELSE 1 END, id
+                LIMIT 1
+                ''',
+                (bank_id, raw_question_id, raw_question_id, raw_question_id),
+            ).fetchone()
+            if not question:
+                continue
+            state_question_id = int(question['id'])
+
+            # 获取现有状态
+            existing = conn.execute(
+                '''
+                SELECT status, answer_count, correct_count, wrong_count, seen_at, last_answer_json
+                FROM mini_question_states
+                WHERE openid = ? AND bank_id = ? AND question_id = ?
+                ''',
+                (openid, bank_id, state_question_id),
+            ).fetchone()
+            existing_dict = dict(existing) if existing else None
+
+            if action == 'seen':
+                next_status = (existing_dict or {}).get('status') or 'seen'
+                answer_count = int((existing_dict or {}).get('answer_count') or 0)
+                correct_count = int((existing_dict or {}).get('correct_count') or 0)
+                wrong_count = int((existing_dict or {}).get('wrong_count') or 0)
+                last_answer_json = (existing_dict or {}).get('last_answer_json') or _json_dumps([])
+                seen_at = (existing_dict or {}).get('seen_at') or now
+                last_answered_at = (existing_dict or {}).get('last_answered_at')
+            else:
+                is_correct = _as_bool(item.get('isCorrect') if 'isCorrect' in item else item.get('is_correct'))
+                next_status = 'mastered' if is_correct else 'wrong'
+                answer_count = int((existing_dict or {}).get('answer_count') or 0) + 1
+                correct_count = int((existing_dict or {}).get('correct_count') or 0) + (1 if is_correct else 0)
+                wrong_count = int((existing_dict or {}).get('wrong_count') or 0) + (0 if is_correct else 1)
+                last_answer_json = _json_dumps(answer)
+                seen_at = (existing_dict or {}).get('seen_at') or now
+                last_answered_at = now
+
+            conn.execute(
+                '''
+                INSERT INTO mini_question_states (
+                    openid, bank_id, question_id, status, answer_count,
+                    correct_count, wrong_count, last_answer_json, last_mode,
+                    seen_at, last_answered_at, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(openid, bank_id, question_id) DO UPDATE SET
+                    status = excluded.status,
+                    answer_count = excluded.answer_count,
+                    correct_count = excluded.correct_count,
+                    wrong_count = excluded.wrong_count,
+                    last_answer_json = excluded.last_answer_json,
+                    last_mode = excluded.last_mode,
+                    seen_at = excluded.seen_at,
+                    last_answered_at = excluded.last_answered_at,
+                    updated_at = excluded.updated_at
+                ''',
+                (
+                    openid, bank_id, state_question_id, next_status, answer_count,
+                    correct_count, wrong_count, last_answer_json, mode,
+                    seen_at, last_answered_at, now, now,
+                ),
+            )
+
+            # 更新最后进度
+            if action == 'answer' and mode in ('practice', 'sequential'):
+                conn.execute(
+                    '''
+                    INSERT INTO mini_practice_progress (
+                        openid, bank_id, mode, last_question_id, updated_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(openid, bank_id, mode) DO UPDATE SET
+                        last_question_id = excluded.last_question_id,
+                        updated_at = excluded.updated_at
+                    ''',
+                    (openid, bank_id, 'practice', state_question_id, now),
+                )
+
+    return {'success': True}
+

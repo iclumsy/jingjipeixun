@@ -301,6 +301,43 @@ class ExamBankRouteTests(unittest.TestCase):
         self.assertEqual(payload["state"]["answerCount"], 1)
         self.assertEqual(self.list_operation_logs(student_id), [])
 
+    def test_mini_student_saves_batch_question_states(self):
+        bank = self.create_bank()
+        student_id = self.create_reviewed_student(openid="student-openid", name="张治富")
+        headers = self.mini_headers(openid="student-openid", is_admin=False)
+
+        response = self.client.post(
+            "/api/miniprogram/practice/batch_question_states",
+            headers=headers,
+            json={
+                "bankId": bank["id"],
+                "mode": "exam",
+                "states": [
+                    {
+                        "questionId": 101,
+                        "action": "answer",
+                        "isCorrect": True,
+                        "answer": ["B"],
+                    }
+                ],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["success"])
+
+        # Check DB to verify state was saved
+        with self.app.app_context():
+            with get_db_connection() as conn:
+                row = conn.execute(
+                    "SELECT * FROM mini_question_states WHERE openid = ? AND bank_id = ?",
+                    ("student-openid", bank["id"]),
+                ).fetchone()
+                self.assertIsNotNone(row)
+                self.assertEqual(row["status"], "mastered")
+                self.assertEqual(row["answer_count"], 1)
+
 
 
 if __name__ == "__main__":
