@@ -377,8 +377,8 @@ def create_app():
 
     @app.route('/exam')
     def exam():
-        """渲染在线练习页面（公开访问，无需登录）。"""
-        return render_template('exam.html')
+        """原网页端在线练习系统，现已下线永久重定向回首页。"""
+        return redirect('/', code=301)
 
     @app.route('/admin')
     def admin():
