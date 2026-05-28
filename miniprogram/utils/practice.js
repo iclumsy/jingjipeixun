@@ -124,7 +124,9 @@ function buildBankStudyState(bank = {}) {
     wrongCount,
     recommendedMode,
     recommendedTitle,
-    recommendedDetail
+    recommendedDetail,
+    examCount: Math.max(0, Number(questionState.examCount || 0)),
+    bestScore: Math.max(0, Number(questionState.bestScore || 0))
   }
 }
 

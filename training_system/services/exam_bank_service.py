@@ -1,6 +1,7 @@
 import json
 import os
-from datetime import datetime
+import sqlite3
+from datetime import datetime, timedelta
 
 from models.student import get_db_connection
 
@@ -821,7 +822,7 @@ def _aggregate_question_state_summary(question_count, counts=None):
     }
 
 
-def _format_summary_bank(bank, progress=None, type_counts=None, question_counts=None, wrong_question_ids=None):
+def _format_summary_bank(bank, progress=None, type_counts=None, question_counts=None, wrong_question_ids=None, exam_stats=None):
     state_summary = _aggregate_question_state_summary(
         int(bank.get('question_count') or 0),
         question_counts,
@@ -833,6 +834,7 @@ def _format_summary_bank(bank, progress=None, type_counts=None, question_counts=
         'multi': 0,
         'judge': 0,
     }
+    exam_stats = exam_stats or {}
     return {
         'id': bank['id'],
         'bankKey': bank['bank_key'],
@@ -851,6 +853,8 @@ def _format_summary_bank(bank, progress=None, type_counts=None, question_counts=
         'questionState': {
             **state_summary,
             'wrongQuestionIds': merged_wrong_ids,
+            'examCount': int(exam_stats.get('exam_count') or 0),
+            'bestScore': int(exam_stats.get('best_score') or 0),
         },
     }
 
@@ -1193,10 +1197,27 @@ def get_practice_summary(openid, is_admin=False):
                 [EXAM_BANK_TRAINING_TYPE, openid] + list(ACTIVE_STUDENT_STATUSES),
             ).fetchall()
         banks = [_row_to_bank(row) for row in rows]
-        progress = _progress_for_banks(conn, openid, [bank['id'] for bank in banks])
-        type_counts = _type_counts_for_banks(conn, [bank['id'] for bank in banks])
-        question_state_counts = _question_state_counts_for_banks(conn, openid, [bank['id'] for bank in banks])
-        wrong_question_ids = _wrong_question_ids_for_banks(conn, openid, [bank['id'] for bank in banks])
+        bank_ids = [bank['id'] for bank in banks]
+        progress = _progress_for_banks(conn, openid, bank_ids)
+        type_counts = _type_counts_for_banks(conn, bank_ids)
+        question_state_counts = _question_state_counts_for_banks(conn, openid, bank_ids)
+        wrong_question_ids = _wrong_question_ids_for_banks(conn, openid, bank_ids)
+
+        # 聚合每个题库的模考统计（次数、最高分）
+        exam_stats_map = {}
+        if openid and bank_ids:
+            es_placeholders = ','.join(['?'] * len(bank_ids))
+            es_rows = conn.execute(
+                f'''
+                SELECT bank_id, COUNT(*) as exam_count, MAX(score) as best_score
+                FROM mini_exam_records
+                WHERE openid = ? AND bank_id IN ({es_placeholders})
+                GROUP BY bank_id
+                ''',
+                [openid] + bank_ids
+            ).fetchall()
+            for r in es_rows:
+                exam_stats_map[r['bank_id']] = dict(r)
 
     summary_banks = [
         _format_summary_bank(
@@ -1205,6 +1226,7 @@ def get_practice_summary(openid, is_admin=False):
             type_counts.get(bank['id']),
             question_state_counts.get(bank['id']),
             wrong_question_ids.get(bank['id']),
+            exam_stats_map.get(bank['id']),
         )
         for bank in banks
     ]
@@ -1353,20 +1375,62 @@ def save_exam_record(openid, bank_id, payload):
     duration = int(payload.get('durationSeconds') or payload.get('duration_seconds') or 0)
     passed = bool(payload.get('passed'))
     answers = payload.get('answers') or {}
+    submit_id = str(payload.get('submitId') or payload.get('submit_id') or '').strip()
+    question_order = payload.get('questionOrder') or payload.get('question_order') or []
+    if not isinstance(question_order, list):
+        question_order = []
+    question_order = question_order[:1000]  # 单次模考最多 1000 题
+
     with get_db_connection() as conn:
-        cursor = conn.execute(
-            '''
-            INSERT INTO mini_exam_records (
-                openid, bank_id, score, total, correct_count,
-                duration_seconds, passed, answers_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''',
-            (
-                openid, bank_id, score, total, correct,
-                duration, 1 if passed else 0, _json_dumps(answers),
-            ),
-        )
-        return {'success': True, 'id': cursor.lastrowid}
+        # 1. 首选 submit_id 唯一性幂等校验
+        if submit_id:
+            existing = conn.execute(
+                'SELECT id FROM mini_exam_records WHERE submit_id = ?',
+                (submit_id,)
+            ).fetchone()
+            if existing:
+                return {'success': True, 'id': existing['id'], 'duplicate': True}
+        # 2. 备选内容与时间幂等校验（防止无 submit_id 时，10秒内重复发起的相同答卷记录）
+        else:
+            ten_seconds_ago = (datetime.now() - timedelta(seconds=10)).strftime('%Y-%m-%d %H:%M:%S')
+            existing = conn.execute(
+                '''
+                SELECT id FROM mini_exam_records
+                WHERE openid = ? AND bank_id = ? AND score = ? AND total = ?
+                  AND correct_count = ? AND duration_seconds = ? AND answers_json = ?
+                  AND created_at >= ?
+                ORDER BY id DESC LIMIT 1
+                ''',
+                (openid, bank_id, score, total, correct, duration, _json_dumps(answers), ten_seconds_ago)
+            ).fetchone()
+            if existing:
+                return {'success': True, 'id': existing['id'], 'duplicate': True}
+
+        try:
+            cursor = conn.execute(
+                '''
+                INSERT INTO mini_exam_records (
+                    openid, bank_id, score, total, correct_count,
+                    duration_seconds, passed, answers_json, submit_id, question_order
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    openid, bank_id, score, total, correct,
+                    duration, 1 if passed else 0, _json_dumps(answers),
+                    submit_id if submit_id else None,
+                    _json_dumps(question_order) if question_order else None,
+                ),
+            )
+            return {'success': True, 'id': cursor.lastrowid}
+        except sqlite3.IntegrityError:
+            if submit_id:
+                existing = conn.execute(
+                    'SELECT id FROM mini_exam_records WHERE submit_id = ?',
+                    (submit_id,)
+                ).fetchone()
+                if existing:
+                    return {'success': True, 'id': existing['id'], 'duplicate': True}
+            raise
 
 
 def save_batch_question_states(openid, bank_id, payload):
@@ -1383,7 +1447,20 @@ def save_batch_question_states(openid, bank_id, payload):
     if not isinstance(states_list, list):
         raise ValueError('参数 states 必须是数组')
 
+    if not states_list:
+        return {'success': True}
+
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # 提取所有不为空的题目ID进行批量处理
+    raw_ids = []
+    for item in states_list:
+        qid = item.get('questionId') or item.get('question_id')
+        if qid:
+            raw_ids.append(str(qid).strip())
+
+    if not raw_ids:
+        return {'success': True}
 
     with get_db_connection() as conn:
         bank = conn.execute(
@@ -1393,66 +1470,114 @@ def save_batch_question_states(openid, bank_id, payload):
         if not bank:
             raise ValueError('题库不存在')
 
+        # 1. 批量查询题目信息
+        placeholders = ','.join(['?'] * len(raw_ids))
+        question_rows = conn.execute(
+            f'''
+            SELECT id, source_question_id
+            FROM exam_questions
+            WHERE bank_id = ? AND (
+                CAST(id AS TEXT) IN ({placeholders})
+                OR CAST(source_question_id AS TEXT) IN ({placeholders})
+            )
+            ''',
+            [bank_id] + raw_ids + raw_ids
+        ).fetchall()
+
+        # 构建题目ID查找字典
+        q_map = {}
+        for r in question_rows:
+            db_id = int(r['id'])
+            q_map[str(db_id)] = db_id
+            if r['source_question_id']:
+                q_map[str(r['source_question_id']).strip()] = db_id
+
+        # 2. 批量查询已有的学员答题状态记录
+        resolved_qids = list(set(q_map.values()))
+        existing_states = {}
+        if resolved_qids:
+            q_placeholders = ','.join(['?'] * len(resolved_qids))
+            state_rows = conn.execute(
+                f'''
+                SELECT question_id, status, answer_count, correct_count, wrong_count, seen_at, last_answer_json, last_answered_at
+                FROM mini_question_states
+                WHERE openid = ? AND bank_id = ? AND question_id IN ({q_placeholders})
+                ''',
+                [openid, bank_id] + resolved_qids
+            ).fetchall()
+            for r in state_rows:
+                existing_states[int(r['question_id'])] = dict(r)
+
+        # 3. 内存中合并计算同一批内可能重复题目状态的更新（进行次数累加）
+        merged_states = {}
         for item in states_list:
             question_id = item.get('questionId') or item.get('question_id')
             raw_question_id = str(question_id or '').strip()
-            if not raw_question_id:
+            if not raw_question_id or raw_question_id not in q_map:
                 continue
 
+            state_question_id = q_map[raw_question_id]
             action = str(item.get('action') or 'answer').strip().lower()
             if action not in ('seen', 'answer'):
                 continue
 
+            is_correct = _as_bool(item.get('isCorrect') if 'isCorrect' in item else item.get('is_correct'))
             answer = _normalize_answer_payload(item.get('answer'))
 
-            # 查询题目
-            question = conn.execute(
-                '''
-                SELECT id, source_question_id
-                FROM exam_questions
-                WHERE bank_id = ? AND (
-                    CAST(id AS TEXT) = ?
-                    OR CAST(source_question_id AS TEXT) = ?
-                )
-                ORDER BY CASE WHEN CAST(source_question_id AS TEXT) = ? THEN 0 ELSE 1 END, id
-                LIMIT 1
-                ''',
-                (bank_id, raw_question_id, raw_question_id, raw_question_id),
-            ).fetchone()
-            if not question:
-                continue
-            state_question_id = int(question['id'])
-
-            # 获取现有状态
-            existing = conn.execute(
-                '''
-                SELECT status, answer_count, correct_count, wrong_count, seen_at, last_answer_json
-                FROM mini_question_states
-                WHERE openid = ? AND bank_id = ? AND question_id = ?
-                ''',
-                (openid, bank_id, state_question_id),
-            ).fetchone()
-            existing_dict = dict(existing) if existing else None
-
-            if action == 'seen':
-                next_status = (existing_dict or {}).get('status') or 'seen'
-                answer_count = int((existing_dict or {}).get('answer_count') or 0)
-                correct_count = int((existing_dict or {}).get('correct_count') or 0)
-                wrong_count = int((existing_dict or {}).get('wrong_count') or 0)
-                last_answer_json = (existing_dict or {}).get('last_answer_json') or _json_dumps([])
-                seen_at = (existing_dict or {}).get('seen_at') or now
-                last_answered_at = (existing_dict or {}).get('last_answered_at')
+            if state_question_id not in merged_states:
+                merged_states[state_question_id] = {
+                    'action': action,
+                    'actions': [(action, is_correct, answer)]
+                }
             else:
-                is_correct = _as_bool(item.get('isCorrect') if 'isCorrect' in item else item.get('is_correct'))
-                next_status = 'mastered' if is_correct else 'wrong'
-                answer_count = int((existing_dict or {}).get('answer_count') or 0) + 1
-                correct_count = int((existing_dict or {}).get('correct_count') or 0) + (1 if is_correct else 0)
-                wrong_count = int((existing_dict or {}).get('wrong_count') or 0) + (0 if is_correct else 1)
-                last_answer_json = _json_dumps(answer)
-                seen_at = (existing_dict or {}).get('seen_at') or now
-                last_answered_at = now
+                # 只要包含任一 answer 就锁定为 answer，防止后续 seen 覆盖导致进度写入被吞
+                if action == 'answer':
+                    merged_states[state_question_id]['action'] = 'answer'
+                merged_states[state_question_id]['actions'].append((action, is_correct, answer))
 
-            conn.execute(
+        states_to_update = []
+        progress_to_update = []
+
+        for state_question_id, info in merged_states.items():
+            existing_dict = existing_states.get(state_question_id)
+
+            status = (existing_dict or {}).get('status') or 'seen'
+            answer_count = int((existing_dict or {}).get('answer_count') or 0)
+            correct_count = int((existing_dict or {}).get('correct_count') or 0)
+            wrong_count = int((existing_dict or {}).get('wrong_count') or 0)
+            last_answer_json = (existing_dict or {}).get('last_answer_json') or _json_dumps([])
+            seen_at = (existing_dict or {}).get('seen_at') or now
+            last_answered_at = (existing_dict or {}).get('last_answered_at')
+
+            for action, is_correct, answer in info['actions']:
+                if action == 'seen':
+                    seen_at = seen_at or now
+                else:
+                    status = 'mastered' if is_correct else 'wrong'
+                    answer_count += 1
+                    if is_correct:
+                        correct_count += 1
+                    else:
+                        wrong_count += 1
+                    last_answer_json = _json_dumps(answer)
+                    seen_at = seen_at or now
+                    last_answered_at = now
+
+            states_to_update.append((
+                openid, bank_id, state_question_id, status, answer_count,
+                correct_count, wrong_count, last_answer_json, mode,
+                seen_at, last_answered_at, now, now
+            ))
+
+            # 仅做非覆盖式的更新（只更新最后一个有效的进度）
+            if info['action'] == 'answer' and mode in ('practice', 'sequential'):
+                progress_to_update.append((
+                    openid, bank_id, 'practice', state_question_id, now
+                ))
+
+        # 4. 执行批量批量插入更新 (executemany)
+        if states_to_update:
+            conn.executemany(
                 '''
                 INSERT INTO mini_question_states (
                     openid, bank_id, question_id, status, answer_count,
@@ -1470,26 +1595,116 @@ def save_batch_question_states(openid, bank_id, payload):
                     last_answered_at = excluded.last_answered_at,
                     updated_at = excluded.updated_at
                 ''',
-                (
-                    openid, bank_id, state_question_id, next_status, answer_count,
-                    correct_count, wrong_count, last_answer_json, mode,
-                    seen_at, last_answered_at, now, now,
-                ),
+                states_to_update
             )
 
-            # 更新最后进度
-            if action == 'answer' and mode in ('practice', 'sequential'):
-                conn.execute(
-                    '''
-                    INSERT INTO mini_practice_progress (
-                        openid, bank_id, mode, last_question_id, updated_at
-                    ) VALUES (?, ?, ?, ?, ?)
-                    ON CONFLICT(openid, bank_id, mode) DO UPDATE SET
-                        last_question_id = excluded.last_question_id,
-                        updated_at = excluded.updated_at
-                    ''',
-                    (openid, bank_id, 'practice', state_question_id, now),
-                )
+        if progress_to_update:
+            # 使用 executemany 进行批量进度同步
+            conn.executemany(
+                '''
+                INSERT INTO mini_practice_progress (
+                    openid, bank_id, mode, last_question_id, updated_at
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(openid, bank_id, mode) DO UPDATE SET
+                    last_question_id = excluded.last_question_id,
+                    updated_at = excluded.updated_at
+                ''',
+                progress_to_update
+            )
 
     return {'success': True}
+
+
+def get_exam_history(openid, bank_id, limit=200, offset=0):
+    openid = str(openid or '').strip()
+    bank_id = int(bank_id or 0)
+    limit = max(1, min(int(limit or 200), 500))
+    offset = max(0, int(offset or 0))
+    with get_db_connection() as conn:
+        total_row = conn.execute(
+            'SELECT COUNT(*) as cnt FROM mini_exam_records WHERE openid = ? AND bank_id = ?',
+            (openid, bank_id)
+        ).fetchone()
+        total_count = total_row['cnt'] if total_row else 0
+
+        rows = conn.execute(
+            '''
+            SELECT id, score, total, correct_count, duration_seconds, passed, created_at
+            FROM mini_exam_records
+            WHERE openid = ? AND bank_id = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT ? OFFSET ?
+            ''',
+            (openid, bank_id, limit, offset)
+        ).fetchall()
+    return {'success': True, 'list': [dict(row) for row in rows], 'total': total_count}
+
+
+def get_exam_record_detail(openid, record_id, is_admin=False):
+    openid = str(openid or '').strip()
+    record_id = int(record_id or 0)
+    with get_db_connection() as conn:
+        record_row = conn.execute(
+            'SELECT * FROM mini_exam_records WHERE id = ?',
+            (record_id,)
+        ).fetchone()
+        if not record_row:
+            raise ValueError('考试记录不存在')
+        record = dict(record_row)
+        if record['openid'] != openid:
+            raise PermissionError('无权查看此考试记录')
+
+        # 校验题库访问权限
+        if not can_access_bank(openid, record['bank_id'], is_admin):
+            raise PermissionError('无权限访问该题库')
+
+        # 解析用户的作答 JSON
+        answers = _json_loads(record.get('answers_json'), {})
+
+        # 优先使用 question_order 确定题目展现顺序，兼容旧记录退化到 answers.keys()
+        raw_order = _json_loads(record.get('question_order'), [])
+        if isinstance(raw_order, list) and raw_order:
+            question_ids = [str(qid) for qid in raw_order]
+        else:
+            question_ids = list(answers.keys())
+
+        # 批量获取关联的题目明细，使用真实数据库字段名并复用 _row_to_question
+        # 分块查询以防御 SQLite 参数上限（每块最多 500 个，留 1 个位给 bank_id）
+        q_dict = {}
+        CHUNK_SIZE = 500
+        for i in range(0, len(question_ids), CHUNK_SIZE):
+            chunk = question_ids[i:i + CHUNK_SIZE]
+            placeholders = ','.join(['?'] * len(chunk))
+            q_rows = conn.execute(
+                f'''
+                SELECT id, question, question_type, options_json, answer_json, analysis,
+                       question_images_json, option_images_json
+                FROM exam_questions
+                WHERE bank_id = ? AND CAST(id AS TEXT) IN ({placeholders})
+                ''',
+                [record['bank_id']] + chunk
+            ).fetchall()
+            for r in q_rows:
+                q_data = _row_to_question(r)
+                q_dict[str(q_data['id'])] = q_data
+
+        questions = []
+        for qid in question_ids:
+            if qid in q_dict:
+                questions.append(q_dict[qid])
+
+    return {
+        'success': True,
+        'record': {
+            'id': record['id'],
+            'score': record['score'],
+            'total': record['total'],
+            'correct_count': record['correct_count'],
+            'duration_seconds': record['duration_seconds'],
+            'passed': record['passed'],
+            'created_at': record['created_at']
+        },
+        'answers': answers,
+        'questions': questions
+    }
 

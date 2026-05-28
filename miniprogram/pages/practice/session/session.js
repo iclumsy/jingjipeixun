@@ -1,6 +1,8 @@
 const api = require('../../../utils/api')
 const practice = require('../../../utils/practice')
 
+const DRAFT_VERSION = 'v1'
+
 const MODE_TITLES = {
   memorize: '题目浏览',
   sequential: '顺序练习',
@@ -51,7 +53,8 @@ Page({
     wrongQuestionIds: [],
     timeLeft: 3600,
     timerText: '60:00',
-    showCard: false
+    showCard: false,
+    submitId: ''
   },
 
   onLoad(options = {}) {
@@ -69,12 +72,103 @@ Page({
       title: `${title} · ${this.modeTitle(mode, filter)}`,
       modeHint: this.modeHint(mode, filter)
     })
+
+    if (mode === 'exam') {
+      const draftKey = 'exam_draft_' + bankId
+      const draft = wx.getStorageSync(draftKey)
+      if (draft && draft.version === DRAFT_VERSION) {
+        wx.showModal({
+          title: '继续考试？',
+          content: '检测到您有中途退出的模拟考试，是否继续？',
+          confirmText: '继续',
+          cancelText: '重新开始',
+          success: (res) => {
+            if (res.confirm) {
+              this.restoreDraft(draft)
+            } else {
+              wx.removeStorageSync(draftKey)
+              this.loadQuestions()
+            }
+          }
+        })
+        return
+      } else if (draft) {
+        // 版本号不匹配，旧草稿不可用，自动清理并重新加载
+        wx.removeStorageSync(draftKey)
+      }
+    }
     this.loadQuestions()
   },
 
-  onUnload() {
-    this.clearTimer()
+  restoreDraft(draft) {
+    const questions = draft.questions || []
+    const currentIndex = draft.currentIndex || 0
+    const answerMap = draft.answerMap || {}
+    const timeLeft = draft.timeLeft !== undefined ? draft.timeLeft : 3600
+    const answeredQuestionIds = draft.answeredQuestionIds || {}
+    const submitId = draft.submitId || ('sub_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10))
+    const questionTotal = questions.length
+    const min = String(Math.floor(timeLeft / 60)).padStart(2, '0')
+    const sec = String(timeLeft % 60).padStart(2, '0')
+
+    const stateMaps = this.data.showQuestionTypeFilter
+      ? practice.buildQuestionStateMaps(questions)
+      : { seenQuestionIds: {}, answeredQuestionIds: {}, masteredQuestionIds: {} }
+    this._seenQuestionIds = { ...stateMaps.seenQuestionIds }
+
+    this.setData({
+      submitId,
+      questions,
+      loading: false,
+      currentIndex,
+      currentPosition: currentIndex,
+      questionTotal,
+      answerMap,
+      timeLeft,
+      timerText: `${min}:${sec}`,
+      answeredQuestionIds,
+      seenQuestionIds: stateMaps.seenQuestionIds,
+      masteredQuestionIds: stateMaps.masteredQuestionIds,
+      summaryState: {},
+      doneCount: 0,
+      correctCount: 0,
+      wrongQuestionIds: []
+    })
+    this.updateSessionMeta()
+    this.prepareCurrentQuestion()
+    this.startTimer()
   },
+
+  saveExamDraft() {
+    if (this.data.mode !== 'exam') return
+    if (!this.data.questions || this.data.questions.length === 0) return
+    try {
+      // 仅保留前端答题渲染的核心字段，避免 questions 数组携带大量数据库冗余字段导致 Storage 满或卡顿
+      const cleanQuestions = this.data.questions.map(q => ({
+        id: q.id,
+        question: q.question,
+        question_type: q.question_type,
+        options: q.options,
+        answer: q.answer,
+        analysis: q.analysis,
+        question_images: q.question_images,
+        option_images: q.option_images
+      }))
+      wx.setStorageSync('exam_draft_' + this.data.bankId, {
+        version: DRAFT_VERSION,
+        submitId: this.data.submitId || '',
+        questions: cleanQuestions,
+        currentIndex: this.data.currentIndex,
+        answerMap: this.data.answerMap,
+        timeLeft: this.data.timeLeft,
+        answeredQuestionIds: this.data.answeredQuestionIds
+      })
+    } catch (err) {
+      console.error('保存考试草稿失败:', err)
+    }
+  },
+
+
 
   modeTitle(mode, filter) {
     return MODE_TITLES[mode] || '练习'
@@ -109,7 +203,12 @@ Page({
           ? practice.buildQuestionStateMaps(questions)
           : { seenQuestionIds: {}, answeredQuestionIds: {}, masteredQuestionIds: {} }
         this._seenQuestionIds = { ...stateMaps.seenQuestionIds }
+        
+        // 随机生成一个本次模考的全局 submitId 供防重幂等校验使用
+        const submitId = 'sub_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10)
+
         this.setData({
+          submitId,
           questions,
           loading: false,
           currentIndex,
@@ -268,9 +367,16 @@ Page({
       selected = [key]
     }
     const answerMap = { ...this.data.answerMap, [q.id]: selected }
-    const answeredQuestionIds = this.data.mode === 'exam'
-      ? { ...this.data.answeredQuestionIds, [q.id]: true }
-      : this.data.answeredQuestionIds
+    
+    let answeredQuestionIds = { ...this.data.answeredQuestionIds }
+    if (this.data.mode === 'exam') {
+      if (selected.length > 0) {
+        answeredQuestionIds[q.id] = true
+      } else {
+        delete answeredQuestionIds[q.id]
+      }
+    }
+    
     this.setData({
       selectedKeys: selected,
       answerMap,
@@ -414,7 +520,7 @@ Page({
       ? Math.max(0, Math.min(100, Math.round(((position + 1) / total) * 100)))
       : 0
     const summaryState = this.data.mode === 'exam'
-      ? { answeredCount: Object.keys(this.data.answeredQuestionIds || {}).length }
+      ? { answeredCount: Object.values(this.data.answeredQuestionIds || {}).filter(Boolean).length }
       : this.data.summaryState
     const progressMeta = practice.resolveSessionProgressMeta(this.data.mode, summaryState)
     this.setData({
@@ -513,7 +619,11 @@ Page({
       
       wx.showLoading({ title: '提交中...', mask: true })
       try {
-        await this.recordExamQuestionStates(resultMap)
+        // 仅在答题状态尚未保存时提交，避免网络重试导致次数重复累加
+        if (!this._questionStatesRecorded) {
+          await this.recordExamQuestionStates(resultMap)
+          this._questionStatesRecorded = true
+        }
         await api.savePracticeExam({
           bankId: this.data.bankId,
           score,
@@ -521,17 +631,30 @@ Page({
           correctCount: correct,
           durationSeconds: 3600 - this.data.timeLeft,
           passed: score >= 80,
-          answers: answerMap
+          answers: answerMap,
+          submitId: this.data.submitId || '',
+          questionOrder: this.data.questions.map(q => q.id)
         })
+        // 只有在保存题目状态和考试记录都成功后，才清除本地草稿并跳转到结果页
+        try {
+          wx.removeStorageSync('exam_draft_' + this.data.bankId)
+        } catch (storageErr) {
+          console.error('清理考试草稿失败:', storageErr)
+        }
+        wx.redirectTo({
+          url: `/pages/practice/result/result?score=${score}&total=${total}&correct=${correct}&duration=${3600 - this.data.timeLeft}`
+        })
+        return
       } catch (err) {
-        console.warn('保存考试记录失败', err)
+        console.warn('交卷失败，请重试', err)
+        wx.showToast({ title: '提交失败，请检查网络后重试', icon: 'none' })
+        // 重置 finishingSession 锁并重新开启定时器，允许用户再次点击交卷重试
+        this._finishingSession = false
+        this.startTimer()
+        return
       } finally {
         wx.hideLoading()
       }
-      wx.redirectTo({
-        url: `/pages/practice/result/result?score=${score}&total=${total}&correct=${correct}&duration=${3600 - this.data.timeLeft}`
-      })
-      return
     }
     wx.navigateBack()
   },
@@ -548,7 +671,20 @@ Page({
       const min = String(Math.floor(next / 60)).padStart(2, '0')
       const sec = String(next % 60).padStart(2, '0')
       this.setData({ timeLeft: next, timerText: `${min}:${sec}` })
+      
+      if (next % 10 === 0) {
+        this.saveExamDraft()
+      }
     }, 1000)
+  },
+
+  onHide() {
+    this.saveExamDraft()
+  },
+
+  onUnload() {
+    this.saveExamDraft()
+    this.clearTimer()
   },
 
   clearTimer() {

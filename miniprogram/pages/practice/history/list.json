@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "模拟考试记录",
+  "navigationBarBackgroundColor": "#2f6af5",
+  "navigationBarTextStyle": "white",
+  "enablePullDownRefresh": true,
+  "backgroundColor": "#f3f6fb"
+}

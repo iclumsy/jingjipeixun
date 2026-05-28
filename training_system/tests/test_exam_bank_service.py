@@ -681,6 +681,329 @@ class ExamBankServiceTests(unittest.TestCase):
         exam_bank_service.set_exam_bank_active(bank["id"], False)
         self.assertFalse(exam_bank_service.can_access_bank("admin-openid", bank["id"], True))
 
+    def test_exam_record_detail_returns_correct_question_fields(self):
+        """Item 4/11: get_exam_record_detail 应使用真实字段名，返回完整的题干、选项、答案"""
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(SAMPLE_QUESTIONS, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        with get_db_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO students (
+                    name, gender, education, id_card, phone, job_category,
+                    exam_project, project_code, training_type, status,
+                    submitter_openid, training_project_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "测试生", "男", "本科", "110101199001011237", "13800138003",
+                    "场(厂)内专用机动车辆作业", "叉车司机", "N1",
+                    "special_equipment", "reviewed", "detail-openid",
+                    self.get_project_id("叉车司机"),
+                ),
+            )
+            # 获取题目真实的数据库 ID
+            q_row = conn.execute("SELECT id FROM exam_questions WHERE bank_id = ?", (bank["id"],)).fetchone()
+        real_qid = str(q_row["id"])
+
+        result = exam_bank_service.save_exam_record("detail-openid", bank["id"], {
+            "score": 100,
+            "total": 1,
+            "correctCount": 1,
+            "durationSeconds": 60,
+            "passed": True,
+            "answers": {real_qid: ["B"]},
+            "submitId": "test-detail-submit-1",
+        })
+        self.assertTrue(result["success"])
+
+        detail = exam_bank_service.get_exam_record_detail("detail-openid", result["id"], is_admin=False)
+        self.assertTrue(detail["success"])
+        self.assertEqual(detail["record"]["score"], 100)
+        self.assertEqual(len(detail["questions"]), 1)
+
+        q = detail["questions"][0]
+        self.assertEqual(q["question"], "1+1=?")
+        self.assertIsInstance(q["options"], dict)
+        self.assertIn("A", q["options"])
+        self.assertEqual(q["answer"], ["B"])
+        self.assertEqual(detail["answers"][real_qid], ["B"])
+
+    def test_exam_record_detail_respects_question_order(self):
+        """Item 1/11: 按 question_order 而非 answers.keys() 顺序排列"""
+        questions = [make_question(201, "第一题"), make_question(202, "第二题"), make_question(203, "第三题")]
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(questions, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        with get_db_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO students (
+                    name, gender, education, id_card, phone, job_category,
+                    exam_project, project_code, training_type, status,
+                    submitter_openid, training_project_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "测试生2", "女", "本科", "110101199001011238", "13800138004",
+                    "场(厂)内专用机动车辆作业", "叉车司机", "N1",
+                    "special_equipment", "reviewed", "order-openid",
+                    self.get_project_id("叉车司机"),
+                ),
+            )
+            qids = [str(r["id"]) for r in conn.execute(
+                "SELECT id FROM exam_questions WHERE bank_id = ? ORDER BY id",
+                (bank["id"],)
+            ).fetchall()]
+
+        # 提交时传递一个与自然顺序不同的 question_order（反转）
+        reversed_order = list(reversed(qids))
+        result = exam_bank_service.save_exam_record("order-openid", bank["id"], {
+            "score": 100, "total": 3, "correctCount": 3, "durationSeconds": 60, "passed": True,
+            "answers": {qid: ["B"] for qid in qids},
+            "questionOrder": [int(qid) for qid in reversed_order],
+            "submitId": "test-order-submit-1",
+        })
+
+        detail = exam_bank_service.get_exam_record_detail("order-openid", result["id"], is_admin=False)
+        returned_qids = [str(q["id"]) for q in detail["questions"]]
+        self.assertEqual(returned_qids, reversed_order)
+
+    def test_exam_record_detail_raises_permission_error_for_wrong_user(self):
+        """Item 2/11: openid 不匹配时应抛出 PermissionError 而非 ValueError"""
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(SAMPLE_QUESTIONS, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        result = exam_bank_service.save_exam_record("owner-openid", bank["id"], {
+            "score": 50, "total": 1, "correctCount": 0, "durationSeconds": 30, "passed": False,
+            "answers": {"1": ["A"]},
+        })
+        with self.assertRaises(PermissionError):
+            exam_bank_service.get_exam_record_detail("other-openid", result["id"])
+
+    def test_exam_history_supports_pagination(self):
+        """Item 8/11: get_exam_history 应支持 limit/offset 分页"""
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(SAMPLE_QUESTIONS, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        for i in range(5):
+            exam_bank_service.save_exam_record("page-openid", bank["id"], {
+                "score": 50 + i * 10, "total": 1, "correctCount": 0, "durationSeconds": 30, "passed": False,
+                "answers": {"1": ["A"]},
+            })
+
+        full = exam_bank_service.get_exam_history("page-openid", bank["id"])
+        self.assertEqual(len(full["list"]), 5)
+
+        page1 = exam_bank_service.get_exam_history("page-openid", bank["id"], limit=2, offset=0)
+        self.assertEqual(len(page1["list"]), 2)
+
+        page2 = exam_bank_service.get_exam_history("page-openid", bank["id"], limit=2, offset=2)
+        self.assertEqual(len(page2["list"]), 2)
+
+        page3 = exam_bank_service.get_exam_history("page-openid", bank["id"], limit=2, offset=4)
+        self.assertEqual(len(page3["list"]), 1)
+
+    def test_summary_includes_exam_count_and_best_score(self):
+        """Item 5/11: _format_summary_bank 应返回 examCount 和 bestScore"""
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(SAMPLE_QUESTIONS, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        exam_bank_service.save_exam_record("admin-openid", bank["id"], {
+            "score": 70, "total": 1, "correctCount": 0, "durationSeconds": 30, "passed": False,
+            "answers": {"1": ["A"]},
+        })
+        exam_bank_service.save_exam_record("admin-openid", bank["id"], {
+            "score": 92, "total": 1, "correctCount": 1, "durationSeconds": 30, "passed": True,
+            "answers": {"1": ["B"]},
+        })
+
+        summary = exam_bank_service.get_practice_summary("admin-openid", is_admin=True)
+        bank_data = summary["banks"][0]
+        self.assertEqual(bank_data["questionState"]["examCount"], 2)
+        self.assertEqual(bank_data["questionState"]["bestScore"], 92)
+
+    def test_batch_states_action_merge_preserves_answer_over_seen(self):
+        """Item 3/11: 同批内先 answer 再 seen 时，action 不应被覆盖为 seen"""
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps([
+                make_question(301, "第一题"),
+            ], ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        with get_db_connection() as conn:
+            qid = conn.execute(
+                "SELECT id FROM exam_questions WHERE bank_id = ?", (bank["id"],)
+            ).fetchone()["id"]
+
+        # 同批中先 answer 再 seen
+        exam_bank_service.save_batch_question_states("student-openid", bank["id"], {
+            "mode": "practice",
+            "states": [
+                {"questionId": qid, "action": "answer", "isCorrect": True, "answer": ["B"]},
+                {"questionId": qid, "action": "seen"},
+            ]
+        })
+
+        with get_db_connection() as conn:
+            state = conn.execute(
+                "SELECT status, answer_count FROM mini_question_states WHERE openid = ? AND bank_id = ? AND question_id = ?",
+                ("student-openid", bank["id"], qid),
+            ).fetchone()
+        self.assertEqual(state["status"], "mastered")
+        self.assertEqual(state["answer_count"], 1)
+
+        # 同时验证 practice progress 已写入（action 为 answer 时才写进度）
+        with get_db_connection() as conn:
+            progress = conn.execute(
+                "SELECT * FROM mini_practice_progress WHERE openid = ? AND bank_id = ? AND mode = ?",
+                ("student-openid", bank["id"], "practice"),
+            ).fetchone()
+        self.assertIsNotNone(progress)
+        self.assertEqual(progress["last_question_id"], qid)
+
+    def test_save_exam_record_deduplicates_by_submit_id(self):
+        """Item 4: 相同 submit_id 重复提交应返回 duplicate 且只产生一条记录"""
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(SAMPLE_QUESTIONS, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        payload = {
+            "score": 80, "total": 1, "correctCount": 1,
+            "durationSeconds": 60, "passed": True,
+            "answers": {"1": ["B"]},
+            "submitId": "dedup-test-001",
+        }
+        first = exam_bank_service.save_exam_record("dedup-openid", bank["id"], payload)
+        self.assertTrue(first["success"])
+        self.assertNotIn("duplicate", first)
+
+        second = exam_bank_service.save_exam_record("dedup-openid", bank["id"], payload)
+        self.assertTrue(second["success"])
+        self.assertTrue(second.get("duplicate"))
+        self.assertEqual(second["id"], first["id"])
+
+        with get_db_connection() as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM mini_exam_records WHERE submit_id = ?",
+                ("dedup-test-001",)
+            ).fetchone()[0]
+        self.assertEqual(count, 1)
+
+    def test_save_exam_record_deduplicates_by_content_within_window(self):
+        """Item 4: 无 submit_id 时，10 秒内内容完全相同应命中内容兜底幂等"""
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(SAMPLE_QUESTIONS, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        payload = {
+            "score": 60, "total": 1, "correctCount": 0,
+            "durationSeconds": 30, "passed": False,
+            "answers": {"1": ["A"]},
+            # 不传 submitId
+        }
+        first = exam_bank_service.save_exam_record("content-dedup-openid", bank["id"], payload)
+        self.assertTrue(first["success"])
+
+        second = exam_bank_service.save_exam_record("content-dedup-openid", bank["id"], payload)
+        self.assertTrue(second["success"])
+        self.assertTrue(second.get("duplicate"))
+        self.assertEqual(second["id"], first["id"])
+
+    def test_save_exam_record_integrity_error_fallback(self):
+        """Item 4: IntegrityError 竞态分支——模拟并发插入后的兜底"""
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(SAMPLE_QUESTIONS, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        # 先正常插入一条
+        first = exam_bank_service.save_exam_record("integrity-openid", bank["id"], {
+            "score": 75, "total": 1, "correctCount": 1,
+            "durationSeconds": 45, "passed": False,
+            "answers": {"1": ["B"]},
+            "submitId": "integrity-race-001",
+        })
+        self.assertTrue(first["success"])
+
+        # 手动绕过前置查询直接插入同 submit_id，模拟竞态
+        with get_db_connection() as conn:
+            try:
+                conn.execute(
+                    "INSERT INTO mini_exam_records (openid, bank_id, score, total, correct_count, "
+                    "duration_seconds, passed, answers_json, submit_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    ("integrity-openid", bank["id"], 75, 1, 1, 45, 0, '{"1":["B"]}', "integrity-race-001")
+                )
+                self.fail("应当抛出 IntegrityError")
+            except sqlite3.IntegrityError:
+                pass  # 预期行为：唯一索引阻止重复
+
+    def test_exam_record_detail_falls_back_to_answer_keys_without_order(self):
+        """Item 5: 旧记录无 question_order 时应退化到 answers.keys() 顺序"""
+        questions = [make_question(401, "第一题"), make_question(402, "第二题")]
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(questions, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        with get_db_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO students (
+                    name, gender, education, id_card, phone, job_category,
+                    exam_project, project_code, training_type, status,
+                    submitter_openid, training_project_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "测试生3", "男", "本科", "110101199001011239", "13800138005",
+                    "场(厂)内专用机动车辆作业", "叉车司机", "N1",
+                    "special_equipment", "reviewed", "fallback-openid",
+                    self.get_project_id("叉车司机"),
+                ),
+            )
+            qids = [str(r["id"]) for r in conn.execute(
+                "SELECT id FROM exam_questions WHERE bank_id = ? ORDER BY id",
+                (bank["id"],)
+            ).fetchall()]
+
+        # 不传 questionOrder，模拟旧版前端提交
+        result = exam_bank_service.save_exam_record("fallback-openid", bank["id"], {
+            "score": 100, "total": 2, "correctCount": 2,
+            "durationSeconds": 30, "passed": True,
+            "answers": {qids[0]: ["B"], qids[1]: ["B"]},
+            "submitId": "fallback-test-001",
+        })
+
+        # 确认 question_order 列为 NULL
+        with get_db_connection() as conn:
+            rec = conn.execute(
+                "SELECT question_order FROM mini_exam_records WHERE id = ?",
+                (result["id"],)
+            ).fetchone()
+        self.assertIsNone(rec["question_order"])
+
+        detail = exam_bank_service.get_exam_record_detail(
+            "fallback-openid", result["id"], is_admin=False
+        )
+        returned_qids = [str(q["id"]) for q in detail["questions"]]
+        # 退化路径：顺序应与 answers dict 的 keys() 顺序一致
+        self.assertEqual(returned_qids, list({qids[0]: ["B"], qids[1]: ["B"]}.keys()))
+        self.assertEqual(len(detail["questions"]), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -10,6 +10,8 @@
     "pages/practice/index/index",
     "pages/practice/session/session",
     "pages/practice/result/result",
+    "pages/practice/history/list",
+    "pages/practice/history/detail",
     "pages/agreement/agreement",
     "pages/privacy/privacy"
   ],

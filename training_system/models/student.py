@@ -380,10 +380,36 @@ def init_db(database_path):
                 duration_seconds INTEGER DEFAULT 0,
                 passed           INTEGER DEFAULT 0,
                 answers_json     TEXT DEFAULT '{}',
+                submit_id        TEXT,
+                question_order   TEXT,
                 created_at       TIMESTAMP DEFAULT (DATETIME(CURRENT_TIMESTAMP, 'localtime'))
             )
         ''')
         _ensure_column_exists(conn, 'mini_question_states', 'seen_at', 'seen_at TEXT')
+        _ensure_column_exists(conn, 'mini_exam_records', 'submit_id', 'submit_id TEXT')
+        _ensure_column_exists(conn, 'mini_exam_records', 'question_order', 'question_order TEXT')
+        try:
+            conn.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_mini_exam_records_submit_id ON mini_exam_records(submit_id)')
+        except sqlite3.IntegrityError:
+            # 存量数据中存在重复的非空 submit_id，索引创建失败
+            import logging
+            logger = logging.getLogger(__name__)
+            # 主动查询重复数据方便定位清理
+            try:
+                dupes = conn.execute(
+                    "SELECT submit_id, COUNT(*) as cnt FROM mini_exam_records "
+                    "WHERE submit_id IS NOT NULL GROUP BY submit_id HAVING COUNT(*) > 1 LIMIT 5"
+                ).fetchall()
+                dupe_info = '; '.join(f"submit_id={r['submit_id']}(x{r['cnt']})" for r in dupes)
+                logger.error(
+                    'mini_exam_records 中存在重复 submit_id，无法创建唯一索引，幂等保护未生效。'
+                    f' 重复数据示例: {dupe_info}。请手动清理后重启服务。'
+                )
+            except Exception:
+                logger.error(
+                    'mini_exam_records 中存在重复 submit_id，无法创建唯一索引。'
+                    '请手动清理重复数据后重启服务以启用幂等保护。'
+                )
         conn.execute(
             '''
             UPDATE mini_question_states

@@ -60,6 +60,17 @@
           <view class="progress-fill" style="width: {{activeBank.studyState.progressPercent}}%;"></view>
         </view>
       </view>
+      <!-- 模考历史记录入口 -->
+      <view wx:if="{{activeBank.studyState.examCount > 0}}" class="history-entry" bindtap="goToHistoryList">
+        <view class="history-left">
+          <text class="history-icon">🏆</text>
+          <text class="history-title">模考历史记录 ({{activeBank.studyState.examCount}}次)</text>
+        </view>
+        <view class="history-right">
+          <text class="history-desc">最高分 {{activeBank.studyState.bestScore}}分</text>
+          <text class="history-arrow">➔</text>
+        </view>
+      </view>
     </view>
 
     <view class="action-card">

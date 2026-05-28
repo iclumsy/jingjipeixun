@@ -76,5 +76,13 @@ Page({
     wx.navigateTo({
       url: `/pages/practice/session/session?bankId=${bank.id}&mode=${mode}&filter=${filter || ''}&title=${encodeURIComponent(bank.displayName || '真题练习')}&lastQuestionId=${encodeURIComponent(startQuestionId || '')}`
     })
+  },
+
+  goToHistoryList() {
+    const bank = this.data.activeBank
+    if (!bank) return
+    wx.navigateTo({
+      url: `/pages/practice/history/list?bankId=${bank.id}&title=${encodeURIComponent(bank.displayName || '模拟考试')}`
+    })
   }
 })

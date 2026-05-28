@@ -1,0 +1,168 @@
+<view class="history-detail-page">
+  <!-- 顶部得分面板 -->
+  <view class="score-banner {{record.passed ? 'pass-bg' : 'fail-bg'}}">
+    <view class="banner-main">
+      <view class="score-big">{{record.score}}<text class="score-unit">分</text></view>
+      <view class="result-badge">{{record.passed ? '考核通过' : '未通过'}}</view>
+    </view>
+    <view class="banner-grid">
+      <view class="grid-item">
+        <text class="grid-val">{{record.correct_count}}/{{record.total}}</text>
+        <text class="grid-label">答对题数</text>
+      </view>
+      <view class="grid-item">
+        <text class="grid-val">{{record.durationText}}</text>
+        <text class="grid-label">答题耗时</text>
+      </view>
+      <view class="grid-item">
+        <text class="grid-val">{{record.dateText}}</text>
+        <text class="grid-label">交卷时间</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 粘性过滤控制栏 -->
+  <view class="filter-bar">
+    <view class="filter-left">
+      <text class="filter-title">题目回顾</text>
+      <text class="filter-count">共 {{displayQuestions.length}} 题</text>
+    </view>
+    <view class="filter-right">
+      <view class="card-toggle-btn" bindtap="toggleCard">答题卡</view>
+      <text class="filter-label">只看错题</text>
+      <switch 
+        checked="{{onlyWrong}}" 
+        color="#2f6af5" 
+        bindchange="toggleWrongOnly" 
+        class="wrong-switch"
+      />
+    </view>
+  </view>
+
+  <!-- 题目列表 -->
+  <view class="questions-list">
+    <view wx:if="{{loading}}" class="state-hint">正在读取答卷详情...</view>
+    
+    <view wx:elif="{{displayQuestions.length === 0}}" class="empty-state">
+      <icon type="success" size="64" color="#10b981" />
+      <view class="empty-title">没有符合条件的题目</view>
+      <view class="empty-desc">{{onlyWrong ? '恭喜您，本次模拟考试没有错题！' : '该答卷暂无题目内容'}}</view>
+    </view>
+
+    <view wx:else>
+      <view 
+        wx:for="{{displayQuestions}}" 
+        wx:key="id" 
+        id="q-{{item.id}}"
+        class="question-card {{item.isCorrect ? 'card-correct' : 'card-wrong'}}"
+      >
+        <!-- 题目头部 -->
+        <view class="q-header">
+          <view class="q-info">
+            <text class="q-index">第 {{item.index}} 题</text>
+            <text class="q-badge {{item.type}}">{{item.typeLabel}}</text>
+          </view>
+          <view class="q-status-badge {{item.isCorrect ? 'badge-correct' : 'badge-wrong'}}">
+            {{item.isCorrect ? '回答正确' : '回答错误'}}
+          </view>
+        </view>
+
+        <!-- 题干 -->
+        <view class="q-question">{{item.question}}</view>
+
+        <!-- 题目图片 -->
+        <view wx:if="{{item.hasImages}}" class="q-images">
+          <image 
+            wx:for="{{item.questionImages}}" 
+            wx:for-item="img" 
+            wx:key="*this"
+            src="{{img}}" 
+            mode="aspectFit" 
+            class="q-img"
+            data-url="{{img}}"
+            data-urls="{{item.questionImages}}"
+            bindtap="previewImage"
+          />
+        </view>
+
+        <!-- 选项列表 -->
+        <view class="options-container">
+          <view 
+            wx:for="{{item.optionsList}}" 
+            wx:for-item="opt" 
+            wx:key="key" 
+            class="option-item {{opt.statusClass}}"
+          >
+            <view class="option-icon-box">
+              <text wx:if="{{opt.statusClass === 'opt-correct-selected'}}" class="opt-icon tick-icon">✔</text>
+              <text wx:elif="{{opt.statusClass === 'opt-wrong-selected'}}" class="opt-icon cross-icon">✘</text>
+              <text wx:else class="opt-key-circle">{{opt.key}}</text>
+            </view>
+            <view class="option-content">
+              <text class="option-text">{{opt.text}}</text>
+              <image 
+                wx:if="{{opt.image}}" 
+                src="{{opt.image}}" 
+                mode="aspectFit" 
+                class="option-img"
+                data-url="{{opt.image}}"
+                bindtap="previewImage"
+              />
+            </view>
+          </view>
+        </view>
+
+        <!-- 对比面板 -->
+        <view class="contrast-panel">
+          <view class="contrast-row">
+            <text class="contrast-label">您的作答：</text>
+            <text class="contrast-val {{item.isCorrect ? 'text-correct' : 'text-wrong'}}">{{item.studentAnswerText}}</text>
+          </view>
+          <view class="contrast-row">
+            <text class="contrast-label">正确答案：</text>
+            <text class="contrast-val text-correct">{{item.correctAnswerText}}</text>
+          </view>
+        </view>
+
+        <!-- 解析区域 -->
+        <view class="analysis-box">
+          <view class="analysis-title">题目解析</view>
+          <view class="analysis-content">{{item.analysis || '暂无解析'}}</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 答题卡浮层 -->
+  <view wx:if="{{showCard}}" class="card-overlay" bindtap="toggleCard">
+    <view class="card-panel-pop" catchtap="none">
+      <view class="card-head-pop">
+        <text class="card-title-pop">答题卡回顾</text>
+        <view class="card-close-pop" bindtap="toggleCard">✕</view>
+      </view>
+      <scroll-view scroll-y class="card-scroll-pop">
+        <view class="card-grid-pop">
+          <view 
+            wx:for="{{questions}}" 
+            wx:key="id" 
+            data-id="{{item.id}}" 
+            class="card-cell-pop {{item.isCorrect ? 'correct' : 'wrong'}}"
+            bindtap="jumpToQuestion"
+          >
+            {{item.index}}
+          </view>
+        </view>
+      </scroll-view>
+      <view class="card-legend-pop">
+        <view class="legend-item-pop">
+          <view class="legend-dot-pop correct"></view>
+          <text>正确 ({{record.correct_count}})</text>
+        </view>
+        <view class="legend-item-pop">
+          <view class="legend-dot-pop wrong"></view>
+          <text>错误 ({{record.total - record.correct_count}})</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

@@ -273,3 +273,35 @@ def mini_practice_batch_question_states():
     except ValueError as err:
         return _error(err, 400)
 
+
+@exam_bank_bp.route('/api/miniprogram/practice/banks/<int:bank_id>/exam_history', methods=['GET'])
+def mini_practice_exam_history(bank_id):
+    user = _require_mini_user()
+    if not user:
+        return _error('未授权访问，请先登录', 401)
+    if not exam_bank_service.can_access_bank(user.get('openid', ''), bank_id, bool(user.get('is_admin'))):
+        return _error('无权限访问该题库', 403)
+    try:
+        limit = request.args.get('limit', 200, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        result = exam_bank_service.get_exam_history(user.get('openid', ''), bank_id, limit=limit, offset=offset)
+        return jsonify(result)
+    except ValueError as err:
+        return _error(err, 400)
+
+
+@exam_bank_bp.route('/api/miniprogram/practice/exams/<int:record_id>/detail', methods=['GET'])
+def mini_practice_exam_detail(record_id):
+    user = _require_mini_user()
+    if not user:
+        return _error('未授权访问，请先登录', 401)
+    try:
+        result = exam_bank_service.get_exam_record_detail(
+            user.get('openid', ''), record_id, is_admin=bool(user.get('is_admin'))
+        )
+        return jsonify(result)
+    except PermissionError as err:
+        return _error(str(err), 403)
+    except ValueError as err:
+        return _error(err, 400)
+

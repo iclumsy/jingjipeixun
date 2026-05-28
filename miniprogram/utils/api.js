@@ -944,6 +944,18 @@ async function savePracticeExam(payload = {}) {
   })
 }
 
+async function getExamHistory(bankId) {
+  return await requestApi(`/api/miniprogram/practice/banks/${bankId}/exam_history`, {
+    method: 'GET'
+  })
+}
+
+async function getExamRecordDetail(recordId) {
+  return await requestApi(`/api/miniprogram/practice/exams/${recordId}/detail`, {
+    method: 'GET'
+  })
+}
+
 const COS = require('./cos-wx-sdk-v5.js');
 
 let cosInstance = null;
@@ -1252,6 +1264,8 @@ module.exports = {
   saveQuestionState,    // 保存单题学习状态
   saveBatchQuestionStates, // 批量保存题目学习状态
   savePracticeExam,     // 保存模拟考试记录
+  getExamHistory,       // 获取模拟考试历史记录
+  getExamRecordDetail,  // 获取模考记录答卷明细
   toAbsoluteFileUrl,    // 转换服务器文件 URL
   uploadAttachment,     // 上传附件
   downloadTrainingForm, // 下载体检表
