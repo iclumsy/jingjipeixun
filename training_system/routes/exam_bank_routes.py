@@ -5,6 +5,13 @@ from services import exam_bank_service
 
 exam_bank_bp = Blueprint('exam_bank', __name__)
 
+MODE_LABELS = {
+    'sequential': '顺序练习',
+    'exam': '模拟考试',
+    'wrong': '错题练习',
+    'memorize': '题目浏览',
+}
+
 
 def _success(**payload):
     return jsonify({'success': True, **payload})
@@ -161,14 +168,7 @@ def mini_practice_questions(bank_id):
     bank = exam_bank_service.get_exam_bank(bank_id)
     bank_name = bank.get('display_name') if bank else f"ID {bank_id}"
     mode = request.args.get('mode', 'sequential')
-    mode_labels = {
-        'sequential': '顺序练习',
-        'exam': '模拟考试',
-        'wrong': '错题练习',
-        'memorize': '题目浏览'
-    }
-    mode_label = mode_labels.get(mode, mode)
-    current_app.logger.info(f"拉取了题库「{bank_name}」的题目，练习模式：{mode_label}")
+    current_app.logger.info(f"拉取了题库「{bank_name}」的题目，练习模式：{MODE_LABELS.get(mode, mode)}")
 
     result = exam_bank_service.get_questions(
         bank_id,
@@ -190,10 +190,18 @@ def mini_practice_next_question(bank_id):
     if not exam_bank_service.can_access_bank(user.get('openid', ''), bank_id, bool(user.get('is_admin'))):
         return _error('无权限访问该题库', 403)
 
+    mode = request.args.get('mode', 'sequential')
+    current_question_id = request.args.get('current_question_id')
+    # 仅在本轮首次加载（无游标）时记一条，避免逐题刷屏
+    if not current_question_id:
+        bank = exam_bank_service.get_exam_bank(bank_id)
+        bank_name = bank.get('display_name') if bank else f"ID {bank_id}"
+        current_app.logger.info(f"开始了题库「{bank_name}」的{MODE_LABELS.get(mode, mode)}")
+
     result = exam_bank_service.get_next_question(
         bank_id,
-        mode=request.args.get('mode', 'sequential'),
-        current_question_id=request.args.get('current_question_id'),
+        mode=mode,
+        current_question_id=current_question_id,
         question_type=request.args.get('question_type', ''),
         openid=user.get('openid', ''),
     )
