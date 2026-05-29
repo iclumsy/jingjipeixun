@@ -140,6 +140,7 @@ Page({
   },
 
   saveExamDraft() {
+    if (this._finishingSession) return
     if (this.data.mode !== 'exam') return
     if (!this.data.questions || this.data.questions.length === 0) return
     try {
