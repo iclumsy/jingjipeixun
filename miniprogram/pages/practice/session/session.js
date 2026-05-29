@@ -662,6 +662,7 @@ Page({
 
   startTimer() {
     this.clearTimer()
+    this.saveExamDraft()
     this._timer = setInterval(() => {
       const next = this.data.timeLeft - 1
       if (next <= 0) {

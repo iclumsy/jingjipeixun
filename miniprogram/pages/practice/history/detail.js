@@ -13,6 +13,11 @@ Page({
 
   onLoad(options) {
     const recordId = Number(options.recordId || 0)
+    if (!recordId) {
+      wx.showToast({ title: '记录ID无效', icon: 'none' })
+      this.setData({ loading: false })
+      return
+    }
     this.loadDetail(recordId)
   },
 
