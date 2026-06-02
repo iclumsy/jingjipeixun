@@ -178,7 +178,7 @@ Page({
   modeHint(mode, filter) {
     if (mode === 'memorize') return '题目浏览会优先展示未浏览题，并直接显示答案和解析'
     if (mode === 'exam') return '模拟考试可跳题，最后统一交卷'
-    if (mode === 'wrong') return '错题需要连续答对 2 次才能标记为已掌握'
+    if (mode === 'wrong') return '集中处理上次练习留下的错题'
     return '每答一题都会立即记录掌握和错题状态'
   },
 
@@ -398,35 +398,24 @@ Page({
       return
     }
     const isCorrect = practice.isCorrectAnswer(q, this.data.selectedKeys)
-
-    // 错题练习模式下：需要连续答对 2 次才视为已掌握
-    let isMastered = isCorrect
-    if (this.data.mode === 'wrong') {
-      this._wrongStreaks = this._wrongStreaks || {}
-      const prev = this._wrongStreaks[q.id] || 0
-      const streak = isCorrect ? prev + 1 : 0
-      this._wrongStreaks[q.id] = streak
-      isMastered = streak >= 2
-    }
-
-    const wrongIds = isMastered
+    const wrongIds = isCorrect
       ? this.data.wrongQuestionIds.filter(id => id !== q.id)
       : Array.from(new Set([...this.data.wrongQuestionIds, q.id]))
     const resultMap = { ...this.data.resultMap, [q.id]: isCorrect }
     const wasAnswered = !!this.data.answeredQuestionIds[q.id]
     const wasMastered = !!this.data.masteredQuestionIds[q.id]
     const answeredQuestionIds = { ...this.data.answeredQuestionIds, [q.id]: true }
-    const masteredQuestionIds = isMastered
+    const masteredQuestionIds = isCorrect
       ? { ...this.data.masteredQuestionIds, [q.id]: true }
       : { ...this.data.masteredQuestionIds }
-    if (!isMastered) delete masteredQuestionIds[q.id]
+    if (!isCorrect) delete masteredQuestionIds[q.id]
     const summaryState = { ...this.data.summaryState }
     if (!wasAnswered) {
       summaryState.answeredCount = Math.max(0, Number(summaryState.answeredCount || 0)) + 1
     }
-    if (isMastered && !wasMastered) {
+    if (isCorrect && !wasMastered) {
       summaryState.masteredCount = Math.max(0, Number(summaryState.masteredCount || 0)) + 1
-    } else if (!isMastered && wasMastered) {
+    } else if (!isCorrect && wasMastered) {
       summaryState.masteredCount = Math.max(0, Number(summaryState.masteredCount || 0) - 1)
     }
     this.setData({
