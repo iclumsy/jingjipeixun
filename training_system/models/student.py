@@ -386,6 +386,7 @@ def init_db(database_path):
             )
         ''')
         _ensure_column_exists(conn, 'mini_question_states', 'seen_at', 'seen_at TEXT')
+        _ensure_column_exists(conn, 'mini_question_states', 'consecutive_correct', 'consecutive_correct INTEGER DEFAULT 0')
         _ensure_column_exists(conn, 'mini_exam_records', 'submit_id', 'submit_id TEXT')
         _ensure_column_exists(conn, 'mini_exam_records', 'question_order', 'question_order TEXT')
         try:

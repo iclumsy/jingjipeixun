@@ -1302,6 +1302,8 @@ def save_question_state(openid, bank_id, question_id, payload):
         ).fetchone()
         existing_dict = dict(existing) if existing else None
 
+        consecutive_correct = int((existing_dict or {}).get('consecutive_correct') or 0)
+
         if action == 'seen':
             next_status = (existing_dict or {}).get('status') or 'seen'
             answer_count = int((existing_dict or {}).get('answer_count') or 0)
@@ -1312,21 +1314,29 @@ def save_question_state(openid, bank_id, question_id, payload):
             last_answered_at = (existing_dict or {}).get('last_answered_at')
         else:
             is_correct = _as_bool(payload.get('isCorrect') if 'isCorrect' in payload else payload.get('is_correct'))
-            next_status = 'mastered' if is_correct else 'wrong'
             answer_count = int((existing_dict or {}).get('answer_count') or 0) + 1
             correct_count = int((existing_dict or {}).get('correct_count') or 0) + (1 if is_correct else 0)
             wrong_count = int((existing_dict or {}).get('wrong_count') or 0) + (0 if is_correct else 1)
             last_answer_json = _json_dumps(answer)
             seen_at = (existing_dict or {}).get('seen_at') or now
             last_answered_at = now
+            # 错题练习模式下需要连续答对 2 次才标记为已掌握
+            if is_correct:
+                consecutive_correct += 1
+            else:
+                consecutive_correct = 0
+            if mode == 'wrong':
+                next_status = 'mastered' if consecutive_correct >= 2 else 'wrong'
+            else:
+                next_status = 'mastered' if is_correct else 'wrong'
 
         conn.execute(
             '''
             INSERT INTO mini_question_states (
                 openid, bank_id, question_id, status, answer_count,
                 correct_count, wrong_count, last_answer_json, last_mode,
-                seen_at, last_answered_at, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                seen_at, last_answered_at, consecutive_correct, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(openid, bank_id, question_id) DO UPDATE SET
                 status = excluded.status,
                 answer_count = excluded.answer_count,
@@ -1336,12 +1346,13 @@ def save_question_state(openid, bank_id, question_id, payload):
                 last_mode = excluded.last_mode,
                 seen_at = excluded.seen_at,
                 last_answered_at = excluded.last_answered_at,
+                consecutive_correct = excluded.consecutive_correct,
                 updated_at = excluded.updated_at
             ''',
             (
                 openid, bank_id, state_question_id, next_status, answer_count,
                 correct_count, wrong_count, last_answer_json, mode,
-                seen_at, last_answered_at, now, now,
+                seen_at, last_answered_at, consecutive_correct, now, now,
             ),
         )
         if action == 'answer' and mode in ('practice', 'sequential'):
@@ -1499,7 +1510,7 @@ def save_batch_question_states(openid, bank_id, payload):
             q_placeholders = ','.join(['?'] * len(resolved_qids))
             state_rows = conn.execute(
                 f'''
-                SELECT question_id, status, answer_count, correct_count, wrong_count, seen_at, last_answer_json, last_answered_at
+                SELECT question_id, status, answer_count, correct_count, wrong_count, seen_at, last_answer_json, last_answered_at, consecutive_correct
                 FROM mini_question_states
                 WHERE openid = ? AND bank_id = ? AND question_id IN ({q_placeholders})
                 ''',
@@ -1548,17 +1559,23 @@ def save_batch_question_states(openid, bank_id, payload):
             last_answer_json = (existing_dict or {}).get('last_answer_json') or _json_dumps([])
             seen_at = (existing_dict or {}).get('seen_at') or now
             last_answered_at = (existing_dict or {}).get('last_answered_at')
+            consecutive_correct = int((existing_dict or {}).get('consecutive_correct') or 0)
 
             for action, is_correct, answer in info['actions']:
                 if action == 'seen':
                     seen_at = seen_at or now
                 else:
-                    status = 'mastered' if is_correct else 'wrong'
                     answer_count += 1
                     if is_correct:
                         correct_count += 1
+                        consecutive_correct += 1
                     else:
                         wrong_count += 1
+                        consecutive_correct = 0
+                    if mode == 'wrong':
+                        status = 'mastered' if consecutive_correct >= 2 else 'wrong'
+                    else:
+                        status = 'mastered' if is_correct else 'wrong'
                     last_answer_json = _json_dumps(answer)
                     seen_at = seen_at or now
                     last_answered_at = now
@@ -1566,7 +1583,7 @@ def save_batch_question_states(openid, bank_id, payload):
             states_to_update.append((
                 openid, bank_id, state_question_id, status, answer_count,
                 correct_count, wrong_count, last_answer_json, mode,
-                seen_at, last_answered_at, now, now
+                seen_at, last_answered_at, consecutive_correct, now, now
             ))
 
             # 仅做非覆盖式的更新（只更新最后一个有效的进度）
@@ -1582,8 +1599,8 @@ def save_batch_question_states(openid, bank_id, payload):
                 INSERT INTO mini_question_states (
                     openid, bank_id, question_id, status, answer_count,
                     correct_count, wrong_count, last_answer_json, last_mode,
-                    seen_at, last_answered_at, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    seen_at, last_answered_at, consecutive_correct, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(openid, bank_id, question_id) DO UPDATE SET
                     status = excluded.status,
                     answer_count = excluded.answer_count,
@@ -1593,6 +1610,7 @@ def save_batch_question_states(openid, bank_id, payload):
                     last_mode = excluded.last_mode,
                     seen_at = excluded.seen_at,
                     last_answered_at = excluded.last_answered_at,
+                    consecutive_correct = excluded.consecutive_correct,
                     updated_at = excluded.updated_at
                 ''',
                 states_to_update
