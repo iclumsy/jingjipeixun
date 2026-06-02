@@ -398,24 +398,35 @@ Page({
       return
     }
     const isCorrect = practice.isCorrectAnswer(q, this.data.selectedKeys)
-    const wrongIds = isCorrect
+
+    // 错题练习模式下：需要连续答对 2 次才视为已掌握
+    let isMastered = isCorrect
+    if (this.data.mode === 'wrong') {
+      this._wrongStreaks = this._wrongStreaks || {}
+      const prev = this._wrongStreaks[q.id] || 0
+      const streak = isCorrect ? prev + 1 : 0
+      this._wrongStreaks[q.id] = streak
+      isMastered = streak >= 2
+    }
+
+    const wrongIds = isMastered
       ? this.data.wrongQuestionIds.filter(id => id !== q.id)
       : Array.from(new Set([...this.data.wrongQuestionIds, q.id]))
     const resultMap = { ...this.data.resultMap, [q.id]: isCorrect }
     const wasAnswered = !!this.data.answeredQuestionIds[q.id]
     const wasMastered = !!this.data.masteredQuestionIds[q.id]
     const answeredQuestionIds = { ...this.data.answeredQuestionIds, [q.id]: true }
-    const masteredQuestionIds = isCorrect
+    const masteredQuestionIds = isMastered
       ? { ...this.data.masteredQuestionIds, [q.id]: true }
       : { ...this.data.masteredQuestionIds }
-    if (!isCorrect) delete masteredQuestionIds[q.id]
+    if (!isMastered) delete masteredQuestionIds[q.id]
     const summaryState = { ...this.data.summaryState }
     if (!wasAnswered) {
       summaryState.answeredCount = Math.max(0, Number(summaryState.answeredCount || 0)) + 1
     }
-    if (isCorrect && !wasMastered) {
+    if (isMastered && !wasMastered) {
       summaryState.masteredCount = Math.max(0, Number(summaryState.masteredCount || 0)) + 1
-    } else if (!isCorrect && wasMastered) {
+    } else if (!isMastered && wasMastered) {
       summaryState.masteredCount = Math.max(0, Number(summaryState.masteredCount || 0) - 1)
     }
     this.setData({
