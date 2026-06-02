@@ -262,6 +262,16 @@ class ExamBankServiceTests(unittest.TestCase):
             "answer": ["A"],
             "mode": "practice",
         })
+        # 第一次答对（错题模式），应当仍为 wrong，连续答对数累计到 1
+        correct_once = exam_bank_service.save_question_state("student-openid", bank["id"], question_id, {
+            "action": "answer",
+            "isCorrect": True,
+            "answer": ["B"],
+            "mode": "wrong",
+        })
+        assert correct_once["state"]["status"] == "wrong"
+
+        # 第二次连续答对（错题模式），变为 mastered
         mastered = exam_bank_service.save_question_state("student-openid", bank["id"], question_id, {
             "action": "answer",
             "isCorrect": True,
@@ -272,8 +282,8 @@ class ExamBankServiceTests(unittest.TestCase):
         self.assertEqual(seen["state"]["status"], "seen")
         self.assertEqual(wrong["state"]["status"], "wrong")
         self.assertEqual(mastered["state"]["status"], "mastered")
-        self.assertEqual(mastered["state"]["answerCount"], 2)
-        self.assertEqual(mastered["state"]["correctCount"], 1)
+        self.assertEqual(mastered["state"]["answerCount"], 3)
+        self.assertEqual(mastered["state"]["correctCount"], 2)
         self.assertEqual(mastered["state"]["wrongCount"], 1)
         self.assertEqual(mastered["state"]["lastMode"], "wrong")
         self.assertEqual(mastered["state"]["lastAnswer"], ["B"])
