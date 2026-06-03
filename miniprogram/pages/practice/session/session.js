@@ -642,7 +642,7 @@ Page({
           total,
           correctCount: correct,
           durationSeconds: 3600 - this.data.timeLeft,
-          passed: score >= 80,
+          passed: score >= 70,
           answers: answerMap,
           submitId: this.data.submitId || '',
           questionOrder: this.data.questions.map(q => q.id)

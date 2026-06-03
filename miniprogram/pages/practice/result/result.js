@@ -15,7 +15,7 @@ Page({
       total: Number(options.total || 0),
       correct: Number(options.correct || 0),
       durationText: `${Math.floor(duration / 60)} 分 ${duration % 60} 秒`,
-      passed: score >= 80
+      passed: score >= 70
     })
   },
 

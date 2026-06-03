@@ -101,7 +101,7 @@
       <view class="mode-card" data-mode="exam" bindtap="startMode">
         <view class="mode-title">模拟考试</view>
         <view class="mode-desc">100 题，60 分钟</view>
-        <view class="mode-detail">80 分及格</view>
+        <view class="mode-detail">70 分及格</view>
       </view>
       <view class="mode-card {{activeBank.studyState.hasWrongQuestions ? '' : 'muted'}}" data-mode="wrong" bindtap="startMode">
         <view class="mode-title">错题回顾</view>
