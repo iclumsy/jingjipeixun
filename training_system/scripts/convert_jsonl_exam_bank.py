@@ -5,12 +5,13 @@ the backend exam-bank uploader, and download referenced images.
 
 Example:
   python3 training_system/scripts/convert_jsonl_exam_bank.py \
-    "/path/to/source.jsonl" \
-    --output training_system/static/data/Q2_限门式起重机.json \
-    --image-dir training_system/static/images/junrui \
+    "/Users/ditto/Documents/junrui/特种设备安全管理(A)_锅炉压力容器压力管道.jsonl" \
+    --output training_system/static/data/A_锅炉压力容器压力管道安全管理.json \
+    --image-dir training_system/static/images/junru/Users/ditto/Movies/精技/download_douyin.py /Users/ditto/Movies/精技/7628545398097028782_很详细的叉车实操考试流程，看这个视频就够了！ #叉车证#叉车考试 #实操考试#考试路线#考试细节.mp4 /Users/ditto/Movies/精技/head_swap_video.py /Users/ditto/Movies/精技/inswapper_128.onnx /Users/ditto/Movies/精技/face_swap_video.py /Users/ditto/Movies/精技/7644872558579815012_N1叉车证支持开哪些车型 一条视频给你讲明白#嵊州 #n1叉车证 #叉车证 #叉车实际操作 #叉车培训考证.mp4i \
     --image-base-url http://file.tskspx.cn \
-    --image-prefix menshi_
+    --image-prefix guoluguanli_
 """
+
 import argparse
 import html
 import json
