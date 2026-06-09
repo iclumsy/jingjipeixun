@@ -145,7 +145,8 @@ function normalizeLearningStatus(result = {}) {
       bestScoreText: bestScore === null || bestScore === '' ? '-' : `${bestScore}分`,
       passCount: Number(summary.passCount || 0),
       latestPassed: !!summary.latestPassed,
-      latestDurationText: summary.latestDurationText || ''
+      latestDurationText: summary.latestDurationText || '',
+      studyDurationText: summary.studyDurationText || '-'
     },
     examStats: {
       count: Number(examStats.count || 0),
@@ -615,13 +616,25 @@ Page({
   },
 
   async onLearningStatusTap(e) {
-    const { id } = e.currentTarget.dataset
+    const { id, name } = e.currentTarget.dataset
     if (!id) {
       wx.showToast({ title: '记录ID不存在', icon: 'none' })
       return
     }
 
-    const student = this.data.records.find(item => String(item._id) === String(id)) || { _id: id }
+    let student = this.data.records.find(item => String(item._id) === String(id))
+    if (!student) {
+      if (name) {
+        student = { _id: id, name: name }
+      } else {
+        const repItem = this.data.reportList && this.data.reportList.find(item => String(item.id) === String(id))
+        if (repItem) {
+          student = { _id: id, name: repItem.name }
+        } else {
+          student = { _id: id }
+        }
+      }
+    }
     this.setData({
       showLearningStatusModal: true,
       learningStatusStudent: student,

@@ -1113,6 +1113,60 @@ def get_student_learning_status(student):
         if not bank:
             return base
 
+        # 估算学习时长
+        exam_seconds_row = conn.execute(
+            "SELECT SUM(COALESCE(duration_seconds, 0)) FROM mini_exam_records WHERE openid = ? AND bank_id = ?",
+            (openid, bank['id'])
+        ).fetchone()
+        exam_seconds = exam_seconds_row[0] if exam_seconds_row and exam_seconds_row[0] is not None else 0
+
+        states_for_time = conn.execute(
+            """
+            SELECT last_answered_at
+            FROM mini_question_states
+            WHERE openid = ? AND bank_id = ? AND last_answered_at IS NOT NULL AND last_answered_at != ''
+            ORDER BY last_answered_at ASC
+            """,
+            (openid, bank['id'])
+        ).fetchall()
+        
+        practice_seconds = 0
+        from datetime import datetime
+        if states_for_time:
+            parsed_times = []
+            for s in states_for_time:
+                ts = s[0]
+                try:
+                    ts_clean = ts.split(".")[0]
+                    parsed_times.append(datetime.strptime(ts_clean, "%Y-%m-%d %H:%M:%S"))
+                except Exception:
+                    continue
+            if parsed_times:
+                parsed_times.sort()
+                practice_seconds += 15
+                for i in range(1, len(parsed_times)):
+                    diff = (parsed_times[i] - parsed_times[i - 1]).total_seconds()
+                    if 0 < diff <= 300:
+                        practice_seconds += diff
+                    else:
+                        practice_seconds += 15
+
+        total_seconds = int(exam_seconds + practice_seconds)
+        if total_seconds <= 0:
+            study_duration_text = "-"
+        elif total_seconds < 60:
+            study_duration_text = f"{total_seconds}秒"
+        elif total_seconds < 3600:
+            minutes = total_seconds // 60
+            study_duration_text = f"{minutes}分钟"
+        else:
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+            if minutes > 0:
+                study_duration_text = f"{hours}小时{minutes}分"
+            else:
+                study_duration_text = f"{hours}小时"
+
         progress = conn.execute(
             '''
             SELECT *
@@ -1216,6 +1270,7 @@ def get_student_learning_status(student):
         'passCount': pass_count,
         'latestPassed': bool(int(latest.get('passed') or 0)) if latest else False,
         'latestDurationText': _duration_text(latest.get('duration_seconds')) if latest else '',
+        'studyDurationText': study_duration_text,
     })
 
     activities = []

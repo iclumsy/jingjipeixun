@@ -273,7 +273,10 @@
         <view 
           wx:for="{{reportList}}" 
           wx:key="index" 
-          class="student-card report-flat-card"
+          class="student-card report-flat-card tap-feedback"
+          bindtap="onLearningStatusTap"
+          data-id="{{item.id}}"
+          data-name="{{item.name}}"
         >
           <view class="card-main">
             <!-- 第一行：基础身份 + 报考科目 (左侧) + 项目状态 (靠右) -->
@@ -499,7 +502,10 @@
             <view class="learning-progress-bar" style="width: {{learningStatus.summary.studyProgressPercent}}%;"></view>
           </view>
           <view class="learning-progress-note">
-            已答 {{learningStatus.summary.answeredCount}} 题，正确率 {{learningStatus.summary.correctRate}}%，掌握率 {{learningStatus.summary.masteryPercent}}%，最近 {{learningStatus.summary.lastStudyTimeText || '-'}}
+            已答 {{learningStatus.summary.answeredCount}} 题，正确率 {{learningStatus.summary.correctRate}}%，掌握率 {{learningStatus.summary.masteryPercent}}%
+          </view>
+          <view class="learning-progress-note" style="margin-top: 8rpx; color: #1e293b; font-weight: 500;">
+            累计学时：{{learningStatus.summary.studyDurationText || '-'}} · 最近：{{learningStatus.summary.lastStudyTimeText || '-'}}
           </view>
         </view>
 

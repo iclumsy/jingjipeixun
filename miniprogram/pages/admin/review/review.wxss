@@ -1837,9 +1837,15 @@
   border-radius: 8rpx;
 }
 
-.status-active {
+.status-active,
+.status-practicing {
   background-color: #e0f2fe;
   color: #0369a1;
+}
+
+.status-exam_attempted {
+  background-color: #fef3c7;
+  color: #b45309;
 }
 
 .status-passed {
@@ -2085,6 +2091,12 @@
   font-size: 30rpx;
   font-weight: 700;
   color: #1e293b;
+  width: 110rpx;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .std-project {
