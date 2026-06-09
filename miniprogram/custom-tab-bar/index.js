@@ -66,8 +66,8 @@ Component({
       const adminTabs = [
         {
           pagePath: "/pages/admin/review/review",
-          text: "审核管理",
-          iconText: "审"
+          text: "学员管理",
+          iconText: "管"
         }
       ]
 

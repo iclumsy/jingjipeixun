@@ -201,21 +201,29 @@ Page({
     regFormLogAnchor: '',
     regFormLogTitle: '',
 
-    showOperationLogModal: false,
-    operationLogStudent: {},
-    operationLogs: [],
-    operationLogsLoading: false,
-    operationLogsError: '',
-
-    showLearningStatusModal: false,
-    learningStatusStudent: {},
-    learningStatus: normalizeLearningStatus(),
-    learningStatusLoading: false,
-    learningStatusError: '',
-
-    // 更多操作弹窗
+        // 更多操作弹窗
     showMoreActionsModal: false,
-    moreActionsStudent: {}
+    moreActionsStudent: {},
+
+    // 双 Tab 切换属性
+    currentTab: 'review', // review (信息审核) | report (学习统计)
+
+    // 学习统计 Tab 对应的数据状态
+    statusTabs: [
+      { label: '全部', value: 'all' },
+      { label: '学习中', value: 'active' },
+      { label: '已通过', value: 'passed' },
+      { label: '未开始', value: 'not_started' }
+    ],
+    activeStatus: 'all',
+    searchQuery: '',
+    reportList: [],
+    reportPage: 1,
+    reportLimit: 20,
+    reportHasMore: true,
+    reportLoading: false,
+    reportRefreshing: false,
+    reportInitialized: false
   },
 
   async onLoad() {
@@ -312,7 +320,11 @@ Page({
       if (this._skipRefreshOnShow) {
         this._skipRefreshOnShow = false
       } else {
-        await this.refreshAll(true)
+        if (this.data.currentTab === 'review') {
+          await this.refreshAll(true)
+        } else {
+          await this.refreshReportAll()
+        }
       }
       // 定期提醒管理员授权订阅（所有管理员打开此页都会触发检查）
       setTimeout(() => this.promptAdminSubscription(), 800)
@@ -324,13 +336,22 @@ Page({
       wx.stopPullDownRefresh()
       return
     }
-    this.refreshAll(true)
+    if (this.data.currentTab === 'review') {
+      this.refreshAll(true)
+    } else {
+      this.refreshReportAll()
+    }
   },
 
   onReachBottom() {
-    if (!this.ensureAdminAccess(false)) return
-    if (!this.data.loading && this.data.hasMore) {
-      this.loadRecords(false)
+    if (this.data.currentTab === 'review') {
+      if (!this.data.loading && this.data.hasMore) {
+        this.loadRecords(false)
+      }
+    } else {
+      if (!this.data.reportLoading && this.data.reportHasMore) {
+        this.loadReportRecords(false)
+      }
     }
   },
 
@@ -960,5 +981,144 @@ Page({
     if (!id) return
     this.closeMoreActionsModal()
     this.onOperationLogTap({ currentTarget: { dataset: { id } } })
+  },
+
+  // ========== 双 Tab 切换 ==========
+  switchSegmentTab(e) {
+    const tab = e.currentTarget.dataset.tab
+    if (tab === this.data.currentTab) return
+    this.setData({
+      currentTab: tab
+    }, () => {
+      if (tab === 'report' && !this.data.reportInitialized) {
+        this.refreshReportAll()
+      } else if (tab === 'review') {
+        this.refreshAll(true)
+      }
+    })
+  },
+
+  // ========== 学习统计 (Report) 模块业务方法 ==========
+  async refreshReportAll() {
+    this.setData({
+      reportPage: 1,
+      reportHasMore: true
+    }, () => {
+      this.loadReportRecords(true)
+    })
+  },
+
+  async loadReportRecords(refresh = false) {
+    if (this.data.reportLoading) return
+
+    this.setData({
+      reportLoading: true,
+      reportRefreshing: refresh
+    })
+
+    try {
+      const page = refresh ? 1 : this.data.reportPage
+      const result = await api.getLearningStats({
+        search: this.data.searchQuery,
+        status: this.data.activeStatus,
+        page,
+        limit: this.data.reportLimit
+      })
+
+      const currentList = (result.list || []).map(item => ({
+        ...item,
+        expanded: false
+      }))
+
+      const records = refresh ? currentList : this.data.reportList.concat(currentList)
+
+      this.setData({
+        reportList: records,
+        reportPage: page + 1,
+        reportHasMore: !!result.hasMore,
+        reportLoading: false,
+        reportRefreshing: false,
+        reportInitialized: true
+      })
+    } catch (err) {
+      console.error('加载学习统计数据失败:', err)
+      this.setData({
+        reportLoading: false,
+        reportRefreshing: false
+      })
+      wx.showToast({
+        title: err.message || '加载统计失败',
+        icon: 'none'
+      })
+    } finally {
+      wx.stopPullDownRefresh()
+    }
+  },
+
+  onReportStatusTabTap(e) {
+    const { val } = e.currentTarget.dataset
+    if (val === this.data.activeStatus) return
+    this.setData({
+      activeStatus: val
+    }, () => {
+      this.refreshReportAll()
+    })
+  },
+
+  onReportSearchInput(e) {
+    this.setData({
+      searchQuery: e.detail.value
+    })
+  },
+
+  onReportSearchConfirm() {
+    this.refreshReportAll()
+  },
+
+  onReportSearchClear() {
+    this.setData({
+      searchQuery: ''
+    }, () => {
+      this.refreshReportAll()
+    })
+  },
+
+  onReportToggleExpand(e) {
+    const index = e.currentTarget.dataset.index
+    const expandedKey = `reportList[${index}].expanded`
+    this.setData({
+      [expandedKey]: !this.data.reportList[index].expanded
+    })
+  },
+
+  onReportCallStudent(e) {
+    const { phone } = e.currentTarget.dataset
+    if (!phone) {
+      wx.showToast({
+        title: '手机号不存在',
+        icon: 'none'
+      })
+      return
+    }
+    wx.makePhoneCall({
+      phoneNumber: phone,
+      fail: () => {}
+    })
+  },
+
+  onReportCopyPhoneAndNotify(e) {
+    const { phone, name } = e.currentTarget.dataset
+    if (!phone) return
+    wx.setClipboardData({
+      data: phone,
+      success: () => {
+        wx.showModal({
+          title: '复制成功',
+          content: `已复制学员 ${name} 的手机号/微信号 (${phone})。可以打开微信搜索联系他督促学习。`,
+          showCancel: false,
+          confirmText: '我知道了'
+        })
+      }
+    })
   }
 })

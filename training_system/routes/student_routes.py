@@ -2657,3 +2657,258 @@ def dashboard_stats_route():
     except Exception as e:
         current_app.logger.exception('Error getting dashboard stats')
         return build_internal_error_response('获取统计数据失败')
+
+
+@student_bp.route('/api/miniprogram/admin/learning_stats', methods=['GET'])
+@mini_admin_required
+def get_miniprogram_admin_learning_stats_route():
+    """
+    小程序管理员专用的学员学习统计列表 API。
+    按 (姓名, 手机号) 进行去重聚合，并计算各项目的进度及综合状态。
+    支持关键字过滤和状态过滤，并实现内存分页。
+    """
+    try:
+        from models.student import get_db_connection
+
+        search_query = request.args.get('search', '').strip().lower()
+        status_filter = request.args.get('status', '').strip()  # all, passed, active, not_started
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 20))
+
+        where_clauses = ["status IN ('reviewed', 'registered')"]
+        params = []
+
+        if search_query:
+            where_clauses.append("(LOWER(name) LIKE ? OR phone LIKE ? OR LOWER(exam_project) LIKE ? OR LOWER(project_code) LIKE ?)")
+            search_pattern = f'%{search_query}%'
+            params.extend([search_pattern, search_pattern, search_pattern, search_pattern])
+
+        with get_db_connection() as conn:
+            # 1. 查询基础报考记录 (使用参数化防注入)
+            sql = f"""
+                SELECT id, name, phone, id_card, company, status, exam_project, project_code, training_type, submitter_openid, training_project_id, created_at
+                FROM students
+                WHERE {' AND '.join(where_clauses)}
+                ORDER BY id DESC
+            """
+            rows = conn.execute(sql, params).fetchall()
+            students = [dict(row) for row in rows]
+
+            # 2. 批量预加载所有可用的题库配置 (特种作业/特种设备)
+            banks_rows = conn.execute("""
+                SELECT id, bank_key, display_name, project_code, exam_project, training_project_id, question_count 
+                FROM exam_banks 
+                WHERE is_active = 1
+            """).fetchall()
+            banks = [dict(b) for b in banks_rows]
+
+            # 3. 批量查出各用户在各题库的练习状态统计 (避免循环中N+1查询)
+            qs_rows = conn.execute("""
+                SELECT 
+                    qs.openid,
+                    qs.bank_id,
+                    SUM(CASE WHEN COALESCE(qs.seen_at, '') != '' THEN 1 ELSE 0 END) AS seen_count,
+                    SUM(CASE WHEN qs.status = 'mastered' THEN 1 ELSE 0 END) AS mastered_count,
+                    SUM(CASE WHEN qs.status = 'wrong' THEN 1 ELSE 0 END) AS wrong_count,
+                    COUNT(*) AS touched_count,
+                    MAX(COALESCE(qs.updated_at, qs.created_at)) AS latest_state_updated_at
+                FROM mini_question_states qs
+                JOIN exam_questions eq ON eq.id = qs.question_id AND eq.bank_id = qs.bank_id
+                WHERE eq.is_active = 1
+                GROUP BY qs.openid, qs.bank_id
+            """).fetchall()
+            qs_map = {(r['openid'], r['bank_id']): dict(r) for r in qs_rows}
+
+            # 4. 批量查出各用户在各题库的模拟考试历史统计
+            exam_rows = conn.execute("""
+                SELECT 
+                    openid,
+                    bank_id,
+                    COUNT(*) AS exam_count,
+                    SUM(CASE WHEN COALESCE(passed, 0) = 1 THEN 1 ELSE 0 END) AS pass_count,
+                    MAX(score) AS best_score,
+                    MAX(created_at) AS latest_exam_created_at
+                FROM mini_exam_records
+                GROUP BY openid, bank_id
+            """).fetchall()
+            exam_map = {(r['openid'], r['bank_id']): dict(r) for r in exam_rows}
+
+        # 辅助匹配内存中题库
+        def find_bank_in_memory(student_item):
+            t_id = student_item.get('training_project_id')
+            p_code = str(student_item.get('project_code') or '').strip()
+            e_proj = str(student_item.get('exam_project') or '').strip()
+            t_type = student_item.get('training_type') or 'special_operation'
+
+            if t_id is not None:
+                for b in banks:
+                    if b.get('training_project_id') == t_id:
+                        return b
+            for b in banks:
+                if (b.get('project_code') == p_code and 
+                    b.get('exam_project') == e_proj and 
+                    b.get('training_type', 'special_operation') == t_type):
+                    return b
+            return None
+
+        # 内存分组聚合，空值兜底保障聚合唯一性
+        from collections import defaultdict
+        grouped = defaultdict(list)
+        for s in students:
+            name = (s.get('name') or '').strip() or '未知姓名'
+            phone = (s.get('phone') or '').strip() or '未知电话'
+            key = (name, phone)
+            grouped[key].append(s)
+
+        aggregated_list = []
+        for (name, phone), items in grouped.items():
+            subjects = []
+            total_done = 0
+            total_question = 0
+            total_mastered = 0
+            total_wrong = 0
+            latest_time = ''
+
+            for item in items:
+                openid = item.get('submitter_openid')
+                bank = find_bank_in_memory(item)
+
+                q_count = 0
+                d_count = 0
+                m_count = 0
+                w_count = 0
+                progress_percent = 0
+                exam_count = 0
+                best_score = None
+                last_time = ''
+                state = 'not_started'
+                state_text = '未开始'
+
+                if openid and bank:
+                    q_count = int(bank.get('question_count') or 0)
+                    map_key = (openid, bank['id'])
+
+                    qs_info = qs_map.get(map_key, {})
+                    m_count = int(qs_info.get('mastered_count') or 0)
+                    w_count = int(qs_info.get('wrong_count') or 0)
+                    touched_count = int(qs_info.get('touched_count') or 0)
+                    d_count = m_count + w_count
+
+                    ex_info = exam_map.get(map_key, {})
+                    exam_count = int(ex_info.get('exam_count') or 0)
+                    pass_count = int(ex_info.get('pass_count') or 0)
+                    best_score = ex_info.get('best_score')
+                    if best_score is not None:
+                        best_score = int(best_score)
+
+                    progress_percent = round(touched_count * 100 / q_count) if q_count else 0
+
+                    if pass_count > 0:
+                        state = 'passed'
+                        state_text = '已通过'
+                    elif exam_count > 0:
+                        state = 'exam_attempted'
+                        state_text = '已模考'
+                    elif touched_count > 0:
+                        state = 'practicing'
+                        state_text = '练习中'
+                    else:
+                        state = 'not_started'
+                        state_text = '未开始'
+
+                    times = []
+                    if qs_info.get('latest_state_updated_at'):
+                        times.append(qs_info['latest_state_updated_at'])
+                    if ex_info.get('latest_exam_created_at'):
+                        times.append(ex_info['latest_exam_created_at'])
+                    if times:
+                        raw_time = max(times)
+                        last_time = raw_time.strip().replace('T', ' ')
+                        if len(last_time) >= 16:
+                            last_time = last_time[:16]
+
+                elif not openid:
+                    state_text = '未绑定'
+
+                total_done += d_count
+                total_question += q_count
+                total_mastered += m_count
+                total_wrong += w_count
+
+                if last_time and last_time != '-':
+                    if not latest_time or last_time > latest_time:
+                        latest_time = last_time
+
+                subjects.append({
+                    'id': item.get('id'),
+                    'examProject': item.get('exam_project') or '',
+                    'projectCode': item.get('project_code') or '',
+                    'state': state,
+                    'stateText': state_text,
+                    'doneCount': d_count,
+                    'questionCount': q_count,
+                    'progressPercent': progress_percent,
+                    'masteredCount': m_count,
+                    'wrongCount': w_count,
+                    'examCount': exam_count,
+                    'bestScore': best_score,
+                    'lastStudyTimeText': last_time or '-'
+                })
+
+            has_passed = any(sub['state'] == 'passed' for sub in subjects)
+            has_active = any(sub['state'] in ('practicing', 'exam_attempted') for sub in subjects)
+
+            if has_passed:
+                overall_state = 'passed'
+                overall_state_text = '已通过'
+            elif has_active:
+                overall_state = 'active'
+                overall_state_text = '学习中'
+            else:
+                overall_state = 'not_started'
+                overall_state_text = '未开始'
+
+            total_percent = int((total_done / total_question) * 100) if total_question > 0 else 0
+            company = items[0].get('company') or ''
+
+            aggregated_list.append({
+                'name': name,
+                'phone': phone,
+                'company': company,
+                'subjects': subjects,
+                'overallState': overall_state,
+                'overallStateText': overall_state_text,
+                'totalDone': total_done,
+                'totalQuestion': total_question,
+                'totalMastered': total_mastered,
+                'totalWrong': total_wrong,
+                'totalPercent': total_percent,
+                'lastStudyTimeText': latest_time or '-'
+            })
+
+        # 状态过滤
+        filtered_list = []
+        for student in aggregated_list:
+            if status_filter and status_filter != 'all':
+                if student['overallState'] != status_filter:
+                    continue
+            filtered_list.append(student)
+
+        total_count = len(filtered_list)
+        start = (page - 1) * limit
+        end = start + limit
+        sliced = filtered_list[start:end]
+        has_more = end < total_count
+
+        return jsonify({
+            'success': True,
+            'list': sliced,
+            'total': total_count,
+            'page': page,
+            'limit': limit,
+            'hasMore': has_more
+        })
+    except Exception as e:
+        current_app.logger.exception('Error in miniprogram admin learning_stats API')
+        return build_internal_error_response('加载学习统计数据失败')
+

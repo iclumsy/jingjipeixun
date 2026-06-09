@@ -1237,6 +1237,19 @@ async function downloadRegForm(studentId, name, idCard) {
 }
 
 
+/**
+ * 获取学员学习统计列表（管理员专属）。
+ * @param {Object} params - { search, status, page, limit }
+ * @returns {Promise<Object>} { list, total, page, limit, hasMore }
+ */
+function getLearningStats(params = {}) {
+  return requestApi('/api/miniprogram/admin/learning_stats', {
+    method: 'GET',
+    data: params
+  })
+}
+
+
 // ======================== 导出接口 ========================
 module.exports = {
   login,               // 登录
@@ -1244,6 +1257,7 @@ module.exports = {
   syncStudent,          // 同步/查询当前用户的学员记录
   getStudents,          // 获取学员列表
   getStudentDetail,     // 获取学员详情
+  getLearningStats,     // 获取学习统计列表 (新)
   getGeneratedMaterials, // 获取已生成报名材料
   getStudentOperationLogs, // 获取学员操作记录
   getStudentLearningStatus, // 获取学员学习情况
