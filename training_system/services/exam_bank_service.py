@@ -77,8 +77,13 @@ def _normalize_question(question, sort_order):
     if not _has_answer(question):
         raise ValueError(f'第 {sort_order + 1} 道题缺少答案')
 
+    # 校验 source_question_id
+    source_id = str(question.get('id') or '').strip()
+    if not source_id:
+        raise ValueError(f'第 {sort_order + 1} 道题缺少 id 字段（source_question_id）')
+
     return {
-        'source_question_id': str(question.get('id') or ''),
+        'source_question_id': source_id,
         'question_type': _normalize_question_type(question),
         'type_code': question.get('type_code'),
         'question': str(question.get('question') or '').strip(),
@@ -220,6 +225,12 @@ def import_exam_bank(file_stream, filename, training_project_id, display_name=''
     if not normalized_questions:
         raise ValueError('题库不能为空')
 
+    # 检查 source_question_id 是否有重复
+    source_ids = [q['source_question_id'] for q in normalized_questions]
+    duplicates = [sid for sid in set(source_ids) if source_ids.count(sid) > 1]
+    if duplicates:
+        raise ValueError(f'题库中存在重复的题目 ID: {", ".join(duplicates[:5])}{"..." if len(duplicates) > 5 else ""}')
+
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     bank_key = _bank_key_from_filename(filename)
     with get_db_connection() as conn:
@@ -232,6 +243,15 @@ def import_exam_bank(file_stream, filename, training_project_id, display_name=''
             if not existing:
                 raise ValueError('题库不存在')
             bank_id = int(replace_bank_id)
+
+            # 获取旧题库中的题目映射 (source_question_id -> id)
+            old_questions = conn.execute(
+                'SELECT id, source_question_id FROM exam_questions WHERE bank_id = ?',
+                (bank_id,)
+            ).fetchall()
+            old_question_map = {q['source_question_id']: q['id'] for q in old_questions}
+
+            # 更新题库信息
             conn.execute(
                 '''
                 UPDATE exam_banks
@@ -249,9 +269,91 @@ def import_exam_bank(file_stream, filename, training_project_id, display_name=''
                     now, now, bank_id,
                 ),
             )
-            conn.execute('DELETE FROM exam_questions WHERE bank_id = ?', (bank_id,))
-            conn.execute('DELETE FROM mini_question_states WHERE bank_id = ?', (bank_id,))
-            conn.execute('DELETE FROM mini_practice_progress WHERE bank_id = ?', (bank_id,))
+
+            # 智能更新：根据 source_question_id 匹配
+            new_source_ids = set()
+            for item in normalized_questions:
+                source_id = item['source_question_id']
+                new_source_ids.add(source_id)
+
+                if source_id in old_question_map:
+                    # 已存在，更新题目内容（保留原 id），并标记为活跃
+                    old_id = old_question_map[source_id]
+                    conn.execute(
+                        '''
+                        UPDATE exam_questions
+                        SET question_type = ?, type_code = ?, question = ?,
+                            question_html = ?, options_json = ?, answer_json = ?,
+                            analysis = ?, question_images_json = ?, option_images_json = ?,
+                            audio = ?, sort_order = ?, raw_json = ?, is_active = 1
+                        WHERE id = ?
+                        ''',
+                        (
+                            item['question_type'], item['type_code'], item['question'],
+                            item['question_html'], item['options_json'], item['answer_json'],
+                            item['analysis'], item['question_images_json'], item['option_images_json'],
+                            item['audio'], item['sort_order'], item['raw_json'],
+                            old_id,
+                        )
+                    )
+                else:
+                    # 新题目，插入（默认 is_active = 1）
+                    conn.execute(
+                        '''
+                        INSERT INTO exam_questions (
+                            bank_id, source_question_id, question_type, type_code, question,
+                            question_html, options_json, answer_json, analysis,
+                            question_images_json, option_images_json, audio, sort_order,
+                            raw_json, is_active
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                        ''',
+                        (
+                            bank_id, item['source_question_id'], item['question_type'],
+                            item['type_code'], item['question'], item['question_html'],
+                            item['options_json'], item['answer_json'], item['analysis'],
+                            item['question_images_json'], item['option_images_json'],
+                            item['audio'], item['sort_order'], item['raw_json'],
+                        )
+                    )
+
+            # 处理新题库中不存在的旧题目
+            old_source_ids = set(old_question_map.keys())
+            removed_source_ids = old_source_ids - new_source_ids
+
+            for source_id in removed_source_ids:
+                old_id = old_question_map[source_id]
+
+                # 检查是否有学员数据（包括练习记录和考试记录）
+                has_practice_data = conn.execute(
+                    'SELECT COUNT(*) as cnt FROM mini_question_states WHERE question_id = ?',
+                    (old_id,)
+                ).fetchone()['cnt']
+
+                has_exam_data = conn.execute(
+                    '''
+                    SELECT COUNT(*) as cnt FROM mini_exam_records
+                    WHERE bank_id = ? AND (
+                        (json_valid(answers_json) AND json_type(answers_json, '$.' || ?) IS NOT NULL)
+                        OR
+                        (json_valid(question_order) AND EXISTS (
+                            SELECT 1 FROM json_each(question_order) WHERE value = ?
+                        ))
+                    )
+                    ''',
+                    (bank_id, str(old_id), int(old_id))
+                ).fetchone()['cnt']
+
+                if has_practice_data == 0 and has_exam_data == 0:
+                    # 无学员数据，可以删除
+                    conn.execute('DELETE FROM exam_questions WHERE id = ?', (old_id,))
+                else:
+                    # 有学员数据，保留题目但标记为非活跃
+                    conn.execute(
+                        'UPDATE exam_questions SET is_active = 0 WHERE id = ?',
+                        (old_id,)
+                    )
+            row = conn.execute('SELECT * FROM exam_banks WHERE id = ?', (bank_id,)).fetchone()
+            return _row_to_bank(row)
         else:
             cursor = conn.execute(
                 '''
@@ -277,8 +379,8 @@ def import_exam_bank(file_stream, filename, training_project_id, display_name=''
                 bank_id, source_question_id, question_type, type_code, question,
                 question_html, options_json, answer_json, analysis,
                 question_images_json, option_images_json, audio, sort_order,
-                raw_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                raw_json, is_active
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
             ''',
             [
                 (
@@ -354,7 +456,7 @@ def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_i
     offset = (page_no - 1) * page_size
     student_openid = str(openid or '').strip()
     params = [bank_id]
-    where = 'WHERE bank_id = ?'
+    where = 'WHERE bank_id = ? AND is_active = 1'  # 只查询活跃的题目
 
     if mode == 'wrong' and student_openid:
         where += '''
@@ -419,7 +521,7 @@ def get_questions(bank_id, mode='sequential', page=1, limit=20, wrong_question_i
                     COUNT(*) AS touched_count
                 FROM mini_question_states qs
                 JOIN exam_questions eq ON eq.id = qs.question_id
-                {state_where}
+                {state_where} AND eq.is_active = 1
                 ''',
                 state_params,
             ).fetchone()
@@ -471,8 +573,8 @@ def get_next_question(bank_id, mode='sequential', current_question_id=None, ques
             current_id = None
 
     params = [bank_id]
-    where = 'WHERE bank_id = ?'
-    count_where = 'WHERE bank_id = ?'
+    where = 'WHERE bank_id = ? AND is_active = 1'
+    count_where = 'WHERE bank_id = ? AND is_active = 1'
     count_params = [bank_id]
 
     if question_type in ('single', 'multi', 'judge', 'case'):
@@ -624,7 +726,7 @@ def get_next_question(bank_id, mode='sequential', current_question_id=None, ques
                     COUNT(*) AS touched_count
                 FROM mini_question_states qs
                 JOIN exam_questions eq ON eq.id = qs.question_id
-                {state_where}
+                {state_where} AND eq.is_active = 1
                 ''',
                 state_params,
             ).fetchone()
@@ -718,7 +820,20 @@ def _progress_for_banks(conn, openid, bank_ids):
         ''',
         [openid] + list(bank_ids) + ['practice'],
     ).fetchall()
-    return {row['bank_id']: dict(row) for row in rows}
+    result = {}
+    for row in rows:
+        d = dict(row)
+        # 若 last_question_id 指向已下架（is_active=0）的题目，清空以免前端跳转到旧题
+        last_qid = d.get('last_question_id')
+        if last_qid:
+            active = conn.execute(
+                'SELECT 1 FROM exam_questions WHERE id = ? AND is_active = 1',
+                (last_qid,)
+            ).fetchone()
+            if not active:
+                d['last_question_id'] = None
+        result[d['bank_id']] = d
+    return result
 
 
 def _type_counts_for_banks(conn, bank_ids):
@@ -729,7 +844,7 @@ def _type_counts_for_banks(conn, bank_ids):
         f'''
         SELECT bank_id, question_type, COUNT(*) AS count
         FROM exam_questions
-        WHERE bank_id IN ({placeholders})
+        WHERE bank_id IN ({placeholders}) AND is_active = 1
         GROUP BY bank_id, question_type
         ''',
         list(bank_ids),
@@ -756,14 +871,15 @@ def _question_state_counts_for_banks(conn, openid, bank_ids):
     rows = conn.execute(
         f'''
         SELECT
-            bank_id,
-            SUM(CASE WHEN COALESCE(seen_at, '') != '' THEN 1 ELSE 0 END) AS seen_count,
-            SUM(CASE WHEN status = 'mastered' THEN 1 ELSE 0 END) AS mastered_count,
-            SUM(CASE WHEN status = 'wrong' THEN 1 ELSE 0 END) AS wrong_count,
+            qs.bank_id,
+            SUM(CASE WHEN COALESCE(qs.seen_at, '') != '' THEN 1 ELSE 0 END) AS seen_count,
+            SUM(CASE WHEN qs.status = 'mastered' THEN 1 ELSE 0 END) AS mastered_count,
+            SUM(CASE WHEN qs.status = 'wrong' THEN 1 ELSE 0 END) AS wrong_count,
             COUNT(*) AS touched_count
-        FROM mini_question_states
-        WHERE openid = ? AND bank_id IN ({placeholders})
-        GROUP BY bank_id
+        FROM mini_question_states qs
+        JOIN exam_questions eq ON eq.id = qs.question_id
+        WHERE qs.openid = ? AND qs.bank_id IN ({placeholders}) AND eq.is_active = 1
+        GROUP BY qs.bank_id
         ''',
         [openid] + list(bank_ids),
     ).fetchall()
@@ -784,10 +900,11 @@ def _wrong_question_ids_for_banks(conn, openid, bank_ids):
     placeholders = ','.join(['?'] * len(bank_ids))
     rows = conn.execute(
         f'''
-        SELECT bank_id, question_id
-        FROM mini_question_states
-        WHERE openid = ? AND bank_id IN ({placeholders}) AND status = ?
-        ORDER BY updated_at DESC, id DESC
+        SELECT qs.bank_id, qs.question_id
+        FROM mini_question_states qs
+        JOIN exam_questions eq ON eq.id = qs.question_id
+        WHERE qs.openid = ? AND qs.bank_id IN ({placeholders}) AND qs.status = ? AND eq.is_active = 1
+        ORDER BY qs.updated_at DESC, qs.id DESC
         ''',
         [openid] + list(bank_ids) + ['wrong'],
     ).fetchall()
@@ -1009,12 +1126,13 @@ def get_student_learning_status(student):
         state_rows = conn.execute(
             '''
             SELECT
-                SUM(CASE WHEN COALESCE(seen_at, '') != '' THEN 1 ELSE 0 END) AS seen_count,
-                SUM(CASE WHEN status = 'mastered' THEN 1 ELSE 0 END) AS mastered_count,
-                SUM(CASE WHEN status = 'wrong' THEN 1 ELSE 0 END) AS wrong_count,
+                SUM(CASE WHEN COALESCE(qs.seen_at, '') != '' THEN 1 ELSE 0 END) AS seen_count,
+                SUM(CASE WHEN qs.status = 'mastered' THEN 1 ELSE 0 END) AS mastered_count,
+                SUM(CASE WHEN qs.status = 'wrong' THEN 1 ELSE 0 END) AS wrong_count,
                 COUNT(*) AS touched_count
-            FROM mini_question_states
-            WHERE openid = ? AND bank_id = ?
+            FROM mini_question_states qs
+            JOIN exam_questions eq ON eq.id = qs.question_id
+            WHERE qs.openid = ? AND qs.bank_id = ? AND eq.is_active = 1
             ''',
             (openid, bank['id']),
         ).fetchone()
@@ -1279,7 +1397,7 @@ def save_question_state(openid, bank_id, question_id, payload):
             '''
             SELECT id, source_question_id
             FROM exam_questions
-            WHERE bank_id = ? AND (
+            WHERE bank_id = ? AND is_active = 1 AND (
                 CAST(id AS TEXT) = ?
                 OR CAST(source_question_id AS TEXT) = ?
             )
@@ -1487,7 +1605,7 @@ def save_batch_question_states(openid, bank_id, payload):
             f'''
             SELECT id, source_question_id
             FROM exam_questions
-            WHERE bank_id = ? AND (
+            WHERE bank_id = ? AND is_active = 1 AND (
                 CAST(id AS TEXT) IN ({placeholders})
                 OR CAST(source_question_id AS TEXT) IN ({placeholders})
             )

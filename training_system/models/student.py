@@ -330,9 +330,12 @@ def init_db(database_path):
                 option_images_json   TEXT DEFAULT '{}',
                 audio                TEXT,
                 sort_order           INTEGER DEFAULT 0,
-                raw_json             TEXT DEFAULT '{}'
+                raw_json             TEXT DEFAULT '{}',
+                is_active            INTEGER DEFAULT 1
             )
         ''')
+
+        _ensure_column_exists(conn, 'exam_questions', 'is_active', 'is_active INTEGER DEFAULT 1')
 
         conn.execute('''
             CREATE TABLE IF NOT EXISTS mini_practice_progress (
@@ -515,6 +518,17 @@ def init_db(database_path):
             "CREATE INDEX IF NOT EXISTS idx_exam_questions_bank_sort "
             "ON exam_questions(bank_id, sort_order)"
         )
+        try:
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_exam_questions_bank_source_unique "
+                "ON exam_questions(bank_id, source_question_id) "
+                "WHERE source_question_id IS NOT NULL AND source_question_id != ''"
+            )
+        except sqlite3.IntegrityError:
+            print(
+                "[init_db WARNING] 无法创建唯一索引 idx_exam_questions_bank_source_unique，"
+                "可能存在重复的 (bank_id, source_question_id) 数据，请先清理重复数据"
+            )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_practice_progress_openid_bank "
             "ON mini_practice_progress(openid, bank_id)"
