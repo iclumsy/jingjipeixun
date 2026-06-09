@@ -2087,6 +2087,19 @@
   min-width: 0;
 }
 
+.first-right {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  flex-shrink: 0;
+}
+
+.std-time {
+  font-size: 22rpx;
+  color: #64748b;
+  font-weight: 500;
+}
+
 .std-name {
   font-size: 30rpx;
   font-weight: 700;
@@ -2179,4 +2192,98 @@
   background-color: #ecfdf5;
   color: #10b981;
   border: 1rpx solid #d1fae5;
+}
+
+/* 多段式胶囊进度条 */
+.progress-capsule {
+  height: 8rpx;
+  background-color: #f1f5f9;
+  border-radius: 4rpx;
+  display: flex;
+  overflow: hidden;
+  margin: 12rpx 0;
+  width: 100%;
+}
+
+.capsule-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.capsule-fill.mastered {
+  background-color: #10b981;
+}
+
+.capsule-fill.practicing {
+  background-color: #3b82f6;
+}
+
+/* 3列数据网格（按 4:3:3 比例分配） */
+.chip-grid-cols {
+  display: grid;
+  grid-template-columns: 4fr 3fr 3fr;
+  gap: 8rpx;
+  margin-top: 10rpx;
+  width: 100%;
+}
+
+.data-chip {
+  display: flex;
+  align-items: center;
+  font-size: 21rpx;
+  padding: 6rpx 8rpx;
+  border-radius: 8rpx;
+  font-weight: 500;
+  gap: 4rpx;
+  border: 1rpx solid transparent;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.chip-icon {
+  font-size: 23rpx;
+  flex-shrink: 0;
+  margin-right: 8rpx;
+}
+
+.chip-val {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* 进度芯片：淡蓝色 */
+.progress-chip {
+  background-color: #eff6ff;
+  color: #1e40af;
+  border-color: #dbeafe;
+}
+
+/* 模考芯片：无模考为淡灰色，有模考为淡紫色 */
+.exam-chip {
+  background-color: #f8fafc;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+.exam-chip.has-exam {
+  background-color: #faf5ff;
+  color: #6b21a8;
+  border-color: #f3e8ff;
+}
+
+/* 学时芯片：淡青色 */
+.duration-chip {
+  background-color: #ecfeff;
+  color: #0891b2;
+  border-color: #cffafe;
+}
+
+/* 时间芯片：淡砂色/淡黄色 */
+.time-chip {
+  background-color: #fefaf0;
+  color: #b45309;
+  border-color: #fef3c7;
 }

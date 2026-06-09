@@ -1038,10 +1038,32 @@ Page({
         limit: this.data.reportLimit
       })
 
-      const currentList = (result.list || []).map(item => ({
-        ...item,
-        expanded: false
-      }))
+      const currentList = (result.list || []).map(item => {
+        let shortTime = item.lastStudyTimeText || '-'
+        if (shortTime && shortTime.length >= 10 && /^\d{4}-/.test(shortTime)) {
+          shortTime = shortTime.substring(5)
+        }
+        
+        let durationText = '-'
+        const secs = Number(item.studyDurationSeconds || 0)
+        if (secs > 0) {
+          let hoursVal = secs / 3600
+          if (hoursVal > 0 && hoursVal < 0.1) {
+            hoursVal = 0.1
+          }
+          const hoursStr = hoursVal.toFixed(1)
+          durationText = parseFloat(hoursStr) + '小时'
+        } else if (secs === 0 && item.studyDurationText && item.studyDurationText !== '-') {
+          durationText = item.studyDurationText
+        }
+
+        return {
+          ...item,
+          lastStudyTimeText: shortTime,
+          studyDurationText: durationText,
+          expanded: false
+        }
+      })
 
       const records = refresh ? currentList : this.data.reportList.concat(currentList)
 

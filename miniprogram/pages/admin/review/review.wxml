@@ -279,28 +279,37 @@
           data-name="{{item.name}}"
         >
           <view class="card-main">
-            <!-- 第一行：基础身份 + 报考科目 (左侧) + 项目状态 (靠右) -->
+            <!-- 第一行：基础身份 + 报考科目 (左侧) + 最近学习时间 + 项目状态 (靠右) -->
             <view class="card-row-first">
               <view class="first-left">
                 <text class="std-name">{{item.name}}</text>
                 <text class="std-project">{{item.examProject}}<text class="std-code" wx:if="{{item.projectCode}}">({{item.projectCode}})</text></text>
               </view>
-              <view class="status-badge status-{{item.state}}">{{item.stateText}}</view>
+              <view class="first-right">
+                <text class="std-time">📅 {{item.lastStudyTimeText}}</text>
+                <view class="status-badge status-{{item.state}}">{{item.stateText}}</view>
+              </view>
             </view>
             
-            <!-- 第二行：学习与时间数据统计（网页设计精髓） -->
-            <view class="card-row-second">
-              <view class="stat-line">
-                <text class="stat-item">已做: {{item.doneCount}}/{{item.questionCount}} (掌握: {{item.masteredPercent}}%)</text>
-                <text class="stat-divider">·</text>
-                <text class="stat-item">错题: {{item.wrongCount}}</text>
-                <text class="stat-divider">·</text>
-                <text class="stat-item">模考: {{item.examCount}}次({{item.bestScore !== null ? item.bestScore + '分' : '-'}})</text>
+            <!-- 胶囊进度条：绿色代表已掌握，蓝色代表已做但未掌握 -->
+            <view class="progress-capsule">
+              <view class="capsule-fill mastered" style="width: {{item.masteredPercent}}%;"></view>
+              <view class="capsule-fill practicing" style="width: {{(item.progressPercent - item.masteredPercent) > 0 ? (item.progressPercent - item.masteredPercent) : 0}}%;"></view>
+            </view>
+            
+            <!-- 第二行：数据指标列网格 (3列等分对齐) -->
+            <view class="card-row-second chip-grid-cols">
+              <view class="data-chip progress-chip">
+                <text class="chip-icon">📊</text>
+                <text class="chip-val">{{item.doneCount}}/{{item.questionCount}} ({{item.masteredPercent}}%)</text>
               </view>
-              <view class="time-line">
-                <text class="time-item">学时: {{item.studyDurationText}}</text>
-                <text class="time-divider">·</text>
-                <text class="time-item">最近学习: {{item.lastStudyTimeText}}</text>
+              <view class="data-chip exam-chip {{item.examCount > 0 ? 'has-exam' : ''}}">
+                <text class="chip-icon">🏆</text>
+                <text class="chip-val">{{item.examCount}}次{{item.bestScore !== null ? ' (' + item.bestScore + '分)' : ''}}</text>
+              </view>
+              <view class="data-chip duration-chip">
+                <text class="chip-icon">⏱️</text>
+                <text class="chip-val">{{item.studyDurationText}}</text>
               </view>
             </view>
           </view>
