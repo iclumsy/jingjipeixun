@@ -273,97 +273,32 @@
         <view 
           wx:for="{{reportList}}" 
           wx:key="index" 
-          class="student-card {{item.expanded ? 'expanded' : ''}}"
+          class="student-card report-flat-card"
         >
-          <!-- 首屏概要行 (点击展开) -->
-          <view class="card-header" bindtap="onReportToggleExpand" data-index="{{index}}">
-            <view class="info-left">
-              <view class="name-row">
-                <text class="student-name">{{item.name}}</text>
-                <view class="status-badge status-{{item.overallState}}">{{item.overallStateText}}</view>
+          <view class="card-main">
+            <!-- 第一行：基础身份 + 报考科目 (左侧) + 项目状态 (靠右) -->
+            <view class="card-row-first">
+              <view class="first-left">
+                <text class="std-name">{{item.name}}</text>
+                <text class="std-project">{{item.examProject}}<text class="std-code" wx:if="{{item.projectCode}}">({{item.projectCode}})</text></text>
               </view>
-              <view class="company-text" wx:if="{{item.company}}">
-                <text class="icon-company">🏢</text> {{item.company}}
-              </view>
+              <view class="status-badge status-{{item.state}}">{{item.stateText}}</view>
             </view>
             
-            <view class="info-right">
-              <view class="progress-box">
-                <text class="progress-num">{{item.totalPercent}}%</text>
-                <text class="progress-lbl">总进度</text>
+            <!-- 第二行：学习与时间数据统计（网页设计精髓） -->
+            <view class="card-row-second">
+              <view class="stat-line">
+                <text class="stat-item">已做: {{item.doneCount}}/{{item.questionCount}} (掌握: {{item.masteredPercent}}%)</text>
+                <text class="stat-divider">·</text>
+                <text class="stat-item">错题: {{item.wrongCount}}</text>
+                <text class="stat-divider">·</text>
+                <text class="stat-item">模考: {{item.examCount}}次({{item.bestScore !== null ? item.bestScore + '分' : '-'}})</text>
               </view>
-              <view class="arrow-icon {{item.expanded ? 'up' : 'down'}}"></view>
-            </view>
-          </view>
-
-          <!-- 折叠展开的明细行 -->
-          <view class="card-detail" wx:if="{{item.expanded}}">
-            <!-- 项目分割线 -->
-            <view class="detail-divider"></view>
-            
-            <!-- 科目明细列表 -->
-            <view class="subject-title">报考科目与学习记录</view>
-            <view class="subject-list">
-              <view 
-                wx:for="{{item.subjects}}" 
-                wx:for-item="sub" 
-                wx:key="id" 
-                class="subject-item"
-              >
-                <view class="subject-header">
-                  <view class="subject-name-box">
-                    <text class="subject-name">{{sub.examProject}}</text>
-                    <text class="subject-code" wx:if="{{sub.projectCode}}">({{sub.projectCode}})</text>
-                  </view>
-                  <view class="subject-badge sub-status-{{sub.state}}">{{sub.stateText}}</view>
-                </view>
-
-                <!-- 学习细节数据 -->
-                <view class="detail-grid">
-                  <view class="grid-item">
-                    <text class="grid-lbl">答题/总题</text>
-                    <text class="grid-val">{{sub.doneCount}} / {{sub.questionCount}}</text>
-                  </view>
-                  <view class="grid-item">
-                    <text class="grid-lbl">掌握率</text>
-                    <text class="grid-val">{{sub.masteredCount}}题 ({{sub.progressPercent}}%)</text>
-                  </view>
-                  <view class="grid-item">
-                    <text class="grid-lbl">模拟考试</text>
-                    <text class="grid-val">{{sub.examCount}}次</text>
-                  </view>
-                  <view class="grid-item">
-                    <text class="grid-lbl">最高得分</text>
-                    <text class="grid-val {{sub.bestScore >= 60 ? 'pass-score' : ''}}">{{sub.bestScore !== null ? sub.bestScore + '分' : '-'}}</text>
-                  </view>
-                </view>
-
-                <view class="time-row" wx:if="{{sub.lastStudyTimeText}}">
-                  <text class="time-lbl">最近学习时间：</text>
-                  <text class="time-val">{{sub.lastStudyTimeText}}</text>
-                </view>
+              <view class="time-line">
+                <text class="time-item">学时: {{item.studyDurationText}}</text>
+                <text class="time-divider">·</text>
+                <text class="time-item">最近学习: {{item.lastStudyTimeText}}</text>
               </view>
-            </view>
-
-            <!-- 底部督促功能栏 -->
-            <view class="action-bar">
-              <button 
-                class="action-btn call-btn" 
-                bindtap="onReportCallStudent" 
-                data-phone="{{item.phone}}"
-                hover-class="btn-hover"
-              >
-                <text class="btn-icon">📞</text>电话联系
-              </button>
-              <button 
-                class="action-btn wx-btn" 
-                bindtap="onReportCopyPhoneAndNotify" 
-                data-phone="{{item.phone}}" 
-                data-name="{{item.name}}"
-                hover-class="btn-hover"
-              >
-                <text class="btn-icon">💬</text>微信督促
-              </button>
             </view>
           </view>
         </view>
@@ -371,7 +306,7 @@
         <!-- 加载更多 / 到底提示 -->
         <view class="load-more-tip">
           <text wx:if="{{reportLoading}}">正在加载...</text>
-          <text wx:elif="{{!reportHasMore && reportList.length > 0}}">已显示全部学员</text>
+          <text wx:elif="{{!reportHasMore && reportList.length > 0}}">已显示全部学习记录</text>
         </view>
       </view>
 

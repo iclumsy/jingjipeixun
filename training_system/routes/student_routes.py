@@ -2751,154 +2751,186 @@ def get_miniprogram_admin_learning_stats_route():
                     return b
             return None
 
-        # 内存分组聚合，空值兜底保障聚合唯一性
-        from collections import defaultdict
-        grouped = defaultdict(list)
+        # 用于精准估算单门科目学习时长的辅助函数
+        def estimate_subject_study_time(db_conn, student_openid, target_bank_id):
+            # 1. 模拟考试总时长
+            exam_row = db_conn.execute(
+                "SELECT SUM(COALESCE(duration_seconds, 0)) FROM mini_exam_records WHERE openid = ? AND bank_id = ?",
+                (student_openid, target_bank_id)
+            ).fetchone()
+            exam_seconds = exam_row[0] if exam_row and exam_row[0] is not None else 0
+
+            # 2. 刷题练习估计时长
+            states = db_conn.execute(
+                """
+                SELECT last_answered_at
+                FROM mini_question_states
+                WHERE openid = ?
+                  AND bank_id = ?
+                  AND last_answered_at IS NOT NULL
+                  AND last_answered_at != ''
+                ORDER BY last_answered_at ASC
+                """,
+                (student_openid, target_bank_id)
+            ).fetchall()
+            
+            practice_seconds = 0
+            from datetime import datetime
+            if states:
+                parsed_times = []
+                for s in states:
+                    ts = s[0]
+                    try:
+                        ts_clean = ts.split(".")[0]
+                        parsed_times.append(datetime.strptime(ts_clean, "%Y-%m-%d %H:%M:%S"))
+                    except Exception:
+                        continue
+                
+                if parsed_times:
+                    parsed_times.sort()
+                    practice_seconds += 15  # 第一题计 15 秒
+                    for i in range(1, len(parsed_times)):
+                        diff = (parsed_times[i] - parsed_times[i - 1]).total_seconds()
+                        if 0 < diff <= 300:
+                            practice_seconds += diff
+                        else:
+                            practice_seconds += 15
+
+            total_seconds = int(exam_seconds + practice_seconds)
+            if total_seconds <= 0:
+                return total_seconds, "-"
+            elif total_seconds < 60:
+                return total_seconds, f"{total_seconds}秒"
+            elif total_seconds < 3600:
+                minutes = total_seconds // 60
+                return total_seconds, f"{minutes}分钟"
+            else:
+                hours = total_seconds // 3600
+                minutes = (total_seconds % 3600) // 60
+                if minutes > 0:
+                    return total_seconds, f"{hours}小时{minutes}分"
+                return total_seconds, f"{hours}小时"
+
+        # 平铺模式：每个学员报名的每一个科目都是一条独立的展示记录
+        flat_list = []
         for s in students:
             name = (s.get('name') or '').strip() or '未知姓名'
             phone = (s.get('phone') or '').strip() or '未知电话'
-            key = (name, phone)
-            grouped[key].append(s)
+            openid = s.get('submitter_openid')
+            bank = find_bank_in_memory(s)
 
-        aggregated_list = []
-        for (name, phone), items in grouped.items():
-            subjects = []
-            total_done = 0
-            total_question = 0
-            total_mastered = 0
-            total_wrong = 0
-            latest_time = ''
+            q_count = 0
+            d_count = 0
+            m_count = 0
+            w_count = 0
+            progress_percent = 0
+            mastered_percent = 0
+            exam_count = 0
+            best_score = None
+            last_time = ''
+            state = 'not_started'
+            state_text = '未开始'
 
-            for item in items:
-                openid = item.get('submitter_openid')
-                bank = find_bank_in_memory(item)
+            if openid and bank:
+                q_count = int(bank.get('question_count') or 0)
+                map_key = (openid, bank['id'])
 
-                q_count = 0
-                d_count = 0
-                m_count = 0
-                w_count = 0
-                progress_percent = 0
-                exam_count = 0
-                best_score = None
-                last_time = ''
-                state = 'not_started'
-                state_text = '未开始'
+                qs_info = qs_map.get(map_key, {})
+                m_count = int(qs_info.get('mastered_count') or 0)
+                w_count = int(qs_info.get('wrong_count') or 0)
+                touched_count = int(qs_info.get('touched_count') or 0)
+                d_count = m_count + w_count
 
-                if openid and bank:
-                    q_count = int(bank.get('question_count') or 0)
-                    map_key = (openid, bank['id'])
+                ex_info = exam_map.get(map_key, {})
+                exam_count = int(ex_info.get('exam_count') or 0)
+                pass_count = int(ex_info.get('pass_count') or 0)
+                best_score = ex_info.get('best_score')
+                if best_score is not None:
+                    best_score = int(best_score)
 
-                    qs_info = qs_map.get(map_key, {})
-                    m_count = int(qs_info.get('mastered_count') or 0)
-                    w_count = int(qs_info.get('wrong_count') or 0)
-                    touched_count = int(qs_info.get('touched_count') or 0)
-                    d_count = m_count + w_count
+                progress_percent = round(touched_count * 100 / q_count) if q_count else 0
+                mastered_percent = round(m_count * 100 / q_count) if q_count else 0
 
-                    ex_info = exam_map.get(map_key, {})
-                    exam_count = int(ex_info.get('exam_count') or 0)
-                    pass_count = int(ex_info.get('pass_count') or 0)
-                    best_score = ex_info.get('best_score')
-                    if best_score is not None:
-                        best_score = int(best_score)
+                if pass_count > 0:
+                    state = 'passed'
+                    state_text = '已通过'
+                elif exam_count > 0:
+                    state = 'exam_attempted'
+                    state_text = '已模考'
+                elif touched_count > 0:
+                    state = 'practicing'
+                    state_text = '练习中'
+                else:
+                    state = 'not_started'
+                    state_text = '未开始'
 
-                    progress_percent = round(touched_count * 100 / q_count) if q_count else 0
+                times = []
+                if qs_info.get('latest_state_updated_at'):
+                    times.append(qs_info['latest_state_updated_at'])
+                if ex_info.get('latest_exam_created_at'):
+                    times.append(ex_info['latest_exam_created_at'])
+                if times:
+                    raw_time = max(times)
+                    last_time = raw_time.strip().replace('T', ' ')
+                    if len(last_time) >= 16:
+                        last_time = last_time[:16]
+            elif not openid:
+                state_text = '未绑定'
 
-                    if pass_count > 0:
-                        state = 'passed'
-                        state_text = '已通过'
-                    elif exam_count > 0:
-                        state = 'exam_attempted'
-                        state_text = '已模考'
-                    elif touched_count > 0:
-                        state = 'practicing'
-                        state_text = '练习中'
-                    else:
-                        state = 'not_started'
-                        state_text = '未开始'
-
-                    times = []
-                    if qs_info.get('latest_state_updated_at'):
-                        times.append(qs_info['latest_state_updated_at'])
-                    if ex_info.get('latest_exam_created_at'):
-                        times.append(ex_info['latest_exam_created_at'])
-                    if times:
-                        raw_time = max(times)
-                        last_time = raw_time.strip().replace('T', ' ')
-                        if len(last_time) >= 16:
-                            last_time = last_time[:16]
-
-                elif not openid:
-                    state_text = '未绑定'
-
-                total_done += d_count
-                total_question += q_count
-                total_mastered += m_count
-                total_wrong += w_count
-
-                if last_time and last_time != '-':
-                    if not latest_time or last_time > latest_time:
-                        latest_time = last_time
-
-                subjects.append({
-                    'id': item.get('id'),
-                    'examProject': item.get('exam_project') or '',
-                    'projectCode': item.get('project_code') or '',
-                    'state': state,
-                    'stateText': state_text,
-                    'doneCount': d_count,
-                    'questionCount': q_count,
-                    'progressPercent': progress_percent,
-                    'masteredCount': m_count,
-                    'wrongCount': w_count,
-                    'examCount': exam_count,
-                    'bestScore': best_score,
-                    'lastStudyTimeText': last_time or '-'
-                })
-
-            has_passed = any(sub['state'] == 'passed' for sub in subjects)
-            has_active = any(sub['state'] in ('practicing', 'exam_attempted') for sub in subjects)
-
-            if has_passed:
-                overall_state = 'passed'
-                overall_state_text = '已通过'
-            elif has_active:
-                overall_state = 'active'
-                overall_state_text = '学习中'
-            else:
-                overall_state = 'not_started'
-                overall_state_text = '未开始'
-
-            total_percent = int((total_done / total_question) * 100) if total_question > 0 else 0
-            company = items[0].get('company') or ''
-
-            aggregated_list.append({
+            flat_list.append({
+                'id': s.get('id'),
                 'name': name,
                 'phone': phone,
-                'company': company,
-                'subjects': subjects,
-                'overallState': overall_state,
-                'overallStateText': overall_state_text,
-                'totalDone': total_done,
-                'totalQuestion': total_question,
-                'totalMastered': total_mastered,
-                'totalWrong': total_wrong,
-                'totalPercent': total_percent,
-                'lastStudyTimeText': latest_time or '-'
+                'company': s.get('company') or '',
+                'openid': openid,
+                'bankId': bank['id'] if bank else None,
+                'examProject': s.get('exam_project') or '',
+                'projectCode': s.get('project_code') or '',
+                'state': state,
+                'stateText': state_text,
+                'doneCount': d_count,
+                'questionCount': q_count,
+                'progressPercent': progress_percent,
+                'masteredCount': m_count,
+                'masteredPercent': mastered_percent,
+                'wrongCount': w_count,
+                'examCount': exam_count,
+                'bestScore': best_score,
+                'lastStudyTimeText': last_time or '-',
+                'studyDurationText': '-',
+                'studyDurationSeconds': 0
             })
 
         # 状态过滤
         filtered_list = []
-        for student in aggregated_list:
+        for item in flat_list:
             if status_filter and status_filter != 'all':
-                if student['overallState'] != status_filter:
-                    continue
-            filtered_list.append(student)
+                if status_filter == 'active':
+                    if item['state'] not in ('practicing', 'exam_attempted'):
+                        continue
+                elif status_filter == 'passed':
+                    if item['state'] != 'passed':
+                        continue
+                elif status_filter == 'not_started':
+                    if item['state'] != 'not_started':
+                        continue
+            filtered_list.append(item)
 
         total_count = len(filtered_list)
         start = (page - 1) * limit
         end = start + limit
         sliced = filtered_list[start:end]
         has_more = end < total_count
+
+        # 精确估计本页最多 20 条记录的学时
+        with get_db_connection() as conn2:
+            for item in sliced:
+                op_id = item['openid']
+                b_id = item['bankId']
+                if op_id and b_id:
+                    secs, duration_lbl = estimate_subject_study_time(conn2, op_id, b_id)
+                    item['studyDurationText'] = duration_lbl
+                    item['studyDurationSeconds'] = secs
 
         return jsonify({
             'success': True,
