@@ -1010,13 +1010,12 @@ Page({
     this.onRejectTap({ currentTarget: { dataset: { id } } })
   },
 
-  async onMoreExamPassed() {
-    const id = this.data.moreActionsStudent && this.data.moreActionsStudent._id
+  async onMarkExamPassedTap(e) {
+    const id = e.currentTarget.dataset.id
     if (!id) return
     const confirmed = await this.confirmAction('考试通过', '确认将该学员标记为理论考试已通过吗？')
     if (!confirmed) return
 
-    this.closeMoreActionsModal()
     wx.showLoading({ title: '处理中...' })
     try {
       await api.markExamPassed(id)
@@ -1027,6 +1026,13 @@ Page({
       wx.hideLoading()
       wx.showToast({ title: err.message || '操作失败', icon: 'none' })
     }
+  },
+
+  onMoreExamPassed() {
+    const id = this.data.moreActionsStudent && this.data.moreActionsStudent._id
+    if (!id) return
+    this.closeMoreActionsModal()
+    this.onMarkExamPassedTap({ currentTarget: { dataset: { id } } })
   },
 
   // ========== 双 Tab 切换 ==========

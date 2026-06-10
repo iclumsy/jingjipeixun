@@ -191,7 +191,7 @@
               >⋯ 更多操作</button>
             </block>
 
-            <!-- 已报名：操作记录 + 更多操作 -->
+            <!-- 已报名：操作记录 + 考试通过 -->
             <block wx:elif="{{item.status === 'registered'}}">
               <button
                 class="action-btn btn-operation-log"
@@ -199,13 +199,14 @@
                 catchtap="onOperationLogTap"
                 data-id="{{item._id}}"
               >📋 操作记录</button>
-
+              
               <button
-                class="action-btn btn-more"
+                wx:if="{{item.actions.canMarkExamPassed}}"
+                class="action-btn btn-approve"
                 size="mini"
-                catchtap="onMoreActionsTap"
+                catchtap="onMarkExamPassedTap"
                 data-id="{{item._id}}"
-              >⋯ 更多操作</button>
+              >✅ 考试通过</button>
             </block>
 
             <!-- 考试通过：仅保留操作记录 -->
