@@ -2352,7 +2352,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 deleteBtn.style.cssText = 'background: #FFF1F2; color: #BE123C;';
                 deleteBtn.textContent = '🗑️ 删除学员';
                 deleteBtn.onclick = () => {
-                    showRejectDialog(null, true);
+                    showRejectDialog(true);
                 };
                 actionBar.appendChild(deleteBtn);
 
@@ -2615,12 +2615,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
 
-                const rejectBtn = document.createElement('button');
-                rejectBtn.className = 'btn';
-                rejectBtn.style.cssText = 'background: #FEE2E2; color: #EF4444; margin-right: 8px;';
-                rejectBtn.textContent = '↩️ 驳回';
-                rejectBtn.onclick = () => showRejectDialog();
-                actionBar.appendChild(rejectBtn);
+                if (currentStatus === 'rejected') {
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'btn';
+                    deleteBtn.style.cssText = 'background: #FFF1F2; color: #BE123C; margin-right: 8px;';
+                    deleteBtn.textContent = '🗑️ 删除学员';
+                    deleteBtn.onclick = () => showRejectDialog(true);
+                    actionBar.appendChild(deleteBtn);
+                } else {
+                    const rejectBtn = document.createElement('button');
+                    rejectBtn.className = 'btn';
+                    rejectBtn.style.cssText = 'background: #FEE2E2; color: #EF4444; margin-right: 8px;';
+                    rejectBtn.textContent = '↩️ 驳回';
+                    rejectBtn.onclick = () => showRejectDialog();
+                    actionBar.appendChild(rejectBtn);
+                }
             }
             
             // 最后将保存追加进去，使其在最右侧
