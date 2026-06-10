@@ -10,23 +10,29 @@
 脚本只读 SQLite 数据库，不会修改任何业务数据。
 """
 import argparse
-import csv
 import html
 import os
 import sqlite3
+import sys
 from datetime import datetime
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
+from services.exam_bank_service import estimate_subject_study_time
+
 DEFAULT_DB_PATH = os.path.join(BASE_DIR, "database", "students.db")
 ACTIVE_STUDENT_STATUSES = ("reviewed", "registered")
 EXAM_BANK_TRAINING_TYPE = "special_equipment"
 
 STATUS_LABELS = {
     "unreviewed": "待审核",
-    "reviewed": "已通过",
+    "reviewed": "已审核",
     "registered": "已报名",
     "rejected": "已驳回",
+    "exam_passed": "考试通过",
 }
 
 TRAINING_TYPE_LABELS = {
@@ -43,48 +49,7 @@ STATE_TEXTS = {
     "passed": "已通过模拟考试",
 }
 
-CSV_HEADERS = [
-    "学员ID",
-    "姓名",
-    "手机号",
-    "身份证号",
-    "单位",
-    "培训类型",
-    "报名状态",
-    "作业类别",
-    "考试项目",
-    "项目代码",
-    "报名时间",
-    "小程序OpenID",
-    "题库ID",
-    "匹配题库",
-    "题库题量",
-    "学习状态",
-    "已浏览题数",
-    "已答题数",
-    "已掌握题数",
-    "错题数",
-    "未学习题数",
-    "学习覆盖率%",
-    "答题进度%",
-    "掌握率%",
-    "当前正确率%",
-    "练习答题次数",
-    "练习答对次数",
-    "练习答错次数",
-    "最近练习时间",
-    "模拟考试次数",
-    "模考通过次数",
-    "模考最高分",
-    "模考平均分",
-    "最近模考分数",
-    "最近模考结果",
-    "最近模考时间",
-    "最近模考用时秒",
-    "最后学习时间",
-    "学习时长",
-    "学习时长秒",
-]
+
 
 
 def _connect(db_path):
@@ -131,19 +96,9 @@ def _latest_time(*values):
     return max(candidates) if candidates else ""
 
 
-def _default_output_path():
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return os.path.join(BASE_DIR, "database", f"student_learning_report_{timestamp}.csv")
-
-
 def _default_html_output_path():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return os.path.join(BASE_DIR, "database", f"student_learning_report_{timestamp}.html")
-
-
-def _csv_output_for_html(html_path):
-    base, _ext = os.path.splitext(os.path.abspath(html_path))
-    return f"{base}.csv"
 
 
 def _table_exists(conn, table_name):
@@ -324,66 +279,6 @@ def _build_empty_row(student, state, bank=None):
         "学习时长秒": 0,
     }
 
-
-def _estimate_study_time(conn, openid, bank_id):
-    # 1. 模拟考试总时长
-    row = conn.execute(
-        "SELECT SUM(COALESCE(duration_seconds, 0)) FROM mini_exam_records WHERE openid = ? AND bank_id = ?",
-        (openid, bank_id)
-    ).fetchone()
-    exam_seconds = row[0] if row and row[0] is not None else 0
-
-    # 2. 刷题练习估计时长
-    states = conn.execute(
-        """
-        SELECT last_answered_at
-        FROM mini_question_states
-        WHERE openid = ?
-          AND bank_id = ?
-          AND last_answered_at IS NOT NULL
-          AND last_answered_at != ''
-        ORDER BY last_answered_at ASC
-        """,
-        (openid, bank_id)
-    ).fetchall()
-    
-    practice_seconds = 0
-    if states:
-        parsed_times = []
-        for s in states:
-            ts = s[0]
-            try:
-                ts_clean = ts.split(".")[0]
-                parsed_times.append(datetime.strptime(ts_clean, "%Y-%m-%d %H:%M:%S"))
-            except Exception:
-                continue
-        
-        if parsed_times:
-            parsed_times.sort()
-            practice_seconds += 15  # 第一题计 15 秒
-            for i in range(1, len(parsed_times)):
-                diff = (parsed_times[i] - parsed_times[i - 1]).total_seconds()
-                if 0 < diff <= 300:
-                    practice_seconds += diff
-                else:
-                    practice_seconds += 15
-
-    total_seconds = int(exam_seconds + practice_seconds)
-    if total_seconds <= 0:
-        return total_seconds, "-"
-    elif total_seconds < 60:
-        return total_seconds, f"{total_seconds}秒"
-    elif total_seconds < 3600:
-        minutes = total_seconds // 60
-        return total_seconds, f"{minutes}分钟"
-    else:
-        hours = total_seconds // 3600
-        minutes = (total_seconds % 3600) // 60
-        if minutes > 0:
-            return total_seconds, f"{hours}小时{minutes}分"
-        return total_seconds, f"{hours}小时"
-
-
 def _build_report_row(conn, student):
     openid = str(student["submitter_openid"] or "").strip()
     bank = _find_student_bank(conn, student)
@@ -425,7 +320,7 @@ def _build_report_row(conn, student):
         state = "not_started"
 
     row = _build_empty_row(student, state, bank)
-    duration_sec, duration_str = _estimate_study_time(conn, openid, bank["id"])
+    duration_sec, duration_str = estimate_subject_study_time(conn, openid, bank["id"])
     row.update({
         "已浏览题数": seen_count,
         "已答题数": answered_count,
@@ -465,15 +360,6 @@ def collect_report_rows(db_path=DEFAULT_DB_PATH, statuses=None, include_all_stat
         students = _load_students(conn, statuses=statuses, include_all_statuses=include_all_statuses)
         return [_build_report_row(conn, student) for student in students]
 
-
-def write_csv(rows, output_path, encoding="utf-8-sig"):
-    output_dir = os.path.dirname(os.path.abspath(output_path))
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
-    with open(output_path, "w", newline="", encoding=encoding) as fp:
-        writer = csv.DictWriter(fp, fieldnames=CSV_HEADERS, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(rows)
 
 
 def summarize_rows(rows):
@@ -1213,49 +1099,36 @@ def write_html_report(rows, output_path, generated_at=None):
         fp.write(html_doc)
 
 
-def resolve_output_paths(args):
+def resolve_html_path(args):
     output = (args.output or "").strip()
     html_output = (args.html_output or "").strip()
-    csv_output = (args.csv_output or "").strip()
 
     if html_output:
-        html_path = html_output
-    elif output and not output.lower().endswith(".csv"):
-        html_path = output
+        return html_output
+    elif output:
+        return output
     else:
-        html_path = _default_html_output_path()
-
-    if csv_output:
-        csv_path = csv_output
-    elif output and output.lower().endswith(".csv"):
-        csv_path = output
-    else:
-        csv_path = _csv_output_for_html(html_path)
-
-    return html_path, csv_path
+        return _default_html_output_path()
 
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="导出学员学习、练习、模拟考试统计 HTML 报表")
     parser.add_argument("--db", default=DEFAULT_DB_PATH, help=f"SQLite 数据库路径，默认: {DEFAULT_DB_PATH}")
-    parser.add_argument("--output", default="", help="HTML 输出路径；若以 .csv 结尾则兼容为 CSV 输出路径")
+    parser.add_argument("--output", default="", help="HTML 输出路径")
     parser.add_argument("--html-output", default="", help="HTML 输出路径")
-    parser.add_argument("--csv-output", default="", help="CSV 明细输出路径，默认与 HTML 同名")
-    parser.add_argument("--no-csv", action="store_true", help="只生成 HTML，不生成 CSV 明细")
     parser.add_argument(
         "--status",
         action="append",
-        choices=["unreviewed", "reviewed", "registered", "rejected"],
+        choices=["unreviewed", "reviewed", "registered", "rejected", "exam_passed"],
         help="只统计指定报名状态；可重复传入。默认统计 reviewed/registered",
     )
     parser.add_argument("--all-statuses", action="store_true", help="统计全部报名状态")
-    parser.add_argument("--encoding", default="utf-8-sig", help="CSV 编码，默认 utf-8-sig")
     return parser.parse_args(argv)
 
 
 def main(argv=None):
     args = parse_args(argv)
-    html_output, _ = resolve_output_paths(args)
+    html_output = resolve_html_path(args)
     rows = collect_report_rows(
         db_path=args.db,
         statuses=args.status,

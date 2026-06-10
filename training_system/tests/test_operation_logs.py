@@ -72,6 +72,17 @@ class MiniprogramReviewOperationLogUiTests(unittest.TestCase):
         self.assertIn("async onOperationLogTap", js)
         self.assertIn("api.getStudentOperationLogs", js)
         self.assertIn("closeOperationLogModal", js)
+        self.assertIn("function normalizeAdminStatusFilters", js)
+        self.assertIn("FALLBACK_STATUS_FILTERS.map", js)
+        self.assertIn("考试通过", js)
+        self.assertIn("exam_passed", js)
+        self.assertNotIn("onMoreOperationLog", js)
+        self.assertIn("onMoreExamPassed", js)
+        self.assertIn("api.markExamPassed", js)
+        self.assertIn("item.status === 'registered'", wxml)
+        self.assertIn("catchtap=\"onMoreActionsTap\"", wxml)
+        self.assertIn("moreActionsStudent.actions.canMarkExamPassed", wxml)
+        self.assertIn("标记理论考试已通过", wxml)
 
         self.assertIn(".btn-operation-log", wxss)
         self.assertIn("font-size: 18rpx", wxss)
@@ -79,9 +90,8 @@ class MiniprogramReviewOperationLogUiTests(unittest.TestCase):
         self.assertIn("width: 100%", wxss)
         self.assertNotIn("flex: 1 1 0;", wxss)
         self.assertIn(".btn-reject,\n.btn-delete", wxss)
-        self.assertIn("width: 108rpx", wxss)
         self.assertIn(".btn-secondary,\n.btn-operation-log", wxss)
-        self.assertIn("width: 160rpx", wxss)
+        self.assertNotIn("more-action-log", wxml)
 
 
 class WebStudentDetailLearningStatusUiTests(unittest.TestCase):
@@ -156,6 +166,30 @@ class OperationLogTests(unittest.TestCase):
             "application_type": "new_exam",
             "files": files,
         }
+
+    def insert_student(self, db_path, status):
+        conn = sqlite3.connect(db_path)
+        try:
+            cursor = conn.execute(
+                "INSERT INTO students (name, gender, education, id_card, phone, "
+                "company, job_category, training_type, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    "张三",
+                    "男",
+                    "高中或同等学历",
+                    "110101199001011234",
+                    "13800138000",
+                    "测试单位",
+                    "叉车司机",
+                    "special_equipment",
+                    status,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            conn.close()
 
     def test_init_db_creates_operation_logs_table(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -264,6 +298,66 @@ class OperationLogTests(unittest.TestCase):
         self.assertEqual(row["action"], "student_created")
         self.assertEqual(row["action_label"], "提交报名")
         self.assertEqual(row["status"], "success")
+
+    def test_mark_exam_passed_route_allows_reviewed_and_registered_students(self):
+        for initial_status in ("reviewed", "registered"):
+            with self.subTest(initial_status=initial_status):
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    db_path = os.path.join(tmp_dir, "students.db")
+                    students_dir = os.path.join(tmp_dir, "students")
+                    student_model.init_db(db_path)
+                    student_id = self.insert_student(db_path, initial_status)
+                    app = self.build_app(tmp_dir, db_path, students_dir)
+
+                    response = app.test_client().post(f"/api/students/{student_id}/mark_exam_passed")
+
+                    self.assertEqual(response.status_code, 200, response.get_json())
+                    data = response.get_json()
+                    self.assertEqual(data["student"]["status"], "exam_passed")
+                    self.assertEqual(data["student"]["statusText"], "考试通过")
+
+                    conn = sqlite3.connect(db_path)
+                    conn.row_factory = sqlite3.Row
+                    try:
+                        student_row = conn.execute(
+                            "SELECT status FROM students WHERE id = ?",
+                            (student_id,),
+                        ).fetchone()
+                        log_row = conn.execute(
+                            "SELECT action, action_label, status FROM operation_logs "
+                            "WHERE student_id = ? ORDER BY id DESC LIMIT 1",
+                            (student_id,),
+                        ).fetchone()
+                    finally:
+                        conn.close()
+
+                    self.assertEqual(student_row["status"], "exam_passed")
+                    self.assertEqual(log_row["action"], "student_exam_passed")
+                    self.assertEqual(log_row["action_label"], "考试通过")
+                    self.assertEqual(log_row["status"], "success")
+
+    def test_mark_exam_passed_route_rejects_unreviewed_students(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = os.path.join(tmp_dir, "students.db")
+            students_dir = os.path.join(tmp_dir, "students")
+            student_model.init_db(db_path)
+            student_id = self.insert_student(db_path, "unreviewed")
+            app = self.build_app(tmp_dir, db_path, students_dir)
+
+            response = app.test_client().post(f"/api/students/{student_id}/mark_exam_passed")
+
+            self.assertEqual(response.status_code, 400, response.get_json())
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            try:
+                student_row = conn.execute(
+                    "SELECT status FROM students WHERE id = ?",
+                    (student_id,),
+                ).fetchone()
+            finally:
+                conn.close()
+
+        self.assertEqual(student_row["status"], "unreviewed")
 
 
 if __name__ == "__main__":

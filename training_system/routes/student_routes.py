@@ -12,6 +12,7 @@ API 端点列表:
     POST   /api/miniprogram/upload              - 小程序表单提交前预上传附件
     POST   /api/students/<id>/reject            - 驳回学员（更新状态或删除）
     POST   /api/students/<id>/approve           - 审核通过学员
+    POST   /api/students/<id>/mark_exam_passed  - 标记理论考试通过
     GET    /api/students/<id>/attachments.zip   - 打包下载学员所有附件
     GET    /api/companies                       - 获取公司名称列表
 
@@ -87,6 +88,8 @@ REQUIRED_ATTACHMENTS_BY_APPLICATION = {
     ('special_equipment', 'new_exam'): REQUIRED_ATTACHMENTS['special_equipment'],
     ('special_equipment', 'renewal'): ['photo', 'certificate_info_page', 'certificate_records_page'],
 }
+
+PROCESSED_STUDENT_STATUSES = ('reviewed', 'registered', 'exam_passed')
 
 MATERIAL_TYPE_ALIASES = {
     'photo': 'photo',
@@ -550,7 +553,7 @@ def create_student_route():
                 )
             ).fetchone()
             if existing:
-                if existing['status'] in ('unreviewed', 'reviewed', 'registered'):
+                if existing['status'] in ('unreviewed', *PROCESSED_STUDENT_STATUSES):
                     raise AppError('该项目您已有正在处理或已通过的报名，请勿重复提交', status_code=400)
                 elif existing['status'] == 'rejected':
                     rejected_id = existing['id']
@@ -992,7 +995,7 @@ def update_student_route(id):
                 del updates['status']
                 
             # 2. 防止 ABA 并发流转：如果此时数据库已经是通过/已报名状态（管理员已处理），报错拦截
-            if current_student.get('status') in ('reviewed', 'registered'):
+            if current_student.get('status') in PROCESSED_STUDENT_STATUSES:
                 raise AppError('管理员已审核通过或已完成报名，无法再提交修改', status_code=403)
                 
             # 3. 强制降维：既然他确实重新编辑并提交了图片或文字，强制恢复为待审核状态
@@ -1506,6 +1509,57 @@ def approve_student_route(id):
         return build_internal_error_response('审核学员失败，请稍后重试')
 
 
+@student_bp.route('/api/students/<int:id>/mark_exam_passed', methods=['POST'])
+@mini_admin_required
+def mark_exam_passed_route(id):
+    """将已审核或已报名学员标记为理论考试通过。"""
+    try:
+        current_student = get_student_by_id(id)
+        current_status = current_student.get('status', '')
+        if current_status not in ('reviewed', 'registered'):
+            raise AppError('仅支持已审核或已报名学员标记考试通过', status_code=400)
+
+        student = update_student(id, {
+            'status': 'exam_passed',
+            'reject_reason': '',
+        })
+
+        operator = log_operator_name()
+        client_ip = get_client_ip(request)
+        student_name = student.get('name', '')
+        submitter = resolve_openid_name(student.get('submitter_openid', ''))
+        current_app.logger.info(
+            f'[考试通过] 操作人={operator} IP={client_ip} '
+            f'学员ID={id} 姓名={student_name} 提交人={submitter}'
+        )
+        log_student_operation(
+            id,
+            'student_exam_passed',
+            '考试通过',
+            message='理论考试已通过',
+            before={'status': current_status},
+            after={'status': student.get('status', '')},
+            metadata={
+                'name': student_name,
+                'submitter': submitter,
+            }
+        )
+
+        return jsonify({
+            'success': True,
+            'message': '已标记考试通过',
+            'student': enrich_student(student),
+        })
+
+    except NotFoundError as e:
+        return jsonify(e.to_dict()), e.status_code
+    except AppError as e:
+        return jsonify(e.to_dict()), e.status_code
+    except Exception:
+        current_app.logger.exception('Error marking exam passed for student %s', id)
+        return build_internal_error_response('标记考试通过失败，请稍后重试')
+
+
 @student_bp.route('/api/students/<int:id>/swap_materials', methods=['POST'])
 @mini_admin_required
 def swap_materials_route(id):
@@ -1645,8 +1699,8 @@ def activate_card_route(id):
         # 仅特种设备且已审核或已报名的学员可以开卡
         if student.get('training_type') != 'special_equipment':
             return jsonify({'error': '仅特种设备学员可以开卡'}), 400
-        if student.get('status') not in ('reviewed', 'registered'):
-            return jsonify({'error': '仅审核通过或已报名的学员可以开卡'}), 400
+        if student.get('status') not in PROCESSED_STUDENT_STATUSES:
+            return jsonify({'error': '仅已审核、已报名或考试通过的学员可以开卡'}), 400
 
         # 防止重复开卡
         if student.get('card_activated'):
@@ -1758,9 +1812,9 @@ def download_attachments_zip_route(id):
 
         student = get_student_by_id(id)
 
-        # 仅允许下载已审核或已报名学员的附件
-        if student.get('status') not in ('reviewed', 'registered'):
-            return jsonify({'error': '仅支持已审核或已报名学员打包下载'}), 400
+        # 仅允许下载已审核、已报名或考试通过学员的附件
+        if student.get('status') not in PROCESSED_STUDENT_STATUSES:
+            return jsonify({'error': '仅支持已审核、已报名或考试通过学员打包下载'}), 400
 
         # 需要打包的附件字段列表
         attachment_keys = [
@@ -1859,8 +1913,8 @@ def download_training_form_route(id):
         student = get_student_by_id(id)
 
 
-        if student.get('status') not in ('reviewed', 'registered'):
-            return jsonify({'error': '仅支持已审核或已报名学员下载体检表'}), 400
+        if student.get('status') not in PROCESSED_STUDENT_STATUSES:
+            return jsonify({'error': '仅支持已审核、已报名或考试通过学员下载体检表'}), 400
 
         rel = student.get('training_form_path', '')
         if not rel:
@@ -1907,8 +1961,8 @@ def regenerate_training_form_route(id):
     """
     try:
         student = get_student_by_id(id)
-        if student.get('status') not in ('reviewed', 'registered'):
-            return jsonify({'error': '仅支持已审核学员重新生成体检表'}), 400
+        if student.get('status') not in PROCESSED_STUDENT_STATUSES:
+            return jsonify({'error': '仅支持已审核、已报名或考试通过学员重新生成体检表'}), 400
 
         health_check_path = generate_health_check_form(
             student,
@@ -1960,8 +2014,8 @@ def generate_materials_route(id):
     try:
 
         student = get_student_by_id(id)
-        if student.get('status') not in ('reviewed', 'registered'):
-            return jsonify({'error': '仅支持已审核或已报名学员生成报名材料'}), 400
+        if student.get('status') not in PROCESSED_STUDENT_STATUSES:
+            return jsonify({'error': '仅支持已审核、已报名或考试通过学员生成报名材料'}), 400
             
         from services.material_service import generate_student_materials, generate_health_check_form
         import io as _io
@@ -2286,8 +2340,8 @@ def regenerate_material_route(id):
     try:
 
         student = get_student_by_id(id)
-        if student.get('status') not in ('reviewed', 'registered'):
-            return jsonify({'error': '仅支持已审核或已报名学员'}), 400
+        if student.get('status') not in PROCESSED_STUDENT_STATUSES:
+            return jsonify({'error': '仅支持已审核、已报名或考试通过学员'}), 400
 
         data = request.get_json(silent=True) or {}
         material_type = normalize_material_type(data.get('material_type', ''))
@@ -2477,8 +2531,8 @@ def download_materials_zip_route(id):
     try:
 
         student = get_student_by_id(id)
-        if student.get('status') not in ('reviewed', 'registered'):
-            return jsonify({'error': '仅支持已审核或已报名学员打包下载'}), 400
+        if student.get('status') not in PROCESSED_STUDENT_STATUSES:
+            return jsonify({'error': '仅支持已审核、已报名或考试通过学员打包下载'}), 400
             
         id_card = student.get('id_card', '')
         name = student.get('name', '')
@@ -2753,63 +2807,7 @@ def get_miniprogram_admin_learning_stats_route():
 
         # 用于精准估算单门科目学习时长的辅助函数
         def estimate_subject_study_time(db_conn, student_openid, target_bank_id):
-            # 1. 模拟考试总时长
-            exam_row = db_conn.execute(
-                "SELECT SUM(COALESCE(duration_seconds, 0)) FROM mini_exam_records WHERE openid = ? AND bank_id = ?",
-                (student_openid, target_bank_id)
-            ).fetchone()
-            exam_seconds = exam_row[0] if exam_row and exam_row[0] is not None else 0
-
-            # 2. 刷题练习估计时长
-            states = db_conn.execute(
-                """
-                SELECT last_answered_at
-                FROM mini_question_states
-                WHERE openid = ?
-                  AND bank_id = ?
-                  AND last_answered_at IS NOT NULL
-                  AND last_answered_at != ''
-                ORDER BY last_answered_at ASC
-                """,
-                (student_openid, target_bank_id)
-            ).fetchall()
-            
-            practice_seconds = 0
-            from datetime import datetime
-            if states:
-                parsed_times = []
-                for s in states:
-                    ts = s[0]
-                    try:
-                        ts_clean = ts.split(".")[0]
-                        parsed_times.append(datetime.strptime(ts_clean, "%Y-%m-%d %H:%M:%S"))
-                    except Exception:
-                        continue
-                
-                if parsed_times:
-                    parsed_times.sort()
-                    practice_seconds += 15  # 第一题计 15 秒
-                    for i in range(1, len(parsed_times)):
-                        diff = (parsed_times[i] - parsed_times[i - 1]).total_seconds()
-                        if 0 < diff <= 300:
-                            practice_seconds += diff
-                        else:
-                            practice_seconds += 15
-
-            total_seconds = int(exam_seconds + practice_seconds)
-            if total_seconds <= 0:
-                return total_seconds, "-"
-            elif total_seconds < 60:
-                return total_seconds, f"{total_seconds}秒"
-            elif total_seconds < 3600:
-                minutes = total_seconds // 60
-                return total_seconds, f"{minutes}分钟"
-            else:
-                hours = total_seconds // 3600
-                minutes = (total_seconds % 3600) // 60
-                if minutes > 0:
-                    return total_seconds, f"{hours}小时{minutes}分"
-                return total_seconds, f"{hours}小时"
+            return exam_bank_service.estimate_subject_study_time(db_conn, student_openid, target_bank_id)
 
         # 平铺模式：每个学员报名的每一个科目都是一条独立的展示记录
         flat_list = []
@@ -2943,4 +2941,3 @@ def get_miniprogram_admin_learning_stats_route():
     except Exception as e:
         current_app.logger.exception('Error in miniprogram admin learning_stats API')
         return build_internal_error_response('加载学习统计数据失败')
-

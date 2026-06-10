@@ -5,7 +5,7 @@
 状态枚举、按钮显隐逻辑、培训类型/报名类型文案、标签规则等。
 
 派生字段清单（仅追加，绝不修改原字段）:
-    - statusText            状态文案（"待审核"/"已通过"/"已报名"/"已驳回"）
+    - statusText            状态文案（"待审核"/"已审核"/"已报名"/"已驳回"/"考试通过"）
     - statusClass           状态 CSS 类（直接等于 status）
     - statusHint            用户端详情页提示文案
     - trainingTypeText      培训类型文案（"特种作业"/"特种设备"）
@@ -27,9 +27,10 @@ from flask import current_app
 
 _STATUS_TEXT = {
     'unreviewed': '待审核',
-    'reviewed': '已通过',
+    'reviewed': '已审核',
     'registered': '已报名',
     'rejected': '已驳回',
+    'exam_passed': '考试通过',
 }
 
 _STATUS_HINT = {
@@ -37,6 +38,7 @@ _STATUS_HINT = {
     'reviewed': '资料已审核通过，可在后台继续办理',
     'registered': '已提交报名到省网平台',
     'rejected': '资料已被驳回，可修改后重新提交',
+    'exam_passed': '理论考试已通过',
 }
 
 _TRAINING_TYPE_TEXT = {
@@ -55,24 +57,26 @@ def _build_actions(s):
     status = s.get('status') or ''
     tt = s.get('training_type') or ''
     is_se = tt == 'special_equipment'
-    is_passed = status in ('reviewed', 'registered')
+    is_passed = status in ('reviewed', 'registered', 'exam_passed')
     has_health_form = bool(s.get('training_form_path'))
     card_activated = bool(s.get('card_activated'))
 
     return {
         'canApprove': status == 'unreviewed',
-        # 已报名的学员需要先到省网平台撤销，不可直接驳回
-        'canReject': status != 'registered',
+        # 已报名或考试通过的学员不可直接驳回
+        'canReject': status not in ('registered', 'exam_passed'),
         'canDelete': True,
         # 仅特种设备且已审核（未报名）可触发省网报名
         'canSubmitReg': is_se and status == 'reviewed',
+        # 已审核或已报名的学员可推进为理论考试通过
+        'canMarkExamPassed': status in ('reviewed', 'registered'),
         # 特种设备已审核/已报名且未开过卡，可开学习卡
         'canActivateCard': is_se and is_passed and not card_activated,
         # 已开卡后可查询卡信息
         'canQueryCard': is_se and is_passed and card_activated,
-        # 已报名后才能下载省网申请表
-        'canDownloadRegForm': status == 'registered',
-        # 已审核或已报名且体检表存在时可下载
+        # 已报名或考试通过后才能下载省网申请表
+        'canDownloadRegForm': status in ('registered', 'exam_passed'),
+        # 已审核、已报名或考试通过且体检表存在时可下载
         'canDownloadHealthForm': is_passed and has_health_form,
         # 用户端：仅被驳回可跳编辑页（与小程序当前行为一致）
         'canEdit': status == 'rejected',
@@ -107,6 +111,8 @@ def _build_action_list(actions):
     items.append({'key': 'delete', 'label': '删除', 'icon': '🗑️', 'style': 'danger'})
     if actions.get('canSubmitReg'):
         items.append({'key': 'submit_register', 'label': '提交报名', 'icon': '🚀', 'style': 'secondary'})
+    if actions.get('canMarkExamPassed'):
+        items.append({'key': 'mark_exam_passed', 'label': '考试通过', 'icon': '✅', 'style': 'secondary'})
     return items
 
 

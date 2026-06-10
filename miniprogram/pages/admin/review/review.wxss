@@ -59,6 +59,14 @@
   margin-bottom: 0;
 }
 
+.status-filter-row {
+  gap: 0;
+}
+
+.status-filter-row .chip-list {
+  justify-content: center;
+}
+
 .filter-title {
   width: 76rpx;
   flex: 0 0 76rpx;
@@ -201,6 +209,11 @@
 .badge-registered {
   background: #e0e7ff;
   color: #3730a3;
+}
+
+.badge-exam_passed {
+  background: #dcfce7;
+  color: #166534;
 }
 
 .meta-row {
@@ -384,7 +397,7 @@
   border: 1rpx solid #cbd5e1;
 }
 
-/* 已通过 / 已报名：按钮紧凑右对齐 */
+/* 已审核 / 已报名：按钮紧凑右对齐 */
 .actions-status-reviewed,
 .actions-status-registered {
   justify-content: flex-end;
@@ -427,7 +440,7 @@
   color: #ffffff;
 }
 
-/* 卡片头部「已通过」标签旁的开卡按钮 */
+/* 卡片头部「已审核」标签旁的开卡按钮 */
 .card-head-activate-btn {
   flex-shrink: 0;
   margin: 0;
@@ -1576,8 +1589,8 @@
 .more-action-reject .more-action-label { color: #b45309; }
 .more-action-delete .more-action-icon { background: #fee2e2; }
 .more-action-delete .more-action-label { color: #b91c1c; }
-.more-action-log .more-action-icon { background: #dbeafe; }
-.more-action-log .more-action-label { color: #1d4ed8; }
+.more-action-exam .more-action-icon { background: #dcfce7; }
+.more-action-exam .more-action-label { color: #15803d; }
 
 .more-actions-footer {
   padding: 16rpx 26rpx 28rpx;

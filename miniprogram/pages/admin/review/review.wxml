@@ -24,8 +24,7 @@
           </view>
         </view>
 
-        <view class="filter-row">
-          <view class="filter-title">状态</view>
+        <view class="filter-row status-filter-row">
           <view class="chip-list">
             <view
               wx:for="{{statusFilters}}"
@@ -167,7 +166,7 @@
                 data-id="{{item._id}}"
               >📋 操作记录</button>
             </block>
-            <!-- 已通过：主操作 + 操作记录 + 更多操作 -->
+            <!-- 已审核：主操作 + 操作记录 + 更多操作 -->
             <block wx:elif="{{item.status === 'reviewed'}}">
               <button
                 wx:if="{{item.actions.canSubmitReg}}"
@@ -192,8 +191,25 @@
               >⋯ 更多操作</button>
             </block>
 
-            <!-- 已报名：仅保留可执行项 -->
+            <!-- 已报名：操作记录 + 更多操作 -->
             <block wx:elif="{{item.status === 'registered'}}">
+              <button
+                class="action-btn btn-operation-log"
+                size="mini"
+                catchtap="onOperationLogTap"
+                data-id="{{item._id}}"
+              >📋 操作记录</button>
+
+              <button
+                class="action-btn btn-more"
+                size="mini"
+                catchtap="onMoreActionsTap"
+                data-id="{{item._id}}"
+              >⋯ 更多操作</button>
+            </block>
+
+            <!-- 考试通过：仅保留操作记录 -->
+            <block wx:elif="{{item.status === 'exam_passed'}}">
               <button
                 class="action-btn btn-operation-log"
                 size="mini"
@@ -653,14 +669,15 @@
         </view>
 
         <view
-          class="more-action-item more-action-log"
+          wx:if="{{moreActionsStudent.actions.canMarkExamPassed}}"
+          class="more-action-item more-action-exam"
           hover-class="more-action-hover"
-          catchtap="onMoreOperationLog"
+          catchtap="onMoreExamPassed"
         >
-          <view class="more-action-icon">📋</view>
+          <view class="more-action-icon">✅</view>
           <view class="more-action-text">
-            <text class="more-action-label">操作记录</text>
-            <text class="more-action-desc">查看该学员所有操作历史</text>
+            <text class="more-action-label">考试通过</text>
+            <text class="more-action-desc">标记理论考试已通过</text>
           </view>
           <text class="more-action-arrow">›</text>
         </view>

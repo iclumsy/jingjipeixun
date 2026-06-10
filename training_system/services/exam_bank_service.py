@@ -1078,6 +1078,74 @@ def _format_exam_record(row):
     }
 
 
+def estimate_subject_study_time(conn, openid, bank_id):
+    """
+    估算某位学员在某个题库下的累计学习时长。
+    返回: (total_seconds, duration_text)
+    """
+    # 1. 模拟考试总时长
+    row = conn.execute(
+        "SELECT SUM(COALESCE(duration_seconds, 0)) FROM mini_exam_records WHERE openid = ? AND bank_id = ?",
+        (openid, bank_id)
+    ).fetchone()
+    exam_seconds = row[0] if row and row[0] is not None else 0
+
+    # 2. 刷题练习估计时长（排除 last_mode = 'exam' 的模考做题记录）
+    states = conn.execute(
+        """
+        SELECT last_answered_at
+        FROM mini_question_states
+        WHERE openid = ?
+          AND bank_id = ?
+          AND last_answered_at IS NOT NULL
+          AND last_answered_at != ''
+          AND COALESCE(last_mode, '') != 'exam'
+        ORDER BY last_answered_at ASC
+        """,
+        (openid, bank_id)
+    ).fetchall()
+    
+    practice_seconds = 0
+    from datetime import datetime
+    if states:
+        parsed_times = []
+        for s in states:
+            ts = s[0]
+            try:
+                ts_clean = ts.split(".")[0]
+                parsed_times.append(datetime.strptime(ts_clean, "%Y-%m-%d %H:%M:%S"))
+            except Exception:
+                continue
+        
+        if parsed_times:
+            parsed_times.sort()
+            practice_seconds += 15  # 第一题计 15 秒
+            for i in range(1, len(parsed_times)):
+                diff = (parsed_times[i] - parsed_times[i - 1]).total_seconds()
+                if 0 < diff <= 300:
+                    practice_seconds += diff
+                elif diff == 0:
+                    # 相同时间戳（例如某些批量写入的非exam记录），不增加任何时长
+                    pass
+                else:
+                    practice_seconds += 15
+
+    total_seconds = int(exam_seconds + practice_seconds)
+    if total_seconds <= 0:
+        return total_seconds, "-"
+    elif total_seconds < 60:
+        return total_seconds, f"{total_seconds}秒"
+    elif total_seconds < 3600:
+        minutes = total_seconds // 60
+        return total_seconds, f"{minutes}分钟"
+    else:
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        if minutes > 0:
+            return total_seconds, f"{hours}小时{minutes}分"
+        return total_seconds, f"{hours}小时"
+
+
 def get_student_learning_status(student):
     """汇总管理员查看某个学员学习情况所需的数据。"""
     student = dict(student or {})
@@ -1114,58 +1182,7 @@ def get_student_learning_status(student):
             return base
 
         # 估算学习时长
-        exam_seconds_row = conn.execute(
-            "SELECT SUM(COALESCE(duration_seconds, 0)) FROM mini_exam_records WHERE openid = ? AND bank_id = ?",
-            (openid, bank['id'])
-        ).fetchone()
-        exam_seconds = exam_seconds_row[0] if exam_seconds_row and exam_seconds_row[0] is not None else 0
-
-        states_for_time = conn.execute(
-            """
-            SELECT last_answered_at
-            FROM mini_question_states
-            WHERE openid = ? AND bank_id = ? AND last_answered_at IS NOT NULL AND last_answered_at != ''
-            ORDER BY last_answered_at ASC
-            """,
-            (openid, bank['id'])
-        ).fetchall()
-        
-        practice_seconds = 0
-        from datetime import datetime
-        if states_for_time:
-            parsed_times = []
-            for s in states_for_time:
-                ts = s[0]
-                try:
-                    ts_clean = ts.split(".")[0]
-                    parsed_times.append(datetime.strptime(ts_clean, "%Y-%m-%d %H:%M:%S"))
-                except Exception:
-                    continue
-            if parsed_times:
-                parsed_times.sort()
-                practice_seconds += 15
-                for i in range(1, len(parsed_times)):
-                    diff = (parsed_times[i] - parsed_times[i - 1]).total_seconds()
-                    if 0 < diff <= 300:
-                        practice_seconds += diff
-                    else:
-                        practice_seconds += 15
-
-        total_seconds = int(exam_seconds + practice_seconds)
-        if total_seconds <= 0:
-            study_duration_text = "-"
-        elif total_seconds < 60:
-            study_duration_text = f"{total_seconds}秒"
-        elif total_seconds < 3600:
-            minutes = total_seconds // 60
-            study_duration_text = f"{minutes}分钟"
-        else:
-            hours = total_seconds // 3600
-            minutes = (total_seconds % 3600) // 60
-            if minutes > 0:
-                study_duration_text = f"{hours}小时{minutes}分"
-            else:
-                study_duration_text = f"{hours}小时"
+        total_seconds, study_duration_text = estimate_subject_study_time(conn, openid, bank['id'])
 
         progress = conn.execute(
             '''
@@ -1780,9 +1797,9 @@ def save_batch_question_states(openid, bank_id, payload):
                     correct_count = excluded.correct_count,
                     wrong_count = excluded.wrong_count,
                     last_answer_json = excluded.last_answer_json,
-                    last_mode = excluded.last_mode,
+                    last_mode = CASE WHEN excluded.last_mode = 'exam' THEN (CASE WHEN COALESCE(mini_question_states.last_answered_at, '') != '' THEN COALESCE(mini_question_states.last_mode, excluded.last_mode) ELSE excluded.last_mode END) ELSE excluded.last_mode END,
                     seen_at = excluded.seen_at,
-                    last_answered_at = excluded.last_answered_at,
+                    last_answered_at = CASE WHEN excluded.last_mode = 'exam' THEN (CASE WHEN COALESCE(mini_question_states.last_answered_at, '') != '' THEN mini_question_states.last_answered_at ELSE NULL END) ELSE excluded.last_answered_at END,
                     consecutive_correct = excluded.consecutive_correct,
                     updated_at = excluded.updated_at
                 ''',

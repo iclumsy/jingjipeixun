@@ -18,9 +18,10 @@ const TRAINING_TYPE_LABELS = {
 // 状态新增/调整请改后端 services/student_serializer.py，前端无需发版
 const STATUS_LABELS = {
   unreviewed: '待审核',
-  reviewed: '已通过',
+  reviewed: '已审核',
   registered: '已报名',
-  rejected: '已驳回'
+  rejected: '已驳回',
+  exam_passed: '考试通过'
 }
 
 // 文化程度选项

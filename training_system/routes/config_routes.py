@@ -334,12 +334,13 @@ def get_student_filters():
         status_filters = []
         default_status = ''
     else:
-        # 管理端：4 个独立状态 tab，与网页端 admin.html 保持一致
+        # 管理端：状态 tab 独立展示；考试通过放在最右侧。
         status_filters = [
             {'label': '待审核', 'value': 'unreviewed'},
-            {'label': '已通过', 'value': 'reviewed'},
+            {'label': '已审核', 'value': 'reviewed'},
             {'label': '已报名', 'value': 'registered'},
             {'label': '已驳回', 'value': 'rejected'},
+            {'label': '考试通过', 'value': 'exam_passed'},
         ]
         default_status = 'unreviewed'
 

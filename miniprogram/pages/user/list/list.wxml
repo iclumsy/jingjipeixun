@@ -4,7 +4,7 @@
       <view class="summary-title">我的提交</view>
       <view class="summary-count">{{students.length}} 条</view>
     </view>
-    <view class="summary-desc">待审核和已通过记录仅查看，已驳回记录可进入编辑后重新提交。</view>
+    <view class="summary-desc">待审核、已审核和考试通过记录仅查看，已驳回记录可进入编辑后重新提交。</view>
   </view>
 
   <view class="student-list">

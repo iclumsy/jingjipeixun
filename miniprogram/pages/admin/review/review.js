@@ -6,9 +6,10 @@ const { hasAdminAccess, formatDateTime } = require('../../../utils/page-helpers'
 // 状态/培训类型筛选条目变更请改后端配置接口，前端无需发版。
 const FALLBACK_STATUS_FILTERS = [
   { label: '待审核', value: 'unreviewed' },
-  { label: '已通过', value: 'reviewed' },
+  { label: '已审核', value: 'reviewed' },
   { label: '已报名', value: 'registered' },
-  { label: '已驳回', value: 'rejected' }
+  { label: '已驳回', value: 'rejected' },
+  { label: '考试通过', value: 'exam_passed' }
 ]
 
 const FALLBACK_TRAINING_TYPE_FILTERS = [
@@ -16,22 +17,39 @@ const FALLBACK_TRAINING_TYPE_FILTERS = [
   { label: '特种作业', value: 'special_operation' }
 ]
 
+function normalizeAdminStatusFilters(filters = []) {
+  const byValue = new Map()
+  FALLBACK_STATUS_FILTERS.forEach(item => byValue.set(item.value, { ...item }))
+  if (Array.isArray(filters)) {
+    filters.forEach(item => {
+      if (!item || !item.value) return
+      if (!byValue.has(item.value)) return
+      byValue.set(item.value, {
+        ...item,
+        label: FALLBACK_STATUS_FILTERS.find(fallback => fallback.value === item.value).label
+      })
+    })
+  }
+  return FALLBACK_STATUS_FILTERS.map(item => byValue.get(item.value) || item)
+}
+
 // 后端 enrich 缺失时的本地能力位兜底，逻辑须与 services/student_serializer.py::_build_actions 保持一致
 function buildLocalActions(item) {
   const status = item.status || ''
   const tt = item.training_type || ''
   const isSe = tt === 'special_equipment'
-  const isPassed = status === 'reviewed' || status === 'registered'
+  const isPassed = status === 'reviewed' || status === 'registered' || status === 'exam_passed'
   const cardActivated = !!item.card_activated
   const hasHealthForm = !!item.training_form_path
   return {
     canApprove: status === 'unreviewed',
-    canReject: status !== 'registered',
+    canReject: status !== 'registered' && status !== 'exam_passed',
     canDelete: true,
     canSubmitReg: isSe && status === 'reviewed',
+    canMarkExamPassed: status === 'reviewed' || status === 'registered',
     canActivateCard: isSe && isPassed && !cardActivated,
     canQueryCard: isSe && isPassed && cardActivated,
-    canDownloadRegForm: status === 'registered',
+    canDownloadRegForm: status === 'registered' || status === 'exam_passed',
     canDownloadHealthForm: isPassed && hasHealthForm,
     canEdit: status === 'rejected'
   }
@@ -42,7 +60,10 @@ function mapRecord(item) {
   if (item.training_type === 'special_equipment' && item.application_type === 'renewal') {
     fallbackTags.push({ text: '复审', color: '#e65100', bg: '#fff3e0' })
   }
-  const actions = item.actions || buildLocalActions(item)
+  const actions = item.actions ? {
+    ...buildLocalActions(item),
+    ...item.actions
+  } : buildLocalActions(item)
   const canViewLearningStatus = item.status === 'reviewed' || item.status === 'registered'
   return {
     ...item,
@@ -235,7 +256,7 @@ Page({
       if (!res) return
       const updates = {}
       if (Array.isArray(res.status_filters) && res.status_filters.length > 0) {
-        updates.statusFilters = res.status_filters
+        updates.statusFilters = normalizeAdminStatusFilters(res.status_filters)
       }
       if (Array.isArray(res.training_type_filters) && res.training_type_filters.length > 0) {
         updates.trainingTypeFilters = res.training_type_filters
@@ -510,7 +531,7 @@ Page({
     try {
       await api.reviewStudent(id, 'approve')
       wx.hideLoading()
-      wx.showToast({ title: '已通过', icon: 'success' })
+      wx.showToast({ title: '已审核', icon: 'success' })
       this.silentRequestSubscription()
       await this.loadRecords(true)
     } catch (err) {
@@ -989,11 +1010,23 @@ Page({
     this.onRejectTap({ currentTarget: { dataset: { id } } })
   },
 
-  onMoreOperationLog() {
+  async onMoreExamPassed() {
     const id = this.data.moreActionsStudent && this.data.moreActionsStudent._id
     if (!id) return
+    const confirmed = await this.confirmAction('考试通过', '确认将该学员标记为理论考试已通过吗？')
+    if (!confirmed) return
+
     this.closeMoreActionsModal()
-    this.onOperationLogTap({ currentTarget: { dataset: { id } } })
+    wx.showLoading({ title: '处理中...' })
+    try {
+      await api.markExamPassed(id)
+      wx.hideLoading()
+      wx.showToast({ title: '考试通过', icon: 'success' })
+      await this.loadRecords(true)
+    } catch (err) {
+      wx.hideLoading()
+      wx.showToast({ title: err.message || '操作失败', icon: 'none' })
+    }
   },
 
   // ========== 双 Tab 切换 ==========
@@ -1022,7 +1055,10 @@ Page({
   },
 
   async loadReportRecords(refresh = false) {
-    if (this.data.reportLoading) return
+    if (this.data.reportLoading && !refresh) return
+
+    this._reportReqSeq = (this._reportReqSeq || 0) + 1
+    const currentSeq = this._reportReqSeq
 
     this.setData({
       reportLoading: true,
@@ -1037,6 +1073,10 @@ Page({
         page,
         limit: this.data.reportLimit
       })
+
+      if (currentSeq !== this._reportReqSeq) {
+        return
+      }
 
       const currentList = (result.list || []).map(item => {
         let shortTime = item.lastStudyTimeText || '-'
@@ -1076,6 +1116,7 @@ Page({
         reportInitialized: true
       })
     } catch (err) {
+      if (currentSeq !== this._reportReqSeq) return
       console.error('加载学习统计数据失败:', err)
       this.setData({
         reportLoading: false,
@@ -1086,7 +1127,9 @@ Page({
         icon: 'none'
       })
     } finally {
-      wx.stopPullDownRefresh()
+      if (currentSeq === this._reportReqSeq) {
+        wx.stopPullDownRefresh()
+      }
     }
   },
 

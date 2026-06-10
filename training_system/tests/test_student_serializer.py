@@ -5,7 +5,7 @@
     - enrich_student: 状态/类型/标签/动作/文件名等派生字段
     - enrich_student: 旧字段一字未变、异常 fallback、批量处理
     - get_students:    撤销 reviewed→reviewed,registered 自动合并后行为
-    - /api/config/student_filters: 4 个独立状态 tab 配置返回
+    - /api/config/student_filters: 独立状态 tab 配置返回
 """
 import os
 import sys
@@ -63,13 +63,16 @@ class StatusTextTests(unittest.TestCase):
         self.assertEqual(enrich_student(base_student(status='unreviewed'))['statusText'], '待审核')
 
     def test_reviewed(self):
-        self.assertEqual(enrich_student(base_student(status='reviewed'))['statusText'], '已通过')
+        self.assertEqual(enrich_student(base_student(status='reviewed'))['statusText'], '已审核')
 
     def test_registered(self):
         self.assertEqual(enrich_student(base_student(status='registered'))['statusText'], '已报名')
 
     def test_rejected(self):
         self.assertEqual(enrich_student(base_student(status='rejected'))['statusText'], '已驳回')
+
+    def test_exam_passed(self):
+        self.assertEqual(enrich_student(base_student(status='exam_passed'))['statusText'], '考试通过')
 
     def test_unknown_status_falls_back_to_raw(self):
         self.assertEqual(enrich_student(base_student(status='custom'))['statusText'], 'custom')
@@ -80,7 +83,7 @@ class StatusTextTests(unittest.TestCase):
 
 class StatusClassTests(unittest.TestCase):
     def test_status_class_equals_status(self):
-        for st in ('unreviewed', 'reviewed', 'registered', 'rejected'):
+        for st in ('unreviewed', 'reviewed', 'registered', 'rejected', 'exam_passed'):
             self.assertEqual(enrich_student(base_student(status=st))['statusClass'], st)
 
 
@@ -91,6 +94,7 @@ class StatusHintTests(unittest.TestCase):
             'reviewed': '资料已审核通过，可在后台继续办理',
             'registered': '已提交报名到省网平台',
             'rejected': '资料已被驳回，可修改后重新提交',
+            'exam_passed': '理论考试已通过',
         }
         for status, hint in expected.items():
             self.assertEqual(enrich_student(base_student(status=status))['statusHint'], hint)
@@ -166,6 +170,15 @@ class ActionsTests(unittest.TestCase):
         self.assertTrue(a['canActivateCard'])
         self.assertTrue(a['canDownloadRegForm'])
 
+    def test_exam_passed_is_terminal_for_review_actions(self):
+        a = enrich_student(base_student(status='exam_passed', training_type='special_equipment'))['actions']
+        self.assertFalse(a['canApprove'])
+        self.assertFalse(a['canReject'])
+        self.assertFalse(a['canSubmitReg'])
+        self.assertFalse(a['canMarkExamPassed'])
+        self.assertTrue(a['canActivateCard'])
+        self.assertTrue(a['canDownloadRegForm'])
+
     def test_rejected_can_edit_and_reject(self):
         a = enrich_student(base_student(status='rejected'))['actions']
         self.assertTrue(a['canEdit'])
@@ -196,7 +209,7 @@ class ActionsTests(unittest.TestCase):
         self.assertFalse(a['canDownloadHealthForm'])
 
     def test_can_delete_always_true(self):
-        for st in ('unreviewed', 'reviewed', 'registered', 'rejected'):
+        for st in ('unreviewed', 'reviewed', 'registered', 'rejected', 'exam_passed'):
             self.assertTrue(enrich_student(base_student(status=st))['actions']['canDelete'])
 
 
@@ -226,6 +239,14 @@ class ActionListTests(unittest.TestCase):
         items = enrich_student(base_student(status='reviewed', training_type='special_operation'))['actionList']
         keys = [it['key'] for it in items]
         self.assertNotIn('submit_register', keys)
+
+    def test_exam_passed_omits_review_actions(self):
+        items = enrich_student(base_student(status='exam_passed', training_type='special_equipment'))['actionList']
+        keys = [it['key'] for it in items]
+        self.assertNotIn('approve', keys)
+        self.assertNotIn('reject', keys)
+        self.assertNotIn('mark_exam_passed', keys)
+        self.assertIn('delete', keys)
 
     def test_action_items_have_required_fields(self):
         items = enrich_student(base_student(status='unreviewed'))['actionList']
@@ -393,6 +414,23 @@ class StatusFilterModelTests(unittest.TestCase):
         statuses = sorted([s['status'] for s in students])
         self.assertEqual(statuses, ['registered', 'reviewed'])
 
+    def test_compound_reviewed_registered_excludes_exam_passed(self):
+        self._insert_student('reviewed', '0001')
+        self._insert_student('registered', '0002')
+        self._insert_student('exam_passed', '0004')
+        with self.app.app_context():
+            students = student_model.get_students(status='reviewed,registered')
+        statuses = sorted([s['status'] for s in students])
+        self.assertEqual(statuses, ['registered', 'reviewed'])
+
+    def test_exam_passed_filter_is_independent(self):
+        self._insert_student('reviewed', '0001')
+        self._insert_student('exam_passed', '0004')
+        with self.app.app_context():
+            students = student_model.get_students(status='exam_passed')
+        statuses = sorted([s['status'] for s in students])
+        self.assertEqual(statuses, ['exam_passed'])
+
     def test_pending_includes_unreviewed_and_rejected(self):
         self._insert_student('unreviewed', '0001')
         self._insert_student('rejected', '0002')
@@ -422,7 +460,7 @@ class StatusFilterModelTests(unittest.TestCase):
 # ======================== 配置接口 ========================
 
 class StudentFiltersConfigTests(unittest.TestCase):
-    """验证 /api/config/student_filters 返回 4 个独立 tab。"""
+    """验证 /api/config/student_filters 返回独立 tab。"""
 
     def setUp(self):
         from routes.config_routes import config_bp
@@ -430,14 +468,14 @@ class StudentFiltersConfigTests(unittest.TestCase):
         self.app.register_blueprint(config_bp)
         self.client = self.app.test_client()
 
-    def test_admin_returns_four_status_tabs(self):
+    def test_admin_returns_status_tabs_with_exam_passed_on_the_right(self):
         resp = self.client.get('/api/config/student_filters?role=admin')
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
         labels = [t['label'] for t in data['status_filters']]
-        self.assertEqual(labels, ['待审核', '已通过', '已报名', '已驳回'])
+        self.assertEqual(labels, ['待审核', '已审核', '已报名', '已驳回', '考试通过'])
         values = [t['value'] for t in data['status_filters']]
-        self.assertEqual(values, ['unreviewed', 'reviewed', 'registered', 'rejected'])
+        self.assertEqual(values, ['unreviewed', 'reviewed', 'registered', 'rejected', 'exam_passed'])
 
     def test_default_filters(self):
         resp = self.client.get('/api/config/student_filters?role=admin')
@@ -455,7 +493,7 @@ class StudentFiltersConfigTests(unittest.TestCase):
     def test_default_role_is_admin(self):
         resp = self.client.get('/api/config/student_filters')
         data = resp.get_json()
-        self.assertEqual(len(data['status_filters']), 4)
+        self.assertEqual(len(data['status_filters']), 5)
 
 
 if __name__ == '__main__':

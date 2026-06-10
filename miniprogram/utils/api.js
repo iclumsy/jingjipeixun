@@ -772,6 +772,27 @@ async function reviewStudent(studentId, action, rejectReason = '') {
 }
 
 /**
+ * 标记学员理论考试通过。
+ *
+ * @param {number|string} studentId - 学员 ID
+ * @returns {Promise<Object>} 操作结果
+ */
+async function markExamPassed(studentId) {
+  const id = encodeURIComponent(String(studentId || '').trim())
+  if (!id) throw new Error('学员ID不能为空')
+
+  const result = await requestApi(`/api/students/${id}/mark_exam_passed`, {
+    method: 'POST',
+    data: {}
+  })
+  return {
+    success: true,
+    message: result.message || '已标记考试通过',
+    student: withClientId(result.student || {})
+  }
+}
+
+/**
  * 更新学员信息（部分更新）。
  *
  * @param {number|string} studentId - 学员 ID
@@ -1265,6 +1286,7 @@ module.exports = {
   regenerateTrainingForm, // 重新生成体检表
   swapMaterials,          // 互换身份证正反面/户口本首页本人页
   reviewStudent,        // 审核学员
+  markExamPassed,       // 标记考试通过
   updateStudent,        // 更新学员
   deleteStudent,        // 删除学员
   getCompanies,         // 获取公司列表

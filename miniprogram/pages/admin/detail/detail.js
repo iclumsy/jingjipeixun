@@ -653,7 +653,7 @@ Page({
     try {
       await api.reviewStudent(this.data.studentId, 'approve')
       wx.hideLoading()
-      wx.showToast({ title: '已通过', icon: 'success' })
+      wx.showToast({ title: '已审核', icon: 'success' })
       this.silentRequestSubscription()
       await this.loadDetail()
       await this.loadGeneratedMaterials()

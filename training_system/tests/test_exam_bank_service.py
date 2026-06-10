@@ -1014,6 +1014,158 @@ class ExamBankServiceTests(unittest.TestCase):
         self.assertEqual(returned_qids, list({qids[0]: ["B"], qids[1]: ["B"]}.keys()))
         self.assertEqual(len(detail["questions"]), 2)
 
+    def test_study_duration_estimation(self):
+        """测试统一的累计学时估算逻辑，包括排除模考做题记录与 diff == 0 的去重"""
+        questions = [
+            make_question(101, "第一题"),
+            make_question(102, "第二题"),
+            make_question(103, "第三题"),
+        ]
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(questions, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        with get_db_connection() as conn:
+            qids = [r["id"] for r in conn.execute(
+                "SELECT id FROM exam_questions WHERE bank_id = ? ORDER BY id", (bank["id"],)
+            ).fetchall()]
+
+        # 模拟 1 个考试记录，用时 120 秒
+        exam_bank_service.save_exam_record("student-openid", bank["id"], {
+            "score": 90, "total": 1, "correctCount": 1,
+            "durationSeconds": 120, "passed": True,
+            "answers": {str(qids[0]): ["B"]},
+            "submitId": "exam-001",
+        })
+
+        # 模拟练习刷题状态 (3题，时间分别为 12:00:00, 12:00:10, 12:00:10 (重合))
+        # 12:00:00 -> 12:00:10 的 diff = 10 秒
+        # 12:00:10 -> 12:00:10 的 diff = 0 秒 (应当跳过)
+        # 理论练习时长：第一题 15s + diff 10s = 25s
+        with get_db_connection() as conn:
+            conn.execute(
+                "INSERT INTO mini_question_states (openid, bank_id, question_id, status, last_mode, last_answered_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                ("student-openid", bank["id"], qids[0], "mastered", "practice", "2026-06-10 12:00:00")
+            )
+            conn.execute(
+                "INSERT INTO mini_question_states (openid, bank_id, question_id, status, last_mode, last_answered_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                ("student-openid", bank["id"], qids[1], "mastered", "practice", "2026-06-10 12:00:10")
+            )
+            conn.execute(
+                "INSERT INTO mini_question_states (openid, bank_id, question_id, status, last_mode, last_answered_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                ("student-openid", bank["id"], qids[2], "mastered", "practice", "2026-06-10 12:00:10")
+            )
+
+        with get_db_connection() as conn:
+            total_sec, duration_text = exam_bank_service.estimate_subject_study_time(conn, "student-openid", bank["id"])
+
+        # 理论总时长 = 120s (exam) + 25s (practice) = 145s
+        self.assertEqual(total_sec, 145)
+        self.assertEqual(duration_text, "2分钟")
+
+    def test_save_batch_question_states_preserves_practice_timestamps(self):
+        """测试批量状态写入（如模考交卷）在 ON CONFLICT 时不会覆盖此前练习的时间戳"""
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(SAMPLE_QUESTIONS, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        with get_db_connection() as conn:
+            qid = conn.execute(
+                "SELECT id FROM exam_questions WHERE bank_id = ?", (bank["id"],)
+            ).fetchone()["id"]
+
+        # 1. 模拟刷题练习：写入 practice 时间戳
+        exam_bank_service.save_batch_question_states("student-openid", bank["id"], {
+            "mode": "practice",
+            "states": [
+                {"questionId": qid, "action": "answer", "isCorrect": True, "answer": ["B"]}
+            ]
+        })
+
+        with get_db_connection() as conn:
+            state1 = conn.execute(
+                "SELECT last_mode, last_answered_at FROM mini_question_states WHERE openid = ? AND bank_id = ? AND question_id = ?",
+                ("student-openid", bank["id"], qid)
+            ).fetchone()
+        self.assertEqual(state1["last_mode"], "practice")
+        self.assertIsNotNone(state1["last_answered_at"])
+
+        # 2. 模拟模考交卷：以 mode='exam' 批量写入同样这道题
+        # 验证 ON CONFLICT 时这道题的 last_mode 和 last_answered_at 应该保留先前的 practice 状态
+        exam_bank_service.save_batch_question_states("student-openid", bank["id"], {
+            "mode": "exam",
+            "states": [
+                {"questionId": qid, "action": "answer", "isCorrect": True, "answer": ["B"]}
+            ]
+        })
+
+        with get_db_connection() as conn:
+            state2 = conn.execute(
+                "SELECT last_mode, last_answered_at FROM mini_question_states WHERE openid = ? AND bank_id = ? AND question_id = ?",
+                ("student-openid", bank["id"], qid)
+            ).fetchone()
+        # 应该依然是 practice，时间戳没有被改写
+        self.assertEqual(state2["last_mode"], "practice")
+        self.assertEqual(state2["last_answered_at"], state1["last_answered_at"])
+
+    def test_save_batch_question_states_handles_seen_only_conflict_correctly(self):
+        """测试批量状态写入在冲突时：如果此前旧记录只有 seen (没有答题时间戳)，模考不会回填为练习时间戳"""
+        bank = exam_bank_service.import_exam_bank(
+            io.BytesIO(json.dumps(SAMPLE_QUESTIONS, ensure_ascii=False).encode("utf-8")),
+            "N1_叉车司机.json",
+            self.get_project_id("叉车司机"),
+        )
+        with get_db_connection() as conn:
+            qid = conn.execute(
+                "SELECT id FROM exam_questions WHERE bank_id = ?", (bank["id"],)
+            ).fetchone()["id"]
+
+        # 1. 模拟刷题 seen 状态：写入 seen_at，但 last_answered_at 为空，模式为 practice
+        exam_bank_service.save_batch_question_states("student-openid", bank["id"], {
+            "mode": "practice",
+            "states": [
+                {"questionId": qid, "action": "seen"}
+            ]
+        })
+
+        with get_db_connection() as conn:
+            state1 = conn.execute(
+                "SELECT last_mode, last_answered_at FROM mini_question_states WHERE openid = ? AND bank_id = ? AND question_id = ?",
+                ("student-openid", bank["id"], qid)
+            ).fetchone()
+        self.assertEqual(state1["last_mode"], "practice")
+        self.assertTrue(state1["last_answered_at"] is None or state1["last_answered_at"] == '')
+
+        # 2. 模拟模考提交这一题
+        exam_bank_service.save_batch_question_states("student-openid", bank["id"], {
+            "mode": "exam",
+            "states": [
+                {"questionId": qid, "action": "answer", "isCorrect": True, "answer": ["B"]}
+            ]
+        })
+
+        with get_db_connection() as conn:
+            state2 = conn.execute(
+                "SELECT last_mode, last_answered_at FROM mini_question_states WHERE openid = ? AND bank_id = ? AND question_id = ?",
+                ("student-openid", bank["id"], qid)
+            ).fetchone()
+        
+        # 应该变成了 exam 模式，且 last_answered_at 依然为空/None，没有被填入模考的时间戳
+        self.assertEqual(state2["last_mode"], "exam")
+        self.assertTrue(state2["last_answered_at"] is None or state2["last_answered_at"] == '')
+
+        # 3. 验证此时估算的时长不会包含本题的练习时间（因为 last_mode 为 exam 并且没有练习答题时间戳）
+        with get_db_connection() as conn:
+            total_sec, duration_text = exam_bank_service.estimate_subject_study_time(conn, "student-openid", bank["id"])
+        
+        # 因为没有 exam 记录，只有 mini_question_states 模考，应该没有任何练习学时
+        self.assertEqual(total_sec, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
