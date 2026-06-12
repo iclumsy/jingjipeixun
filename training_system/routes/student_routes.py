@@ -2756,36 +2756,52 @@ def get_miniprogram_admin_learning_stats_route():
             """).fetchall()
             banks = [dict(b) for b in banks_rows]
 
-            # 3. 批量查出各用户在各题库的练习状态统计 (避免循环中N+1查询)
-            qs_rows = conn.execute("""
-                SELECT 
-                    qs.openid,
-                    qs.bank_id,
-                    SUM(CASE WHEN COALESCE(qs.seen_at, '') != '' THEN 1 ELSE 0 END) AS seen_count,
-                    SUM(CASE WHEN qs.status = 'mastered' THEN 1 ELSE 0 END) AS mastered_count,
-                    SUM(CASE WHEN qs.status = 'wrong' THEN 1 ELSE 0 END) AS wrong_count,
-                    COUNT(*) AS touched_count,
-                    MAX(COALESCE(qs.updated_at, qs.created_at)) AS latest_state_updated_at
-                FROM mini_question_states qs
-                JOIN exam_questions eq ON eq.id = qs.question_id AND eq.bank_id = qs.bank_id
-                WHERE eq.is_active = 1
-                GROUP BY qs.openid, qs.bank_id
-            """).fetchall()
-            qs_map = {(r['openid'], r['bank_id']): dict(r) for r in qs_rows}
+            # 3. 提取当前有效学员的 openid 列表以供索引精准匹配查询（大幅提高大表查询性能，避免全表扫描）
+            valid_openids = list(set([s['submitter_openid'] for s in students if s.get('submitter_openid')]))
 
-            # 4. 批量查出各用户在各题库的模拟考试历史统计
-            exam_rows = conn.execute("""
-                SELECT 
-                    openid,
-                    bank_id,
-                    COUNT(*) AS exam_count,
-                    SUM(CASE WHEN COALESCE(passed, 0) = 1 THEN 1 ELSE 0 END) AS pass_count,
-                    MAX(score) AS best_score,
-                    MAX(created_at) AS latest_exam_created_at
-                FROM mini_exam_records
-                GROUP BY openid, bank_id
-            """).fetchall()
-            exam_map = {(r['openid'], r['bank_id']): dict(r) for r in exam_rows}
+            qs_rows = []
+            exam_rows = []
+            if valid_openids:
+                # 分批查询，每批最多 500 个，防止 SQLite 占位符超标
+                BATCH_SIZE = 500
+                for i in range(0, len(valid_openids), BATCH_SIZE):
+                    batch = valid_openids[i:i+BATCH_SIZE]
+                    placeholders = ','.join(['?'] * len(batch))
+                    
+                    # 批量查出这批用户在各题库的练习状态统计 (避免循环中N+1查询)
+                    q_sql = f"""
+                        SELECT 
+                            qs.openid,
+                            qs.bank_id,
+                            SUM(CASE WHEN COALESCE(qs.seen_at, '') != '' THEN 1 ELSE 0 END) AS seen_count,
+                            SUM(CASE WHEN qs.status = 'mastered' THEN 1 ELSE 0 END) AS mastered_count,
+                            SUM(CASE WHEN qs.status = 'wrong' THEN 1 ELSE 0 END) AS wrong_count,
+                            COUNT(*) AS touched_count,
+                            MAX(COALESCE(qs.updated_at, qs.created_at)) AS latest_state_updated_at
+                        FROM mini_question_states qs
+                        JOIN exam_questions eq ON eq.id = qs.question_id AND eq.bank_id = qs.bank_id
+                        WHERE eq.is_active = 1 AND qs.openid IN ({placeholders})
+                        GROUP BY qs.openid, qs.bank_id
+                    """
+                    qs_rows.extend([dict(r) for r in conn.execute(q_sql, batch).fetchall()])
+
+                    # 批量查出这批用户在各题库的模拟考试历史统计
+                    e_sql = f"""
+                        SELECT 
+                            openid,
+                            bank_id,
+                            COUNT(*) AS exam_count,
+                            SUM(CASE WHEN COALESCE(passed, 0) = 1 THEN 1 ELSE 0 END) AS pass_count,
+                            MAX(score) AS best_score,
+                            MAX(created_at) AS latest_exam_created_at
+                        FROM mini_exam_records
+                        WHERE openid IN ({placeholders})
+                        GROUP BY openid, bank_id
+                    """
+                    exam_rows.extend([dict(r) for r in conn.execute(e_sql, batch).fetchall()])
+
+            qs_map = {(r['openid'], r['bank_id']): r for r in qs_rows}
+            exam_map = {(r['openid'], r['bank_id']): r for r in exam_rows}
 
         # 辅助匹配内存中题库
         def find_bank_in_memory(student_item):
