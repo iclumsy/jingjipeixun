@@ -68,6 +68,26 @@ except Exception as err:
     REMBG_SESSION_IMPORT_ERROR = str(err)
 
 
+# ======================== Rembg 单例会话缓存 ========================
+_rembg_session = None
+
+def _get_rembg_session():
+    """懒加载并返回全局单例的 rembg 会话，避免重复加载 AI 模型造成内存泄露。"""
+    global _rembg_session
+    if _rembg_session is None and new_session is not None:
+        try:
+            _rembg_session = new_session(
+                model_name="u2net_human_seg",
+                alpha_matting=True,
+                alpha_matting_foreground_threshold=240,
+                alpha_matting_background_threshold=10,
+                alpha_matting_erode_size=10
+            )
+        except Exception as err:
+            current_app.logger.error(f'初始化 rembg 会话失败: {err}')
+    return _rembg_session
+
+
 def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
     """
     将证件照背景替换为指定颜色（默认白色）。
@@ -95,17 +115,9 @@ def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
         with open(input_path, "rb") as f:
             input_img = f.read()
 
-        # 使用 rembg 去除背景
-        # 优先使用 u2net_human_seg 模型（专为人像优化）
-        # alpha_matting 参数控制边缘精度，避免强硬的剪裁边缘
-        if new_session is not None:
-            session = new_session(
-                model_name="u2net_human_seg",
-                alpha_matting=True,
-                alpha_matting_foreground_threshold=240,
-                alpha_matting_background_threshold=10,
-                alpha_matting_erode_size=10
-            )
+        # 使用复用的单例会话去除背景，避免重复加载神经网络参数
+        session = _get_rembg_session()
+        if session is not None:
             output_img = remove(input_img, session=session)
         else:
             # new_session 不可用时回退到默认会话
@@ -115,6 +127,7 @@ def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
                     REMBG_SESSION_IMPORT_ERROR
                 )
             output_img = remove(input_img)
+        
         img_no_bg = Image.open(io.BytesIO(output_img)).convert("RGBA")
 
         # 修复透明度掩码：用形态学膨胀处理 alpha 通道
@@ -134,6 +147,16 @@ def change_id_photo_bg(input_path, output_path, bg_color=(255, 255, 255)):
         # 保存处理后的图片
         result.save(output_path, quality=95)
         current_app.logger.info(f'图片背景替换成功: {output_path}')
+        
+        # 显式关闭图片对象，加速内存释放
+        try:
+            img_no_bg.close()
+            img_no_bg_fixed.close()
+            bg_img.close()
+            result.close()
+        except Exception:
+            pass
+
         return output_path
     except Exception as e:
         current_app.logger.error(f'图片背景替换失败: {str(e)}')
