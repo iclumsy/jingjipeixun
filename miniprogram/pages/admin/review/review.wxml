@@ -291,7 +291,7 @@
 
         <!-- 项目一级分类筛选 -->
         <view class="project-filter-row" wx:if="{{reportProjects && reportProjects.length > 0}}">
-          <scroll-view class="project-scroll" scroll-x="true" enable-flex="true">
+          <view class="project-chips-wrap">
             <view 
               class="project-chip {{activeProject === '' ? 'active' : ''}}" 
               bindtap="onReportProjectTap" 
@@ -304,7 +304,7 @@
               bindtap="onReportProjectTap" 
               data-val="{{item}}"
             >{{item}}</view>
-          </scroll-view>
+          </view>
         </view>
 
         <!-- 状态过滤 Tab -->

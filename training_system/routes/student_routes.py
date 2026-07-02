@@ -2743,9 +2743,13 @@ def get_miniprogram_admin_learning_stats_route():
             params.append(project_filter)
 
         with get_db_connection() as conn:
-            # 0. 获取所有启用的培训项目名列表用于一级分类筛选
-            proj_rows = conn.execute("SELECT DISTINCT exam_project FROM training_projects WHERE is_active = 1 ORDER BY id ASC").fetchall()
-            all_projects = [r['exam_project'] for r in proj_rows if r['exam_project']]
+            # 0. 获取当前已有学员的培训项目名列表用于一级分类筛选
+            proj_rows = conn.execute(
+                "SELECT DISTINCT exam_project FROM students "
+                "WHERE status IN ('reviewed', 'registered') AND exam_project IS NOT NULL AND exam_project != '' "
+                "ORDER BY exam_project ASC"
+            ).fetchall()
+            all_projects = [r['exam_project'] for r in proj_rows]
 
             # 1. 查询基础报考记录 (使用参数化防注入)
             sql = f"""
