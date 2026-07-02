@@ -9,6 +9,24 @@
     <!-- 选项 1: 信息审核视图 -->
     <block wx:if="{{currentTab === 'review'}}">
       <view class="filter-card card fade-enter">
+        <!-- 搜索框 -->
+        <view class="search-bar">
+          <icon class="search-icon" type="search" size="16" color="#999999"></icon>
+          <input 
+            class="search-input" 
+            type="text" 
+            placeholder="搜索姓名、手机或身份证号..." 
+            value="{{filters.search}}" 
+            bindinput="onReviewSearchInput"
+            bindconfirm="onReviewSearchConfirm" 
+            confirm-type="search"
+          />
+          <view class="search-clear" wx:if="{{filters.search}}" bindtap="onReviewSearchClear">
+            <icon type="clear" size="16" color="#cccccc"></icon>
+          </view>
+          <view class="search-btn" bindtap="onReviewSearchConfirm">搜索</view>
+        </view>
+
         <view class="filter-row" wx:if="{{false}}">
           <view class="filter-title">类型</view>
           <view class="chip-list">
@@ -269,6 +287,24 @@
             <icon type="clear" size="16" color="#cccccc"></icon>
           </view>
           <view class="search-btn" bindtap="onReportSearchConfirm">搜索</view>
+        </view>
+
+        <!-- 项目一级分类筛选 -->
+        <view class="project-filter-row" wx:if="{{reportProjects && reportProjects.length > 0}}">
+          <scroll-view class="project-scroll" scroll-x="true" enable-flex="true">
+            <view 
+              class="project-chip {{activeProject === '' ? 'active' : ''}}" 
+              bindtap="onReportProjectTap" 
+              data-val=""
+            >全部项目</view>
+            <view 
+              wx:for="{{reportProjects}}" 
+              wx:key="*this"
+              class="project-chip {{activeProject === item ? 'active' : ''}}" 
+              bindtap="onReportProjectTap" 
+              data-val="{{item}}"
+            >{{item}}</view>
+          </scroll-view>
         </view>
 
         <!-- 状态过滤 Tab -->

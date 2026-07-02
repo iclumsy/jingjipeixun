@@ -2300,3 +2300,41 @@
   color: #b45309;
   border-color: #fef3c7;
 }
+
+/* ================================== */
+/* 学习项目一级筛选滑动栏 */
+/* ================================== */
+.project-filter-row {
+  margin-top: 10rpx;
+  margin-bottom: 20rpx;
+  padding: 0 4rpx;
+  white-space: nowrap;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.project-scroll {
+  display: flex;
+  flex-direction: row;
+  height: 64rpx;
+  align-items: center;
+}
+
+.project-chip {
+  display: inline-block;
+  padding: 8rpx 24rpx;
+  background-color: #f1f5f9;
+  color: #475569;
+  font-size: 24rpx;
+  border-radius: 30rpx;
+  margin-right: 12rpx;
+  font-weight: 500;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.project-chip.active {
+  background-color: #e0e7ff;
+  color: #4f46e5;
+  font-weight: 600;
+}

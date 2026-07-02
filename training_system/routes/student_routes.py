@@ -2726,6 +2726,7 @@ def get_miniprogram_admin_learning_stats_route():
 
         search_query = request.args.get('search', '').strip().lower()
         status_filter = request.args.get('status', '').strip()  # all, passed, active, not_started
+        project_filter = request.args.get('project', '').strip()
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 20))
 
@@ -2737,7 +2738,15 @@ def get_miniprogram_admin_learning_stats_route():
             search_pattern = f'%{search_query}%'
             params.extend([search_pattern, search_pattern, search_pattern, search_pattern])
 
+        if project_filter:
+            where_clauses.append("exam_project = ?")
+            params.append(project_filter)
+
         with get_db_connection() as conn:
+            # 0. 获取所有启用的培训项目名列表用于一级分类筛选
+            proj_rows = conn.execute("SELECT DISTINCT exam_project FROM training_projects WHERE is_active = 1 ORDER BY id ASC").fetchall()
+            all_projects = [r['exam_project'] for r in proj_rows if r['exam_project']]
+
             # 1. 查询基础报考记录 (使用参数化防注入)
             sql = f"""
                 SELECT id, name, phone, id_card, company, status, exam_project, project_code, training_type, submitter_openid, training_project_id, created_at
@@ -2949,6 +2958,7 @@ def get_miniprogram_admin_learning_stats_route():
         return jsonify({
             'success': True,
             'list': sliced,
+            'projects': all_projects,
             'total': total_count,
             'page': page,
             'limit': limit,

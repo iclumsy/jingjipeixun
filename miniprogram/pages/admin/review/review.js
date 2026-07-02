@@ -199,7 +199,8 @@ Page({
     filters: {
       status: 'unreviewed',
       training_type: 'special_equipment',
-      company: ''
+      company: '',
+      search: ''
     },
     companyOptions: ['全部'],
     companyIndex: 0,
@@ -223,7 +224,7 @@ Page({
     regFormLogAnchor: '',
     regFormLogTitle: '',
 
-        // 更多操作弹窗
+    // 更多操作弹窗
     showMoreActionsModal: false,
     moreActionsStudent: {},
 
@@ -239,6 +240,8 @@ Page({
     ],
     activeStatus: 'all',
     searchQuery: '',
+    reportProjects: [],
+    activeProject: '',
     reportList: [],
     reportPage: 1,
     reportLimit: 20,
@@ -266,7 +269,7 @@ Page({
         if (res.default.training_type) updates['filters.training_type'] = res.default.training_type
       }
       if (Object.keys(updates).length > 0) this.setData(updates)
-    }).catch(() => {})
+    }).catch(() => { })
 
     await this.refreshAll(true)
     this._skipRefreshOnShow = true
@@ -280,7 +283,7 @@ Page({
         // 首次进入时也检查是否需要提醒授权（onShow 在 initialized 之前已执行，不会触发）
         setTimeout(() => this.promptAdminSubscription(), 800)
       }
-    }).catch(() => {})
+    }).catch(() => { })
   },
 
   /**
@@ -291,8 +294,8 @@ Page({
     if (!this._subscribeTemplateId) return
     wx.requestSubscribeMessage({
       tmplIds: [this._subscribeTemplateId],
-      success: () => {},
-      fail: () => {}
+      success: () => { },
+      fail: () => { }
     })
   },
 
@@ -326,7 +329,7 @@ Page({
                 wx.showToast({ title: '已开启通知', icon: 'success' })
               }
             },
-            fail: () => {}
+            fail: () => { }
           })
         }
       }
@@ -1076,6 +1079,7 @@ Page({
       const result = await api.getLearningStats({
         search: this.data.searchQuery,
         status: this.data.activeStatus,
+        project: this.data.activeProject,
         page,
         limit: this.data.reportLimit
       })
@@ -1089,7 +1093,7 @@ Page({
         if (shortTime && shortTime.length >= 10 && /^\d{4}-/.test(shortTime)) {
           shortTime = shortTime.substring(5)
         }
-        
+
         let durationText = '-'
         const secs = Number(item.studyDurationSeconds || 0)
         if (secs > 0) {
@@ -1115,6 +1119,7 @@ Page({
 
       this.setData({
         reportList: records,
+        reportProjects: result.projects || this.data.reportProjects,
         reportPage: page + 1,
         reportHasMore: !!result.hasMore,
         reportLoading: false,
@@ -1167,6 +1172,34 @@ Page({
     })
   },
 
+  onReviewSearchInput(e) {
+    this.setData({
+      'filters.search': e.detail.value
+    })
+  },
+
+  onReviewSearchConfirm() {
+    this.refreshAll(true)
+  },
+
+  onReviewSearchClear() {
+    this.setData({
+      'filters.search': ''
+    }, () => {
+      this.refreshAll(true)
+    })
+  },
+
+  onReportProjectTap(e) {
+    const val = e.currentTarget.dataset.val
+    if (val === this.data.activeProject) return
+    this.setData({
+      activeProject: val
+    }, () => {
+      this.refreshReportAll()
+    })
+  },
+
   onReportToggleExpand(e) {
     const index = e.currentTarget.dataset.index
     const expandedKey = `reportList[${index}].expanded`
@@ -1186,7 +1219,7 @@ Page({
     }
     wx.makePhoneCall({
       phoneNumber: phone,
-      fail: () => {}
+      fail: () => { }
     })
   },
 
