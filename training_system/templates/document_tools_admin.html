@@ -41,18 +41,6 @@
             <div id="toolMessage" class="exam-bank-message"></div>
         </section>
 
-        <section id="adjustPanel" class="document-tool-panel document-tool-adjust" hidden>
-            <div class="document-tool-panel-title">
-                <h2>调整</h2>
-                <button id="reanalyzeBtn" type="button" class="document-tool-secondary">识别裁剪框</button>
-            </div>
-            <div id="adjustControls" class="document-tool-control-grid"></div>
-            <div class="document-tool-actions">
-                <button id="regenerateBtn" type="button" class="document-tool-primary">重新生成</button>
-                <a id="zipDownloadLink" class="document-tool-secondary" href="#" target="_blank" rel="noopener">打包下载</a>
-            </div>
-        </section>
-
         <section id="previewPanel" class="document-tool-preview" hidden>
             <div class="document-tool-preview-column">
                 <h2>原图</h2>
@@ -61,25 +49,13 @@
             <div class="document-tool-preview-column">
                 <h2>生成结果</h2>
                 <div id="outputList" class="document-tool-card-grid"></div>
+                <div id="resultActions" class="document-tool-actions document-tool-result-actions" hidden>
+                    <button id="openAdjustBtn" type="button" class="document-tool-primary">调整</button>
+                    <a id="zipDownloadLink" class="document-tool-secondary" href="#" target="_blank" rel="noopener">打包下载</a>
+                </div>
             </div>
         </section>
     </main>
-
-    <div id="cropModal" class="document-tool-modal" hidden>
-        <div class="document-tool-modal-card">
-            <div class="document-tool-modal-head">
-                <h2 id="cropModalTitle">调整裁剪框</h2>
-                <button id="cropModalClose" type="button">×</button>
-            </div>
-            <div class="document-tool-canvas-wrap">
-                <canvas id="cropCanvas"></canvas>
-            </div>
-            <div class="document-tool-modal-actions">
-                <button id="cropResetBtn" type="button" class="document-tool-secondary">重置</button>
-                <button id="cropSaveBtn" type="button" class="document-tool-primary">保存裁剪框</button>
-            </div>
-        </div>
-    </div>
 
     <script src="/static/js/document_tools_admin.js"></script>
 </body>

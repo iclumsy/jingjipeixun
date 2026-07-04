@@ -90,7 +90,12 @@ class DocumentToolRouteTests(unittest.TestCase):
         response = self.client.get("/admin/document-tools")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("证件处理", response.get_data(as_text=True))
+        html = response.get_data(as_text=True)
+        self.assertIn("证件处理", html)
+        self.assertIn('id="resultActions"', html)
+        self.assertIn('id="openAdjustBtn"', html)
+        self.assertNotIn('id="adjustPanel"', html)
+        self.assertNotIn('id="cropModal"', html)
 
     def test_uploading_id_card_images_creates_session_scoped_outputs(self):
         self.login_web_admin()
