@@ -32,6 +32,16 @@ function $(id) {
   return document.getElementById(id);
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
+
 function showMessage(text, type = '') {
   const el = $('toolMessage');
   el.textContent = text || '';
@@ -104,15 +114,16 @@ function renderSelectedPreviews() {
   const cfg = activeConfig();
   const cards = cfg.fields.map(field => {
     const item = state.previewUrls[field.key];
+    const label = escapeHtml(field.label);
     if (!item) {
-      return `<div class="document-tool-card empty"><div>${field.label}</div><small>未选择</small></div>`;
+      return `<div class="document-tool-card empty"><div>${label}</div><small>未选择</small></div>`;
     }
     return `
       <div class="document-tool-card">
-        <img src="${item.url}" alt="${field.label}">
+        <img src="${escapeHtml(item.url)}" alt="${label}">
         <div class="document-tool-card-foot">
-          <span>${field.label}</span>
-          <small>${item.name}</small>
+          <span>${label}</span>
+          <small>${escapeHtml(item.name)}</small>
         </div>
       </div>
     `;
@@ -133,15 +144,16 @@ function fileByField(fieldKey) {
 function renderInputCardsFromTask() {
   $('inputList').innerHTML = activeConfig().fields.map(field => {
     const input = fileByField(field.key);
+    const label = escapeHtml(field.label);
     if (!input) {
-      return `<div class="document-tool-card empty"><div>${field.label}</div><small>未上传</small></div>`;
+      return `<div class="document-tool-card empty"><div>${label}</div><small>未上传</small></div>`;
     }
     return `
       <div class="document-tool-card">
-        <img src="${input.url}" alt="${field.label}">
+        <img src="${escapeHtml(input.url)}" alt="${label}">
         <div class="document-tool-card-foot">
-          <span>${field.label}</span>
-          <small>${input.filename}</small>
+          <span>${label}</span>
+          <small>${escapeHtml(input.filename)}</small>
         </div>
       </div>
     `;
@@ -158,10 +170,10 @@ function renderTask(task) {
   const outputs = task.outputs || [];
   $('outputList').innerHTML = outputs.length ? outputs.map(output => `
     <div class="document-tool-card">
-      <img src="${output.url}?v=${Date.now()}" alt="${output.filename}">
+      <img src="${escapeHtml(output.url)}?v=${Date.now()}" alt="${escapeHtml(output.filename)}">
       <div class="document-tool-card-foot">
-        <span>${output.filename}</span>
-        <a href="${output.download_url}" target="_blank" rel="noopener">下载</a>
+        <span>${escapeHtml(output.filename)}</span>
+        <a href="${escapeHtml(output.download_url)}" target="_blank" rel="noopener">下载</a>
       </div>
     </div>
   `).join('') : '<div class="document-tool-empty">暂无生成结果</div>';
@@ -265,6 +277,27 @@ function canvasPoint(canvas, event) {
     Math.round((event.clientX - rect.left) * scaleX),
     Math.round((event.clientY - rect.top) * scaleY)
   ];
+}
+
+function createTaskRequestGuard(getCurrentTaskId) {
+  let sequence = 0;
+  let active = true;
+  return {
+    next(taskId) {
+      sequence += 1;
+      return { taskId, sequence };
+    },
+    isCurrent(token, taskId) {
+      return active && token && token.sequence === sequence && token.taskId === taskId && getCurrentTaskId() === taskId;
+    },
+    invalidate() {
+      sequence += 1;
+    },
+    close() {
+      active = false;
+      sequence += 1;
+    }
+  };
 }
 
 function buildAdjustImagePanel(field, cropState) {
@@ -655,6 +688,18 @@ function openAdjustmentModal() {
   panel.appendChild(modal);
   document.body.appendChild(panel);
 
+  const taskIdAtOpen = state.task.id;
+  const reanalyzeGuard = createTaskRequestGuard(() => state.task && state.task.id);
+  let reanalyzeController = null;
+  let reanalyzeTimer = null;
+
+  function abortReanalyze() {
+    if (reanalyzeController) {
+      reanalyzeController.abort();
+      reanalyzeController = null;
+    }
+  }
+
   function buildNonRotationAdjustments() {
     const adjustments = collectModalAdjustments(panel);
     activeConfig().fields.forEach(field => {
@@ -665,6 +710,8 @@ function openAdjustmentModal() {
 
   function reanalyzePoints(adjustments) {
     if (adjustments.crop_mode === 'none') {
+      reanalyzeGuard.invalidate();
+      abortReanalyze();
       cfg.fields.forEach(field => {
         const el = panelEls[field.pointKey];
         if (el) el.clearMarkedPoints('「不裁剪」模式：将保留全图');
@@ -675,23 +722,31 @@ function openAdjustmentModal() {
       const el = panelEls[field.pointKey];
       if (el && !el.getHasDragged() && !el.getHasConfirmed()) el.setStatus('⏳ 计算中...', '#9ca3af');
     });
-    requestJson(`/api/admin/document_tools/tasks/${state.task.id}/analyze_points`, {
+    const token = reanalyzeGuard.next(taskIdAtOpen);
+    abortReanalyze();
+    reanalyzeController = window.AbortController ? new AbortController() : null;
+    const requestOptions = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ adjustments })
-    }).then(data => {
+    };
+    if (reanalyzeController) requestOptions.signal = reanalyzeController.signal;
+
+    requestJson(`/api/admin/document_tools/tasks/${taskIdAtOpen}/analyze_points`, requestOptions).then(data => {
+      if (!reanalyzeGuard.isCurrent(token, taskIdAtOpen) || !panel.isConnected) return;
       cfg.fields.forEach(field => {
         const el = panelEls[field.pointKey];
         if (!el || el.getHasDragged() || el.getHasConfirmed()) return;
         const pts = data.points ? data.points[field.pointKey] : null;
         if (pts && pts.length === 4) {
-          state.points[field.pointKey] = pts;
           el.applyServerPoints(pts);
         } else {
           el.setStatus('未识别到边缘，将自动处理', '#9ca3af');
         }
       });
-    }).catch(() => {
+    }).catch(err => {
+      if (err && err.name === 'AbortError') return;
+      if (!reanalyzeGuard.isCurrent(token, taskIdAtOpen) || !panel.isConnected) return;
       cfg.fields.forEach(field => {
         const el = panelEls[field.pointKey];
         if (el && !el.getHasDragged() && !el.getHasConfirmed()) el.setStatus('计算失败', '#ef4444');
@@ -699,7 +754,6 @@ function openAdjustmentModal() {
     });
   }
 
-  let reanalyzeTimer = null;
   function scheduleReanalyze() {
     clearTimeout(reanalyzeTimer);
     reanalyzeTimer = setTimeout(() => reanalyzePoints(buildNonRotationAdjustments()), 400);
@@ -720,6 +774,9 @@ function openAdjustmentModal() {
     if (field && panelEls[field.pointKey]) {
       panelEls[field.pointKey].setRotation(parseInt(pill.dataset.value, 10) || 0);
     } else if (group === 'crop_mode' && pill.dataset.value === 'none') {
+      clearTimeout(reanalyzeTimer);
+      reanalyzeGuard.invalidate();
+      abortReanalyze();
       cfg.fields.forEach(item => {
         const el = panelEls[item.pointKey];
         if (el) el.clearMarkedPoints('「不裁剪」模式：将保留全图');
@@ -729,7 +786,12 @@ function openAdjustmentModal() {
     }
   });
 
-  const close = () => panel.remove();
+  const close = () => {
+    clearTimeout(reanalyzeTimer);
+    reanalyzeGuard.close();
+    abortReanalyze();
+    panel.remove();
+  };
   panel.querySelector('#doc-adjust-close').onclick = close;
   panel.querySelector('#doc-adjust-cancel').onclick = close;
   panel.addEventListener('click', event => {

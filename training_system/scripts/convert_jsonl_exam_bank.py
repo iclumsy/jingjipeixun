@@ -5,11 +5,11 @@ the backend exam-bank uploader, and download referenced images.
 
 Example:
   python3 training_system/scripts/convert_jsonl_exam_bank.py \
-    "/Users/ditto/Documents/junrui/特种设备安全管理(A)_起重机械.jsonl" \
-    --output training_system/static/data/A_起重机械安全管理.json \
+    "/Users/ditto/Documents/junrui/起重机指挥(Q1).jsonl" \
+    --output training_system/static/data/Q1_起重机指挥.json \
     --image-dir training_system/static/images/junrui \
     --image-base-url http://file.tskspx.cn \
-    --image-prefix qizhongjixie_
+    --image-prefix qizhongzhihui_
 """
 
 import argparse

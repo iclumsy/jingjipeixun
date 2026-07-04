@@ -49,4 +49,24 @@ vm.runInContext(`
   assert(document.getElementById('inputList').innerHTML.includes('身份证正面'));
   assert(document.getElementById('inputList').innerHTML.includes('front.jpg'));
   assert(document.getElementById('outputList').innerHTML.includes('生成后显示结果'));
+
+  state.previewUrls.id_card_front = { name: '"><img src=x onerror=alert(1)>', url: 'blob:evil' };
+  renderSelectedPreviews();
+  assert(!document.getElementById('inputList').innerHTML.includes('<img src=x onerror=alert(1)>'));
+  assert(document.getElementById('inputList').innerHTML.includes('&quot;&gt;&lt;img src=x onerror=alert(1)&gt;'));
+
+  state.task = { id: 'task-a' };
+  const guard = createTaskRequestGuard(() => state.task && state.task.id);
+  const firstRequest = guard.next('task-a');
+  const secondRequest = guard.next('task-a');
+  assert.strictEqual(guard.isCurrent(firstRequest, 'task-a'), false);
+  assert.strictEqual(guard.isCurrent(secondRequest, 'task-b'), false);
+  state.task = { id: 'task-b' };
+  assert.strictEqual(guard.isCurrent(secondRequest, 'task-a'), false);
+  state.task = { id: 'task-a' };
+  assert.strictEqual(guard.isCurrent(secondRequest, 'task-a'), true);
+  guard.close();
+  assert.strictEqual(guard.isCurrent(secondRequest, 'task-a'), false);
 `, context);
+
+assert(!source.includes('state.points[field.pointKey] = pts'), 'auto-detected points must not be stored as confirmed global points');
