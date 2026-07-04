@@ -123,6 +123,11 @@ def logout():
     """
     # 清除所有 session 数据（包括认证标记和用户信息）
     auth_user = session.get('auth_user', '未知用户')
+    try:
+        from services.document_tool_service import cleanup_current_session_temp_files
+        cleanup_current_session_temp_files()
+    except Exception as err:
+        current_app.logger.warning(f'清理临时证件处理文件失败: {err}')
     session.clear()
     
     client_ip = get_client_ip(request)
