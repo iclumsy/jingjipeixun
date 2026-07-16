@@ -611,74 +611,94 @@ def get_next_question(bank_id, mode='sequential', current_question_id=None, ques
         order_params = [student_openid, bank_id]
 
     with get_db_connection() as conn:
-        # 游标：基于 (sort_order, id) 而不是只用 id
-        if current_id:
-            if mode == 'memorize' and student_openid:
-                # 题目浏览：需要考虑"未浏览优先"排序
-                # 获取当前题的 sort_order 和是否已浏览
-                current_row = conn.execute(
-                    'SELECT sort_order FROM exam_questions WHERE id = ?',
-                    [current_id]
-                ).fetchone()
-                if current_row:
-                    current_sort_order = current_row['sort_order']
-                    current_seen = conn.execute(
-                        '''
-                        SELECT COUNT(*) FROM mini_question_states
-                        WHERE openid = ? AND bank_id = ? AND question_id = ? AND COALESCE(seen_at, '') != ''
-                        ''',
-                        [student_openid, bank_id, current_id]
-                    ).fetchone()[0] > 0
+        # 计算当前模式下的总题数
+        total = conn.execute(f'SELECT COUNT(*) FROM exam_questions {count_where}', count_params).fetchone()[0]
 
-                    if current_seen:
-                        # 当前题已浏览：下一题可以是未浏览的任意题，或已浏览且排序更后的题
-                        where += '''
-                            AND (
-                                id NOT IN (
-                                    SELECT question_id
-                                    FROM mini_question_states
-                                    WHERE openid = ? AND bank_id = ? AND COALESCE(seen_at, '') != ''
-                                )
-                                OR (
-                                    id IN (
+        row = None
+        # 如果没有传入当前题目ID，且为顺序练习，则寻找用户在该分类下首个未掌握的题作为起点
+        if not current_id and mode == 'sequential' and student_openid:
+            progress_query = f'''
+                SELECT id FROM exam_questions
+                {count_where}
+                AND id NOT IN (
+                    SELECT question_id FROM mini_question_states
+                    WHERE openid = ? AND bank_id = ? AND status = 'mastered'
+                )
+                ORDER BY sort_order ASC, id ASC
+                LIMIT 1
+            '''
+            progress_params = count_params + [student_openid, bank_id]
+            progress_row = conn.execute(progress_query, progress_params).fetchone()
+            if progress_row:
+                row = conn.execute('SELECT * FROM exam_questions WHERE id = ?', [progress_row['id']]).fetchone()
+
+        if not row:
+            # 游标：基于 (sort_order, id) 而不是只用 id
+            if current_id:
+                if mode == 'memorize' and student_openid:
+                    # 题目浏览：需要考虑"未浏览优先"排序
+                    # 获取当前题的 sort_order 和是否已浏览
+                    current_row = conn.execute(
+                        'SELECT sort_order FROM exam_questions WHERE id = ?',
+                        [current_id]
+                    ).fetchone()
+                    if current_row:
+                        current_sort_order = current_row['sort_order']
+                        current_seen = conn.execute(
+                            '''
+                            SELECT COUNT(*) FROM mini_question_states
+                            WHERE openid = ? AND bank_id = ? AND question_id = ? AND COALESCE(seen_at, '') != ''
+                            ''',
+                            [student_openid, bank_id, current_id]
+                        ).fetchone()[0] > 0
+
+                        if current_seen:
+                            # 当前题已浏览：下一题可以是未浏览的任意题，或已浏览且排序更后的题
+                            where += '''
+                                AND (
+                                    id NOT IN (
                                         SELECT question_id
                                         FROM mini_question_states
                                         WHERE openid = ? AND bank_id = ? AND COALESCE(seen_at, '') != ''
                                     )
-                                    AND (sort_order > ? OR (sort_order = ? AND id > ?))
+                                    OR (
+                                        id IN (
+                                            SELECT question_id
+                                            FROM mini_question_states
+                                            WHERE openid = ? AND bank_id = ? AND COALESCE(seen_at, '') != ''
+                                        )
+                                        AND (sort_order > ? OR (sort_order = ? AND id > ?))
+                                    )
                                 )
-                            )
-                        '''
-                        params.extend([student_openid, bank_id, student_openid, bank_id, current_sort_order, current_sort_order, current_id])
-                    else:
-                        # 当前题未浏览：下一题是未浏览且排序更后的题
-                        where += '''
-                            AND id NOT IN (
-                                SELECT question_id
-                                FROM mini_question_states
-                                WHERE openid = ? AND bank_id = ? AND COALESCE(seen_at, '') != ''
-                            )
-                            AND (sort_order > ? OR (sort_order = ? AND id > ?))
-                        '''
-                        params.extend([student_openid, bank_id, current_sort_order, current_sort_order, current_id])
-            else:
-                # 其他模式：基于 (sort_order, id) 游标
-                current_row = conn.execute(
-                    'SELECT sort_order FROM exam_questions WHERE id = ?',
-                    [current_id]
-                ).fetchone()
-                if current_row:
-                    current_sort_order = current_row['sort_order']
-                    where += ' AND (sort_order > ? OR (sort_order = ? AND id > ?))'
-                    params.extend([current_sort_order, current_sort_order, current_id])
-        # 计算当前模式下的总题数
-        total = conn.execute(f'SELECT COUNT(*) FROM exam_questions {count_where}', count_params).fetchone()[0]
+                            '''
+                            params.extend([student_openid, bank_id, student_openid, bank_id, current_sort_order, current_sort_order, current_id])
+                        else:
+                            # 当前题未浏览：下一题是未浏览且排序更后的题
+                            where += '''
+                                AND id NOT IN (
+                                    SELECT question_id
+                                    FROM mini_question_states
+                                    WHERE openid = ? AND bank_id = ? AND COALESCE(seen_at, '') != ''
+                                )
+                                AND (sort_order > ? OR (sort_order = ? AND id > ?))
+                            '''
+                            params.extend([student_openid, bank_id, current_sort_order, current_sort_order, current_id])
+                else:
+                    # 其他模式：基于 (sort_order, id) 游标
+                    current_row = conn.execute(
+                        'SELECT sort_order FROM exam_questions WHERE id = ?',
+                        [current_id]
+                    ).fetchone()
+                    if current_row:
+                        current_sort_order = current_row['sort_order']
+                        where += ' AND (sort_order > ? OR (sort_order = ? AND id > ?))'
+                        params.extend([current_sort_order, current_sort_order, current_id])
 
-        # 查询下一题
-        row = conn.execute(
-            f'SELECT * FROM exam_questions {where} {order} LIMIT 1',
-            params + order_params,
-        ).fetchone()
+            # 查询下一题
+            row = conn.execute(
+                f'SELECT * FROM exam_questions {where} {order} LIMIT 1',
+                params + order_params,
+            ).fetchone()
 
         if not row:
             return {'question': None, 'total': total, 'hasMore': False, 'currentPosition': total}

@@ -2738,9 +2738,7 @@ def get_miniprogram_admin_learning_stats_route():
             search_pattern = f'%{search_query}%'
             params.extend([search_pattern, search_pattern, search_pattern, search_pattern])
 
-        if project_filter:
-            where_clauses.append("exam_project = ?")
-            params.append(project_filter)
+
 
         with get_db_connection() as conn:
             # 0. 获取当前已有学员的培训项目名列表用于一级分类筛选
@@ -2928,7 +2926,28 @@ def get_miniprogram_admin_learning_stats_route():
                 'studyDurationSeconds': 0
             })
 
-        # 状态过滤
+        # 计算当前状态和搜索条件过滤下各项目的学员人数
+        project_counts = {}
+        total_matching_count = 0
+        for item in flat_list:
+            matches_status = True
+            if status_filter and status_filter != 'all':
+                if status_filter == 'active':
+                    if item['state'] not in ('practicing', 'exam_attempted'):
+                        matches_status = False
+                elif status_filter == 'passed':
+                    if item['state'] != 'passed':
+                        matches_status = False
+                elif status_filter == 'not_started':
+                    if item['state'] != 'not_started':
+                        matches_status = False
+            if matches_status:
+                p_name = item['examProject']
+                if p_name:
+                    project_counts[p_name] = project_counts.get(p_name, 0) + 1
+                total_matching_count += 1
+
+        # 状态和项目过滤
         filtered_list = []
         for item in flat_list:
             if status_filter and status_filter != 'all':
@@ -2941,6 +2960,9 @@ def get_miniprogram_admin_learning_stats_route():
                 elif status_filter == 'not_started':
                     if item['state'] != 'not_started':
                         continue
+            if project_filter:
+                if item['examProject'] != project_filter:
+                    continue
             filtered_list.append(item)
 
         total_count = len(filtered_list)
@@ -2963,6 +2985,8 @@ def get_miniprogram_admin_learning_stats_route():
             'success': True,
             'list': sliced,
             'projects': all_projects,
+            'project_counts': project_counts,
+            'total_matching_count': total_matching_count,
             'total': total_count,
             'page': page,
             'limit': limit,

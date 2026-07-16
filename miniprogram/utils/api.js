@@ -552,6 +552,7 @@ async function getStudents(params = {}) {
     query.my_only = true
   }
   delete query.myOnly
+  delete query.project
 
   const result = await requestApi('/api/students', {
     method: 'GET',
@@ -559,6 +560,23 @@ async function getStudents(params = {}) {
   })
 
   let list = Array.isArray(result) ? result.map(withClientId) : []
+
+  // 提取项目列表及人数统计
+  const projectCounts = {}
+  let totalMatching = list.length
+  list.forEach(item => {
+    const proj = item.exam_project || ''
+    if (proj) {
+      projectCounts[proj] = (projectCounts[proj] || 0) + 1
+    }
+  })
+  const projects = Object.keys(projectCounts).sort()
+
+  // 客户端过滤项目
+  if (rest.project) {
+    list = list.filter(item => item.exam_project === rest.project)
+  }
+
   const pageNo = parsePositiveInt(page, 1)
   const pageSize = Math.min(parsePositiveInt(limit, 20), 100)
   const start = (pageNo - 1) * pageSize
@@ -570,7 +588,10 @@ async function getStudents(params = {}) {
     list: sliced,
     page: pageNo,
     limit: pageSize,
-    hasMore
+    hasMore,
+    projects,
+    projectCounts,
+    totalMatching
   }
   if (parseBoolean(include_total) || parseBoolean(with_total)) {
     response.total = list.length

@@ -12,13 +12,13 @@ Page({
   },
 
   onLoad() {
-    this.loadSummary()
   },
 
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateTabBar()
     }
+    this.loadSummary()
   },
 
   onPullDownRefresh() {

@@ -200,11 +200,15 @@ Page({
       status: 'unreviewed',
       training_type: 'special_equipment',
       company: '',
-      search: ''
+      search: '',
+      project: ''
     },
     companyOptions: ['全部'],
     companyIndex: 0,
     records: [],
+    reviewProjects: [],
+    reviewProjectCounts: {},
+    reviewTotalMatchingCount: 0,
     page: 1,
     limit: 20,
     hasMore: true,
@@ -241,6 +245,8 @@ Page({
     activeStatus: 'all',
     searchQuery: '',
     reportProjects: [],
+    reportProjectCounts: {},
+    reportTotalMatchingCount: 0,
     activeProject: '',
     reportList: [],
     reportPage: 1,
@@ -454,6 +460,9 @@ Page({
 
       this.setData({
         records,
+        reviewProjects: result.projects || [],
+        reviewProjectCounts: result.projectCounts || {},
+        reviewTotalMatchingCount: result.totalMatching || 0,
         page: page + 1,
         hasMore: !!result.hasMore,
         loading: false,
@@ -477,6 +486,7 @@ Page({
 
     this.setData({
       'filters.status': value,
+      'filters.project': '',
       page: 1
     })
     await this.refreshAll(true)
@@ -1120,6 +1130,8 @@ Page({
       this.setData({
         reportList: records,
         reportProjects: result.projects || this.data.reportProjects,
+        reportProjectCounts: result.project_counts || {},
+        reportTotalMatchingCount: result.total_matching_count || 0,
         reportPage: page + 1,
         reportHasMore: !!result.hasMore,
         reportLoading: false,
@@ -1197,6 +1209,16 @@ Page({
       activeProject: val
     }, () => {
       this.refreshReportAll()
+    })
+  },
+
+  onReviewProjectTap(e) {
+    const val = e.currentTarget.dataset.val
+    if (val === this.data.filters.project) return
+    this.setData({
+      'filters.project': val
+    }, () => {
+      this.refreshAll(true)
     })
   },
 

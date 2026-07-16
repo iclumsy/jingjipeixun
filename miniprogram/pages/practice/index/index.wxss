@@ -57,27 +57,34 @@
 }
 
 .bank-tabs {
-  white-space: nowrap;
-  margin-bottom: 18rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx 16rpx;
+  background: #fff;
+  border: 1rpx solid #dce6f2;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+  box-sizing: border-box;
 }
 
 .bank-tab {
   display: inline-flex;
   align-items: center;
-  min-height: 64rpx;
-  padding: 0 22rpx;
-  margin-right: 12rpx;
-  border-radius: 999rpx;
-  background: #fff;
-  color: #697994;
-  border: 1rpx solid #dce6f2;
+  padding: 8rpx 24rpx;
+  border-radius: 30rpx;
+  background-color: #f1f5f9;
+  color: #475569;
   font-size: 24rpx;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
 }
 
 .bank-tab.active {
-  background: #2f6af5;
-  color: #fff;
-  border-color: #2f6af5;
+  background-color: #e0e7ff;
+  color: #4f46e5;
+  font-weight: 600;
 }
 
 .hero-card,

@@ -64,7 +64,7 @@
 }
 
 .status-filter-row .chip-list {
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .filter-title {
@@ -2333,6 +2333,12 @@
   background-color: #e0e7ff;
   color: #4f46e5;
   font-weight: 600;
+}
+
+.review-project-filter {
+  margin-top: 24rpx !important;
+  border-top: 1rpx solid #f1f5f9;
+  padding-top: 20rpx;
 }
 
 

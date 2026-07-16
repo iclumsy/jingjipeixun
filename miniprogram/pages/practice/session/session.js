@@ -257,6 +257,7 @@ Page({
           currentIndex: 0,
           currentPosition,
           questionTotal,
+          lastQuestionId: question.id,
           seenQuestionIds: stateMaps.seenQuestionIds,
           answeredQuestionIds: stateMaps.answeredQuestionIds,
           masteredQuestionIds: stateMaps.masteredQuestionIds,
@@ -415,12 +416,20 @@ Page({
     const resultMap = { ...this.data.resultMap, [q.id]: isCorrect }
     const wasAnswered = !!this.data.answeredQuestionIds[q.id]
     const wasMastered = !!this.data.masteredQuestionIds[q.id]
+    const wasSeen = !!this.data.seenQuestionIds[q.id]
     const answeredQuestionIds = { ...this.data.answeredQuestionIds, [q.id]: true }
     const masteredQuestionIds = isMastered
       ? { ...this.data.masteredQuestionIds, [q.id]: true }
       : { ...this.data.masteredQuestionIds }
     if (!isMastered) delete masteredQuestionIds[q.id]
+
+    let seenQuestionIds = this.data.seenQuestionIds
     const summaryState = { ...this.data.summaryState }
+    if (!wasSeen) {
+      seenQuestionIds = { ...this.data.seenQuestionIds, [q.id]: true }
+      summaryState.seenCount = Math.max(0, Number(summaryState.seenCount || 0)) + 1
+    }
+
     if (!wasAnswered) {
       summaryState.answeredCount = Math.max(0, Number(summaryState.answeredCount || 0)) + 1
     }
@@ -435,6 +444,7 @@ Page({
       resultMap,
       answeredQuestionIds,
       masteredQuestionIds,
+      seenQuestionIds,
       summaryState,
       doneCount: Number(summaryState.answeredCount || Object.keys(answeredQuestionIds).length),
       correctCount: Number(summaryState.masteredCount || Object.keys(masteredQuestionIds).length),
@@ -489,6 +499,7 @@ Page({
           currentPosition: this.data.mode === 'wrong' ? prevPosition + 1 : currentPosition,
           questionTotal: this.data.mode === 'wrong' ? prevTotal : questionTotal,
           loading: false,
+          lastQuestionId: question.id,
           seenQuestionIds: stateMaps.seenQuestionIds,
           answeredQuestionIds: stateMaps.answeredQuestionIds,
           masteredQuestionIds: stateMaps.masteredQuestionIds,

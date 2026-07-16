@@ -56,6 +56,24 @@
           </view>
         </view>
 
+        <!-- 项目筛选 -->
+        <view class="project-filter-row review-project-filter" wx:if="{{reviewProjects && reviewProjects.length > 0}}">
+          <view class="project-chips-wrap">
+            <view
+              class="project-chip {{filters.project === '' ? 'active' : ''}}"
+              bindtap="onReviewProjectTap"
+              data-val=""
+            >全部项目 ({{reviewTotalMatchingCount || 0}}人)</view>
+            <view
+              wx:for="{{reviewProjects}}"
+              wx:key="*this"
+              class="project-chip {{filters.project === item ? 'active' : ''}}"
+              bindtap="onReviewProjectTap"
+              data-val="{{item}}"
+            >{{item}} ({{reviewProjectCounts[item] || 0}}人)</view>
+          </view>
+        </view>
+
         <view class="filter-row" wx:if="{{false}}">
           <view class="filter-title">公司</view>
           <view class="company-picker">
@@ -296,14 +314,14 @@
               class="project-chip {{activeProject === '' ? 'active' : ''}}" 
               bindtap="onReportProjectTap" 
               data-val=""
-            >全部项目</view>
+            >全部项目 ({{reportTotalMatchingCount || 0}}人)</view>
             <view 
               wx:for="{{reportProjects}}" 
               wx:key="*this"
               class="project-chip {{activeProject === item ? 'active' : ''}}" 
               bindtap="onReportProjectTap" 
               data-val="{{item}}"
-            >{{item}}</view>
+            >{{item}} ({{reportProjectCounts[item] || 0}}人)</view>
           </view>
         </view>
 

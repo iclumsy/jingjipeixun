@@ -20,7 +20,7 @@
   </view>
 
   <view wx:else>
-    <scroll-view scroll-x class="bank-tabs">
+    <view class="bank-tabs">
       <view
         wx:for="{{banks}}"
         wx:key="id"
@@ -30,7 +30,7 @@
       >
         {{item.displayName}}
       </view>
-    </scroll-view>
+    </view>
 
     <view class="hero-card">
       <view class="bank-row">
