@@ -1292,6 +1292,17 @@ function getLearningStats(params = {}) {
 }
 
 
+/**
+ * 获取数据看板统计（管理员专属）。
+ * @returns {Promise<Object>} { total, by_status, this_month, today, exam_pass_rate, by_project, monthly_trend, recent_students }
+ */
+function getDashboardStats() {
+  return requestApi('/api/stats/dashboard', {
+    method: 'GET'
+  })
+}
+
+
 // ======================== 导出接口 ========================
 module.exports = {
   login,               // 登录
@@ -1300,6 +1311,7 @@ module.exports = {
   getStudents,          // 获取学员列表
   getStudentDetail,     // 获取学员详情
   getLearningStats,     // 获取学习统计列表 (新)
+  getDashboardStats,    // 获取数据看板统计 (新)
   getGeneratedMaterials, // 获取已生成报名材料
   getStudentOperationLogs, // 获取学员操作记录
   getStudentLearningStatus, // 获取学员学习情况

@@ -123,6 +123,10 @@
   min-height: 420rpx;
 }
 
+.record-list.empty {
+  min-height: 0;
+}
+
 .record-card {
   background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
   border: 1rpx solid #dce6f2;
@@ -2341,5 +2345,272 @@
   padding-top: 20rpx;
 }
 
+/* 空列表紧凑提示 */
+.empty-inline-hint {
+  text-align: center;
+  padding: 24rpx 0;
+  font-size: 24rpx;
+  color: #94a3b8;
+}
 
+/* ======================== 数据看板 ======================== */
 
+.dashboard-section {
+  margin-top: 32rpx;
+  padding-top: 28rpx;
+  border-top: 1rpx solid #e2e8f0;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: baseline;
+  gap: 16rpx;
+  margin-bottom: 28rpx;
+  padding: 0 4rpx;
+}
+
+.dashboard-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.dashboard-sub {
+  font-size: 22rpx;
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+/* KPI 卡片网格 */
+.dashboard-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14rpx;
+  margin-bottom: 24rpx;
+}
+
+.kpi-card {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 24rpx 12rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+  border: 1rpx solid #f1f5f9;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6rpx;
+  background: linear-gradient(90deg, #6366f1, #818cf8);
+  border-radius: 20rpx 20rpx 0 0;
+}
+
+.kpi-card.kpi-accent::before {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.kpi-card.kpi-info::before {
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+}
+
+.kpi-card.kpi-success::before {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.kpi-value {
+  font-size: 44rpx;
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-label {
+  font-size: 20rpx;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* 状态分布横行 */
+.dashboard-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 24rpx;
+  padding: 24rpx;
+  background: #ffffff;
+  border-radius: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+  border: 1rpx solid #f1f5f9;
+}
+
+.status-chip-item {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 6rpx 16rpx 6rpx 12rpx;
+  background: #f8fafc;
+  border-radius: 12rpx;
+}
+
+.sc-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sc-dot-unreviewed { background: #f59e0b; }
+.sc-dot-reviewed { background: #3b82f6; }
+.sc-dot-registered { background: #8b5cf6; }
+.sc-dot-passed { background: #10b981; }
+.sc-dot-rejected { background: #ef4444; }
+
+.sc-label {
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.sc-count {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #1e293b;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 通用看板子卡片 */
+.dashboard-card {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 28rpx 24rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+  border: 1rpx solid #f1f5f9;
+}
+
+.dc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+}
+
+.dc-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #334155;
+}
+
+/* 趋势柱状图 */
+.trend-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  height: 250rpx;
+  padding: 10rpx 0;
+}
+
+.trend-bar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.trend-bar-box {
+  width: 44rpx;
+  height: 140rpx;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.trend-bar {
+  width: 100%;
+  min-height: 6rpx;
+  background: linear-gradient(180deg, #818cf8, #6366f1);
+  border-radius: 8rpx 8rpx 4rpx 4rpx;
+  transition: height 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+  overflow: visible;
+}
+
+.trend-count {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #6366f1;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8rpx;
+  white-space: nowrap;
+}
+
+.trend-month {
+  font-size: 26rpx;
+  color: #64748b;
+  font-weight: 500;
+  margin-top: 14rpx;
+  line-height: 1.2;
+}
+
+/* 项目分布列表 */
+.project-dist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+
+.project-dist-item {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.pd-name {
+  font-size: 22rpx;
+  color: #475569;
+  width: 200rpx;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-bar-bg {
+  flex: 1;
+  height: 16rpx;
+  background: #f1f5f9;
+  border-radius: 10rpx;
+  overflow: hidden;
+}
+
+.pd-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #818cf8, #6366f1);
+  border-radius: 10rpx;
+  min-width: 6rpx;
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pd-count {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #334155;
+  width: 80rpx;
+  text-align: right;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}

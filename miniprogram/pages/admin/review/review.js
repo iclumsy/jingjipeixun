@@ -254,7 +254,19 @@ Page({
     reportHasMore: true,
     reportLoading: false,
     reportRefreshing: false,
-    reportInitialized: false
+    reportInitialized: false,
+
+    // 数据看板
+    dashboardLoaded: false,
+    dashboardStats: {
+      total: 0,
+      thisMonth: 0,
+      today: 0,
+      examPassRate: 0,
+      byStatus: {},
+      byProject: [],
+      monthlyTrend: []
+    }
   },
 
   async onLoad() {
@@ -405,6 +417,40 @@ Page({
   async refreshAll(forceCompanyReload = false) {
     await this.loadCompanies(forceCompanyReload)
     await this.loadRecords(true)
+    // 刷新时异步加载看板数据（不阻塞列表加载）
+    this.loadDashboardStats()
+  },
+
+  async loadDashboardStats() {
+    try {
+      const result = await api.getDashboardStats()
+      if (!result) return
+
+      // 趋势数据：取最后 6 个月，计算每月的柱高占比
+      const trend = Array.isArray(result.monthly_trend) ? result.monthly_trend : []
+      const maxCount = Math.max(...trend.map(t => t.count), 1)
+      const monthlyTrend = trend.map(t => {
+        const monthNum = parseInt((t.month || '').split('-')[1] || '0', 10)
+        return {
+          month: monthNum ? `${monthNum}月` : '',
+          count: t.count || 0,
+          heightPercent: Math.round(((t.count || 0) / maxCount) * 100)
+        }
+      })
+
+      this.setData({
+        dashboardLoaded: true,
+        'dashboardStats.total': result.total || 0,
+        'dashboardStats.thisMonth': result.this_month || 0,
+        'dashboardStats.today': result.today || 0,
+        'dashboardStats.examPassRate': result.exam_pass_rate || 0,
+        'dashboardStats.byStatus': result.by_status || {},
+        'dashboardStats.byProject': Array.isArray(result.by_project) ? result.by_project : [],
+        'dashboardStats.monthlyTrend': monthlyTrend
+      })
+    } catch (err) {
+      console.error('加载看板数据失败:', err)
+    }
   },
 
   async loadCompanies(forceReload = false) {

@@ -84,7 +84,7 @@
         </view>
       </view>
 
-      <view class="record-list">
+      <view class="record-list {{records.length === 0 ? 'empty' : ''}}">
         <view
           wx:for="{{records}}"
           wx:key="_id"
@@ -278,10 +278,94 @@
         <view class="loading" wx:if="{{loading && !refreshing}}">加载中...</view>
         <view class="no-more" wx:if="{{!loading && !hasMore && records.length > 0}}">已显示全部记录</view>
 
-        <view class="state-wrap" wx:if="{{!loading && records.length === 0}}">
-          <view class="state-dot"></view>
-          <view class="state-title">暂无符合条件的记录</view>
-          <view class="state-desc">可切换筛选项或下拉刷新后重试</view>
+        <view class="empty-inline-hint" wx:if="{{!loading && records.length === 0}}">
+          <text>当前筛选条件下暂无学员记录</text>
+        </view>
+      </view>
+
+      <!-- 数据看板 -->
+      <view class="dashboard-section" wx:if="{{dashboardLoaded}}">
+        <view class="dashboard-header">
+          <text class="dashboard-title">📊 数据看板</text>
+          <text class="dashboard-sub">实时统计概览</text>
+        </view>
+
+        <!-- KPI 卡片区 -->
+        <view class="dashboard-kpi-grid">
+          <view class="kpi-card kpi-success">
+            <text class="kpi-value">{{dashboardStats.today}}</text>
+            <text class="kpi-label">今日新增</text>
+          </view>
+          <view class="kpi-card kpi-accent">
+            <text class="kpi-value">{{dashboardStats.thisMonth}}</text>
+            <text class="kpi-label">本月新增</text>
+          </view>
+          <view class="kpi-card">
+            <text class="kpi-value">{{dashboardStats.total}}</text>
+            <text class="kpi-label">学员总数</text>
+          </view>
+        </view>
+
+        <!-- 状态分布 -->
+        <view class="dashboard-status-row">
+          <view class="status-chip-item">
+            <text class="sc-dot sc-dot-unreviewed"></text>
+            <text class="sc-label">待审核</text>
+            <text class="sc-count">{{dashboardStats.byStatus.unreviewed || 0}}</text>
+          </view>
+          <view class="status-chip-item">
+            <text class="sc-dot sc-dot-reviewed"></text>
+            <text class="sc-label">已审核</text>
+            <text class="sc-count">{{dashboardStats.byStatus.reviewed || 0}}</text>
+          </view>
+          <view class="status-chip-item">
+            <text class="sc-dot sc-dot-registered"></text>
+            <text class="sc-label">已报名</text>
+            <text class="sc-count">{{dashboardStats.byStatus.registered || 0}}</text>
+          </view>
+          <view class="status-chip-item">
+            <text class="sc-dot sc-dot-passed"></text>
+            <text class="sc-label">考试通过</text>
+            <text class="sc-count">{{dashboardStats.byStatus.exam_passed || 0}}</text>
+          </view>
+          <view class="status-chip-item" wx:if="{{dashboardStats.byStatus.rejected}}">
+            <text class="sc-dot sc-dot-rejected"></text>
+            <text class="sc-label">已驳回</text>
+            <text class="sc-count">{{dashboardStats.byStatus.rejected || 0}}</text>
+          </view>
+        </view>
+
+        <!-- 近 6 个月趋势 -->
+        <view class="dashboard-card" wx:if="{{dashboardStats.monthlyTrend.length > 0}}">
+          <view class="dc-head">
+            <text class="dc-title">近 6 个月趋势</text>
+          </view>
+          <view class="trend-chart">
+            <view class="trend-bar-wrap" wx:for="{{dashboardStats.monthlyTrend}}" wx:key="month">
+              <view class="trend-bar-box">
+                <view class="trend-bar" style="height: {{item.heightPercent}}%;">
+                  <text class="trend-count">{{item.count}}</text>
+                </view>
+              </view>
+              <text class="trend-month">{{item.month}}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 项目分布 -->
+        <view class="dashboard-card" wx:if="{{dashboardStats.byProject.length > 0}}">
+          <view class="dc-head">
+            <text class="dc-title">报考项目分布</text>
+          </view>
+          <view class="project-dist-list">
+            <view class="project-dist-item" wx:for="{{dashboardStats.byProject}}" wx:key="name">
+              <text class="pd-name">{{item.name}}</text>
+              <view class="pd-bar-bg">
+                <view class="pd-bar-fill" style="width: {{dashboardStats.total > 0 ? (item.count / dashboardStats.total * 100) : 0}}%;"></view>
+              </view>
+              <text class="pd-count">{{item.count}}人</text>
+            </view>
+          </view>
         </view>
       </view>
     </block>
