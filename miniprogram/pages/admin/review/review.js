@@ -17,6 +17,8 @@ const FALLBACK_TRAINING_TYPE_FILTERS = [
   { label: '特种作业', value: 'special_operation' }
 ]
 
+const DELETE_ALLOWED_STATUSES = ['unreviewed', 'reviewed', 'registered']
+
 function normalizeAdminStatusFilters(filters = []) {
   const byValue = new Map()
   FALLBACK_STATUS_FILTERS.forEach(item => byValue.set(item.value, { ...item }))
@@ -55,6 +57,10 @@ function buildLocalActions(item) {
   }
 }
 
+function canDeleteFromList(item = {}) {
+  return DELETE_ALLOWED_STATUSES.includes(item.status) && !!(item.actions && item.actions.canDelete)
+}
+
 function mapRecord(item) {
   const fallbackTags = []
   if (item.training_type === 'special_equipment' && item.application_type === 'renewal') {
@@ -68,6 +74,7 @@ function mapRecord(item) {
   return {
     ...item,
     actions,
+    canDeleteFromList: canDeleteFromList({ ...item, actions }),
     canViewLearningStatus,
     statusText: item.statusText || STATUS_LABELS[item.status] || item.status || '-',
     statusClass: item.statusClass || item.status || '',
@@ -209,9 +216,6 @@ Page({
     reviewProjects: [],
     reviewProjectCounts: {},
     reviewTotalMatchingCount: 0,
-    page: 1,
-    limit: 20,
-    hasMore: true,
     loading: false,
     refreshing: false,
     initialized: false,
@@ -231,6 +235,7 @@ Page({
     // 更多操作弹窗
     showMoreActionsModal: false,
     moreActionsStudent: {},
+    deletingStudentId: '',
 
     // 双 Tab 切换属性
     currentTab: 'review', // review (信息审核) | report (学习统计)
@@ -249,9 +254,6 @@ Page({
     reportTotalMatchingCount: 0,
     activeProject: '',
     reportList: [],
-    reportPage: 1,
-    reportLimit: 20,
-    reportHasMore: true,
     reportLoading: false,
     reportRefreshing: false,
     reportInitialized: false,
@@ -386,18 +388,6 @@ Page({
     }
   },
 
-  onReachBottom() {
-    if (this.data.currentTab === 'review') {
-      if (!this.data.loading && this.data.hasMore) {
-        this.loadRecords(false)
-      }
-    } else {
-      if (!this.data.reportLoading && this.data.reportHasMore) {
-        this.loadReportRecords(false)
-      }
-    }
-  },
-
   ensureAdminAccess(showToast = true) {
     if (hasAdminAccess()) return true
 
@@ -494,23 +484,18 @@ Page({
     })
 
     try {
-      const page = refresh ? 1 : this.data.page
       const result = await api.getStudents({
         ...this.data.filters,
-        page,
-        limit: this.data.limit
+        all: true
       })
 
-      const currentList = Array.isArray(result.list) ? result.list.map(mapRecord) : []
-      const records = refresh ? currentList : this.data.records.concat(currentList)
+      const records = Array.isArray(result.list) ? result.list.map(mapRecord) : []
 
       this.setData({
         records,
         reviewProjects: result.projects || [],
         reviewProjectCounts: result.projectCounts || {},
         reviewTotalMatchingCount: result.totalMatching || 0,
-        page: page + 1,
-        hasMore: !!result.hasMore,
         loading: false,
         refreshing: false
       })
@@ -532,8 +517,7 @@ Page({
 
     this.setData({
       'filters.status': value,
-      'filters.project': '',
-      page: 1
+      'filters.project': ''
     })
     await this.refreshAll(true)
   },
@@ -542,10 +526,7 @@ Page({
     const { value } = e.currentTarget.dataset
     if (value === this.data.filters.training_type) return
 
-    this.setData({
-      'filters.training_type': value,
-      page: 1
-    })
+    this.setData({ 'filters.training_type': value })
     await this.refreshAll(true)
   },
 
@@ -555,8 +536,7 @@ Page({
 
     this.setData({
       companyIndex: index,
-      'filters.company': company,
-      page: 1
+      'filters.company': company
     })
     await this.loadRecords(true)
   },
@@ -1094,6 +1074,36 @@ Page({
     this.onMarkExamPassedTap({ currentTarget: { dataset: { id } } })
   },
 
+  async onMoreDelete() {
+    const student = this.data.moreActionsStudent || {}
+    const id = student._id
+    if (!id || !student.canDeleteFromList || this.data.deletingStudentId) return
+
+    this.closeMoreActionsModal()
+    const name = String(student.name || '该学员').trim() || '该学员'
+    let content = `确定删除学员“${name}”吗？将永久删除本系统中的学员记录和关联附件，删除后不可恢复。`
+    if (student.status === 'registered') {
+      content += ' 此操作不会撤销或修改省网报名数据。'
+    }
+    const confirmed = await this.confirmAction('确认删除学员', content)
+    if (!confirmed) return
+
+    this.setData({ deletingStudentId: String(id) })
+    wx.showLoading({ title: '删除中...' })
+    try {
+      await api.deleteStudent(id)
+      wx.hideLoading()
+      wx.showToast({ title: '已删除学员', icon: 'success' })
+      this.setData({ reportInitialized: false })
+      await this.refreshAll(true)
+    } catch (err) {
+      wx.hideLoading()
+      wx.showToast({ title: err.message || '删除失败', icon: 'none' })
+    } finally {
+      this.setData({ deletingStudentId: '' })
+    }
+  },
+
   // ========== 双 Tab 切换 ==========
   switchSegmentTab(e) {
     const tab = e.currentTarget.dataset.tab
@@ -1111,12 +1121,7 @@ Page({
 
   // ========== 学习统计 (Report) 模块业务方法 ==========
   async refreshReportAll() {
-    this.setData({
-      reportPage: 1,
-      reportHasMore: true
-    }, () => {
-      this.loadReportRecords(true)
-    })
+    await this.loadReportRecords(true)
   },
 
   async loadReportRecords(refresh = false) {
@@ -1131,13 +1136,10 @@ Page({
     })
 
     try {
-      const page = refresh ? 1 : this.data.reportPage
       const result = await api.getLearningStats({
         search: this.data.searchQuery,
         status: this.data.activeStatus,
-        project: this.data.activeProject,
-        page,
-        limit: this.data.reportLimit
+        project: this.data.activeProject
       })
 
       if (currentSeq !== this._reportReqSeq) {
@@ -1171,15 +1173,11 @@ Page({
         }
       })
 
-      const records = refresh ? currentList : this.data.reportList.concat(currentList)
-
       this.setData({
-        reportList: records,
+        reportList: currentList,
         reportProjects: result.projects || this.data.reportProjects,
         reportProjectCounts: result.project_counts || {},
         reportTotalMatchingCount: result.total_matching_count || 0,
-        reportPage: page + 1,
-        reportHasMore: !!result.hasMore,
         reportLoading: false,
         reportRefreshing: false,
         reportInitialized: true

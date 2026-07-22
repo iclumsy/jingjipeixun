@@ -201,6 +201,13 @@
                 catchtap="onOperationLogTap"
                 data-id="{{item._id}}"
               >📋 操作记录</button>
+
+              <button
+                class="action-btn btn-more"
+                size="mini"
+                catchtap="onMoreActionsTap"
+                data-id="{{item._id}}"
+              >⋯ 更多操作</button>
             </block>
             <!-- 已审核：主操作 + 操作记录 + 更多操作 -->
             <block wx:elif="{{item.status === 'reviewed'}}">
@@ -243,6 +250,13 @@
                 catchtap="onMarkExamPassedTap"
                 data-id="{{item._id}}"
               >✅ 考试通过</button>
+
+              <button
+                class="action-btn btn-more"
+                size="mini"
+                catchtap="onMoreActionsTap"
+                data-id="{{item._id}}"
+              >⋯ 更多操作</button>
             </block>
 
             <!-- 考试通过：仅保留操作记录 -->
@@ -276,8 +290,6 @@
         </view>
 
         <view class="loading" wx:if="{{loading && !refreshing}}">加载中...</view>
-        <view class="no-more" wx:if="{{!loading && !hasMore && records.length > 0}}">已显示全部记录</view>
-
         <view class="empty-inline-hint" wx:if="{{!loading && records.length === 0}}">
           <text>当前筛选条件下暂无学员记录</text>
         </view>
@@ -468,12 +480,6 @@
               </view>
             </view>
           </view>
-        </view>
-
-        <!-- 加载更多 / 到底提示 -->
-        <view class="load-more-tip">
-          <text wx:if="{{reportLoading}}">正在加载...</text>
-          <text wx:elif="{{!reportHasMore && reportList.length > 0}}">已显示全部学习记录</text>
         </view>
       </view>
 
@@ -817,6 +823,20 @@
           <view class="more-action-text">
             <text class="more-action-label">考试通过</text>
             <text class="more-action-desc">标记理论考试已通过</text>
+          </view>
+          <text class="more-action-arrow">›</text>
+        </view>
+
+        <view
+          wx:if="{{moreActionsStudent.canDeleteFromList}}"
+          class="more-action-item more-action-delete"
+          hover-class="more-action-hover"
+          catchtap="onMoreDelete"
+        >
+          <view class="more-action-icon">🗑️</view>
+          <view class="more-action-text">
+            <text class="more-action-label">删除学员</text>
+            <text class="more-action-desc">永久删除本地记录和关联附件</text>
           </view>
           <text class="more-action-arrow">›</text>
         </view>

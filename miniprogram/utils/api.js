@@ -1283,8 +1283,8 @@ async function downloadRegForm(studentId, name, idCard) {
 
 /**
  * 获取学员学习统计列表（管理员专属）。
- * @param {Object} params - { search, status, page, limit }
- * @returns {Promise<Object>} { list, total, page, limit, hasMore }
+ * @param {Object} params - { search, status, project }
+ * @returns {Promise<Object>} { list, total, projects, project_counts, total_matching_count }
  */
 function getLearningStats(params = {}) {
   return requestApi('/api/miniprogram/admin/learning_stats', {

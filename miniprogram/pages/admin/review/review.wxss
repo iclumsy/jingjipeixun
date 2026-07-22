@@ -599,8 +599,7 @@
   border: none;
 }
 
-.loading,
-.no-more {
+.loading {
   text-align: center;
   padding: 20rpx 0;
   color: #9aa8bc;
@@ -2037,14 +2036,6 @@
 
 .btn-icon {
   font-size: 26rpx;
-}
-
-/* 加载更多与无数据占位 */
-.load-more-tip {
-  text-align: center;
-  font-size: 22rpx;
-  color: #94a3b8;
-  padding: 24rpx 0;
 }
 
 .empty-state {
