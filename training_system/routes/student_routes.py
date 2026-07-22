@@ -2744,7 +2744,7 @@ def get_miniprogram_admin_learning_stats_route():
     """
     小程序管理员专用的学员学习统计列表 API。
     按 (姓名, 手机号) 进行去重聚合，并计算各项目的进度及综合状态。
-    支持关键字过滤和状态过滤，并实现内存分页。
+    支持关键字、状态和项目过滤，并返回完整结果。
     """
     try:
         from models.student import get_db_connection
@@ -2752,9 +2752,6 @@ def get_miniprogram_admin_learning_stats_route():
         search_query = request.args.get('search', '').strip().lower()
         status_filter = request.args.get('status', '').strip()  # all, passed, active, not_started
         project_filter = request.args.get('project', '').strip()
-        page = int(request.args.get('page', 1))
-        limit = int(request.args.get('limit', 20))
-
         where_clauses = ["status IN ('reviewed', 'registered')"]
         params = []
 
@@ -2991,14 +2988,10 @@ def get_miniprogram_admin_learning_stats_route():
             filtered_list.append(item)
 
         total_count = len(filtered_list)
-        start = (page - 1) * limit
-        end = start + limit
-        sliced = filtered_list[start:end]
-        has_more = end < total_count
 
-        # 精确估计本页最多 20 条记录的学时
+        # 精确估计所有返回记录的学时
         with get_db_connection() as conn2:
-            for item in sliced:
+            for item in filtered_list:
                 op_id = item['openid']
                 b_id = item['bankId']
                 if op_id and b_id:
@@ -3008,14 +3001,11 @@ def get_miniprogram_admin_learning_stats_route():
 
         return jsonify({
             'success': True,
-            'list': sliced,
+            'list': filtered_list,
             'projects': all_projects,
             'project_counts': project_counts,
             'total_matching_count': total_matching_count,
-            'total': total_count,
-            'page': page,
-            'limit': limit,
-            'hasMore': has_more
+            'total': total_count
         })
     except Exception as e:
         current_app.logger.exception('Error in miniprogram admin learning_stats API')

@@ -136,6 +136,31 @@ class LearningStatsRouteTests(unittest.TestCase):
         # Project list should still contain all active projects
         self.assertEqual(data["projects"], ["叉车司机", "起重机指挥"])
 
+    def test_learning_stats_returns_all_matching_records_without_pagination(self):
+        for index in range(25):
+            self.create_student(
+                f"Student {index + 1}",
+                "叉车司机",
+                "N1",
+                f"openid-{index + 1}",
+            )
+
+        headers = self.mini_headers(is_admin=True)
+        response = self.client.get(
+            "/api/miniprogram/admin/learning_stats?page=2&limit=1",
+            headers=headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["total"], 25)
+        self.assertEqual(len(data["list"]), 25)
+        self.assertTrue(all("studyDurationSeconds" in item for item in data["list"]))
+        self.assertNotIn("page", data)
+        self.assertNotIn("limit", data)
+        self.assertNotIn("hasMore", data)
+
 
 if __name__ == "__main__":
     unittest.main()
