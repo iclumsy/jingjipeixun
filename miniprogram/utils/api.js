@@ -533,13 +533,14 @@ function withClientId(item) {
 /**
  * 查询学员列表。
  *
- * @param {Object} params - 查询参数 {status, training_type, company, page, per_page}
+ * @param {Object} params - 查询参数 {status, training_type, company, page, limit, all}
  * @returns {Promise<Object>} {students, total, page, per_page, pages}
  */
 async function getStudents(params = {}) {
   const {
     page = 1,
     limit = 20,
+    all = false,
     include_total = false,
     with_total = false,
     ...rest
@@ -577,12 +578,13 @@ async function getStudents(params = {}) {
     list = list.filter(item => item.exam_project === rest.project)
   }
 
-  const pageNo = parsePositiveInt(page, 1)
-  const pageSize = Math.min(parsePositiveInt(limit, 20), 100)
-  const start = (pageNo - 1) * pageSize
-  const end = start + pageSize
-  const sliced = list.slice(start, end)
-  const hasMore = end < list.length
+  const returnAll = parseBoolean(all)
+  const pageNo = returnAll ? 1 : parsePositiveInt(page, 1)
+  const pageSize = returnAll ? list.length : Math.min(parsePositiveInt(limit, 20), 100)
+  const start = returnAll ? 0 : (pageNo - 1) * pageSize
+  const end = returnAll ? list.length : start + pageSize
+  const sliced = returnAll ? list : list.slice(start, end)
+  const hasMore = !returnAll && end < list.length
 
   const response = {
     list: sliced,
