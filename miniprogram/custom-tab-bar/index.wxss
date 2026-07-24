@@ -9,8 +9,8 @@
 
 .tab-bar {
   pointer-events: auto;
-  margin: 0 18rpx calc(8rpx + env(safe-area-inset-bottom));
-  margin-bottom: calc(8rpx + constant(safe-area-inset-bottom));
+  margin: 0 18rpx calc(8rpx + constant(safe-area-inset-bottom));
+  margin-bottom: calc(8rpx + env(safe-area-inset-bottom));
   height: 104rpx;
   border-radius: 30rpx;
   background: rgba(255, 255, 255, 0.96);

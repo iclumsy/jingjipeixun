@@ -304,8 +304,8 @@
   position: fixed;
   left: 24rpx;
   right: 24rpx;
-  bottom: calc(124rpx + env(safe-area-inset-bottom));
   bottom: calc(124rpx + constant(safe-area-inset-bottom));
+  bottom: calc(124rpx + env(safe-area-inset-bottom));
   z-index: 55;
   padding: 0;
 }
