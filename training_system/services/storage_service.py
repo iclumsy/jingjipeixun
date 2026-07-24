@@ -25,6 +25,7 @@ COS 后端直接作为 object key 使用。
 """
 import os
 import io
+import shutil
 
 
 # ======================== 后端选择 ========================
@@ -356,6 +357,77 @@ def delete_file(key):
             # COS 删除失败不中断，返回本地删除结果
 
     return local_ok
+
+
+def delete_prefix(prefix):
+    """
+    按目录前缀批量删除存储后端中的所有文件与目录。
+
+    参数:
+        prefix: 存储 key 前缀，如 'students/特种作业-张三公司-张三/'
+
+    返回:
+        dict: {'success': bool, 'deleted_count': int, 'failed_keys': list}
+    """
+    if not prefix or not str(prefix).strip():
+        return {'success': True, 'deleted_count': 0, 'failed_keys': []}
+
+    clean_prefix = str(prefix).strip().rstrip('/') + '/'
+    backend = _get_backend()
+    failed_keys = []
+    deleted_count = 0
+
+    # 1. 本地目录清理
+    if backend in ('local', 'dual'):
+        abs_path = os.path.join(get_base_dir(), clean_prefix)
+        if os.path.exists(abs_path):
+            try:
+                if os.path.isdir(abs_path):
+                    for root, dirs, files in os.walk(abs_path):
+                        deleted_count += len(files)
+                    shutil.rmtree(abs_path)
+                    _log_info(f'本地目录彻底删除: {abs_path}')
+                else:
+                    os.remove(abs_path)
+                    deleted_count += 1
+            except Exception as e:
+                _log_warning(f'本地目录删除失败 {abs_path}: {e}')
+                failed_keys.append(f'local:{abs_path}')
+
+    # 2. COS 目录/前缀清理
+    if backend in ('cos', 'dual'):
+        try:
+            client, config = _get_cos_client()
+            bucket = config['bucket']
+            cos_prefix = _full_cos_key(clean_prefix, config)
+            marker = ''
+            while True:
+                resp = client.list_objects(Bucket=bucket, Prefix=cos_prefix, Marker=marker, MaxKeys=1000)
+                contents = resp.get('Contents', []) or []
+                if not contents:
+                    break
+                objects = [{'Key': obj['Key']} for obj in contents]
+                del_resp = client.delete_objects(Bucket=bucket, Delete={'Object': objects, 'Quiet': True})
+                errors = del_resp.get('Error', []) or []
+                if errors:
+                    for err in errors:
+                        failed_keys.append(f"cos:{err.get('Key')}")
+                        _log_warning(f"COS 批量删除异常 Key={err.get('Key')}: {err.get('Message')}")
+                deleted_count += len(objects) - len(errors)
+                if resp.get('IsTruncated') == 'true' and resp.get('NextMarker'):
+                    marker = resp.get('NextMarker')
+                else:
+                    break
+            _log_info(f'COS 前缀清理完成: {clean_prefix}')
+        except Exception as e:
+            _log_warning(f'COS 前缀清理异常 prefix={clean_prefix}: {e}')
+            failed_keys.append(f'cos_prefix:{clean_prefix}')
+
+    return {
+        'success': len(failed_keys) == 0,
+        'deleted_count': deleted_count,
+        'failed_keys': failed_keys
+    }
 
 
 # ======================== 读取接口 ========================

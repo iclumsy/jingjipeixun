@@ -1098,6 +1098,60 @@ def _format_exam_record(row):
     }
 
 
+def format_study_duration(total_seconds):
+    """
+    将秒数格式化为合规可读的学时文本。
+    """
+    total_seconds = int(total_seconds or 0)
+    if total_seconds <= 0:
+        return total_seconds, "-"
+    elif total_seconds < 60:
+        return total_seconds, f"{total_seconds}秒"
+    elif total_seconds < 3600:
+        minutes = total_seconds // 60
+        return total_seconds, f"{minutes}分钟"
+    else:
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        if minutes > 0:
+            return total_seconds, f"{hours}小时{minutes}分"
+        return total_seconds, f"{hours}小时"
+
+
+def calculate_practice_seconds_from_timestamps(timestamps):
+    """
+    根据答题打卡时间戳列表估算练习总秒数。
+    """
+    if not timestamps:
+        return 0
+    from datetime import datetime
+    parsed_times = []
+    for ts in timestamps:
+        if not ts:
+            continue
+        try:
+            ts_clean = str(ts).split(".")[0]
+            parsed_times.append(datetime.strptime(ts_clean, "%Y-%m-%d %H:%M:%S"))
+        except Exception:
+            continue
+
+    if not parsed_times:
+        return 0
+
+    parsed_times.sort()
+    practice_seconds = 15  # 第一题计 15 秒
+    for i in range(1, len(parsed_times)):
+        diff = (parsed_times[i] - parsed_times[i - 1]).total_seconds()
+        if 0 < diff <= 300:
+            practice_seconds += diff
+        elif diff == 0:
+            pass
+        else:
+            practice_seconds += 15
+
+    return practice_seconds
+
+
 def estimate_subject_study_time(conn, openid, bank_id):
     """
     估算某位学员在某个题库下的累计学习时长。
@@ -1124,46 +1178,12 @@ def estimate_subject_study_time(conn, openid, bank_id):
         """,
         (openid, bank_id)
     ).fetchall()
-    
-    practice_seconds = 0
-    from datetime import datetime
-    if states:
-        parsed_times = []
-        for s in states:
-            ts = s[0]
-            try:
-                ts_clean = ts.split(".")[0]
-                parsed_times.append(datetime.strptime(ts_clean, "%Y-%m-%d %H:%M:%S"))
-            except Exception:
-                continue
-        
-        if parsed_times:
-            parsed_times.sort()
-            practice_seconds += 15  # 第一题计 15 秒
-            for i in range(1, len(parsed_times)):
-                diff = (parsed_times[i] - parsed_times[i - 1]).total_seconds()
-                if 0 < diff <= 300:
-                    practice_seconds += diff
-                elif diff == 0:
-                    # 相同时间戳（例如某些批量写入的非exam记录），不增加任何时长
-                    pass
-                else:
-                    practice_seconds += 15
+
+    timestamps = [s[0] for s in states if s and s[0]]
+    practice_seconds = calculate_practice_seconds_from_timestamps(timestamps)
 
     total_seconds = int(exam_seconds + practice_seconds)
-    if total_seconds <= 0:
-        return total_seconds, "-"
-    elif total_seconds < 60:
-        return total_seconds, f"{total_seconds}秒"
-    elif total_seconds < 3600:
-        minutes = total_seconds // 60
-        return total_seconds, f"{minutes}分钟"
-    else:
-        hours = total_seconds // 3600
-        minutes = (total_seconds % 3600) // 60
-        if minutes > 0:
-            return total_seconds, f"{hours}小时{minutes}分"
-        return total_seconds, f"{hours}小时"
+    return format_study_duration(total_seconds)
 
 
 def get_student_learning_status(student):

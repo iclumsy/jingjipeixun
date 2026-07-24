@@ -73,6 +73,36 @@ class MaterialAdjustmentModelTests(unittest.TestCase):
         self.assertEqual(adjustments["photo"]["operator_name"], "单利亚")
         self.assertEqual(adjustments["photo"]["operator_source"], "网页端")
 
+    def test_delete_student_removes_material_adjustments(self):
+        with self.app.app_context():
+            student = student_model.create_student({
+                "name": "测试删调整",
+                "gender": "男",
+                "education": "大专",
+                "id_card": "110101199001019999",
+                "phone": "13800138999",
+                "job_category": "场(厂)内专用机动车辆作业",
+                "exam_project": "叉车司机",
+                "project_code": "N1",
+                "training_type": "special_equipment",
+            }, {})
+            sid = student
+            student_model.save_material_adjustment(
+                sid,
+                "photo",
+                {"rotate": 90},
+                {"points": [{"x": 1, "y": 2}]},
+                operator_name="测试员",
+                operator_source="单元测试",
+            )
+            self.assertEqual(len(student_model.get_material_adjustments(sid)), 1)
+
+            # 执行删除学员
+            student_model.delete_student(sid)
+
+            # 验证 material_adjustments 表中的记录已被同步删除
+            self.assertEqual(len(student_model.get_material_adjustments(sid)), 0)
+
 
 class MaterialTypeNormalizationTests(unittest.TestCase):
     def test_material_type_aliases_normalize_to_canonical_values(self):

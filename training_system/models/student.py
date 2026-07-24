@@ -889,6 +889,7 @@ def delete_student(student_id):
         if not student:
             raise NotFoundError('学员不存在')
 
+        conn.execute('DELETE FROM material_adjustments WHERE student_id = ?', (student_id,))
         conn.execute('DELETE FROM students WHERE id = ?', (student_id,))
         return dict(student)
 

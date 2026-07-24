@@ -99,6 +99,22 @@ def _compute_file_prefix(id_card: str, name: str) -> str:
     return f"{id_card}-{name}"
 
 
+def get_student_folder_prefix(student_record: dict) -> str:
+    """计算学员在 students/ 目录下的主文件夹相对 key 前缀。
+
+    示例: 'students/特种作业-阳泉市公司-张三/'
+    """
+    if not isinstance(student_record, dict):
+        return None
+    training_type = student_record.get('training_type') or 'special_operation'
+    company = (student_record.get('company') or '').strip()
+    name = (student_record.get('name') or '').strip()
+    if company and name:
+        dir_name = _compute_dir_name(training_type, company, name)
+        return f"students/{dir_name}/"
+    return None
+
+
 # ======================== 路径映射计算 ========================
 
 # 学员 DB 记录中所有路径字段

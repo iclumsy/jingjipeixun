@@ -1315,7 +1315,11 @@ def reject_student_route(id):
         if should_delete:
             # 彻底删除：先删除数据库记录，再清理附件文件
             student = delete_student(id)
-            delete_student_files(student, current_app.config['BASE_DIR'])
+            cleanup_res = delete_student_files(student, current_app.config['BASE_DIR'])
+            if cleanup_res and not cleanup_res.get('success'):
+                current_app.logger.warning(
+                    f'[驱回并删除] 学员文件/目录清理存在失败项: 学员ID={id} 失败清单={cleanup_res.get("failed_files")}'
+                )
             operator = log_operator_name()
             client_ip = get_client_ip(request)
             submitter = resolve_openid_name(student.get('submitter_openid', ''))
@@ -2794,6 +2798,7 @@ def get_miniprogram_admin_learning_stats_route():
 
             qs_rows = []
             exam_rows = []
+            practice_ts_map = {}  # (openid, bank_id) -> [last_answered_at, ...]
             if valid_openids:
                 # 分批查询，每批最多 500 个，防止 SQLite 占位符超标
                 BATCH_SIZE = 500
@@ -2818,7 +2823,7 @@ def get_miniprogram_admin_learning_stats_route():
                     """
                     qs_rows.extend([dict(r) for r in conn.execute(q_sql, batch).fetchall()])
 
-                    # 批量查出这批用户在各题库的模拟考试历史统计
+                    # 批量查出这批用户在各题库的模拟考试历史统计（含模拟考试总时长）
                     e_sql = f"""
                         SELECT 
                             openid,
@@ -2826,12 +2831,29 @@ def get_miniprogram_admin_learning_stats_route():
                             COUNT(*) AS exam_count,
                             SUM(CASE WHEN COALESCE(passed, 0) = 1 THEN 1 ELSE 0 END) AS pass_count,
                             MAX(score) AS best_score,
-                            MAX(created_at) AS latest_exam_created_at
+                            MAX(created_at) AS latest_exam_created_at,
+                            SUM(COALESCE(duration_seconds, 0)) AS total_exam_seconds
                         FROM mini_exam_records
                         WHERE openid IN ({placeholders})
                         GROUP BY openid, bank_id
                     """
                     exam_rows.extend([dict(r) for r in conn.execute(e_sql, batch).fetchall()])
+
+                    # 批量查出这批用户在各题库的练习打卡时间戳列表（用于估计练习时长）
+                    p_sql = f"""
+                        SELECT openid, bank_id, last_answered_at
+                        FROM mini_question_states
+                        WHERE openid IN ({placeholders})
+                          AND last_answered_at IS NOT NULL
+                          AND last_answered_at != ''
+                          AND COALESCE(last_mode, '') != 'exam'
+                        ORDER BY openid, bank_id, last_answered_at ASC
+                    """
+                    for pr in conn.execute(p_sql, batch).fetchall():
+                        pk = (pr['openid'], pr['bank_id'])
+                        if pk not in practice_ts_map:
+                            practice_ts_map[pk] = []
+                        practice_ts_map[pk].append(pr['last_answered_at'])
 
             qs_map = {(r['openid'], r['bank_id']): r for r in qs_rows}
             exam_map = {(r['openid'], r['bank_id']): r for r in exam_rows}
@@ -2854,10 +2876,6 @@ def get_miniprogram_admin_learning_stats_route():
                     return b
             return None
 
-        # 用于精准估算单门科目学习时长的辅助函数
-        def estimate_subject_study_time(db_conn, student_openid, target_bank_id):
-            return exam_bank_service.estimate_subject_study_time(db_conn, student_openid, target_bank_id)
-
         # 平铺模式：每个学员报名的每一个科目都是一条独立的展示记录
         flat_list = []
         for s in students:
@@ -2877,6 +2895,8 @@ def get_miniprogram_admin_learning_stats_route():
             last_time = ''
             state = 'not_started'
             state_text = '未开始'
+            study_duration_text = '-'
+            study_duration_seconds = 0
 
             if openid and bank:
                 q_count = int(bank.get('question_count') or 0)
@@ -2921,6 +2941,14 @@ def get_miniprogram_admin_learning_stats_route():
                     last_time = raw_time.strip().replace('T', ' ')
                     if len(last_time) >= 16:
                         last_time = last_time[:16]
+
+                # 批量计算学时（无需单条循环再次查询 DB）
+                exam_secs = int(ex_info.get('total_exam_seconds') or 0)
+                practice_ts = practice_ts_map.get(map_key, [])
+                practice_secs = exam_bank_service.calculate_practice_seconds_from_timestamps(practice_ts)
+                study_duration_seconds, study_duration_text = exam_bank_service.format_study_duration(
+                    exam_secs + practice_secs
+                )
             elif not openid:
                 state_text = '未绑定'
 
@@ -2944,8 +2972,8 @@ def get_miniprogram_admin_learning_stats_route():
                 'examCount': exam_count,
                 'bestScore': best_score,
                 'lastStudyTimeText': last_time or '-',
-                'studyDurationText': '-',
-                'studyDurationSeconds': 0
+                'studyDurationText': study_duration_text,
+                'studyDurationSeconds': study_duration_seconds
             })
 
         # 计算当前状态和搜索条件过滤下各项目的学员人数
@@ -2988,16 +3016,6 @@ def get_miniprogram_admin_learning_stats_route():
             filtered_list.append(item)
 
         total_count = len(filtered_list)
-
-        # 精确估计所有返回记录的学时
-        with get_db_connection() as conn2:
-            for item in filtered_list:
-                op_id = item['openid']
-                b_id = item['bankId']
-                if op_id and b_id:
-                    secs, duration_lbl = estimate_subject_study_time(conn2, op_id, b_id)
-                    item['studyDurationText'] = duration_lbl
-                    item['studyDurationSeconds'] = secs
 
         return jsonify({
             'success': True,

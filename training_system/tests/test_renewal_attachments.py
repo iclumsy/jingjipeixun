@@ -227,6 +227,39 @@ class RenewalPersistenceTests(unittest.TestCase):
         self.assertIn("students/a/info.jpg", deleted)
         self.assertIn("students/a/records.jpg", deleted)
 
+    def test_delete_student_files_cleans_folder_prefix_and_generated_materials(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            orig_base = image_service.storage_service.get_base_dir
+            image_service.storage_service.get_base_dir = lambda: tmpdir
+
+            try:
+                # 创建模拟的学员目录及自动生成的报名材料子目录
+                student_folder = os.path.join(tmpdir, "students", "特种作业-测试单位-李四")
+                material_folder = os.path.join(student_folder, "110101199001018888-李四-报名材料")
+                os.makedirs(material_folder, exist_ok=True)
+
+                raw_photo = os.path.join(student_folder, "110101199001018888-李四-个人照片.jpg")
+                generated_pdf = os.path.join(material_folder, "110101199001018888-李四-身份证.pdf")
+                with open(raw_photo, "w") as f:
+                    f.write("photo")
+                with open(generated_pdf, "w") as f:
+                    f.write("pdf")
+
+                student_record = {
+                    "id": 88,
+                    "name": "李四",
+                    "company": "测试单位",
+                    "training_type": "special_operation",
+                    "id_card": "110101199001018888",
+                    "photo_path": "students/特种作业-测试单位-李四/110101199001018888-李四-个人照片.jpg"
+                }
+
+                res = image_service.delete_student_files(student_record)
+                self.assertTrue(res["success"])
+                self.assertFalse(os.path.exists(student_folder))
+            finally:
+                image_service.storage_service.get_base_dir = orig_base
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -23,10 +23,13 @@
 """
 import os
 import io
+import logging
 from PIL import Image, ImageOps
 import numpy as np
 from flask import current_app
 from services import storage_service
+
+logger = logging.getLogger(__name__)
 
 ATTACHMENT_LABELS = {
     'photo': '个人照片',
@@ -316,15 +319,20 @@ def delete_file_if_exists(file_path, base_dir):
     return storage_service.delete_file(file_path)
 
 
-def delete_student_files(student_record, base_dir):
+def delete_student_files(student_record, base_dir=None):
     """
-    删除学员关联的所有文件（本地 + COS）。
+    删除学员关联的所有文件（本地 + COS），包括原始单项附件和自动生成的报名材料全量目录。
 
     参数:
-        student_record: 学员记录字典（含各 *_path 字段）
-        base_dir: 基础目录（兼容旧接口，实际由 storage_service 内部获取）
+        student_record: 学员记录字典（含各 *_path 字段及 name, company, training_type 等）
+        base_dir: 基础目录（兼容旧接口）
+
+    返回:
+        dict: {'success': bool, 'failed_files': list}
     """
-    # 所有可能含有文件路径的数据库字段
+    if not isinstance(student_record, dict):
+        return {'success': True, 'failed_files': []}
+
     file_keys = [
         'photo_path', 'diploma_path',
         'id_card_front_path', 'id_card_back_path',
@@ -333,7 +341,31 @@ def delete_student_files(student_record, base_dir):
         'training_form_path'
     ]
 
-    # 逐个删除关联文件
+    failed_files = []
+    # 1. 逐个删除单项关联文件
     for key in file_keys:
-        if student_record.get(key):
-            storage_service.delete_file(student_record[key])
+        rel_path = student_record.get(key)
+        if rel_path:
+            ok = storage_service.delete_file(rel_path)
+            if not ok:
+                failed_files.append(rel_path)
+
+    # 2. 计算学员主目录前缀并彻底清理（包含生成的报名材料子目录）
+    try:
+        from services import student_folder_service
+        folder_prefix = student_folder_service.get_student_folder_prefix(student_record)
+        if folder_prefix:
+            prefix_res = storage_service.delete_prefix(folder_prefix)
+            if not prefix_res.get('success'):
+                failed_files.extend(prefix_res.get('failed_keys', []))
+    except Exception as e:
+        logger.error(f"清理学员前缀目录失败: {e}", exc_info=True)
+        failed_files.append(f"folder_prefix_error:{e}")
+
+    success = len(failed_files) == 0
+    if not success:
+        logger.warning(f"学员文件/目录清理存在未成功项 (ID={student_record.get('id')}): {failed_files}")
+    else:
+        logger.info(f"学员文件及生成材料目录清理成功 (ID={student_record.get('id')})")
+
+    return {'success': success, 'failed_files': failed_files}
