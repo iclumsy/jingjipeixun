@@ -161,6 +161,20 @@ class LearningStatsRouteTests(unittest.TestCase):
         self.assertNotIn("limit", data)
         self.assertNotIn("hasMore", data)
 
+    def test_dashboard_stats_monthly_trend_returns_unique_months(self):
+        headers = self.mini_headers(is_admin=True)
+        response = self.client.get("/api/stats/dashboard", headers=headers)
+        self.assertEqual(response.status_code, 200)
+
+        data = response.get_json()
+        self.assertTrue(data.get("success", True))
+        trend = data.get("monthly_trend", [])
+        self.assertEqual(len(trend), 6)
+
+        # 校验提取的月份前缀是否互不相同，确保无重复月份
+        months = [item["month"] for item in trend]
+        self.assertEqual(len(months), len(set(months)), f"月份列表中包含重复月份: {months}")
+
 
 if __name__ == "__main__":
     unittest.main()

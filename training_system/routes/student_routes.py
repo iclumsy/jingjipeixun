@@ -2677,22 +2677,25 @@ def dashboard_stats_route():
             type_map = {'special_operation': '特种作业', 'special_equipment': '特种设备'}
             by_training_type = {type_map.get(r['training_type'], r['training_type']): r['cnt'] for r in rows}
 
-            # 近 6 个月趋势
+            # 近 6 个月趋势（按自然年月倒推，避免 31 日大月按 30 天扣减导致月份重复）
             monthly_trend = []
             for i in range(5, -1, -1):
-                d = now - timedelta(days=i * 30)
-                m_start = d.strftime('%Y-%m-01')
-                # 计算下个月第一天
-                if d.month == 12:
-                    m_end = f'{d.year + 1}-01-01'
+                y = now.year
+                m = now.month - i
+                while m <= 0:
+                    m += 12
+                    y -= 1
+                m_start = f'{y:04d}-{m:02d}-01'
+                if m == 12:
+                    m_end = f'{y + 1:04d}-01-01'
                 else:
-                    m_end = f'{d.year}-{d.month + 1:02d}-01'
+                    m_end = f'{y:04d}-{m + 1:02d}-01'
                 cnt = conn.execute(
                     'SELECT COUNT(*) FROM students WHERE created_at >= ? AND created_at < ?',
                     (m_start, m_end)
                 ).fetchone()[0]
                 monthly_trend.append({
-                    'month': d.strftime('%Y-%m'),
+                    'month': f'{y:04d}-{m:02d}',
                     'count': cnt
                 })
 
