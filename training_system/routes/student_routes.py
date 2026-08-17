@@ -2665,9 +2665,13 @@ def dashboard_stats_route():
             # 本月新增
             now = datetime.now()
             month_start = now.strftime('%Y-%m-01')
+            if now.month == 12:
+                next_month_start = f'{now.year + 1:04d}-01-01'
+            else:
+                next_month_start = f'{now.year:04d}-{now.month + 1:02d}-01'
             this_month = conn.execute(
-                'SELECT COUNT(*) FROM students WHERE created_at >= ?',
-                (month_start,)
+                'SELECT COUNT(*) FROM students WHERE created_at >= ? AND created_at < ?',
+                (month_start, next_month_start)
             ).fetchone()[0]
 
             # 按培训类型分布
@@ -2706,21 +2710,15 @@ def dashboard_stats_route():
             ).fetchall()
             recent_students = [dict(r) for r in recent]
 
-            # 按报考项目分布 (取 TOP 6，其余归入"其他")
+            # 按当月报考项目分布 (统计当月报考，列出全部项目，不合并为"其他")
             proj_rows = conn.execute(
                 'SELECT exam_project, COUNT(*) as cnt FROM students '
-                'WHERE exam_project IS NOT NULL AND exam_project != \'\' '
-                'GROUP BY exam_project ORDER BY cnt DESC'
+                'WHERE created_at >= ? AND created_at < ? '
+                'AND exam_project IS NOT NULL AND TRIM(exam_project) != \'\' '
+                'GROUP BY exam_project ORDER BY cnt DESC, exam_project ASC',
+                (month_start, next_month_start)
             ).fetchall()
-            by_project = []
-            other_cnt = 0
-            for idx, r in enumerate(proj_rows):
-                if idx < 6:
-                    by_project.append({'name': r['exam_project'], 'count': r['cnt']})
-                else:
-                    other_cnt += r['cnt']
-            if other_cnt > 0:
-                by_project.append({'name': '其他', 'count': other_cnt})
+            by_project = [{'name': r['exam_project'], 'count': r['cnt']} for r in proj_rows]
 
             # 今日新增
             today_str = now.strftime('%Y-%m-%d')

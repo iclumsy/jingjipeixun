@@ -81,23 +81,39 @@ class LearningStatsRouteTests(unittest.TestCase):
         token = sign_mini_token(self.app.config["SECRET_KEY"], openid, is_admin=is_admin)
         return {"Authorization": f"Bearer {token}"}
 
-    def create_student(self, name, exam_project, project_code, openid="student-openid", status="reviewed"):
+    def create_student(self, name, exam_project, project_code, openid="student-openid", status="reviewed", created_at=None):
         with self.app.app_context():
             with get_db_connection() as conn:
-                conn.execute(
-                    """
-                    INSERT INTO students (
-                        name, gender, education, id_card, phone, job_category,
-                        exam_project, project_code, training_type, status,
-                        submitter_openid
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        name, "男", "高中或同等学历", "110101199001011234", "13800138000",
-                        "场(厂)内专用机动车辆作业", exam_project, project_code,
-                        "special_equipment", status, openid,
-                    ),
-                )
+                if created_at:
+                    conn.execute(
+                        """
+                        INSERT INTO students (
+                            name, gender, education, id_card, phone, job_category,
+                            exam_project, project_code, training_type, status,
+                            submitter_openid, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            name, "男", "高中或同等学历", "110101199001011234", "13800138000",
+                            "场(厂)内专用机动车辆作业", exam_project, project_code,
+                            "special_equipment", status, openid, created_at,
+                        ),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO students (
+                            name, gender, education, id_card, phone, job_category,
+                            exam_project, project_code, training_type, status,
+                            submitter_openid
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            name, "男", "高中或同等学历", "110101199001011234", "13800138000",
+                            "场(厂)内专用机动车辆作业", exam_project, project_code,
+                            "special_equipment", status, openid,
+                        ),
+                    )
                 conn.commit()
 
     def test_learning_stats_without_project_filter(self):
@@ -174,6 +190,39 @@ class LearningStatsRouteTests(unittest.TestCase):
         # 校验提取的月份前缀是否互不相同，确保无重复月份
         months = [item["month"] for item in trend]
         self.assertEqual(len(months), len(set(months)), f"月份列表中包含重复月份: {months}")
+
+    def test_dashboard_stats_by_project_current_month_all_projects(self):
+        # 创建 8 个不同项目的当月学员
+        projects = [f"项目{i}" for i in range(1, 9)]
+        for idx, proj in enumerate(projects):
+            # 每个项目创建 idx+1 名学员，测试倒序排列
+            for s_idx in range(idx + 1):
+                self.create_student(f"当月学员_{proj}_{s_idx}", proj, f"P{idx+1}")
+
+        # 创建上月学员（不应计入当月报考项目分布）
+        self.create_student("上月学员", "上月老项目", "P99", created_at="2020-01-01 10:00:00")
+
+        headers = self.mini_headers(is_admin=True)
+        response = self.client.get("/api/stats/dashboard", headers=headers)
+        self.assertEqual(response.status_code, 200)
+
+        data = response.get_json()
+        by_project = data.get("by_project", [])
+
+        # 1. 验证 8 个项目全部列出，没有被 TOP 6 截断
+        self.assertEqual(len(by_project), 8)
+
+        # 2. 验证没有任何项目被归入“其他”
+        self.assertFalse(any(p["name"] == "其他" for p in by_project))
+
+        # 3. 验证排序为人数倒序：项目8（8人）、项目7（7人）...
+        self.assertEqual(by_project[0]["name"], "项目8")
+        self.assertEqual(by_project[0]["count"], 8)
+        self.assertEqual(by_project[-1]["name"], "项目1")
+        self.assertEqual(by_project[-1]["count"], 1)
+
+        # 4. 验证上月老项目不包含在内
+        self.assertFalse(any(p["name"] == "上月老项目" for p in by_project))
 
 
 if __name__ == "__main__":
