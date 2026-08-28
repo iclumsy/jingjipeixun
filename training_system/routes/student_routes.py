@@ -834,7 +834,8 @@ def update_student_route(id):
         # 以确保体检表生成、通知推送、报名材料自动生成等审核附加流程不被绕过。
         allowed_text = [
             'name', 'gender', 'education', 'school', 'major', 'id_card', 'phone',
-            'company', 'company_address', 'training_project_id', 'application_type'
+            'company', 'company_address', 'training_project_id', 'application_type',
+            'submitter_openid'
         ]
 
         # 获取当前学员记录并检查权限
@@ -993,8 +994,11 @@ def update_student_route(id):
             # 1. 防止越权：无情剔除前端自己伪造的 status 字段，杜绝自己给自己“盖章通过审核”
             if 'status' in updates:
                 del updates['status']
+            # 2. 普通小程序用户禁止修改归属 openid
+            if 'submitter_openid' in updates:
+                del updates['submitter_openid']
                 
-            # 2. 防止 ABA 并发流转：如果此时数据库已经是通过/已报名状态（管理员已处理），报错拦截
+            # 3. 防止 ABA 并发流转：如果此时数据库已经是通过/已报名状态（管理员已处理），报错拦截
             if current_student.get('status') in PROCESSED_STUDENT_STATUSES:
                 raise AppError('管理员已审核通过或已完成报名，无法再提交修改', status_code=403)
                 
@@ -1070,6 +1074,93 @@ def update_student_route(id):
     except Exception as e:
         current_app.logger.exception('Error updating student %s', id)
         return build_internal_error_response('更新学员失败，请稍后重试')
+
+
+@student_bp.route('/api/students/<int:id>/update_openid', methods=['POST'])
+@mini_admin_required
+def update_student_openid_route(id):
+    """
+    修改学员关联的 submitter_openid。
+
+    请求体 (JSON):
+        openid (str): 新的小程序 openid（传空字符串表示解绑/清除）
+        sync_all (bool): 是否同步修改该学员名下的所有报名记录（默认 false）
+
+    返回:
+        200: {
+            "success": True,
+            "message": "...",
+            "student": {...},
+            "updated_count": int,
+            "openid": str
+        }
+    """
+    try:
+        current_student = get_student_by_id(id)
+        payload = request.get_json(silent=True) or {}
+        new_openid = str(payload.get('openid', '') or '').strip()
+        sync_all = bool(payload.get('sync_all', False))
+        old_openid = str(current_student.get('submitter_openid', '') or '').strip()
+
+        # 1. 更新当前学员
+        update_student(id, {'submitter_openid': new_openid})
+
+        updated_count = 1
+        # 2. 如果开启同步，同时更新同身份证号（优先）或同姓名的其他报名记录
+        if sync_all:
+            from models.student import get_db_connection
+            with get_db_connection() as conn:
+                id_card = str(current_student.get('id_card', '') or '').strip()
+                name = str(current_student.get('name', '') or '').strip()
+                if id_card:
+                    cur = conn.execute(
+                        "UPDATE students SET submitter_openid = ? WHERE id_card = ? AND id != ?",
+                        (new_openid, id_card, id)
+                    )
+                    updated_count += cur.rowcount
+                elif name:
+                    cur = conn.execute(
+                        "UPDATE students SET submitter_openid = ? WHERE name = ? AND id != ?",
+                        (new_openid, name, id)
+                    )
+                    updated_count += cur.rowcount
+
+        # 3. 记录操作日志
+        old_display = f"{resolve_openid_name(old_openid)} ({old_openid})" if old_openid else "未绑定"
+        new_display = f"{resolve_openid_name(new_openid)} ({new_openid})" if new_openid else "解绑/清空"
+        log_msg = f"修改学员「{current_student.get('name')}」的 OpenID: 从 {old_display} 改为 {new_display}"
+        if updated_count > 1:
+            log_msg += f"（已同步更新名下共 {updated_count} 条报名记录）"
+
+        log_student_operation(
+            id,
+            'update_openid',
+            '修改OpenID',
+            message=log_msg,
+            before={'submitter_openid': old_openid},
+            after={'submitter_openid': new_openid, 'updated_count': updated_count},
+            metadata={
+                'student_name': current_student.get('name', ''),
+                'old_openid': old_openid,
+                'new_openid': new_openid,
+                'sync_all': sync_all,
+                'updated_count': updated_count
+            }
+        )
+
+        updated_student = get_student_by_id(id)
+        return jsonify({
+            'success': True,
+            'message': f"OpenID 修改成功" + (f"（已同步更新 {updated_count} 条报名记录）" if updated_count > 1 else ""),
+            'student': enrich_student(updated_student),
+            'updated_count': updated_count,
+            'openid': new_openid
+        })
+    except NotFoundError as e:
+        return jsonify(e.to_dict()), 404
+    except Exception as e:
+        current_app.logger.exception('Error updating openid for student %s', id)
+        return build_internal_error_response('修改 OpenID 失败，请稍后重试')
 
 
 @student_bp.route('/api/students/<int:id>/upload', methods=['POST'])

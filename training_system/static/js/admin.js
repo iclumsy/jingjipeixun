@@ -1409,9 +1409,28 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
             const openid = student.submitter_openid || '';
             const knownName = openid && OPENID_NAME_MAP[openid];
-            submitterOpenidNode.textContent = knownName
-                ? `提交人：${knownName}（${openid}）`
-                : `提交人 OpenID：${openid || '-'}`;
+
+            submitterOpenidNode.style.display = 'flex';
+            submitterOpenidNode.style.alignItems = 'center';
+            submitterOpenidNode.style.flexWrap = 'wrap';
+            submitterOpenidNode.style.gap = '8px';
+
+            submitterOpenidNode.innerHTML = `
+                <span style="color:#64748b;font-size:0.85rem;">
+                    ${knownName ? `提交人：<strong style="color:#1e293b;">${escapeHtml(knownName)}</strong>（<span style="font-family:monospace;font-size:0.82rem;">${escapeHtml(openid)}</span>）` : `提交人 OpenID：<span style="font-family:monospace;font-size:0.82rem;color:#475569;">${escapeHtml(openid || '-')}</span>`}
+                </span>
+                <button type="button" class="btn-edit-openid" style="padding:2px 10px;font-size:0.75rem;background:#EEF2FF;color:#4F46E5;border:1px solid #C7D2FE;border-radius:6px;cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:4px;transition:all 0.2s;" onmouseover="this.style.background='#E0E7FF'" onmouseout="this.style.background='#EEF2FF'" title="快速修改或同步该学员绑定的 OpenID">
+                    ✏️ 修改 OpenID
+                </button>
+            `;
+
+            const editBtn = submitterOpenidNode.querySelector('.btn-edit-openid');
+            if (editBtn) {
+                editBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    showEditOpenidDialog(student);
+                };
+            }
         }
         const statusBadge = clone.querySelector('.status-badge');
         if (statusBadge) {
@@ -1546,7 +1565,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             { key: 'job_category', label: '作业类别', required: true, type: 'select', options: [] },
             { key: 'exam_project', label: '操作项目', required: true, type: 'select', options: [] },
             { key: 'project_code', label: '项目代号', readonly: true },
-            { key: 'application_type', label: '报名类型', readonly: true, format: v => v === 'renewal' ? '复审' : '新考证', showIf: s => s.training_type === 'special_equipment' }
+            { key: 'application_type', label: '报名类型', readonly: true, format: v => v === 'renewal' ? '复审' : '新考证', showIf: s => s.training_type === 'special_equipment' },
+            { key: 'submitter_openid', label: '提交人 OpenID', placeholder: '微信小程序 OpenID（选填，留空则解绑）' }
         ];
 
         const originalData = { ...student };
@@ -2710,6 +2730,178 @@ document.addEventListener('DOMContentLoaded', async () => {
             showMessage('操作失败: ' + e.message, 'error');
         }
     };
+
+    /**
+     * 弹出修改 OpenID 绑定对话框。
+     * @param {Object} student - 学员对象
+     */
+    function showEditOpenidDialog(student) {
+        const existing = document.getElementById('_edit_openid_overlay');
+        if (existing) existing.remove();
+
+        const OPENID_NAME_MAP = {
+            'oQRQz3VglMF63fWRtTCX8gbl21jo': '程超',
+            'oQRQz3amHUiSlU5RYNqu-r4GBJlk': '单利亚',
+            'oQRQz3SPn9tEiMy74NxfrzV1ZzJE': '霍玉萍',
+        };
+
+        const relatedStudents = students.filter(s =>
+            (student.id_card && s.id_card === student.id_card) ||
+            (!student.id_card && student.name && s.name === student.name)
+        );
+        const relatedCount = relatedStudents.length;
+
+        const currentOpenid = student.submitter_openid || '';
+        const currentName = currentOpenid ? (OPENID_NAME_MAP[currentOpenid] || '外部/未知用户') : '未绑定';
+
+        const overlay = document.createElement('div');
+        overlay.id = '_edit_openid_overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(15,23,42,0.5);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;animation:fadeIn .2s ease;';
+
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#fff;border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,0.25);padding:0;width:min(480px,94vw);box-sizing:border-box;overflow:hidden;animation:slideUp .25s ease;';
+
+        box.innerHTML = `
+            <div style="background:linear-gradient(135deg,#4F46E5,#7C3AED);padding:20px 24px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:3px;display:flex;align-items:center;gap:8px;">
+                        <span>🔑</span> 修改 OpenID 绑定
+                    </div>
+                    <div style="font-size:12px;color:rgba(255,255,255,0.85);">绑定微信小程序用户，用于小程序端“我的提交”及推送通知</div>
+                </div>
+                <button id="_eod_close" style="background:rgba(255,255,255,0.2);border:none;width:32px;height:32px;border-radius:50%;color:#fff;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;transition:background 0.2s;">×</button>
+            </div>
+            <div style="padding:22px 24px;">
+                <!-- 学员信息摘要卡片 -->
+                <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:13px;color:#334155;">
+                    <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 14px;align-items:center;">
+                        <span style="color:#64748B;">学员姓名：</span>
+                        <strong style="color:#0F172A;font-size:14px;">${escapeHtml(student.name || '-')}</strong>
+                        <span style="color:#64748B;">身份证号：</span>
+                        <span style="font-family:monospace;color:#0F172A;">${escapeHtml(student.id_card || '-')}</span>
+                        <span style="color:#64748B;">当前绑定：</span>
+                        <span style="word-break:break-all;">
+                            ${currentOpenid ? `<span style="background:#EEF2FF;color:#4338CA;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:600;margin-right:6px;">${escapeHtml(currentName)}</span><span style="font-family:monospace;font-size:12px;color:#64748B;">${escapeHtml(currentOpenid)}</span>` : '<span style="color:#94A3B8;">未绑定 (空)</span>'}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 快捷选择管理员/常用人员 -->
+                <div style="margin-bottom:14px;">
+                    <label style="display:block;font-size:12px;color:#64748B;font-weight:600;margin-bottom:6px;text-transform:uppercase;">快捷选择已知人员：</label>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                        <button type="button" class="_quick_openid_btn" data-openid="oQRQz3VglMF63fWRtTCX8gbl21jo" style="padding:4px 10px;border:1px solid #C7D2FE;background:#EEF2FF;color:#4338CA;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500;">程超</button>
+                        <button type="button" class="_quick_openid_btn" data-openid="oQRQz3amHUiSlU5RYNqu-r4GBJlk" style="padding:4px 10px;border:1px solid #C7D2FE;background:#EEF2FF;color:#4338CA;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500;">单利亚</button>
+                        <button type="button" class="_quick_openid_btn" data-openid="oQRQz3SPn9tEiMy74NxfrzV1ZzJE" style="padding:4px 10px;border:1px solid #C7D2FE;background:#EEF2FF;color:#4338CA;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500;">霍玉萍</button>
+                        <button type="button" class="_quick_openid_btn" data-openid="" style="padding:4px 10px;border:1px solid #FCA5A5;background:#FEF2F2;color:#DC2626;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500;">清空</button>
+                    </div>
+                </div>
+
+                <!-- 输入框 -->
+                <div style="margin-bottom:14px;">
+                    <label for="_eod_input" style="display:block;font-size:13px;color:#0F172A;font-weight:600;margin-bottom:6px;">
+                        新 OpenID
+                    </label>
+                    <input type="text" id="_eod_input" value="${escapeHtml(currentOpenid)}" placeholder="请输入或粘贴 28 位微信 OpenID" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #CBD5E1;border-radius:8px;font-family:monospace;font-size:13px;outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='#6366F1'" onblur="this.style.borderColor='#CBD5E1'" />
+                    <div id="_eod_preview" style="font-size:12px;color:#64748B;margin-top:5px;"></div>
+                </div>
+
+                <!-- 同步更新名下所有报名选项 -->
+                <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 14px;margin-bottom:20px;">
+                    <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:13px;color:#166534;user-select:none;">
+                        <input type="checkbox" id="_eod_sync_all" checked style="margin-top:2px;accent-color:#16A34A;width:15px;height:15px;cursor:pointer;" />
+                        <div>
+                            <strong>同步修改该学员名下的所有报名记录</strong>
+                            <div style="font-size:12px;color:#15803D;margin-top:2px;">
+                                ${relatedCount > 1 ? `检测到该学员共报了 <strong>${relatedCount}</strong> 个项目，勾选后将一并更新。` : '同一身份证/姓名下的其他历史报名也会一并更新。'}
+                            </div>
+                        </div>
+                    </label>
+                </div>
+
+                <div style="display:flex;justify-content:flex-end;gap:10px;">
+                    <button id="_eod_cancel" style="padding:9px 20px;border:1px solid #D1D5DB;border-radius:8px;background:#fff;color:#374151;font-size:14px;cursor:pointer;font-weight:500;">取消</button>
+                    <button id="_eod_confirm" style="padding:9px 22px;border:none;border-radius:8px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 3px 8px rgba(79,70,229,0.3);">确认修改</button>
+                </div>
+            </div>
+        `;
+
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        const input = box.querySelector('#_eod_input');
+        const preview = box.querySelector('#_eod_preview');
+        const syncAllCheckbox = box.querySelector('#_eod_sync_all');
+
+        const updatePreview = () => {
+            const val = input.value.trim();
+            if (!val) {
+                preview.innerHTML = '<span style="color:#94A3B8;">将清除绑定（该学员将无提交人）</span>';
+            } else if (OPENID_NAME_MAP[val]) {
+                preview.innerHTML = `<span style="color:#16A34A;font-weight:600;">✓ 已识别为：${OPENID_NAME_MAP[val]}</span>`;
+            } else {
+                preview.innerHTML = '<span style="color:#6366F1;">ℹ 自定义 OpenID</span>';
+            }
+        };
+        input.addEventListener('input', updatePreview);
+        updatePreview();
+
+        box.querySelectorAll('._quick_openid_btn').forEach(btn => {
+            btn.onclick = () => {
+                input.value = btn.getAttribute('data-openid') || '';
+                updatePreview();
+                input.focus();
+            };
+        });
+
+        const close = () => overlay.remove();
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        box.querySelector('#_eod_close').onclick = close;
+        box.querySelector('#_eod_cancel').onclick = close;
+
+        box.querySelector('#_eod_confirm').onclick = async () => {
+            const newOpenid = input.value.trim();
+            const syncAll = syncAllCheckbox.checked;
+            const confirmBtn = box.querySelector('#_eod_confirm');
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = '保存中...';
+
+            try {
+                const res = await fetch(`/api/students/${student.id}/update_openid`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ openid: newOpenid, sync_all: syncAll })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || data.error || '修改失败');
+
+                close();
+                showMessage(data.message || 'OpenID 修改成功', 'success');
+
+                // 同步更新前端内存中的学员列表
+                students.forEach(s => {
+                    if (s.id === student.id || (syncAll && (
+                        (student.id_card && s.id_card === student.id_card) ||
+                        (!student.id_card && student.name && s.name === student.name)
+                    ))) {
+                        s.submitter_openid = newOpenid;
+                    }
+                });
+
+                if (data.student) {
+                    const idx = students.findIndex(s => s.id === student.id);
+                    if (idx >= 0) {
+                        students[idx] = data.student;
+                    }
+                    showDetail(data.student);
+                }
+            } catch (e) {
+                showMessage('修改失败: ' + e.message, 'error');
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = '确认修改';
+            }
+        };
+    }
 
     /**
      * 弹出开卡确认对话框，展示学员信息供管理员核对后提交。
