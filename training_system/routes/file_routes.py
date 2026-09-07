@@ -55,7 +55,8 @@ def serve_students(filename):
     try:
         backend = storage_service._get_backend()
 
-        if backend in ('cos', 'dual'):
+        force_local = request.args.get('source') == 'local'
+        if backend in ('cos', 'dual') and not force_local:
             # COS/双写模式：重定向到 COS 公网 URL（COS 对象已设置 inline 元数据）
             url = storage_service.get_url(f'students/{filename}')
             if url.startswith('https://'):
@@ -63,6 +64,7 @@ def serve_students(filename):
                     separator = '&' if '?' in url else '?'
                     url = f"{url}{separator}{request.query_string.decode('utf-8', errors='ignore')}"
                 return redirect(url, code=302)
+
 
         # local 模式（或 COS 未配置降级）：本地服务 + 强制内联预览
         parts = filename.split('/', 1)

@@ -319,9 +319,92 @@ def delete_file_if_exists(file_path, base_dir):
     return storage_service.delete_file(file_path)
 
 
+def _is_file_in_use_by_other_students(rel_path, exclude_student_id=None):
+    """
+    检查指定相对路径的文件是否仍被其他学员记录引用（例如同人报考多工种共用证件照）。
+    返回: (in_use: bool, other_student_id: int|None)
+    """
+    if not rel_path:
+        return False, None
+    try:
+        from models.student import get_db_connection
+        file_cols = [
+            'photo_path', 'diploma_path',
+            'id_card_front_path', 'id_card_back_path',
+            'hukou_residence_path', 'hukou_personal_path',
+            'certificate_info_page_path', 'certificate_records_page_path',
+            'training_form_path'
+        ]
+        where_or = ' OR '.join([f"{col} = ?" for col in file_cols])
+        sql = f"SELECT id FROM students WHERE ({where_or})"
+        params = [rel_path] * len(file_cols)
+        if exclude_student_id is not None:
+            sql += " AND id != ?"
+            params.append(exclude_student_id)
+        sql += " LIMIT 1"
+        with get_db_connection() as conn:
+            row = conn.execute(sql, params).fetchone()
+            if row:
+                return True, row['id']
+    except Exception as e:
+        logger.debug(f"检查文件引用状态异常（容错跳过）: {e}")
+    return False, None
+
+
+def _is_folder_in_use_by_other_students(folder_prefix, student_record, exclude_student_id=None):
+    """
+    检查指定学员目录前缀是否仍被其他有效学员记录（同一人报考多个工种、或同一单位同名学员）使用。
+    返回: (in_use: bool, other_student_ids: list)
+    """
+    if not folder_prefix:
+        return False, []
+    try:
+        from models.student import get_db_connection
+        file_cols = [
+            'photo_path', 'diploma_path',
+            'id_card_front_path', 'id_card_back_path',
+            'hukou_residence_path', 'hukou_personal_path',
+            'certificate_info_page_path', 'certificate_records_page_path',
+            'training_form_path'
+        ]
+        # 条件 1：任意路径字段位于该 folder_prefix 目录下
+        prefix_pattern = folder_prefix.rstrip('/') + '/%'
+        prefix_exact = folder_prefix.rstrip('/')
+        path_clauses = [f"({col} LIKE ? OR {col} = ?)" for col in file_cols]
+        path_params = []
+        for _ in file_cols:
+            path_params.extend([prefix_pattern, prefix_exact])
+
+        # 条件 2：同姓名 + 同公司 + 同培训类别（即使尚未生成材料或路径为空，其归属目录也是此目录）
+        name = (student_record.get('name') or '').strip()
+        company = (student_record.get('company') or '').strip()
+        training_type = (student_record.get('training_type') or '').strip()
+
+        where_branches = [f"({' OR '.join(path_clauses)})"]
+        all_params = list(path_params)
+
+        if name and company and training_type:
+            where_branches.append("(name = ? AND company = ? AND training_type = ?)")
+            all_params.extend([name, company, training_type])
+
+        sql = f"SELECT id FROM students WHERE ({' OR '.join(where_branches)})"
+        if exclude_student_id is not None:
+            sql += " AND id != ?"
+            all_params.append(exclude_student_id)
+
+        with get_db_connection() as conn:
+            rows = conn.execute(sql, all_params).fetchall()
+            if rows:
+                return True, [r['id'] for r in rows]
+    except Exception as e:
+        logger.debug(f"检查目录前缀引用状态异常（容错跳过）: {e}")
+    return False, []
+
+
 def delete_student_files(student_record, base_dir=None):
     """
     删除学员关联的所有文件（本地 + COS），包括原始单项附件和自动生成的报名材料全量目录。
+    具备多引用安全保护：若其他学员记录（如同一学员报了其他工种）仍在使用该文件或目录，严禁物理删除。
 
     参数:
         student_record: 学员记录字典（含各 *_path 字段及 name, company, training_type 等）
@@ -333,6 +416,8 @@ def delete_student_files(student_record, base_dir=None):
     if not isinstance(student_record, dict):
         return {'success': True, 'failed_files': []}
 
+    student_id = student_record.get('id')
+
     file_keys = [
         'photo_path', 'diploma_path',
         'id_card_front_path', 'id_card_back_path',
@@ -342,22 +427,37 @@ def delete_student_files(student_record, base_dir=None):
     ]
 
     failed_files = []
-    # 1. 逐个删除单项关联文件
+    # 1. 逐个删除单项关联文件（受单文件引用保护）
     for key in file_keys:
         rel_path = student_record.get(key)
         if rel_path:
+            in_use, other_id = _is_file_in_use_by_other_students(rel_path, exclude_student_id=student_id)
+            if in_use:
+                logger.info(
+                    f"[删除保护] 文件 {rel_path} 仍被其他学员记录(ID={other_id})引用，跳过物理删除"
+                )
+                continue
             ok = storage_service.delete_file(rel_path)
             if not ok:
                 failed_files.append(rel_path)
 
-    # 2. 计算学员主目录前缀并彻底清理（包含生成的报名材料子目录）
+    # 2. 计算学员主目录前缀并彻底清理（受整目录引用保护）
     try:
         from services import student_folder_service
         folder_prefix = student_folder_service.get_student_folder_prefix(student_record)
         if folder_prefix:
-            prefix_res = storage_service.delete_prefix(folder_prefix)
-            if not prefix_res.get('success'):
-                failed_files.extend(prefix_res.get('failed_keys', []))
+            folder_in_use, other_ids = _is_folder_in_use_by_other_students(
+                folder_prefix, student_record, exclude_student_id=student_id
+            )
+            if folder_in_use:
+                logger.warning(
+                    f"[删除保护] 目录 {folder_prefix} 仍有其他有效学员记录在用 (共用学员ID: {other_ids})，"
+                    f"跳过整目录清空，保护多项目学员附件！"
+                )
+            else:
+                prefix_res = storage_service.delete_prefix(folder_prefix)
+                if not prefix_res.get('success'):
+                    failed_files.extend(prefix_res.get('failed_keys', []))
     except Exception as e:
         logger.error(f"清理学员前缀目录失败: {e}", exc_info=True)
         failed_files.append(f"folder_prefix_error:{e}")
@@ -366,6 +466,7 @@ def delete_student_files(student_record, base_dir=None):
     if not success:
         logger.warning(f"学员文件/目录清理存在未成功项 (ID={student_record.get('id')}): {failed_files}")
     else:
-        logger.info(f"学员文件及生成材料目录清理成功 (ID={student_record.get('id')})")
+        logger.info(f"学员文件及生成材料目录清理处理完毕 (ID={student_record.get('id')})")
 
     return {'success': success, 'failed_files': failed_files}
+
