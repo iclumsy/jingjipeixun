@@ -13,3 +13,4 @@ tencentcloud-sdk-python-sts
 ddddocr
 pycryptodome
 weasyprint
+gunicorn
